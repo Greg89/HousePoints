@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const adjustPointsSchema = z.object({
-  actorUserId: z.string().min(1),
+  actorAuth0Sub: z.string().min(1),
   targetHouseId: z.string().min(1),
   delta: z.number().int().min(-100).max(100),
   reason: z.string().min(3).max(240),

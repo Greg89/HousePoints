@@ -101,13 +101,43 @@ app.post("/points/adjust", async (request, reply) => {
     return reply.status(400).send({ errors: parsed.error.flatten() });
   }
 
+  const actor = await prisma.user.findUnique({
+    where: {
+      auth0Sub: parsed.data.actorAuth0Sub,
+    },
+    select: {
+      id: true,
+      auth0Sub: true,
+      role: true,
+    },
+  });
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", {
+      actorAuth0Sub: parsed.data.actorAuth0Sub,
+      targetHouseId: parsed.data.targetHouseId,
+      delta: parsed.data.delta,
+    });
+
+    return reply.status(403).send({
+      message: "Signed-in user is not mapped to an internal account",
+      code: "ACTOR_NOT_MAPPED",
+    });
+  }
+
   const transaction = await prisma.pointTransaction.create({
-    data: parsed.data,
+    data: {
+      actorUserId: actor.id,
+      targetHouseId: parsed.data.targetHouseId,
+      delta: parsed.data.delta,
+      reason: parsed.data.reason,
+    },
   });
 
   info(request.log, "points.adjusted", {
     transactionId: transaction.id,
     actorUserId: transaction.actorUserId,
+    actorAuth0Sub: actor.auth0Sub,
     targetHouseId: transaction.targetHouseId,
     delta: transaction.delta,
   });

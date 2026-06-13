@@ -40,15 +40,9 @@ export default async function Home() {
       <section className="rounded-xl border border-zinc-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-zinc-900">Adjust Points (Server Action)</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          This action logs `web.action.*` and `points.adjust.*` events with a request correlation id.
+          This action derives the actor from the signed-in Auth0 session and logs `web.action.*` and `points.adjust.*` events with a request correlation id.
         </p>
         <form action={submitPointAdjustment} className="mt-4 grid gap-3">
-          <input
-            name="actorUserId"
-            className="rounded-md border border-zinc-300 px-3 py-2"
-            placeholder="Actor user id (temporary until user mapping is in place)"
-            required
-          />
           <input
             name="targetHouseId"
             className="rounded-md border border-zinc-300 px-3 py-2"

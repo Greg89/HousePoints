@@ -9,6 +9,7 @@ export type ApiLogEvent =
   | "request.unhandled_error"
   | "health.checked"
   | "leaderboard.fetched"
+  | "points.actor_not_found"
   | "points.adjusted";
 
 type LogContext = Record<string, unknown>;

@@ -41,14 +41,14 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
     throw new Error("You must be logged in to adjust points");
   }
 
-  const actorUserId = String(formData.get("actorUserId") ?? "").trim();
   const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   const delta = Number(formData.get("delta") ?? 0);
+  const actorAuth0Sub = session.user.sub;
 
   logInfo("points.adjust.requested", {
     requestId,
-    actorUserId,
+    actorAuth0Sub,
     targetHouseId,
     delta,
     userSub: session.user.sub,
@@ -62,7 +62,7 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
         "x-request-id": requestId,
       },
       body: JSON.stringify({
-        actorUserId,
+        actorAuth0Sub,
         targetHouseId,
         delta,
         reason,
@@ -86,7 +86,7 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
     logInfo("points.adjust.completed", {
       requestId,
       transactionId: transaction.id,
-      actorUserId,
+      actorAuth0Sub,
       targetHouseId,
       delta,
     });
@@ -99,7 +99,7 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
     logError("web.action.failed", {
       action: "submitPointAdjustment",
       requestId,
-      actorUserId,
+      actorAuth0Sub,
       targetHouseId,
       delta,
       reason,

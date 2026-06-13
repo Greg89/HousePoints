@@ -92,6 +92,7 @@ The API emits structured JSON logs with stable event names and contextual proper
 	- `request.unhandled_error`
 - Business events:
 	- `leaderboard.fetched`
+	- `points.actor_not_found`
 	- `points.adjusted`
 
 The web app also emits structured JSON logs from server actions and auth/session boundaries.
@@ -106,6 +107,8 @@ The web app also emits structured JSON logs from server actions and auth/session
 	- `points.adjust.completed`
 
 When you add new endpoints or server actions, log with an explicit `event` and attach domain fields (for example `actorUserId`, `targetHouseId`, `delta`, `transactionId`) as top-level properties.
+
+Point adjustments now resolve the actor server-side using Auth0 subject (`actorAuth0Sub`) and never accept `actorUserId` directly from the client.
 
 ## Next Steps
 
