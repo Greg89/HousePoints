@@ -16,6 +16,7 @@ const serviceName = process.env.SERVICE_NAME ?? "housepoints-api";
 const logLevel = process.env.LOG_LEVEL ?? "info";
 const defaultOrganizationSlug = process.env.DEFAULT_ORGANIZATION_SLUG ?? "default";
 const defaultOrganizationName = process.env.DEFAULT_ORGANIZATION_NAME ?? "Default Org";
+const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
 
 type ActorRecord = {
   id: string;
@@ -112,7 +113,7 @@ const app = Fastify({
   disableRequestLogging: true,
 });
 
-info(app.log, "api.starting", { port: Number(process.env.API_PORT ?? 4000) });
+info(app.log, "api.starting", { port });
 
 await app.register(cors, {
   origin: true,
@@ -542,6 +543,5 @@ app.post("/points/adjust", async (request, reply) => {
   return reply.status(201).send(transaction);
 });
 
-const port = Number(process.env.API_PORT ?? 4000);
 await app.listen({ port, host: "0.0.0.0" });
 info(app.log, "api.listening", { port });
