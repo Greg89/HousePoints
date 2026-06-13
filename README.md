@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HousePoints
 
-## Getting Started
+Monorepo scaffold for a house-based team points app, designed so web and a future mobile app can share the same backend API and contracts.
 
-First, run the development server:
+## Workspace Layout
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+apps/
+	web/        Next.js frontend (Auth0 UI integration point)
+	api/        Fastify API service (shared for web + future mobile)
+packages/
+	db/         Prisma schema, migrations, and Prisma client wrapper
+	contracts/  Shared Zod schemas and TypeScript API contracts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Why This Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- One API service supports multiple clients (web now, mobile later).
+- Shared contracts reduce drift between frontend and backend.
+- Shared DB package keeps data access and schema ownership in one place.
+- Railway deployment can run `apps/api` and `apps/web` as separate services against one Postgres database.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Prerequisites
 
-## Learn More
+- Node.js 20+
+- npm 10+
+- PostgreSQL (local or Railway)
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Copy environment templates:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```powershell
+Copy-Item apps/web/.env.example apps/web/.env
+Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item packages/db/.env.example packages/db/.env
+```
 
-## Deploy on Vercel
+Set at minimum:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `DATABASE_URL` in `apps/api/.env` and `packages/db/.env`
+- Auth0 variables in `apps/web/.env`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Install
+
+```bash
+npm install
+```
+
+## Development Commands
+
+- Web app: `npm run dev:web`
+- API app: `npm run dev:api`
+- Default dev (web): `npm run dev`
+
+## Database Commands
+
+- Generate Prisma client: `npm run db:generate`
+- Run migration (dev): `npm run db:migrate`
+- Deploy migrations (prod): `npm run db:deploy`
+- Seed houses: `npm run db:seed -w @housepoints/db`
+- Prisma Studio: `npm run db:studio`
+
+## Initial Domain Models
+
+- `House` with four enum values: `AURORA`, `EMBER`, `TIDE`, `GROVE`
+- `User` linked to house and Auth0 subject
+- `PointTransaction` as immutable score log (`delta`, `reason`, actor, target house)
+
+## Railway Deployment Notes
+
+- Create one Postgres service.
+- Deploy `apps/api` and `apps/web` as separate services from this repo.
+- Provide service-specific env vars:
+	- API: `DATABASE_URL`, `API_PORT`
+	- Web: Auth0 vars + `APP_API_BASE_URL`
+- Run `npm run db:deploy` during API release phase.
+
+## Structured Logging (SEQ-Ready)
+
+The API emits structured JSON logs with stable event names and contextual properties.
+
+- Core fields included on all logs:
+	- `service`
+	- `env`
+	- `event`
+	- `requestId` (from `x-request-id` or generated)
+- Request lifecycle events:
+	- `request.received`
+	- `request.completed`
+	- `request.validation_failed`
+	- `request.unhandled_error`
+- Business events:
+	- `leaderboard.fetched`
+	- `points.adjusted`
+
+When you add new endpoints or server actions, log with an explicit `event` and attach domain fields (for example `actorUserId`, `targetHouseId`, `delta`, `transactionId`) as top-level properties.
+
+## Next Steps
+
+- Add Auth0 route handlers and session integration in `apps/web`.
+- Add API authorization middleware to map Auth0 users to internal `User` records.
+- Add leaderboard and transaction feed UI in `apps/web` using `@housepoints/contracts` types.

@@ -1,0 +1,25 @@
+{
+  "name": "@housepoints/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "node -e \"console.log('No API lint rules configured yet')\""
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@housepoints/contracts": "*",
+    "@housepoints/db": "*",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.20.6",
+    "typescript": "^5"
+  }
+}

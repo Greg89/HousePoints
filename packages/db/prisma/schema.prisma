@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+enum HouseName {
+  AURORA
+  EMBER
+  TIDE
+  GROVE
+}
+
+model House {
+  id           String             @id @default(cuid())
+  name         HouseName          @unique
+  users        User[]
+  transactions PointTransaction[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model User {
+  id                String             @id @default(cuid())
+  auth0Sub          String             @unique
+  email             String?            @unique
+  displayName       String
+  role              Role               @default(MEMBER)
+  houseId           String
+  house             House              @relation(fields: [houseId], references: [id], onDelete: Restrict)
+  pointTransactions PointTransaction[] @relation("ActorTransactions")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([houseId])
+}
+
+model PointTransaction {
+  id            String   @id @default(cuid())
+  actorUserId   String
+  targetHouseId String
+  delta         Int
+  reason        String
+  createdAt     DateTime @default(now())
+
+  actor      User  @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
+  targetHouse House @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
+
+  @@index([targetHouseId, createdAt])
+  @@index([actorUserId, createdAt])
+}
