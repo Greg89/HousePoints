@@ -39,7 +39,7 @@ Copy-Item packages/db/.env.example packages/db/.env
 Set at minimum:
 
 - `DATABASE_URL` in `apps/api/.env` and `packages/db/.env`
-- Auth0 variables in `apps/web/.env`
+- Auth0 variables in `apps/web/.env` (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL`)
 
 ## Install
 
@@ -93,6 +93,17 @@ The API emits structured JSON logs with stable event names and contextual proper
 - Business events:
 	- `leaderboard.fetched`
 	- `points.adjusted`
+
+The web app also emits structured JSON logs from server actions and auth/session boundaries.
+
+- Web action events:
+	- `web.action.invoked`
+	- `web.action.completed`
+	- `web.action.failed`
+	- `web.auth.session_missing`
+	- `web.session.read`
+	- `points.adjust.requested`
+	- `points.adjust.completed`
 
 When you add new endpoints or server actions, log with an explicit `event` and attach domain fields (for example `actorUserId`, `targetHouseId`, `delta`, `transactionId`) as top-level properties.
 
