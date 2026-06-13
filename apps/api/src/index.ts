@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { adjustPointsSchema } from "@housepoints/contracts";
+import { adjustPointsSchema, bootstrapUserSchema } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { error, info, warn } from "./logging.js";
 
@@ -91,6 +91,71 @@ app.get("/houses/leaderboard", async (request) => {
   return leaderboard;
 });
 
+app.post("/users/bootstrap", async (request, reply) => {
+  const parsed = bootstrapUserSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "users.bootstrap.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: {
+      auth0Sub: parsed.data.auth0Sub,
+    },
+    select: {
+      id: true,
+      auth0Sub: true,
+      email: true,
+      displayName: true,
+      role: true,
+      houseId: true,
+    },
+  });
+
+  if (existing) {
+    info(request.log, "users.bootstrap.loaded", {
+      userId: existing.id,
+      auth0Sub: existing.auth0Sub,
+      hasHouse: Boolean(existing.houseId),
+    });
+
+    return {
+      ...existing,
+      created: false,
+    };
+  }
+
+  const createdUser = await prisma.user.create({
+    data: {
+      auth0Sub: parsed.data.auth0Sub,
+      email: parsed.data.email ?? null,
+      displayName: parsed.data.displayName,
+    },
+    select: {
+      id: true,
+      auth0Sub: true,
+      email: true,
+      displayName: true,
+      role: true,
+      houseId: true,
+    },
+  });
+
+  info(request.log, "users.bootstrap.created", {
+    userId: createdUser.id,
+    auth0Sub: createdUser.auth0Sub,
+    hasHouse: Boolean(createdUser.houseId),
+  });
+
+  return reply.status(201).send({
+    ...createdUser,
+    created: true,
+  });
+});
+
 app.post("/points/adjust", async (request, reply) => {
   const parsed = adjustPointsSchema.safeParse(request.body);
 
@@ -109,6 +174,7 @@ app.post("/points/adjust", async (request, reply) => {
       id: true,
       auth0Sub: true,
       role: true,
+      houseId: true,
     },
   });
 
@@ -122,6 +188,20 @@ app.post("/points/adjust", async (request, reply) => {
     return reply.status(403).send({
       message: "Signed-in user is not mapped to an internal account",
       code: "ACTOR_NOT_MAPPED",
+    });
+  }
+
+  if (!actor.houseId) {
+    warn(request.log, "points.actor_house_unassigned", {
+      actorUserId: actor.id,
+      actorAuth0Sub: actor.auth0Sub,
+      targetHouseId: parsed.data.targetHouseId,
+      delta: parsed.data.delta,
+    });
+
+    return reply.status(403).send({
+      message: "Signed-in user must be assigned to a house before adjusting points",
+      code: "ACTOR_HOUSE_UNASSIGNED",
     });
   }
 

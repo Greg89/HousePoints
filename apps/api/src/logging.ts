@@ -8,8 +8,12 @@ export type ApiLogEvent =
   | "request.validation_failed"
   | "request.unhandled_error"
   | "health.checked"
+  | "users.bootstrap.validation_failed"
+  | "users.bootstrap.created"
+  | "users.bootstrap.loaded"
   | "leaderboard.fetched"
   | "points.actor_not_found"
+  | "points.actor_house_unassigned"
   | "points.adjusted";
 
 type LogContext = Record<string, unknown>;

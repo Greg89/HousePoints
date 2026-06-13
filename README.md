@@ -91,8 +91,11 @@ The API emits structured JSON logs with stable event names and contextual proper
 	- `request.validation_failed`
 	- `request.unhandled_error`
 - Business events:
+	- `users.bootstrap.created`
+	- `users.bootstrap.loaded`
 	- `leaderboard.fetched`
 	- `points.actor_not_found`
+	- `points.actor_house_unassigned`
 	- `points.adjusted`
 
 The web app also emits structured JSON logs from server actions and auth/session boundaries.
@@ -109,6 +112,12 @@ The web app also emits structured JSON logs from server actions and auth/session
 When you add new endpoints or server actions, log with an explicit `event` and attach domain fields (for example `actorUserId`, `targetHouseId`, `delta`, `transactionId`) as top-level properties.
 
 Point adjustments now resolve the actor server-side using Auth0 subject (`actorAuth0Sub`) and never accept `actorUserId` directly from the client.
+
+## User Bootstrap Flow
+
+- Web server actions call `POST /users/bootstrap` after login.
+- API creates a `User` row on first login (without house assignment) and returns the same record on subsequent calls.
+- Point adjustments are blocked until the mapped user has a `houseId`.
 
 ## Next Steps
 

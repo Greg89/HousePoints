@@ -7,6 +7,9 @@ export type WebLogEvent =
   | "web.auth.not_configured"
   | "web.auth.session_missing"
   | "web.session.read"
+  | "web.user.mapping_ensured"
+  | "web.user.mapping_failed"
+  | "web.user.house_unassigned"
   | "points.adjust.requested"
   | "points.adjust.completed";
 

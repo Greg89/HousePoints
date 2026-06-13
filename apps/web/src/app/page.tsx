@@ -23,6 +23,8 @@ export default async function Home() {
               Signed in as <strong>{session.userName ?? "Unknown"}</strong>
             </p>
             <p className="break-all">Auth0 Subject: {session.userSub}</p>
+            <p className="break-all">App User Id: {session.appUserId ?? "Not mapped"}</p>
+            <p>House Assignment: {session.houseId ?? "Pending assignment"}</p>
             <a className="inline-block rounded-md bg-zinc-900 px-3 py-2 text-white" href="/auth/logout">
               Log out
             </a>
@@ -42,6 +44,11 @@ export default async function Home() {
         <p className="mt-1 text-sm text-zinc-600">
           This action derives the actor from the signed-in Auth0 session and logs `web.action.*` and `points.adjust.*` events with a request correlation id.
         </p>
+        {session.isAuthenticated && session.needsHouseAssignment ? (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Your account is mapped but does not have a house assignment yet. Ask an admin to assign your house before submitting point adjustments.
+          </p>
+        ) : null}
         <form action={submitPointAdjustment} className="mt-4 grid gap-3">
           <input
             name="targetHouseId"
@@ -62,7 +69,11 @@ export default async function Home() {
             placeholder="Reason"
             required
           />
-          <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2 text-white">
+          <button
+            type="submit"
+            className="rounded-md bg-zinc-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-zinc-400"
+            disabled={!session.isAuthenticated || Boolean(session.needsHouseAssignment)}
+          >
             Submit Point Adjustment
           </button>
         </form>

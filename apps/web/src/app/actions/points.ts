@@ -4,6 +4,16 @@ import { randomUUID } from "node:crypto";
 import { getAuth0Client } from "@/lib/auth0";
 import { logError, logInfo, logWarn } from "@/lib/logging";
 
+type AppUserMapping = {
+  id: string;
+  auth0Sub: string;
+  email: string | null;
+  displayName: string;
+  role: "MEMBER" | "ADMIN";
+  houseId: string | null;
+  created: boolean;
+};
+
 function getApiBaseUrl(): string {
   const apiBaseUrl = process.env.APP_API_BASE_URL;
 
@@ -12,6 +22,50 @@ function getApiBaseUrl(): string {
   }
 
   return apiBaseUrl;
+}
+
+async function ensureAppUserMapping(input: {
+  requestId: string;
+  auth0Sub: string;
+  email?: string;
+  displayName?: string;
+}): Promise<AppUserMapping> {
+  const response = await fetch(`${getApiBaseUrl()}/users/bootstrap`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": input.requestId,
+    },
+    body: JSON.stringify({
+      auth0Sub: input.auth0Sub,
+      email: input.email,
+      displayName: input.displayName ?? "Unknown User",
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logWarn("web.user.mapping_failed", {
+      requestId: input.requestId,
+      auth0Sub: input.auth0Sub,
+      statusCode: response.status,
+      responseBody: body,
+    });
+    throw new Error(`User mapping bootstrap failed with status ${response.status}`);
+  }
+
+  const user = (await response.json()) as AppUserMapping;
+
+  logInfo("web.user.mapping_ensured", {
+    requestId: input.requestId,
+    userId: user.id,
+    auth0Sub: user.auth0Sub,
+    created: user.created,
+    hasHouse: Boolean(user.houseId),
+  });
+
+  return user;
 }
 
 export async function submitPointAdjustment(formData: FormData): Promise<void> {
@@ -45,6 +99,21 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
   const reason = String(formData.get("reason") ?? "").trim();
   const delta = Number(formData.get("delta") ?? 0);
   const actorAuth0Sub = session.user.sub;
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+
+  if (!mapping.houseId) {
+    logWarn("web.user.house_unassigned", {
+      requestId,
+      userId: mapping.id,
+      auth0Sub: mapping.auth0Sub,
+    });
+    throw new Error("You must be assigned to a house before adjusting points");
+  }
 
   logInfo("points.adjust.requested", {
     requestId,
@@ -113,6 +182,10 @@ export async function readSessionSummary(): Promise<{
   isAuthenticated: boolean;
   userName?: string;
   userSub?: string;
+  appUserId?: string;
+  houseId?: string | null;
+  role?: "MEMBER" | "ADMIN";
+  needsHouseAssignment?: boolean;
 }> {
   const requestId = randomUUID();
 
@@ -148,9 +221,18 @@ export async function readSessionSummary(): Promise<{
     userSub: session.user.sub,
   };
 
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+
   logInfo("web.session.read", {
     requestId,
     userSub: summary.userSub,
+    appUserId: mapping.id,
+    hasHouse: Boolean(mapping.houseId),
   });
 
   logInfo("web.action.completed", {
@@ -158,5 +240,11 @@ export async function readSessionSummary(): Promise<{
     requestId,
   });
 
-  return summary;
+  return {
+    ...summary,
+    appUserId: mapping.id,
+    houseId: mapping.houseId,
+    role: mapping.role,
+    needsHouseAssignment: !mapping.houseId,
+  };
 }
