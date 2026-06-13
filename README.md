@@ -63,9 +63,10 @@ npm install
 
 ## Initial Domain Models
 
-- `House` with four enum values: `AURORA`, `EMBER`, `TIDE`, `GROVE`
-- `User` linked to house and Auth0 subject
-- `PointTransaction` as immutable score log (`delta`, `reason`, actor, target house)
+- `Organization` as top-level tenant boundary
+- `House` scoped by `organizationId`
+- `User` linked to organization, optional house, and Auth0 subject
+- `PointTransaction` immutable score log scoped by organization (`delta`, `reason`, actor, target house)
 
 ## Railway Deployment Notes
 
@@ -93,9 +94,13 @@ The API emits structured JSON logs with stable event names and contextual proper
 - Business events:
 	- `users.bootstrap.created`
 	- `users.bootstrap.loaded`
+	- `admin.context.loaded`
+	- `admin.house.created`
+	- `admin.user.house_assigned`
 	- `leaderboard.fetched`
 	- `points.actor_not_found`
 	- `points.actor_house_unassigned`
+	- `points.cross_organization_target`
 	- `points.adjusted`
 
 The web app also emits structured JSON logs from server actions and auth/session boundaries.
@@ -118,6 +123,14 @@ Point adjustments now resolve the actor server-side using Auth0 subject (`actorA
 - Web server actions call `POST /users/bootstrap` after login.
 - API creates a `User` row on first login (without house assignment) and returns the same record on subsequent calls.
 - Point adjustments are blocked until the mapped user has a `houseId`.
+
+## Admin Setup Endpoints
+
+- `POST /admin/context`: admin-only org-scoped view of users and houses.
+- `POST /admin/houses`: admin-only create/upsert house within actor organization.
+- `POST /admin/users/assign-house`: admin-only assignment of user to house, scoped to same organization.
+
+All admin and scoring endpoints enforce organization boundaries from the actor mapping.
 
 ## Next Steps
 

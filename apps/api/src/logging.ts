@@ -11,9 +11,14 @@ export type ApiLogEvent =
   | "users.bootstrap.validation_failed"
   | "users.bootstrap.created"
   | "users.bootstrap.loaded"
+  | "admin.forbidden"
+  | "admin.context.loaded"
+  | "admin.house.created"
+  | "admin.user.house_assigned"
   | "leaderboard.fetched"
   | "points.actor_not_found"
   | "points.actor_house_unassigned"
+  | "points.cross_organization_target"
   | "points.adjusted";
 
 type LogContext = Record<string, unknown>;

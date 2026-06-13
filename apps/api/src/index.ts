@@ -2,12 +2,102 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { adjustPointsSchema, bootstrapUserSchema } from "@housepoints/contracts";
+import {
+  actorScopeSchema,
+  adjustPointsSchema,
+  assignUserHouseSchema,
+  bootstrapUserSchema,
+  createHouseSchema,
+} from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { error, info, warn } from "./logging.js";
 
 const serviceName = process.env.SERVICE_NAME ?? "housepoints-api";
 const logLevel = process.env.LOG_LEVEL ?? "info";
+const defaultOrganizationSlug = process.env.DEFAULT_ORGANIZATION_SLUG ?? "default";
+const defaultOrganizationName = process.env.DEFAULT_ORGANIZATION_NAME ?? "Default Org";
+
+type ActorRecord = {
+  id: string;
+  auth0Sub: string;
+  role: "MEMBER" | "ADMIN";
+  houseId: string | null;
+  organizationId: string;
+  organizationSlug: string;
+};
+
+async function getOrCreateOrganization(slug?: string) {
+  const organizationSlug = slug ?? defaultOrganizationSlug;
+
+  return prisma.organization.upsert({
+    where: { slug: organizationSlug },
+    update: {},
+    create: {
+      slug: organizationSlug,
+      name: organizationSlug === defaultOrganizationSlug ? defaultOrganizationName : organizationSlug,
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+    },
+  });
+}
+
+async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
+  const actor = await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: {
+      id: true,
+      auth0Sub: true,
+      role: true,
+      houseId: true,
+      organizationId: true,
+      organization: {
+        select: {
+          slug: true,
+        },
+      },
+    },
+  });
+
+  if (!actor) {
+    return null;
+  }
+
+  return {
+    id: actor.id,
+    auth0Sub: actor.auth0Sub,
+    role: actor.role,
+    houseId: actor.houseId,
+    organizationId: actor.organizationId,
+    organizationSlug: actor.organization.slug,
+  };
+}
+
+function mapAppUser(user: {
+  id: string;
+  auth0Sub: string;
+  email: string | null;
+  displayName: string;
+  role: "MEMBER" | "ADMIN";
+  houseId: string | null;
+  organizationId: string;
+  organization: { slug: string };
+  house: { name: string } | null;
+}) {
+  return {
+    id: user.id,
+    auth0Sub: user.auth0Sub,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role,
+    organizationId: user.organizationId,
+    organizationSlug: user.organization.slug,
+    houseId: user.houseId,
+    houseName: user.house?.name ?? null,
+  };
+}
 
 const app = Fastify({
   logger: {
@@ -57,8 +147,29 @@ app.get("/health", async (request) => {
   return { ok: true };
 });
 
-app.get("/houses/leaderboard", async (request) => {
+app.post("/houses/leaderboard", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", {
+      actorAuth0Sub: parsed.data.actorAuth0Sub,
+    });
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
   const houses = await prisma.house.findMany({
+    where: {
+      organizationId: actor.organizationId,
+    },
     select: {
       id: true,
       name: true,
@@ -85,6 +196,7 @@ app.get("/houses/leaderboard", async (request) => {
     .sort((a, b) => b.score - a.score);
 
   info(request.log, "leaderboard.fetched", {
+    organizationId: actor.organizationId,
     houses: leaderboard.length,
   });
 
@@ -111,7 +223,18 @@ app.post("/users/bootstrap", async (request, reply) => {
       email: true,
       displayName: true,
       role: true,
+      organizationId: true,
+      organization: {
+        select: {
+          slug: true,
+        },
+      },
       houseId: true,
+      house: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
@@ -119,20 +242,25 @@ app.post("/users/bootstrap", async (request, reply) => {
     info(request.log, "users.bootstrap.loaded", {
       userId: existing.id,
       auth0Sub: existing.auth0Sub,
+      organizationId: existing.organizationId,
+      organizationSlug: existing.organization.slug,
       hasHouse: Boolean(existing.houseId),
     });
 
     return {
-      ...existing,
+      ...mapAppUser(existing),
       created: false,
     };
   }
+
+  const organization = await getOrCreateOrganization(parsed.data.organizationSlug);
 
   const createdUser = await prisma.user.create({
     data: {
       auth0Sub: parsed.data.auth0Sub,
       email: parsed.data.email ?? null,
       displayName: parsed.data.displayName,
+      organizationId: organization.id,
     },
     select: {
       id: true,
@@ -140,20 +268,192 @@ app.post("/users/bootstrap", async (request, reply) => {
       email: true,
       displayName: true,
       role: true,
+      organizationId: true,
+      organization: {
+        select: {
+          slug: true,
+        },
+      },
       houseId: true,
+      house: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
   info(request.log, "users.bootstrap.created", {
     userId: createdUser.id,
     auth0Sub: createdUser.auth0Sub,
+    organizationId: createdUser.organizationId,
+    organizationSlug: createdUser.organization.slug,
     hasHouse: Boolean(createdUser.houseId),
   });
 
   return reply.status(201).send({
-    ...createdUser,
+    ...mapAppUser(createdUser),
     created: true,
   });
+});
+
+app.post("/admin/context", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor || actor.role !== "ADMIN") {
+    warn(request.log, "admin.forbidden", {
+      actorAuth0Sub: parsed.data.actorAuth0Sub,
+    });
+    return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+  }
+
+  const [users, houses] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId: actor.organizationId },
+      orderBy: { displayName: "asc" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        role: true,
+        houseId: true,
+      },
+    }),
+    prisma.house.findMany({
+      where: { organizationId: actor.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  info(request.log, "admin.context.loaded", {
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    users: users.length,
+    houses: houses.length,
+  });
+
+  return {
+    organizationId: actor.organizationId,
+    organizationSlug: actor.organizationSlug,
+    users,
+    houses,
+  };
+});
+
+app.post("/admin/houses", async (request, reply) => {
+  const parsed = createHouseSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor || actor.role !== "ADMIN") {
+    warn(request.log, "admin.forbidden", {
+      actorAuth0Sub: parsed.data.actorAuth0Sub,
+    });
+    return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+  }
+
+  const house = await prisma.house.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: actor.organizationId,
+        name: parsed.data.name,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: actor.organizationId,
+      name: parsed.data.name,
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  info(request.log, "admin.house.created", {
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    houseId: house.id,
+    houseName: house.name,
+  });
+
+  return reply.status(201).send(house);
+});
+
+app.post("/admin/users/assign-house", async (request, reply) => {
+  const parsed = assignUserHouseSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor || actor.role !== "ADMIN") {
+    warn(request.log, "admin.forbidden", {
+      actorAuth0Sub: parsed.data.actorAuth0Sub,
+    });
+    return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+  }
+
+  const [targetUser, targetHouse] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: parsed.data.targetUserId },
+      select: { id: true, organizationId: true },
+    }),
+    prisma.house.findUnique({
+      where: { id: parsed.data.targetHouseId },
+      select: { id: true, organizationId: true, name: true },
+    }),
+  ]);
+
+  if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
+  }
+
+  if (!targetHouse || targetHouse.organizationId !== actor.organizationId) {
+    return reply.status(404).send({ message: "Target house not found", code: "TARGET_HOUSE_NOT_FOUND" });
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: targetUser.id },
+    data: { houseId: targetHouse.id },
+    select: {
+      id: true,
+      displayName: true,
+      houseId: true,
+    },
+  });
+
+  info(request.log, "admin.user.house_assigned", {
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    targetUserId: updatedUser.id,
+    targetHouseId: targetHouse.id,
+    targetHouseName: targetHouse.name,
+  });
+
+  return updatedUser;
 });
 
 app.post("/points/adjust", async (request, reply) => {
@@ -166,17 +466,7 @@ app.post("/points/adjust", async (request, reply) => {
     return reply.status(400).send({ errors: parsed.error.flatten() });
   }
 
-  const actor = await prisma.user.findUnique({
-    where: {
-      auth0Sub: parsed.data.actorAuth0Sub,
-    },
-    select: {
-      id: true,
-      auth0Sub: true,
-      role: true,
-      houseId: true,
-    },
-  });
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
 
   if (!actor) {
     warn(request.log, "points.actor_not_found", {
@@ -205,8 +495,34 @@ app.post("/points/adjust", async (request, reply) => {
     });
   }
 
+  const targetHouse = await prisma.house.findUnique({
+    where: {
+      id: parsed.data.targetHouseId,
+    },
+    select: {
+      id: true,
+      organizationId: true,
+    },
+  });
+
+  if (!targetHouse || targetHouse.organizationId !== actor.organizationId) {
+    warn(request.log, "points.cross_organization_target", {
+      actorUserId: actor.id,
+      actorAuth0Sub: actor.auth0Sub,
+      actorOrganizationId: actor.organizationId,
+      targetHouseId: parsed.data.targetHouseId,
+      targetHouseOrganizationId: targetHouse?.organizationId,
+    });
+
+    return reply.status(403).send({
+      message: "Target house is outside your organization",
+      code: "CROSS_ORGANIZATION_TARGET",
+    });
+  }
+
   const transaction = await prisma.pointTransaction.create({
     data: {
+      organizationId: actor.organizationId,
       actorUserId: actor.id,
       targetHouseId: parsed.data.targetHouseId,
       delta: parsed.data.delta,
@@ -218,6 +534,7 @@ app.post("/points/adjust", async (request, reply) => {
     transactionId: transaction.id,
     actorUserId: transaction.actorUserId,
     actorAuth0Sub: actor.auth0Sub,
+    organizationId: actor.organizationId,
     targetHouseId: transaction.targetHouseId,
     delta: transaction.delta,
   });

@@ -10,8 +10,24 @@ type AppUserMapping = {
   email: string | null;
   displayName: string;
   role: "MEMBER" | "ADMIN";
+  organizationId: string;
+  organizationSlug: string;
   houseId: string | null;
+  houseName: string | null;
   created: boolean;
+};
+
+type AdminUser = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  role: "MEMBER" | "ADMIN";
+  houseId: string | null;
+};
+
+type AdminHouse = {
+  id: string;
+  name: string;
 };
 
 function getApiBaseUrl(): string {
@@ -40,6 +56,7 @@ async function ensureAppUserMapping(input: {
       auth0Sub: input.auth0Sub,
       email: input.email,
       displayName: input.displayName ?? "Unknown User",
+      organizationSlug: process.env.APP_ORGANIZATION_SLUG,
     }),
     cache: "no-store",
   });
@@ -178,12 +195,206 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
   }
 }
 
+async function getActorMappingForAdmin(action: string, requestId: string) {
+  const auth0 = getAuth0Client();
+
+  if (!auth0) {
+    logWarn("web.auth.not_configured", { action, requestId });
+    throw new Error("Auth0 is not configured");
+  }
+
+  const session = await auth0.getSession();
+
+  if (!session) {
+    logWarn("web.auth.session_missing", { action, requestId });
+    throw new Error("You must be logged in");
+  }
+
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+
+  if (mapping.role !== "ADMIN") {
+    logWarn("web.admin.forbidden", {
+      action,
+      requestId,
+      actorUserId: mapping.id,
+      role: mapping.role,
+    });
+    throw new Error("Admin role required");
+  }
+
+  return mapping;
+}
+
+export async function createHouse(formData: FormData): Promise<void> {
+  const requestId = randomUUID();
+  const actor = await getActorMappingForAdmin("createHouse", requestId);
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!name) {
+    throw new Error("House name is required");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/admin/houses`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": requestId,
+    },
+    body: JSON.stringify({
+      actorAuth0Sub: actor.auth0Sub,
+      name,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logWarn("web.admin.house_create_failed", {
+      requestId,
+      actorUserId: actor.id,
+      statusCode: response.status,
+      responseBody: body,
+    });
+    throw new Error(`Create house failed with status ${response.status}`);
+  }
+
+  logInfo("web.admin.house_created", {
+    requestId,
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    name,
+  });
+}
+
+export async function assignUserHouse(formData: FormData): Promise<void> {
+  const requestId = randomUUID();
+  const actor = await getActorMappingForAdmin("assignUserHouse", requestId);
+  const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+  const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
+
+  if (!targetUserId || !targetHouseId) {
+    throw new Error("Target user and house are required");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/admin/users/assign-house`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": requestId,
+    },
+    body: JSON.stringify({
+      actorAuth0Sub: actor.auth0Sub,
+      targetUserId,
+      targetHouseId,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logWarn("web.admin.assignment_failed", {
+      requestId,
+      actorUserId: actor.id,
+      targetUserId,
+      targetHouseId,
+      statusCode: response.status,
+      responseBody: body,
+    });
+    throw new Error(`Assign house failed with status ${response.status}`);
+  }
+
+  logInfo("web.admin.user_assigned", {
+    requestId,
+    actorUserId: actor.id,
+    targetUserId,
+    targetHouseId,
+  });
+}
+
+export async function readAdminContext(): Promise<{
+  organizationId: string;
+  organizationSlug: string;
+  users: AdminUser[];
+  houses: AdminHouse[];
+} | null> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+
+  if (!auth0) {
+    return null;
+  }
+
+  const session = await auth0.getSession();
+  if (!session) {
+    return null;
+  }
+
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+
+  if (mapping.role !== "ADMIN") {
+    return null;
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/admin/context`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": requestId,
+    },
+    body: JSON.stringify({
+      actorAuth0Sub: mapping.auth0Sub,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logWarn("web.admin.context_failed", {
+      requestId,
+      actorUserId: mapping.id,
+      statusCode: response.status,
+      responseBody: body,
+    });
+    return null;
+  }
+
+  const context = (await response.json()) as {
+    organizationId: string;
+    organizationSlug: string;
+    users: AdminUser[];
+    houses: AdminHouse[];
+  };
+
+  logInfo("web.admin.context_loaded", {
+    requestId,
+    actorUserId: mapping.id,
+    organizationId: context.organizationId,
+    users: context.users.length,
+    houses: context.houses.length,
+  });
+
+  return context;
+}
+
 export async function readSessionSummary(): Promise<{
   isAuthenticated: boolean;
   userName?: string;
   userSub?: string;
   appUserId?: string;
+  organizationId?: string;
+  organizationSlug?: string;
   houseId?: string | null;
+  houseName?: string | null;
   role?: "MEMBER" | "ADMIN";
   needsHouseAssignment?: boolean;
 }> {
@@ -243,7 +454,10 @@ export async function readSessionSummary(): Promise<{
   return {
     ...summary,
     appUserId: mapping.id,
+    organizationId: mapping.organizationId,
+    organizationSlug: mapping.organizationSlug,
     houseId: mapping.houseId,
+    houseName: mapping.houseName,
     role: mapping.role,
     needsHouseAssignment: !mapping.houseId,
   };

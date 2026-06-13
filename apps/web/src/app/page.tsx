@@ -1,9 +1,16 @@
-import { readSessionSummary, submitPointAdjustment } from "./actions/points";
+import {
+  assignUserHouse,
+  createHouse,
+  readAdminContext,
+  readSessionSummary,
+  submitPointAdjustment,
+} from "./actions/points";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await readSessionSummary();
+  const adminContext = session.role === "ADMIN" ? await readAdminContext() : null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-10 sm:px-10">
@@ -24,6 +31,7 @@ export default async function Home() {
             </p>
             <p className="break-all">Auth0 Subject: {session.userSub}</p>
             <p className="break-all">App User Id: {session.appUserId ?? "Not mapped"}</p>
+            <p>Organization: {session.organizationSlug ?? "Not assigned"}</p>
             <p>House Assignment: {session.houseId ?? "Pending assignment"}</p>
             <a className="inline-block rounded-md bg-zinc-900 px-3 py-2 text-white" href="/auth/logout">
               Log out
@@ -78,6 +86,53 @@ export default async function Home() {
           </button>
         </form>
       </section>
+
+      {adminContext ? (
+        <section className="rounded-xl border border-zinc-200 bg-white p-6">
+          <h2 className="text-lg font-semibold text-zinc-900">Admin Setup</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Manage houses and member assignments for organization <strong>{adminContext.organizationSlug}</strong>.
+          </p>
+
+          <div className="mt-4 grid gap-6 lg:grid-cols-2">
+            <form action={createHouse} className="grid gap-3 rounded-lg border border-zinc-200 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Create House</h3>
+              <input
+                name="name"
+                className="rounded-md border border-zinc-300 px-3 py-2"
+                placeholder="House name"
+                required
+              />
+              <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2 text-white">
+                Create House
+              </button>
+            </form>
+
+            <form action={assignUserHouse} className="grid gap-3 rounded-lg border border-zinc-200 p-4">
+              <h3 className="text-sm font-semibold text-zinc-900">Assign User To House</h3>
+              <select name="targetUserId" className="rounded-md border border-zinc-300 px-3 py-2" required>
+                <option value="">Select user</option>
+                {adminContext.users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.displayName} ({user.email ?? "no-email"})
+                  </option>
+                ))}
+              </select>
+              <select name="targetHouseId" className="rounded-md border border-zinc-300 px-3 py-2" required>
+                <option value="">Select house</option>
+                {adminContext.houses.map((house) => (
+                  <option key={house.id} value={house.id}>
+                    {house.name}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2 text-white">
+                Assign House
+              </button>
+            </form>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

@@ -10,6 +10,13 @@ export type WebLogEvent =
   | "web.user.mapping_ensured"
   | "web.user.mapping_failed"
   | "web.user.house_unassigned"
+  | "web.admin.forbidden"
+  | "web.admin.context_loaded"
+  | "web.admin.context_failed"
+  | "web.admin.house_created"
+  | "web.admin.house_create_failed"
+  | "web.admin.user_assigned"
+  | "web.admin.assignment_failed"
   | "points.adjust.requested"
   | "points.adjust.completed";
 

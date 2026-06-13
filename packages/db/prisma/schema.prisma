@@ -11,20 +11,29 @@ enum Role {
   ADMIN
 }
 
-enum HouseName {
-  AURORA
-  EMBER
-  TIDE
-  GROVE
+model Organization {
+  id           String             @id @default(cuid())
+  name         String
+  slug         String             @unique
+  users        User[]
+  houses       House[]
+  transactions PointTransaction[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 }
 
 model House {
   id           String             @id @default(cuid())
-  name         HouseName          @unique
+  organizationId String
+  name         String
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   users        User[]
   transactions PointTransaction[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model User {
@@ -33,26 +42,32 @@ model User {
   email             String?            @unique
   displayName       String
   role              Role               @default(MEMBER)
+  organizationId    String
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   houseId           String?
   house             House?             @relation(fields: [houseId], references: [id], onDelete: Restrict)
   pointTransactions PointTransaction[] @relation("ActorTransactions")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
+  @@index([organizationId])
   @@index([houseId])
 }
 
 model PointTransaction {
   id            String   @id @default(cuid())
+  organizationId String
   actorUserId   String
   targetHouseId String
   delta         Int
   reason        String
   createdAt     DateTime @default(now())
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   actor      User  @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
   targetHouse House @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
 
+  @@index([organizationId, createdAt])
   @@index([targetHouseId, createdAt])
   @@index([actorUserId, createdAt])
 }
