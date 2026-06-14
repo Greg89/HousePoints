@@ -467,6 +467,7 @@ export async function readSessionSummary(): Promise<{
 
   return {
     ...summary,
+    userName: mapping.displayName,  // DB is source of truth; Auth0 token may be stale
     appUserId: mapping.id,
     organizationId: mapping.organizationId,
     organizationSlug: mapping.organizationSlug,
