@@ -22,7 +22,6 @@ interface DashboardShellProps {
     houseName: string | null;
     houseColor: string | null;
     role: "MEMBER" | "ADMIN";
-    needsHouseAssignment: boolean;
   };
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];
@@ -81,17 +80,15 @@ export function DashboardShell({
               </span>
             )}
             {/* Award points button */}
-            {!session.needsHouseAssignment && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setAwardOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                <Star weight="fill" size={16} />
-                <span className="hidden sm:inline">Award Points</span>
-              </motion.button>
-            )}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setAwardOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Star weight="fill" size={16} />
+              <span className="hidden sm:inline">Award Points</span>
+            </motion.button>
             {/* User / logout */}
             <div className="flex items-center gap-1">
               <a
@@ -112,13 +109,6 @@ export function DashboardShell({
           </div>
         </div>
       </header>
-
-      {/* Needs house assignment banner */}
-      {session.needsHouseAssignment && (
-        <div className="border-b border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 text-center">
-          You haven&apos;t been assigned to a house yet. Ask an admin to assign you.
-        </div>
-      )}
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 py-8">

@@ -33,6 +33,39 @@ export default async function Home() {
     );
   }
 
+  // Block unassigned users — nothing is visible until an admin assigns them to a house
+  if (session.needsHouseAssignment) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <span className="text-3xl">⏳</span>
+          </div>
+          <h1 className="font-display text-2xl font-semibold text-primary">Waiting for Assignment</h1>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            You&apos;re signed in as <strong>{session.userName}</strong>, but you haven&apos;t been assigned to a house yet.
+            An admin will assign you shortly — check back soon.
+          </p>
+          <div className="flex items-center justify-center gap-4 pt-2">
+            <a
+              href="/settings"
+              className="text-sm text-primary hover:underline"
+            >
+              Update your profile
+            </a>
+            <span className="text-border">·</span>
+            <a
+              href="/auth/logout"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Sign out
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Fetch dashboard data in parallel
   const [leaderboard, members, activity, adminContext] = await Promise.all([
     readLeaderboard(),
@@ -109,7 +142,6 @@ export default async function Home() {
         houseName: session.houseName ?? null,
         houseColor: session.houseColor ?? null,
         role: session.role ?? "MEMBER",
-        needsHouseAssignment: session.needsHouseAssignment ?? false,
       }}
       leaderboard={leaderboard ?? []}
       members={members ?? []}
