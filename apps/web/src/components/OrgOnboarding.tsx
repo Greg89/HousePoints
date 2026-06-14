@@ -81,7 +81,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
         <div className="text-center space-y-2">
           <h1 className="font-display text-4xl font-bold text-primary">House Points</h1>
           <p className="text-muted-foreground text-sm">
-            Welcome, <strong>{userName}</strong>. Let's get you set up.
+            Welcome, <strong>{userName}</strong>. Let&apos;s get you set up.
           </p>
         </div>
 
@@ -97,7 +97,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
               <div>
                 <p className="font-semibold text-sm">Create a new organisation</p>
                 <p className="text-muted-foreground text-xs mt-0.5">
-                  Set up houses and invite your team. You'll become the owner.
+                  Set up houses and invite your team. You&apos;ll become the owner.
                 </p>
               </div>
             </button>
@@ -129,7 +129,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
           <div className="rounded-xl border bg-card p-6 space-y-5">
             <div className="space-y-1">
               <h2 className="font-display text-lg font-semibold">Create organisation</h2>
-              <p className="text-muted-foreground text-sm">You'll be the owner and can invite others after setup.</p>
+              <p className="text-muted-foreground text-sm">You&apos;ll be the owner and can invite others after setup.</p>
             </div>
 
             <div className="space-y-2">
