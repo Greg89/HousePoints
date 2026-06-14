@@ -22,7 +22,16 @@ export type ApiLogEvent =
   | "points.cross_organization_target"
   | "points.adjusted"
   | "users.profile.updated"
-  | "users.profile.validation_failed";
+  | "users.profile.validation_failed"
+  | "orgs.created"
+  | "orgs.create.slug_taken"
+  | "orgs.create.already_in_org"
+  | "orgs.invite.created"
+  | "orgs.join.invalid_token"
+  | "orgs.join.token_already_used"
+  | "orgs.join.token_expired"
+  | "orgs.join.already_in_org"
+  | "orgs.join.success";
 
 type LogContext = Record<string, unknown>;
 

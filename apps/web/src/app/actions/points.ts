@@ -10,6 +10,7 @@ import type {
   MemberScore,
   OrgMember,
   Trait,
+  UserRole,
 } from "@housepoints/contracts";
 
 type AppUserMapping = {
@@ -17,9 +18,9 @@ type AppUserMapping = {
   auth0Sub: string;
   email: string | null;
   displayName: string;
-  role: "MEMBER" | "ADMIN";
-  organizationId: string;
-  organizationSlug: string;
+  role: UserRole;
+  organizationId: string | null;
+  organizationSlug: string | null;
   houseId: string | null;
   houseName: string | null;
   houseColor: string | null;
@@ -30,7 +31,7 @@ type AdminUser = {
   id: string;
   displayName: string;
   email: string | null;
-  role: "MEMBER" | "ADMIN";
+  role: UserRole;
   houseId: string | null;
 };
 
@@ -65,7 +66,6 @@ async function ensureAppUserMapping(input: {
       auth0Sub: input.auth0Sub,
       email: input.email,
       displayName: input.displayName ?? "Unknown User",
-      organizationSlug: process.env.APP_ORGANIZATION_SLUG,
     }),
     cache: "no-store",
   });
@@ -411,12 +411,13 @@ export async function readSessionSummary(): Promise<{
   userEmail?: string;
   userSub?: string;
   appUserId?: string;
-  organizationId?: string;
-  organizationSlug?: string;
+  organizationId?: string | null;
+  organizationSlug?: string | null;
   houseId?: string | null;
   houseName?: string | null;
   houseColor?: string | null;
-  role?: "MEMBER" | "ADMIN";
+  role?: UserRole;
+  needsOrg?: boolean;
   needsHouseAssignment?: boolean;
 }> {
   const requestId = randomUUID();
@@ -483,7 +484,8 @@ export async function readSessionSummary(): Promise<{
     houseName: mapping.houseName,
     houseColor: mapping.houseColor,
     role: mapping.role,
-    needsHouseAssignment: !mapping.houseId,
+    needsOrg: !mapping.organizationId,
+    needsHouseAssignment: !!mapping.organizationId && !mapping.houseId,
   };
 }
 
@@ -651,4 +653,89 @@ export async function updateDisplayName(displayName: string): Promise<void> {
 
   revalidatePath("/");
   revalidatePath("/settings");
+}
+
+export async function createOrg(orgName: string, orgSlug: string): Promise<void> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) throw new Error("Auth0 is not configured");
+  const session = await auth0.getSession();
+  if (!session) throw new Error("Not authenticated");
+
+  const response = await fetch(`${getApiBaseUrl()}/orgs/create`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({
+      auth0Sub: session.user.sub,
+      email: session.user.email,
+      displayName: session.user.name ?? "Unknown User",
+      orgName: orgName.trim(),
+      orgSlug: orgSlug.trim(),
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ message: "Unknown error" }));
+    throw new Error(body.message ?? `Create org failed with status ${response.status}`);
+  }
+
+  revalidatePath("/");
+}
+
+export async function joinOrg(inviteToken: string): Promise<void> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) throw new Error("Auth0 is not configured");
+  const session = await auth0.getSession();
+  if (!session) throw new Error("Not authenticated");
+
+  const response = await fetch(`${getApiBaseUrl()}/orgs/join`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({
+      auth0Sub: session.user.sub,
+      email: session.user.email,
+      displayName: session.user.name ?? "Unknown User",
+      inviteToken,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ message: "Unknown error" }));
+    throw new Error(body.message ?? `Join org failed with status ${response.status}`);
+  }
+
+  revalidatePath("/");
+}
+
+export async function createInviteLink(): Promise<{ token: string; expiresAt: string }> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) throw new Error("Auth0 is not configured");
+  const session = await auth0.getSession();
+  if (!session) throw new Error("Not authenticated");
+
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+
+  const response = await fetch(`${getApiBaseUrl()}/orgs/invite`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ message: "Unknown error" }));
+    throw new Error(body.message ?? `Create invite failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return { token: data.token, expiresAt: data.expiresAt };
 }

@@ -143,27 +143,21 @@ describe("bootstrapUserSchema", () => {
     displayName: "Alice",
   };
 
-  it("accepts minimal valid input (no email, no org slug)", () => {
+  it("accepts minimal valid input (no email)", () => {
     expect(bootstrapUserSchema.safeParse(valid).success).toBe(true);
   });
 
-  it("accepts full valid input", () => {
+  it("accepts full valid input with email", () => {
     expect(
       bootstrapUserSchema.safeParse({
         ...valid,
         email: "alice@example.com",
-        organizationSlug: "acme",
       }).success
     ).toBe(true);
   });
 
   it("rejects invalid email", () => {
     const result = bootstrapUserSchema.safeParse({ ...valid, email: "not-an-email" });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects org slug shorter than 2 chars", () => {
-    const result = bootstrapUserSchema.safeParse({ ...valid, organizationSlug: "x" });
     expect(result.success).toBe(false);
   });
 

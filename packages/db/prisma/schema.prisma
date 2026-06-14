@@ -9,6 +9,7 @@ datasource db {
 enum Role {
   MEMBER
   ADMIN
+  OWNER
 }
 
 enum Trait {
@@ -41,8 +42,26 @@ model Organization {
   users        User[]
   houses       House[]
   transactions PointTransaction[]
+  invites      OrgInvite[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
+}
+
+model OrgInvite {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tokenHash      String    @unique          // SHA-256 of the raw token — never store raw
+  createdById    String
+  createdBy      User      @relation("CreatedInvites", fields: [createdById], references: [id], onDelete: Restrict)
+  expiresAt      DateTime
+  usedAt         DateTime?
+  usedById       String?
+  usedBy         User?     @relation("UsedInvites", fields: [usedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
+  @@index([tokenHash])
 }
 
 model House {
@@ -67,12 +86,14 @@ model User {
   email                String?            @unique
   displayName          String
   role                 Role               @default(MEMBER)
-  organizationId       String
-  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organizationId       String?
+  organization         Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   houseId              String?
   house                House?             @relation(fields: [houseId], references: [id], onDelete: Restrict)
   pointTransactions    PointTransaction[] @relation("ActorTransactions")
   receivedTransactions PointTransaction[] @relation("PointsReceived")
+  createdInvites       OrgInvite[]        @relation("CreatedInvites")
+  usedInvite           OrgInvite[]        @relation("UsedInvites")
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 

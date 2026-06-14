@@ -22,7 +22,7 @@ interface DashboardShellProps {
     houseId: string | null;
     houseName: string | null;
     houseColor: string | null;
-    role: "MEMBER" | "ADMIN";
+    role: "MEMBER" | "ADMIN" | "OWNER";
   };
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];

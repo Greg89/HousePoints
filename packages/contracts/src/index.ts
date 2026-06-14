@@ -64,7 +64,6 @@ export const bootstrapUserSchema = z.object({
   auth0Sub: z.string().min(1),
   email: z.string().email().optional(),
   displayName: z.string().min(1).max(120),
-  organizationSlug: z.string().min(2).max(80).optional(),
 });
 
 export type BootstrapUserInput = z.infer<typeof bootstrapUserSchema>;
@@ -74,9 +73,9 @@ export const appUserSchema = z.object({
   auth0Sub: z.string(),
   email: z.string().nullable(),
   displayName: z.string(),
-  role: z.enum(["MEMBER", "ADMIN"]),
-  organizationId: z.string(),
-  organizationSlug: z.string(),
+  role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
+  organizationId: z.string().nullable(),
+  organizationSlug: z.string().nullable(),
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
   houseColor: z.string().nullable(),
@@ -84,11 +83,12 @@ export const appUserSchema = z.object({
 });
 
 export type AppUser = z.infer<typeof appUserSchema>;
+export type UserRole = AppUser["role"];
 
 export const orgMemberSchema = z.object({
   id: z.string(),
   displayName: z.string(),
-  role: z.enum(["MEMBER", "ADMIN"]),
+  role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
   houseColor: z.string().nullable(),
@@ -152,3 +152,71 @@ export const memberScoreSchema = z.object({
 });
 
 export type MemberScore = z.infer<typeof memberScoreSchema>;
+
+// ---------------------------------------------------------------------------
+// Slug validation — shared rule used by org create and invite flows
+// ---------------------------------------------------------------------------
+const slugSchema = z
+  .string()
+  .min(2, "Slug must be at least 2 characters")
+  .max(60, "Slug must be at most 60 characters")
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Slug may only contain lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen"
+  );
+
+// ---------------------------------------------------------------------------
+// Org management schemas
+// ---------------------------------------------------------------------------
+export const createOrgSchema = z.object({
+  auth0Sub: z.string().min(1),
+  email: z.string().email().optional(),
+  displayName: z.string().trim().min(1).max(120),
+  orgName: z.string().trim().min(2).max(80),
+  orgSlug: slugSchema,
+});
+
+export type CreateOrgInput = z.infer<typeof createOrgSchema>;
+
+export const createInviteSchema = z.object({
+  actorAuth0Sub: z.string().min(1),
+  /** How many hours the invite is valid for. Defaults to 72. Max 168 (7 days). */
+  expiresInHours: z.number().int().min(1).max(168).default(72),
+});
+
+export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+
+export const joinOrgSchema = z.object({
+  auth0Sub: z.string().min(1),
+  email: z.string().email().optional(),
+  displayName: z.string().trim().min(1).max(120),
+  /** The raw invite token from the URL */
+  inviteToken: z.string().min(1),
+});
+
+export type JoinOrgInput = z.infer<typeof joinOrgSchema>;
+
+export const promoteUserSchema = z.object({
+  actorAuth0Sub: z.string().min(1),
+  targetUserId: z.string().min(1),
+  role: z.enum(["MEMBER", "ADMIN"]),
+});
+
+export type PromoteUserInput = z.infer<typeof promoteUserSchema>;
+
+export const orgSettingsSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+});
+
+export type OrgSettings = z.infer<typeof orgSettingsSchema>;
+
+export const inviteLinkSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  expiresAt: z.string(),
+  usedAt: z.string().nullable(),
+});
+
+export type InviteLink = z.infer<typeof inviteLinkSchema>;

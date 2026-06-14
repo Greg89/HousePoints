@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
@@ -9,6 +9,10 @@ import {
   assignUserHouseSchema,
   bootstrapUserSchema,
   createHouseSchema,
+  createInviteSchema,
+  createOrgSchema,
+  joinOrgSchema,
+  promoteUserSchema,
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -16,35 +20,30 @@ import { error, info, warn } from "./logging.js";
 
 const serviceName = process.env.SERVICE_NAME ?? "housepoints-api";
 const logLevel = process.env.LOG_LEVEL ?? "info";
-const defaultOrganizationSlug = process.env.DEFAULT_ORGANIZATION_SLUG ?? "default";
-const defaultOrganizationName = process.env.DEFAULT_ORGANIZATION_NAME ?? "Default Org";
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
 
 type ActorRecord = {
   id: string;
   auth0Sub: string;
-  role: "MEMBER" | "ADMIN";
+  role: "MEMBER" | "ADMIN" | "OWNER";
   houseId: string | null;
   organizationId: string;
   organizationSlug: string;
 };
 
-async function getOrCreateOrganization(slug?: string) {
-  const organizationSlug = slug ?? defaultOrganizationSlug;
+import { createHash, randomBytes } from "node:crypto";
 
-  return prisma.organization.upsert({
-    where: { slug: organizationSlug },
-    update: {},
-    create: {
-      slug: organizationSlug,
-      name: organizationSlug === defaultOrganizationSlug ? defaultOrganizationName : organizationSlug,
-    },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-    },
-  });
+function generateInviteToken(): string {
+  return randomBytes(32).toString("hex"); // 64-char hex string
+}
+
+function hashToken(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
+
+/** OWNER inherits all ADMIN privileges */
+function isAdmin(role: "MEMBER" | "ADMIN" | "OWNER"): boolean {
+  return role === "ADMIN" || role === "OWNER";
 }
 
 async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
@@ -68,6 +67,11 @@ async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
     return null;
   }
 
+  // Users without an org can't act on any org-scoped endpoint
+  if (!actor.organizationId || !actor.organization) {
+    return null;
+  }
+
   return {
     id: actor.id,
     auth0Sub: actor.auth0Sub,
@@ -83,10 +87,10 @@ function mapAppUser(user: {
   auth0Sub: string;
   email: string | null;
   displayName: string;
-  role: "MEMBER" | "ADMIN";
+  role: "MEMBER" | "ADMIN" | "OWNER";
   houseId: string | null;
-  organizationId: string;
-  organization: { slug: string };
+  organizationId: string | null;
+  organization: { slug: string } | null;
   house: { name: string; color: string } | null;
 }) {
   return {
@@ -96,7 +100,7 @@ function mapAppUser(user: {
     displayName: user.displayName,
     role: user.role,
     organizationId: user.organizationId,
-    organizationSlug: user.organization.slug,
+    organizationSlug: user.organization?.slug ?? null,
     houseId: user.houseId,
     houseName: user.house?.name ?? null,
     houseColor: user.house?.color ?? null,
@@ -129,7 +133,7 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
   errorResponseBuilder: () => ({
     code: "RATE_LIMITED",
-    message: "Too many requests — please slow down.",
+    message: "Too many requests â€” please slow down.",
   }),
 });
 
@@ -234,30 +238,21 @@ app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 mi
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
+  const userSelect = {
+    id: true,
+    auth0Sub: true,
+    email: true,
+    displayName: true,
+    role: true,
+    organizationId: true,
+    organization: { select: { slug: true } },
+    houseId: true,
+    house: { select: { name: true, color: true } },
+  } as const;
+
   const existing = await prisma.user.findUnique({
-    where: {
-      auth0Sub: parsed.data.auth0Sub,
-    },
-    select: {
-      id: true,
-      auth0Sub: true,
-      email: true,
-      displayName: true,
-      role: true,
-      organizationId: true,
-      organization: {
-        select: {
-          slug: true,
-        },
-      },
-      houseId: true,
-      house: {
-        select: {
-          name: true,
-          color: true,
-        },
-      },
-    },
+    where: { auth0Sub: parsed.data.auth0Sub },
+    select: userSelect,
   });
 
   if (existing) {
@@ -265,59 +260,29 @@ app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 mi
       userId: existing.id,
       auth0Sub: existing.auth0Sub,
       organizationId: existing.organizationId,
-      organizationSlug: existing.organization.slug,
       hasHouse: Boolean(existing.houseId),
     });
-
-    return {
-      ...mapAppUser(existing),
-      created: false,
-    };
+    return { ...mapAppUser(existing), created: false };
   }
 
-  const organization = await getOrCreateOrganization(parsed.data.organizationSlug);
-
+  // New user â€” no org yet. Create the User row without an org.
+  // They must then create an org (POST /orgs/create) or join one (POST /orgs/join).
   const createdUser = await prisma.user.create({
     data: {
       auth0Sub: parsed.data.auth0Sub,
       email: parsed.data.email ?? null,
       displayName: parsed.data.displayName,
-      organizationId: organization.id,
     },
-    select: {
-      id: true,
-      auth0Sub: true,
-      email: true,
-      displayName: true,
-      role: true,
-      organizationId: true,
-      organization: {
-        select: {
-          slug: true,
-        },
-      },
-      houseId: true,
-      house: {
-        select: {
-          name: true,
-          color: true,
-        },
-      },
-    },
+    select: userSelect,
   });
 
   info(request.log, "users.bootstrap.created", {
     userId: createdUser.id,
     auth0Sub: createdUser.auth0Sub,
-    organizationId: createdUser.organizationId,
-    organizationSlug: createdUser.organization.slug,
-    hasHouse: Boolean(createdUser.houseId),
+    hasOrg: false,
   });
 
-  return reply.status(201).send({
-    ...mapAppUser(createdUser),
-    created: true,
-  });
+  return reply.status(201).send({ ...mapAppUser(createdUser), created: true });
 });
 
 app.post("/admin/context", async (request, reply) => {
@@ -332,7 +297,7 @@ app.post("/admin/context", async (request, reply) => {
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
 
-  if (!actor || actor.role !== "ADMIN") {
+  if (!actor || !isAdmin(actor.role)) {
     warn(request.log, "admin.forbidden", {
       actorAuth0Sub: parsed.data.actorAuth0Sub,
     });
@@ -385,7 +350,7 @@ app.post("/admin/houses", async (request, reply) => {
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
 
-  if (!actor || actor.role !== "ADMIN") {
+  if (!actor || !isAdmin(actor.role)) {
     warn(request.log, "admin.forbidden", {
       actorAuth0Sub: parsed.data.actorAuth0Sub,
     });
@@ -439,7 +404,7 @@ app.post("/admin/users/assign-house", async (request, reply) => {
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
 
-  if (!actor || actor.role !== "ADMIN") {
+  if (!actor || !isAdmin(actor.role)) {
     warn(request.log, "admin.forbidden", {
       actorAuth0Sub: parsed.data.actorAuth0Sub,
     });
@@ -727,9 +692,172 @@ app.post("/transactions/recent", async (request, reply) => {
   }));
 });
 
+// ── Org management ───────────────────────────────────────────────────────────
+
+// POST /orgs/create — first-time org setup; caller becomes OWNER
+app.post("/orgs/create", async (request, reply) => {
+  const parsed = createOrgSchema.safeParse(request.body);
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+  }
+
+  const { auth0Sub, email, displayName, orgName, orgSlug } = parsed.data;
+
+  // Reject if slug is already taken
+  const slugTaken = await prisma.organization.findUnique({ where: { slug: orgSlug }, select: { id: true } });
+  if (slugTaken) {
+    warn(request.log, "orgs.create.slug_taken", { orgSlug });
+    return reply.status(409).send({ code: "SLUG_TAKEN", message: `The slug "${orgSlug}" is already in use. Choose a different one.` });
+  }
+
+  // Reject if this Auth0 user is already in an org
+  const existingUser = await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: { id: true, organizationId: true },
+  });
+  if (existingUser?.organizationId) {
+    warn(request.log, "orgs.create.already_in_org", { auth0Sub, existingOrgId: existingUser.organizationId });
+    return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
+  }
+
+  const org = await prisma.organization.create({
+    data: { name: orgName, slug: orgSlug },
+    select: { id: true, slug: true, name: true },
+  });
+
+  // Create or update the user row as OWNER
+  const user = existingUser
+    ? await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { organizationId: org.id, role: "OWNER", displayName, email: email ?? null },
+        select: { id: true, auth0Sub: true, email: true, displayName: true, role: true, organizationId: true, organization: { select: { slug: true } }, houseId: true, house: { select: { name: true, color: true } } },
+      })
+    : await prisma.user.create({
+        data: { auth0Sub, email: email ?? null, displayName, organizationId: org.id, role: "OWNER" },
+        select: { id: true, auth0Sub: true, email: true, displayName: true, role: true, organizationId: true, organization: { select: { slug: true } }, houseId: true, house: { select: { name: true, color: true } } },
+      });
+
+  info(request.log, "orgs.created", { orgId: org.id, orgSlug: org.slug, ownerId: user.id });
+  return reply.status(201).send({ ...mapAppUser(user), created: true });
+});
+
+// POST /orgs/invite — admin/owner generates a single-use invite link
+app.post("/orgs/invite", async (request, reply) => {
+  const parsed = createInviteSchema.safeParse(request.body);
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  if (!actor || !isAdmin(actor.role)) {
+    warn(request.log, "admin.forbidden", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    return reply.status(403).send({ code: "ADMIN_REQUIRED", message: "Admin access required" });
+  }
+
+  const rawToken = generateInviteToken();
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + parsed.data.expiresInHours * 60 * 60 * 1000);
+
+  const invite = await prisma.orgInvite.create({
+    data: {
+      organizationId: actor.organizationId,
+      tokenHash,
+      createdById: actor.id,
+      expiresAt,
+    },
+    select: { id: true, expiresAt: true },
+  });
+
+  info(request.log, "orgs.invite.created", { inviteId: invite.id, actorId: actor.id, orgId: actor.organizationId, expiresAt });
+
+  return reply.status(201).send({
+    id: invite.id,
+    // Return the raw token ONCE — it is never stored in the DB
+    token: rawToken,
+    expiresAt: invite.expiresAt.toISOString(),
+    usedAt: null,
+  });
+});
+
+// POST /orgs/join — consume an invite token and add the user to the org
+app.post("/orgs/join", async (request, reply) => {
+  const parsed = joinOrgSchema.safeParse(request.body);
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+  }
+
+  const { auth0Sub, email, displayName, inviteToken } = parsed.data;
+  const tokenHash = hashToken(inviteToken);
+
+  const invite = await prisma.orgInvite.findUnique({
+    where: { tokenHash },
+    select: { id: true, organizationId: true, expiresAt: true, usedAt: true },
+  });
+
+  if (!invite) {
+    warn(request.log, "orgs.join.invalid_token", { auth0Sub });
+    return reply.status(404).send({ code: "INVITE_NOT_FOUND", message: "Invite link is invalid or has already been used." });
+  }
+
+  if (invite.usedAt) {
+    warn(request.log, "orgs.join.token_already_used", { auth0Sub, inviteId: invite.id });
+    return reply.status(409).send({ code: "INVITE_USED", message: "This invite link has already been used." });
+  }
+
+  if (invite.expiresAt < new Date()) {
+    warn(request.log, "orgs.join.token_expired", { auth0Sub, inviteId: invite.id });
+    return reply.status(410).send({ code: "INVITE_EXPIRED", message: "This invite link has expired. Ask an admin to generate a new one." });
+  }
+
+  // Block users already in a different org
+  const existingUser = await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: { id: true, organizationId: true },
+  });
+  if (existingUser?.organizationId && existingUser.organizationId !== invite.organizationId) {
+    warn(request.log, "orgs.join.already_in_org", { auth0Sub, existingOrgId: existingUser.organizationId });
+    return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
+  }
+  // If already in the same org, still mark invite used and return current mapping
+  if (existingUser?.organizationId === invite.organizationId) {
+    await prisma.orgInvite.update({ where: { id: invite.id }, data: { usedAt: new Date(), usedById: existingUser.id } });
+  }
+
+  const userSelect = {
+    id: true, auth0Sub: true, email: true, displayName: true, role: true,
+    organizationId: true, organization: { select: { slug: true } },
+    houseId: true, house: { select: { name: true, color: true } },
+  } as const;
+
+  const user = existingUser
+    ? await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { organizationId: invite.organizationId, displayName, email: email ?? undefined },
+        select: userSelect,
+      })
+    : await prisma.user.create({
+        data: { auth0Sub, email: email ?? null, displayName, organizationId: invite.organizationId },
+        select: userSelect,
+      });
+
+  // Mark invite as used (idempotent — already done above if org matched)
+  await prisma.orgInvite.update({
+    where: { id: invite.id },
+    data: { usedAt: new Date(), usedById: user.id },
+  });
+
+  info(request.log, "orgs.join.success", { userId: user.id, orgId: invite.organizationId, inviteId: invite.id });
+  return reply.status(200).send({ ...mapAppUser(user), created: !existingUser });
+});
+
   return app;
 }
 
 const app = await buildApp();
 await app.listen({ port, host: "0.0.0.0" });
 info(app.log, "api.listening", { port });
+
+

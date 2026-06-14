@@ -2,6 +2,7 @@ import {
   assignUserHouse,
   awardPoints,
   createHouse,
+  createInviteLink,
   readActivityFeed,
   readAdminContext,
   readLeaderboard,
@@ -11,6 +12,7 @@ import {
 } from "./actions/points";
 import { DashboardShell } from "@/components/DashboardShell";
 import { AdminForms } from "@/components/AdminForms";
+import { OrgOnboarding } from "@/components/OrgOnboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,11 @@ export default async function Home() {
         </div>
       </div>
     );
+  }
+
+  // No org yet — show onboarding (create or join)
+  if (session.needsOrg) {
+    return <OrgOnboarding userName={session.userName ?? "there"} />;
   }
 
   // Block unassigned users — nothing is visible until an admin assigns them to a house
@@ -74,7 +81,7 @@ export default async function Home() {
     readMembers(),
     readActivityFeed(),
     readMemberScores(),
-    session.role === "ADMIN" ? readAdminContext() : Promise.resolve(null),
+    (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext() : Promise.resolve(null),
   ]);
 
   const memberPoints = memberScores ?? [];
@@ -85,6 +92,7 @@ export default async function Home() {
       houses={adminContext.houses}
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
+      onCreateInvite={createInviteLink}
     />
   ) : undefined;
 
