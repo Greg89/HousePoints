@@ -79,15 +79,15 @@ export function DashboardShell({
                 {session.houseName}
               </span>
             )}
-            {/* Award points button */}
+            {/* Award points button — hidden on mobile (FAB used instead) */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setAwardOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <Star weight="fill" size={16} />
-              <span className="hidden sm:inline">Award Points</span>
+              Award Points
             </motion.button>
             {/* User / logout */}
             <div className="flex items-center gap-1">
@@ -137,7 +137,7 @@ export function DashboardShell({
                 )}
               >
                 <Icon size={16} />
-                {label}
+                <span className="hidden sm:inline">{label}</span>
               </Tabs.Trigger>
             ))}
           </Tabs.List>
@@ -170,6 +170,17 @@ export function DashboardShell({
           </Tabs.Content>
         </Tabs.Root>
       </main>
+
+      {/* Mobile FAB — Award Points (visible only below sm) */}
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setAwardOpen(true)}
+        className="sm:hidden fixed bottom-6 right-6 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg"
+        aria-label="Award Points"
+      >
+        <Star weight="fill" size={24} />
+      </motion.button>
 
       {/* Award dialog */}
       <AwardPointsDialog

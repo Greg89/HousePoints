@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Plus, UserSwitch } from "@phosphor-icons/react";
+import { Plus, UserSwitch, PencilSimple } from "@phosphor-icons/react";
 
 interface AdminUser {
   id: string;
@@ -24,6 +24,7 @@ interface AdminFormsProps {
 
 export function AdminForms({ users, houses, onCreateHouse, onAssignHouse }: AdminFormsProps) {
   const [createPending, startCreate] = useTransition();
+  const [editPending, startEdit] = useTransition();
   const [assignPending, startAssign] = useTransition();
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -38,6 +39,24 @@ export function AdminForms({ users, houses, onCreateHouse, onAssignHouse }: Admi
         form.reset();
       } catch (err) {
         toast.error("Failed to create house", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
+  function handleEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
+    const form = e.currentTarget;
+    startEdit(async () => {
+      try {
+        await onCreateHouse(formData);
+        toast.success("House updated", { description: name });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to update house", {
           description: err instanceof Error ? err.message : "Something went wrong",
         });
       }
@@ -66,7 +85,7 @@ export function AdminForms({ users, houses, onCreateHouse, onAssignHouse }: Admi
   }
 
   return (
-    <div className="grid gap-6 sm:grid-cols-2">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {/* Create house */}
       <form onSubmit={handleCreate} className="grid gap-3 rounded-xl border p-5 bg-card">
         <h4 className="text-sm font-semibold flex items-center gap-2">
@@ -97,6 +116,44 @@ export function AdminForms({ users, houses, onCreateHouse, onAssignHouse }: Admi
           className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
           {createPending ? "Creating…" : "Create"}
+        </button>
+      </form>
+
+      {/* Edit house color / description */}
+      <form onSubmit={handleEdit} className="grid gap-3 rounded-xl border p-5 bg-card">
+        <h4 className="text-sm font-semibold flex items-center gap-2">
+          <PencilSimple size={16} />
+          Edit House
+        </h4>
+        <select
+          name="name"
+          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
+          required
+          defaultValue=""
+        >
+          <option value="" disabled>Select house…</option>
+          {houses.map((h) => (
+            <option key={h.id} value={h.name}>{h.name}</option>
+          ))}
+        </select>
+        <input
+          name="color"
+          type="color"
+          defaultValue="#7c3aed"
+          className="h-9 w-full rounded-lg border bg-background px-2 cursor-pointer"
+          title="New color"
+        />
+        <input
+          name="description"
+          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="Description (optional)"
+        />
+        <button
+          type="submit"
+          disabled={editPending}
+          className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {editPending ? "Saving…" : "Save changes"}
         </button>
       </form>
 

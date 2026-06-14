@@ -93,3 +93,10 @@ export const updateProfileSchema = z.object({
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const memberScoreSchema = z.object({
+  memberId: z.string(),
+  points: z.number().int(),
+});
+
+export type MemberScore = z.infer<typeof memberScoreSchema>;

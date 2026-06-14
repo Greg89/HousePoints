@@ -31,8 +31,8 @@ Each tier has its own file with detailed task breakdowns.
 |---|------|--------|
 | 2.1 | Wire up a log drain (SEQ / Axiom / Logtail) on Railway | ⬜ |
 | 2.2 | Configure Railway health check against `GET /health` | ⬜ |
-| 2.3 | `error.tsx` global error boundary in Next.js app | ⬜ |
-| 2.4 | Structured error responses from API (consistent `code` + `message`) | ⬜ |
+| 2.3 | `error.tsx` global error boundary in Next.js app | ✅ |
+| 2.4 | Structured error responses from API (consistent `code` + `message`) | ✅ |
 
 ---
 
@@ -41,11 +41,11 @@ Each tier has its own file with detailed task breakdowns.
 
 | # | Task | Status |
 |---|------|--------|
-| 3.1 | Per-member points on Leaderboard tab (new API endpoint) | ⬜ |
+| 3.1 | Per-member points on Leaderboard tab (new API endpoint) | ✅ |
 | 3.2 | Optimistic score update after awarding points | ⬜ |
 | 3.3 | Activity feed pagination / load-more (currently capped at 50) | ⬜ |
-| 3.4 | Admin: edit existing house color / description | ⬜ |
-| 3.5 | Mobile header — collapse nav into a menu on small screens | ⬜ |
+| 3.4 | Admin: edit existing house color / description | ✅ |
+| 3.5 | Mobile header — collapse nav into a menu on small screens | ✅ |
 
 ---
 

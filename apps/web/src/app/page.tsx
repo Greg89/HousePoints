@@ -5,6 +5,7 @@ import {
   readActivityFeed,
   readAdminContext,
   readLeaderboard,
+  readMemberScores,
   readMembers,
   readSessionSummary,
 } from "./actions/points";
@@ -68,24 +69,15 @@ export default async function Home() {
   }
 
   // Fetch dashboard data in parallel
-  const [leaderboard, members, activity, adminContext] = await Promise.all([
+  const [leaderboard, members, activity, memberScores, adminContext] = await Promise.all([
     readLeaderboard(),
     readMembers(),
     readActivityFeed(),
+    readMemberScores(),
     session.role === "ADMIN" ? readAdminContext() : Promise.resolve(null),
   ]);
 
-  // Compute per-member points from activity for the Leaderboard component
-  const memberPointMap = new Map<string, number>();
-  if (members && activity) {
-    // activity is house-level; member points need separate enrichment
-    // For now we derive from members' house scores proportionally via org members
-    // (placeholder — a dedicated per-member endpoint can be added later)
-  }
-  const memberPoints = (members ?? []).map((m) => ({
-    memberId: m.id,
-    points: memberPointMap.get(m.id) ?? 0,
-  }));
+  const memberPoints = memberScores ?? [];
 
   const adminSection = adminContext ? (
     <AdminForms

@@ -153,7 +153,7 @@ app.addHook("onResponse", async (request, reply) => {
 
 app.setErrorHandler(async (err, request, reply) => {
   error(request.log, "request.unhandled_error", { statusCode: 500 }, err);
-  await reply.status(500).send({ message: "Internal server error" });
+  await reply.status(500).send({ code: "INTERNAL_ERROR", message: "Internal server error" });
 });
 
 app.get("/health", async (request) => {
@@ -168,7 +168,7 @@ app.post("/houses/leaderboard", async (request, reply) => {
     warn(request.log, "request.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -230,7 +230,7 @@ app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 mi
     warn(request.log, "users.bootstrap.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const existing = await prisma.user.findUnique({
@@ -326,7 +326,7 @@ app.post("/admin/context", async (request, reply) => {
     warn(request.log, "request.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -379,7 +379,7 @@ app.post("/admin/houses", async (request, reply) => {
     warn(request.log, "request.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -399,6 +399,7 @@ app.post("/admin/houses", async (request, reply) => {
       },
     },
     update: {
+      color: parsed.data.color,
       ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
     },
     create: {
@@ -432,7 +433,7 @@ app.post("/admin/users/assign-house", async (request, reply) => {
     warn(request.log, "request.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -491,7 +492,7 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
     warn(request.log, "request.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -583,7 +584,7 @@ app.post("/users/profile", async (request, reply) => {
     warn(request.log, "users.profile.validation_failed", {
       issues: parsed.error.issues,
     });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -609,13 +610,45 @@ app.post("/users/profile", async (request, reply) => {
   return updated;
 });
 
+// POST /users/scores - per-member point totals (sum of delta grouped by targetUserId)
+app.post("/users/scores", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  const grouped = await prisma.pointTransaction.groupBy({
+    by: ["targetUserId"],
+    where: {
+      organizationId: actor.organizationId,
+      targetUserId: { not: null },
+    },
+    _sum: { delta: true },
+    orderBy: { _sum: { delta: "desc" } },
+  });
+
+  return grouped.map((row) => ({
+    memberId: row.targetUserId as string,
+    points: row._sum.delta ?? 0,
+  }));
+});
+
 // POST /members - returns org members for the award dialog (any authenticated member)
 app.post("/members", async (request, reply) => {
   const parsed = actorScopeSchema.safeParse(request.body);
 
   if (!parsed.success) {
     warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);
@@ -653,7 +686,7 @@ app.post("/transactions/recent", async (request, reply) => {
 
   if (!parsed.success) {
     warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-    return reply.status(400).send({ errors: parsed.error.flatten() });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
   const actor = await getActorBySub(parsed.data.actorAuth0Sub);

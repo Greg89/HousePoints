@@ -7,6 +7,7 @@ import { logError, logInfo, logWarn } from "@/lib/logging";
 import type {
   ActivityItem,
   LeaderboardEntry,
+  MemberScore,
   OrgMember,
 } from "@housepoints/contracts";
 
@@ -549,6 +550,28 @@ export async function readActivityFeed() {
   });
   if (!response.ok) return null;
   return (await response.json()) as ActivityItem[];
+}
+
+export async function readMemberScores(): Promise<MemberScore[] | null> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) return null;
+  const session = await auth0.getSession();
+  if (!session) return null;
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+  const response = await fetch(`${getApiBaseUrl()}/users/scores`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+  return (await response.json()) as MemberScore[];
 }
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */
