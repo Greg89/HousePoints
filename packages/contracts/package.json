@@ -13,12 +13,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "node -e \"console.log('No contracts lint rules configured yet')\""
   },
   "dependencies": {
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "@vitest/coverage-v8": "^4.1.8",
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }

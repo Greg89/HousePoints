@@ -54,9 +54,9 @@ Each tier has its own file with detailed task breakdowns.
 
 | # | Task | Status |
 |---|------|--------|
-| 4.1 | Vitest unit tests — Zod schemas + utility functions | ⬜ |
-| 4.2 | Fastify integration tests via `app.inject` | ⬜ |
-| 4.3 | GitHub Actions workflow: lint → type-check → build on every PR | ⬜ |
+| 4.1 | Vitest unit tests — Zod schemas + utility functions | ✅ |
+| 4.2 | Fastify integration tests via `app.inject` | ✅ |
+| 4.3 | GitHub Actions workflow: lint → type-check → build on every PR | ✅ |
 | 4.4 | Playwright e2e: login → award points → see score update | ⬜ |
 
 ---

@@ -103,24 +103,25 @@ function mapAppUser(user: {
   };
 }
 
-const app = Fastify({
-  logger: {
-    level: logLevel,
-    base: {
-      service: serviceName,
-      env: process.env.NODE_ENV ?? "development",
+export async function buildApp() {
+  const app = Fastify({
+    logger: {
+      level: logLevel,
+      base: {
+        service: serviceName,
+        env: process.env.NODE_ENV ?? "development",
+      },
     },
-  },
-  requestIdHeader: "x-request-id",
-  genReqId: () => randomUUID(),
-  disableRequestLogging: true,
-});
+    requestIdHeader: "x-request-id",
+    genReqId: () => randomUUID(),
+    disableRequestLogging: true,
+  });
 
-info(app.log, "api.starting", { port });
+  info(app.log, "api.starting", { port });
 
-await app.register(cors, {
-  origin: true,
-});
+  await app.register(cors, {
+    origin: true,
+  });
 
 await app.register(rateLimit, {
   global: true,
@@ -723,5 +724,9 @@ app.post("/transactions/recent", async (request, reply) => {
   }));
 });
 
+  return app;
+}
+
+const app = await buildApp();
 await app.listen({ port, host: "0.0.0.0" });
 info(app.log, "api.listening", { port });

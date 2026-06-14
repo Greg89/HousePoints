@@ -89,7 +89,7 @@ export const assignUserHouseSchema = z.object({
 
 export const updateProfileSchema = z.object({
   actorAuth0Sub: z.string().min(1),
-  displayName: z.string().min(1).max(120).trim(),
+  displayName: z.string().trim().min(1).max(120),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
