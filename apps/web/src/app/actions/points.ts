@@ -3,6 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { getAuth0Client } from "@/lib/auth0";
 import { logError, logInfo, logWarn } from "@/lib/logging";
+import type {
+  ActivityItem,
+  LeaderboardEntry,
+  OrgMember,
+} from "@housepoints/contracts";
 
 type AppUserMapping = {
   id: string;
@@ -489,7 +494,7 @@ export async function readLeaderboard() {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  return (await response.json()) as import("@housepoints/contracts").LeaderboardEntry[];
+  return (await response.json()) as LeaderboardEntry[];
 }
 
 export async function readMembers() {
@@ -511,7 +516,7 @@ export async function readMembers() {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  return (await response.json()) as import("@housepoints/contracts").OrgMember[];
+  return (await response.json()) as OrgMember[];
 }
 
 export async function readActivityFeed() {
@@ -533,7 +538,7 @@ export async function readActivityFeed() {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  return (await response.json()) as import("@housepoints/contracts").ActivityItem[];
+  return (await response.json()) as ActivityItem[];
 }
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */
