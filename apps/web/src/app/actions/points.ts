@@ -228,7 +228,7 @@ async function getActorMappingForAdmin(action: string, requestId: string) {
     displayName: session.user.name,
   });
 
-  if (mapping.role !== "ADMIN") {
+  if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     logWarn("web.admin.forbidden", {
       action,
       requestId,
@@ -360,7 +360,7 @@ export async function readAdminContext(): Promise<{
     displayName: session.user.name,
   });
 
-  if (mapping.role !== "ADMIN") {
+  if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     return null;
   }
 
