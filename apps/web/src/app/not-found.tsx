@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 
 export default function NotFound() {
@@ -9,13 +10,13 @@ export default function NotFound() {
         <p className="text-muted-foreground text-sm">
           The page you&apos;re looking for doesn&apos;t exist.
         </p>
-        <a
+        <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
         >
           <ArrowLeft size={14} />
           Back to dashboard
-        </a>
+        </Link>
       </div>
     </div>
   );

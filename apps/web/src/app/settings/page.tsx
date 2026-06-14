@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { readSessionSummary, updateDisplayName } from "@/app/actions/points";
@@ -21,13 +22,13 @@ export default async function SettingsPage() {
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
-          <a
+          <Link
             href="/"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft size={16} />
             Back to dashboard
-          </a>
+          </Link>
         </div>
       </header>
 

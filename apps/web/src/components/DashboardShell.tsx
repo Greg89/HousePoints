@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { Trophy, Clock, ChartBar, Star, SignOut, User, Gear } from "@phosphor-icons/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, Clock, ChartBar, Star, SignOut, User } from "@phosphor-icons/react";
+import { motion } from "framer-motion";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowCounterClockwise } from "@phosphor-icons/react";
 
 export default function GlobalError({
@@ -29,9 +30,9 @@ export default function GlobalError({
           Try again
         </button>
         <div>
-          <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
