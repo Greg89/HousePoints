@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Clock, ArrowRight } from "@phosphor-icons/react";
 import type { ActivityItem } from "@housepoints/contracts";
+import { TRAIT_LABELS } from "@housepoints/contracts";
 
 interface ActivityFeedProps {
   items: ActivityItem[];
@@ -72,6 +73,11 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                   <span className="text-muted-foreground text-xs">({item.targetHouseName})</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{item.reason}</p>
+                {item.trait && (
+                  <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    {TRAIT_LABELS[item.trait]}
+                  </span>
+                )}
                 <span className="text-xs text-muted-foreground mt-1 block">
                   {relativeTime(item.createdAt)}
                 </span>

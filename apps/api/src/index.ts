@@ -561,6 +561,7 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
       targetHouseId: targetUser.houseId,
       delta: parsed.data.delta,
       reason: parsed.data.reason,
+      trait: parsed.data.trait,
     },
   });
 
@@ -705,6 +706,7 @@ app.post("/transactions/recent", async (request, reply) => {
       id: true,
       delta: true,
       reason: true,
+      trait: true,
       createdAt: true,
       actor: { select: { displayName: true } },
       targetUser: { select: { displayName: true } },
@@ -720,6 +722,7 @@ app.post("/transactions/recent", async (request, reply) => {
     targetHouseColor: tx.targetHouse.color,
     delta: tx.delta,
     reason: tx.reason,
+    trait: tx.trait ?? null,
     createdAt: tx.createdAt.toISOString(),
   }));
 });

@@ -9,6 +9,7 @@ import type {
   LeaderboardEntry,
   MemberScore,
   OrgMember,
+  Trait,
 } from "@housepoints/contracts";
 
 type AppUserMapping = {
@@ -578,7 +579,8 @@ export async function readMemberScores(): Promise<MemberScore[] | null> {
 export async function awardPoints(
   targetUserId: string,
   delta: number,
-  reason: string
+  reason: string,
+  trait: Trait
 ): Promise<void> {
   const requestId = randomUUID();
   const auth0 = getAuth0Client();
@@ -594,7 +596,7 @@ export async function awardPoints(
   const response = await fetch(`${getApiBaseUrl()}/points/adjust`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-request-id": requestId },
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetUserId, delta, reason }),
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetUserId, delta, reason, trait }),
     cache: "no-store",
   });
   if (!response.ok) {

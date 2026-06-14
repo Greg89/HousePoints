@@ -12,6 +12,7 @@ import type {
   LeaderboardEntry,
   OrgMember,
   ActivityItem,
+  Trait,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -28,7 +29,7 @@ interface DashboardShellProps {
   activity: ActivityItem[];
   /** Computed per-member point totals from activity */
   memberPoints: { memberId: string; points: number }[];
-  onAward: (targetUserId: string, delta: number, reason: string) => Promise<void>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<void>;
   loginUrl: string;
   logoutUrl: string;
   adminSection?: React.ReactNode;

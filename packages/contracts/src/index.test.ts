@@ -7,6 +7,10 @@ import {
   updateProfileSchema,
   actorScopeSchema,
   memberScoreSchema,
+  activityItemSchema,
+  traitSchema,
+  TRAITS,
+  TRAIT_LABELS,
 } from "./index";
 
 // ---------------------------------------------------------------------------
@@ -18,6 +22,7 @@ describe("adjustPointsSchema", () => {
     targetUserId: "user_1",
     delta: 10,
     reason: "Great work on the sprint",
+    trait: "COLLABORATION" as const,
   };
 
   it("accepts a valid input", () => {
@@ -57,6 +62,74 @@ describe("adjustPointsSchema", () => {
 
   it("rejects empty actorAuth0Sub", () => {
     const result = adjustPointsSchema.safeParse({ ...valid, actorAuth0Sub: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an invalid trait value", () => {
+    const result = adjustPointsSchema.safeParse({ ...valid, trait: "NOT_A_TRAIT" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing trait", () => {
+    const { trait: _t, ...withoutTrait } = valid;
+    const result = adjustPointsSchema.safeParse(withoutTrait);
+    expect(result.success).toBe(false);
+    expect(result.error?.flatten().fieldErrors.trait).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// traitSchema
+// ---------------------------------------------------------------------------
+describe("traitSchema", () => {
+  it("accepts every defined trait value", () => {
+    for (const t of TRAITS) {
+      expect(traitSchema.safeParse(t).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown string", () => {
+    expect(traitSchema.safeParse("SUPERHERO").success).toBe(false);
+  });
+
+  it("rejects empty string", () => {
+    expect(traitSchema.safeParse("").success).toBe(false);
+  });
+
+  it("TRAIT_LABELS has an entry for every trait", () => {
+    for (const t of TRAITS) {
+      expect(TRAIT_LABELS[t]).toBeTruthy();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// activityItemSchema
+// ---------------------------------------------------------------------------
+describe("activityItemSchema", () => {
+  const base = {
+    id: "tx-1",
+    actorName: "Bob",
+    targetUserName: "Alice",
+    targetHouseName: "Phoenix",
+    targetHouseColor: "#7c3aed",
+    delta: 10,
+    reason: "Great work",
+    createdAt: new Date().toISOString(),
+  };
+
+  it("accepts a valid item with a known trait", () => {
+    const result = activityItemSchema.safeParse({ ...base, trait: "LEADERSHIP" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a valid item with trait: null", () => {
+    const result = activityItemSchema.safeParse({ ...base, trait: null });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an invalid trait in activity item", () => {
+    const result = activityItemSchema.safeParse({ ...base, trait: "MADE_UP" });
     expect(result.success).toBe(false);
   });
 });

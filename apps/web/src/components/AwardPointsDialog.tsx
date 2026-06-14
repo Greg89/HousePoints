@@ -6,7 +6,8 @@ import * as Select from "@radix-ui/react-select";
 import { Star, CaretDown, Check, X } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import type { OrgMember, LeaderboardEntry } from "@housepoints/contracts";
+import type { OrgMember, LeaderboardEntry, Trait } from "@housepoints/contracts";
+import { TRAITS, TRAIT_LABELS } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
 interface AwardPointsDialogProps {
@@ -17,7 +18,7 @@ interface AwardPointsDialogProps {
   /** Houses available for display context only */
   houses: LeaderboardEntry[];
   /** Server action to submit the award */
-  onAward: (targetUserId: string, delta: number, reason: string) => Promise<void>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<void>;
 }
 
 const QUICK_AMOUNTS = [5, 10, 25, 50];
@@ -31,6 +32,7 @@ export function AwardPointsDialog({
   const [targetUserId, setTargetUserId] = useState("");
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
+  const [trait, setTrait] = useState<Trait | "">("");
   const [isPending, startTransition] = useTransition();
 
   const selectedMember = members.find((m) => m.id === targetUserId);
@@ -39,6 +41,7 @@ export function AwardPointsDialog({
     setTargetUserId("");
     setDelta("");
     setReason("");
+    setTrait("");
   }
 
   function handleClose(value: boolean) {
@@ -48,10 +51,10 @@ export function AwardPointsDialog({
 
   function handleSubmit() {
     const deltaNum = parseInt(delta, 10);
-    if (!targetUserId || !deltaNum || !reason.trim()) return;
+    if (!targetUserId || !deltaNum || !reason.trim() || !trait) return;
     startTransition(async () => {
       try {
-        await onAward(targetUserId, deltaNum, reason);
+        await onAward(targetUserId, deltaNum, reason, trait as Trait);
         toast.success("Points awarded!", {
           description: `+${deltaNum} pts to ${selectedMember?.displayName}`,
         });
@@ -71,7 +74,8 @@ export function AwardPointsDialog({
     !isNaN(deltaNum) &&
     deltaNum >= 1 &&
     deltaNum <= 100 &&
-    reason.trim().length >= 3;
+    reason.trim().length >= 3 &&
+    !!trait;
 
   return (
     <Dialog.Root open={open} onOpenChange={handleClose}>
@@ -201,7 +205,52 @@ export function AwardPointsDialog({
 
             {/* Reason */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Reason</label>
+              <label className="text-sm font-medium">Trait</label>
+              <Select.Root value={trait} onValueChange={(v) => setTrait(v as Trait)}>
+                <Select.Trigger
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-sm",
+                    "hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                  )}
+                >
+                  <Select.Value placeholder="Select a trait…">
+                    {trait ? TRAIT_LABELS[trait as Trait] : null}
+                  </Select.Value>
+                  <Select.Icon>
+                    <CaretDown size={16} className="text-muted-foreground" />
+                  </Select.Icon>
+                </Select.Trigger>
+                <Select.Portal>
+                  <Select.Content
+                    className="z-[60] min-w-[240px] max-h-72 overflow-y-auto rounded-lg border bg-popover shadow-lg"
+                    position="popper"
+                    sideOffset={4}
+                  >
+                    <Select.Viewport className="p-1">
+                      {TRAITS.map((t) => (
+                        <Select.Item
+                          key={t}
+                          value={t}
+                          className={cn(
+                            "flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer",
+                            "hover:bg-accent/10 focus:bg-accent/10 outline-none select-none"
+                          )}
+                        >
+                          <Select.ItemText>{TRAIT_LABELS[t]}</Select.ItemText>
+                          <Select.ItemIndicator className="ml-auto">
+                            <Check size={14} />
+                          </Select.ItemIndicator>
+                        </Select.Item>
+                      ))}
+                    </Select.Viewport>
+                  </Select.Content>
+                </Select.Portal>
+              </Select.Root>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Note</label>
               <textarea
                 rows={3}
                 placeholder="Describe what they did well…"

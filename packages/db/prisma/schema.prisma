@@ -11,6 +11,29 @@ enum Role {
   ADMIN
 }
 
+enum Trait {
+  LEADERSHIP
+  OWNERSHIP
+  COLLABORATION
+  MENTORSHIP
+  TECHNICAL_EXCELLENCE
+  PROBLEM_SOLVING
+  INNOVATION
+  KNOWLEDGE_SHARING
+  COMMUNICATION
+  CUSTOMER_FOCUS
+  RELIABILITY
+  INITIATIVE
+  PROCESS_IMPROVEMENT
+  TEAM_SUPPORT
+  ACCOUNTABILITY
+  ADAPTABILITY
+  POSITIVE_INFLUENCE
+  ABOVE_AND_BEYOND
+  CULTURE_CHAMPION
+  UNSUNG_HERO
+}
+
 model Organization {
   id           String             @id @default(cuid())
   name         String
@@ -65,6 +88,7 @@ model PointTransaction {
   targetHouseId  String
   delta          Int
   reason         String
+  trait          Trait?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)

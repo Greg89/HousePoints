@@ -1,10 +1,61 @@
 import { z } from "zod";
 
+export const TRAITS = [
+  "LEADERSHIP",
+  "OWNERSHIP",
+  "COLLABORATION",
+  "MENTORSHIP",
+  "TECHNICAL_EXCELLENCE",
+  "PROBLEM_SOLVING",
+  "INNOVATION",
+  "KNOWLEDGE_SHARING",
+  "COMMUNICATION",
+  "CUSTOMER_FOCUS",
+  "RELIABILITY",
+  "INITIATIVE",
+  "PROCESS_IMPROVEMENT",
+  "TEAM_SUPPORT",
+  "ACCOUNTABILITY",
+  "ADAPTABILITY",
+  "POSITIVE_INFLUENCE",
+  "ABOVE_AND_BEYOND",
+  "CULTURE_CHAMPION",
+  "UNSUNG_HERO",
+] as const;
+
+export type Trait = (typeof TRAITS)[number];
+
+export const TRAIT_LABELS: Record<Trait, string> = {
+  LEADERSHIP:          "Leadership",
+  OWNERSHIP:           "Ownership",
+  COLLABORATION:       "Collaboration",
+  MENTORSHIP:          "Mentorship",
+  TECHNICAL_EXCELLENCE:"Technical Excellence",
+  PROBLEM_SOLVING:     "Problem Solving",
+  INNOVATION:          "Innovation",
+  KNOWLEDGE_SHARING:   "Knowledge Sharing",
+  COMMUNICATION:       "Communication",
+  CUSTOMER_FOCUS:      "Customer Focus",
+  RELIABILITY:         "Reliability",
+  INITIATIVE:          "Initiative",
+  PROCESS_IMPROVEMENT: "Process Improvement",
+  TEAM_SUPPORT:        "Team Support",
+  ACCOUNTABILITY:      "Accountability",
+  ADAPTABILITY:        "Adaptability",
+  POSITIVE_INFLUENCE:  "Positive Influence",
+  ABOVE_AND_BEYOND:    "Above & Beyond",
+  CULTURE_CHAMPION:    "Culture Champion",
+  UNSUNG_HERO:         "Unsung Hero",
+};
+
+export const traitSchema = z.enum(TRAITS);
+
 export const adjustPointsSchema = z.object({
   actorAuth0Sub: z.string().min(1),
   targetUserId: z.string().min(1),
   delta: z.number().int().min(1).max(100),
   reason: z.string().min(3).max(240),
+  trait: traitSchema,
 });
 
 export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
@@ -53,6 +104,7 @@ export const activityItemSchema = z.object({
   targetHouseColor: z.string(),
   delta: z.number().int(),
   reason: z.string(),
+  trait: traitSchema.nullable(),
   createdAt: z.string(),
 });
 

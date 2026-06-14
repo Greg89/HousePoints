@@ -39,6 +39,8 @@ const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
+const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
+const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 
 // â”€â”€ Shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
@@ -148,7 +150,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|ghost", targetUserId: "user-1", delta: 10, reason: "Great sprint work" },
+      payload: { actorAuth0Sub: "auth0|ghost", targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "COLLABORATION" },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
@@ -163,7 +165,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Great sprint work" },
+      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "COLLABORATION" },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("CROSS_ORGANIZATION_TARGET");
@@ -178,7 +180,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Great sprint work" },
+      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "LEADERSHIP" },
     });
     expect(res.statusCode).toBe(422);
     expect(res.json().code).toBe("TARGET_USER_UNASSIGNED");
@@ -190,10 +192,57 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: -5, reason: "Bad attempt" },
+      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: -5, reason: "Bad attempt", trait: "INNOVATION" },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
+    await app.close();
+  });
+
+  it("returns 400 VALIDATION_ERROR when trait is missing", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Good work" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    await app.close();
+  });
+
+  it("awards points and returns 200 with the transaction id and trait", async () => {
+    const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin())  // getActorBySub
+      .mockResolvedValueOnce(targetUser);  // target user lookup
+    mockTxCreate.mockResolvedValue({
+      id: "tx-abc",
+      organizationId: "org-1",
+      actorUserId: "user-2",
+      targetUserId: "user-1",
+      targetHouseId: "house-1",
+      delta: 15,
+      reason: "Crushed the demo",
+      trait: "TECHNICAL_EXCELLENCE",
+      createdAt: new Date(),
+    });
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        actorAuth0Sub: "auth0|admin",
+        targetUserId: "user-1",
+        delta: 15,
+        reason: "Crushed the demo",
+        trait: "TECHNICAL_EXCELLENCE",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.id).toBe("tx-abc");
+    expect(body.trait).toBe("TECHNICAL_EXCELLENCE");
     await app.close();
   });
 });
@@ -256,4 +305,71 @@ describe("POST /admin/users/assign-house", () => {
     await app.close();
   });
 });
+describe("POST /transactions/recent", () => {
+  it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { actorAuth0Sub: "auth0|ghost" },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
+    await app.close();
+  });
 
+  it("returns activity items with trait included", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([
+      {
+        id: "tx-1",
+        delta: 10,
+        reason: "Great collaboration",
+        trait: "COLLABORATION",
+        createdAt: new Date("2026-01-01T12:00:00Z"),
+        actor: { displayName: "Bob" },
+        targetUser: { displayName: "Alice" },
+        targetHouse: { name: "Phoenix", color: "#7c3aed" },
+      },
+    ]);
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { actorAuth0Sub: "auth0|member" },
+    });
+    expect(res.statusCode).toBe(200);
+    const items = res.json();
+    expect(items).toHaveLength(1);
+    expect(items[0].trait).toBe("COLLABORATION");
+    expect(items[0].actorName).toBe("Bob");
+    expect(items[0].delta).toBe(10);
+    await app.close();
+  });
+
+  it("returns trait as null when transaction has no trait", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([
+      {
+        id: "tx-2",
+        delta: 5,
+        reason: "Legacy record",
+        trait: null,
+        createdAt: new Date("2026-01-01T11:00:00Z"),
+        actor: { displayName: "Bob" },
+        targetUser: { displayName: "Alice" },
+        targetHouse: { name: "Phoenix", color: "#7c3aed" },
+      },
+    ]);
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { actorAuth0Sub: "auth0|member" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()[0].trait).toBeNull();
+    await app.close();
+  });
+});
