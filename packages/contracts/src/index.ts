@@ -28,16 +28,43 @@ export const appUserSchema = z.object({
   organizationSlug: z.string(),
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
+  houseColor: z.string().nullable(),
   created: z.boolean(),
 });
 
 export type AppUser = z.infer<typeof appUserSchema>;
 
+export const orgMemberSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  role: z.enum(["MEMBER", "ADMIN"]),
+  houseId: z.string().nullable(),
+  houseName: z.string().nullable(),
+  houseColor: z.string().nullable(),
+});
+
+export type OrgMember = z.infer<typeof orgMemberSchema>;
+
+export const activityItemSchema = z.object({
+  id: z.string(),
+  actorName: z.string(),
+  targetHouseName: z.string(),
+  targetHouseColor: z.string(),
+  delta: z.number().int(),
+  reason: z.string(),
+  createdAt: z.string(),
+});
+
+export type ActivityItem = z.infer<typeof activityItemSchema>;
+
 export const leaderboardEntrySchema = z.object({
   id: z.string(),
   name: z.string(),
+  color: z.string(),
+  description: z.string().nullable(),
   score: z.number().int(),
   transactions: z.number().int().nonnegative(),
+  memberCount: z.number().int().nonnegative(),
 });
 
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
@@ -49,6 +76,8 @@ export const actorScopeSchema = z.object({
 export const createHouseSchema = z.object({
   actorAuth0Sub: z.string().min(1),
   name: z.string().min(2).max(80),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7c3aed"),
+  description: z.string().max(280).optional(),
 });
 
 export const assignUserHouseSchema = z.object({

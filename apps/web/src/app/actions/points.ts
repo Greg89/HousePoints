@@ -14,6 +14,7 @@ type AppUserMapping = {
   organizationSlug: string;
   houseId: string | null;
   houseName: string | null;
+  houseColor: string | null;
   created: boolean;
 };
 
@@ -234,6 +235,8 @@ export async function createHouse(formData: FormData): Promise<void> {
   const requestId = randomUUID();
   const actor = await getActorMappingForAdmin("createHouse", requestId);
   const name = String(formData.get("name") ?? "").trim();
+  const color = String(formData.get("color") ?? "#7c3aed").trim();
+  const description = String(formData.get("description") ?? "").trim() || undefined;
 
   if (!name) {
     throw new Error("House name is required");
@@ -248,6 +251,8 @@ export async function createHouse(formData: FormData): Promise<void> {
     body: JSON.stringify({
       actorAuth0Sub: actor.auth0Sub,
       name,
+      color,
+      description,
     }),
     cache: "no-store",
   });
@@ -395,6 +400,7 @@ export async function readSessionSummary(): Promise<{
   organizationSlug?: string;
   houseId?: string | null;
   houseName?: string | null;
+  houseColor?: string | null;
   role?: "MEMBER" | "ADMIN";
   needsHouseAssignment?: boolean;
 }> {
@@ -458,7 +464,103 @@ export async function readSessionSummary(): Promise<{
     organizationSlug: mapping.organizationSlug,
     houseId: mapping.houseId,
     houseName: mapping.houseName,
+    houseColor: mapping.houseColor,
     role: mapping.role,
     needsHouseAssignment: !mapping.houseId,
   };
+}
+
+export async function readLeaderboard() {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) return null;
+  const session = await auth0.getSession();
+  if (!session) return null;
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+  const response = await fetch(`${getApiBaseUrl()}/houses/leaderboard`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+  return (await response.json()) as import("@housepoints/contracts").LeaderboardEntry[];
+}
+
+export async function readMembers() {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) return null;
+  const session = await auth0.getSession();
+  if (!session) return null;
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+  const response = await fetch(`${getApiBaseUrl()}/members`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+  return (await response.json()) as import("@housepoints/contracts").OrgMember[];
+}
+
+export async function readActivityFeed() {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) return null;
+  const session = await auth0.getSession();
+  if (!session) return null;
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+  const response = await fetch(`${getApiBaseUrl()}/transactions/recent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+  return (await response.json()) as import("@housepoints/contracts").ActivityItem[];
+}
+
+/** Called by AwardPointsDialog – takes typed args instead of FormData */
+export async function awardPoints(
+  targetHouseId: string,
+  delta: number,
+  reason: string
+): Promise<void> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) throw new Error("Auth0 is not configured");
+  const session = await auth0.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+  const response = await fetch(`${getApiBaseUrl()}/points/adjust`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetHouseId, delta, reason }),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Award points failed: ${body}`);
+  }
 }

@@ -23,10 +23,12 @@ model Organization {
 }
 
 model House {
-  id           String             @id @default(cuid())
+  id             String             @id @default(cuid())
   organizationId String
-  name         String
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String
+  color          String             @default("#7c3aed")
+  description    String?
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   users        User[]
   transactions PointTransaction[]
   createdAt    DateTime           @default(now())

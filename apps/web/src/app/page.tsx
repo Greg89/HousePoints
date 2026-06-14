@@ -1,138 +1,124 @@
 import {
   assignUserHouse,
+  awardPoints,
   createHouse,
+  readActivityFeed,
   readAdminContext,
+  readLeaderboard,
+  readMembers,
   readSessionSummary,
-  submitPointAdjustment,
 } from "./actions/points";
+import { DashboardShell } from "@/components/DashboardShell";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await readSessionSummary();
-  const adminContext = session.role === "ADMIN" ? await readAdminContext() : null;
+
+  // Redirect to login if not authenticated
+  if (!session.isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-6 max-w-sm px-4">
+          <h1 className="font-display text-4xl font-bold text-primary">House Points</h1>
+          <p className="text-muted-foreground">Sign in to see standings and award points to your team.</p>
+          <a
+            href="/auth/login"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Sign in with Auth0
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Fetch dashboard data in parallel
+  const [leaderboard, members, activity, adminContext] = await Promise.all([
+    readLeaderboard(),
+    readMembers(),
+    readActivityFeed(),
+    session.role === "ADMIN" ? readAdminContext() : Promise.resolve(null),
+  ]);
+
+  // Compute per-member points from activity for the Leaderboard component
+  const memberPointMap = new Map<string, number>();
+  if (members && activity) {
+    // activity is house-level; member points need separate enrichment
+    // For now we derive from members' house scores proportionally via org members
+    // (placeholder — a dedicated per-member endpoint can be added later)
+  }
+  const memberPoints = (members ?? []).map((m) => ({
+    memberId: m.id,
+    points: memberPointMap.get(m.id) ?? 0,
+  }));
+
+  const adminSection = adminContext ? (
+    <div className="grid gap-6 sm:grid-cols-2">
+      <form action={createHouse} className="grid gap-3 rounded-xl border p-5 bg-card">
+        <h4 className="text-sm font-semibold">Create House</h4>
+        <input
+          name="name"
+          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="House name"
+          required
+        />
+        <input
+          name="color"
+          type="color"
+          defaultValue="#7c3aed"
+          className="h-9 rounded-lg border bg-background px-2"
+          title="House color"
+        />
+        <input
+          name="description"
+          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="Description (optional)"
+        />
+        <button type="submit" className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors">
+          Create
+        </button>
+      </form>
+
+      <form action={assignUserHouse} className="grid gap-3 rounded-xl border p-5 bg-card">
+        <h4 className="text-sm font-semibold">Assign User to House</h4>
+        <select name="targetUserId" className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none" required defaultValue="">
+          <option value="" disabled>Select member…</option>
+          {adminContext.users.map((u) => (
+            <option key={u.id} value={u.id}>{u.displayName}</option>
+          ))}
+        </select>
+        <select name="targetHouseId" className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none" required defaultValue="">
+          <option value="" disabled>Select house…</option>
+          {adminContext.houses.map((h) => (
+            <option key={h.id} value={h.id}>{h.name}</option>
+          ))}
+        </select>
+        <button type="submit" className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors">
+          Assign
+        </button>
+      </form>
+    </div>
+  ) : undefined;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-10 sm:px-10">
-      <header className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.2em] text-zinc-500">HousePoints</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Shared API + Structured Logging Baseline</h1>
-        <p className="text-zinc-600">
-          This page uses server actions that emit structured logs aligned with API logging conventions.
-        </p>
-      </header>
-
-      <section className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-zinc-900">Authentication</h2>
-        {session.isAuthenticated ? (
-          <div className="mt-3 space-y-2 text-sm text-zinc-700">
-            <p>
-              Signed in as <strong>{session.userName ?? "Unknown"}</strong>
-            </p>
-            <p className="break-all">Auth0 Subject: {session.userSub}</p>
-            <p className="break-all">App User Id: {session.appUserId ?? "Not mapped"}</p>
-            <p>Organization: {session.organizationSlug ?? "Not assigned"}</p>
-            <p>House Assignment: {session.houseId ?? "Pending assignment"}</p>
-            <a className="inline-block rounded-md bg-zinc-900 px-3 py-2 text-white" href="/auth/logout">
-              Log out
-            </a>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-2 text-sm text-zinc-700">
-            <p>You are not logged in.</p>
-            <a className="inline-block rounded-md bg-zinc-900 px-3 py-2 text-white" href="/auth/login">
-              Log in with Auth0
-            </a>
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-zinc-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-zinc-900">Adjust Points (Server Action)</h2>
-        <p className="mt-1 text-sm text-zinc-600">
-          This action derives the actor from the signed-in Auth0 session and logs `web.action.*` and `points.adjust.*` events with a request correlation id.
-        </p>
-        {session.isAuthenticated && session.needsHouseAssignment ? (
-          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Your account is mapped but does not have a house assignment yet. Ask an admin to assign your house before submitting point adjustments.
-          </p>
-        ) : null}
-        <form action={submitPointAdjustment} className="mt-4 grid gap-3">
-          <input
-            name="targetHouseId"
-            className="rounded-md border border-zinc-300 px-3 py-2"
-            placeholder="Target house id"
-            required
-          />
-          <input
-            name="delta"
-            type="number"
-            className="rounded-md border border-zinc-300 px-3 py-2"
-            placeholder="Points delta (e.g. 10 or -5)"
-            required
-          />
-          <input
-            name="reason"
-            className="rounded-md border border-zinc-300 px-3 py-2"
-            placeholder="Reason"
-            required
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-zinc-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-zinc-400"
-            disabled={!session.isAuthenticated || Boolean(session.needsHouseAssignment)}
-          >
-            Submit Point Adjustment
-          </button>
-        </form>
-      </section>
-
-      {adminContext ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-zinc-900">Admin Setup</h2>
-          <p className="mt-1 text-sm text-zinc-600">
-            Manage houses and member assignments for organization <strong>{adminContext.organizationSlug}</strong>.
-          </p>
-
-          <div className="mt-4 grid gap-6 lg:grid-cols-2">
-            <form action={createHouse} className="grid gap-3 rounded-lg border border-zinc-200 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Create House</h3>
-              <input
-                name="name"
-                className="rounded-md border border-zinc-300 px-3 py-2"
-                placeholder="House name"
-                required
-              />
-              <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2 text-white">
-                Create House
-              </button>
-            </form>
-
-            <form action={assignUserHouse} className="grid gap-3 rounded-lg border border-zinc-200 p-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Assign User To House</h3>
-              <select name="targetUserId" className="rounded-md border border-zinc-300 px-3 py-2" required>
-                <option value="">Select user</option>
-                {adminContext.users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.displayName} ({user.email ?? "no-email"})
-                  </option>
-                ))}
-              </select>
-              <select name="targetHouseId" className="rounded-md border border-zinc-300 px-3 py-2" required>
-                <option value="">Select house</option>
-                {adminContext.houses.map((house) => (
-                  <option key={house.id} value={house.id}>
-                    {house.name}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" className="rounded-md bg-zinc-900 px-4 py-2 text-white">
-                Assign House
-              </button>
-            </form>
-          </div>
-        </section>
-      ) : null}
-    </main>
+    <DashboardShell
+      session={{
+        userName: session.userName ?? "Team Member",
+        houseId: session.houseId ?? null,
+        houseName: session.houseName ?? null,
+        houseColor: session.houseColor ?? null,
+        role: session.role ?? "MEMBER",
+        needsHouseAssignment: session.needsHouseAssignment ?? false,
+      }}
+      leaderboard={leaderboard ?? []}
+      members={members ?? []}
+      activity={activity ?? []}
+      memberPoints={memberPoints}
+      onAward={awardPoints}
+      loginUrl="/auth/login"
+      logoutUrl="/auth/logout"
+      adminSection={adminSection}
+    />
   );
 }

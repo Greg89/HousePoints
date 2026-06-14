@@ -85,7 +85,7 @@ function mapAppUser(user: {
   houseId: string | null;
   organizationId: string;
   organization: { slug: string };
-  house: { name: string } | null;
+  house: { name: string; color: string } | null;
 }) {
   return {
     id: user.id,
@@ -97,6 +97,7 @@ function mapAppUser(user: {
     organizationSlug: user.organization.slug,
     houseId: user.houseId,
     houseName: user.house?.name ?? null,
+    houseColor: user.house?.color ?? null,
   };
 }
 
@@ -174,9 +175,12 @@ app.post("/houses/leaderboard", async (request, reply) => {
     select: {
       id: true,
       name: true,
+      color: true,
+      description: true,
       _count: {
         select: {
           transactions: true,
+          users: true,
         },
       },
       transactions: {
@@ -191,8 +195,11 @@ app.post("/houses/leaderboard", async (request, reply) => {
     .map((house) => ({
       id: house.id,
       name: house.name,
+      color: house.color,
+      description: house.description,
       score: house.transactions.reduce((total, tx) => total + tx.delta, 0),
       transactions: house._count.transactions,
+      memberCount: house._count.users,
     }))
     .sort((a, b) => b.score - a.score);
 
@@ -234,6 +241,7 @@ app.post("/users/bootstrap", async (request, reply) => {
       house: {
         select: {
           name: true,
+          color: true,
         },
       },
     },
@@ -279,6 +287,7 @@ app.post("/users/bootstrap", async (request, reply) => {
       house: {
         select: {
           name: true,
+          color: true,
         },
       },
     },
@@ -332,7 +341,7 @@ app.post("/admin/context", async (request, reply) => {
     prisma.house.findMany({
       where: { organizationId: actor.organizationId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, color: true, description: true },
     }),
   ]);
 
@@ -377,14 +386,20 @@ app.post("/admin/houses", async (request, reply) => {
         name: parsed.data.name,
       },
     },
-    update: {},
+    update: {
+      ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
+    },
     create: {
       organizationId: actor.organizationId,
       name: parsed.data.name,
+      color: parsed.data.color,
+      description: parsed.data.description ?? null,
     },
     select: {
       id: true,
       name: true,
+      color: true,
+      description: true,
     },
   });
 
@@ -541,6 +556,85 @@ app.post("/points/adjust", async (request, reply) => {
   });
 
   return reply.status(201).send(transaction);
+});
+
+// POST /members - returns org members for the award dialog (any authenticated member)
+app.post("/members", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  const members = await prisma.user.findMany({
+    where: { organizationId: actor.organizationId },
+    orderBy: { displayName: "asc" },
+    select: {
+      id: true,
+      displayName: true,
+      role: true,
+      houseId: true,
+      house: { select: { name: true, color: true } },
+    },
+  });
+
+  return members.map((m) => ({
+    id: m.id,
+    displayName: m.displayName,
+    role: m.role,
+    houseId: m.houseId,
+    houseName: m.house?.name ?? null,
+    houseColor: m.house?.color ?? null,
+  }));
+});
+
+// POST /transactions/recent - enriched activity feed
+app.post("/transactions/recent", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  const transactions = await prisma.pointTransaction.findMany({
+    where: { organizationId: actor.organizationId },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      delta: true,
+      reason: true,
+      createdAt: true,
+      actor: { select: { displayName: true } },
+      targetHouse: { select: { name: true, color: true } },
+    },
+  });
+
+  return transactions.map((tx) => ({
+    id: tx.id,
+    actorName: tx.actor.displayName,
+    targetHouseName: tx.targetHouse.name,
+    targetHouseColor: tx.targetHouse.color,
+    delta: tx.delta,
+    reason: tx.reason,
+    createdAt: tx.createdAt.toISOString(),
+  }));
 });
 
 await app.listen({ port, host: "0.0.0.0" });
