@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
+    "@fastify/rate-limit": "^11.0.0",
     "@housepoints/contracts": "*",
     "@housepoints/db": "*",
     "dotenv": "^17.2.3",

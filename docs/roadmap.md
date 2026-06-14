@@ -18,7 +18,7 @@ Each tier has its own file with detailed task breakdowns.
 | 1.1 | Display name edit (in-app profile settings) | ✅ |
 | 1.2 | `revalidatePath` after all mutating server actions | ✅ |
 | 1.3 | Toast feedback on server action success / failure | ✅ |
-| 1.4 | Rate limiting on API (`@fastify/rate-limit`) | ⬜ |
+| 1.4 | Rate limiting on API (`@fastify/rate-limit`) | ✅ |
 | 1.5 | Error boundary — API failure shows graceful UI, not Next.js crash page | ✅ |
 | 1.6 | Confirm `db:deploy` runs on Railway API start so migrations auto-apply | ✅ |
 

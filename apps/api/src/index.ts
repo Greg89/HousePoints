@@ -2,6 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import {
   actorScopeSchema,
   adjustPointsSchema,
@@ -121,6 +122,16 @@ await app.register(cors, {
   origin: true,
 });
 
+await app.register(rateLimit, {
+  global: true,
+  max: 60,
+  timeWindow: "1 minute",
+  errorResponseBuilder: () => ({
+    code: "RATE_LIMITED",
+    message: "Too many requests — please slow down.",
+  }),
+});
+
 app.addHook("onRequest", async (request) => {
   request.log = request.log.child({
     requestId: request.id,
@@ -212,7 +223,7 @@ app.post("/houses/leaderboard", async (request, reply) => {
   return leaderboard;
 });
 
-app.post("/users/bootstrap", async (request, reply) => {
+app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
   const parsed = bootstrapUserSchema.safeParse(request.body);
 
   if (!parsed.success) {
@@ -473,7 +484,7 @@ app.post("/admin/users/assign-house", async (request, reply) => {
   return updatedUser;
 });
 
-app.post("/points/adjust", async (request, reply) => {
+app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
   const parsed = adjustPointsSchema.safeParse(request.body);
 
   if (!parsed.success) {
