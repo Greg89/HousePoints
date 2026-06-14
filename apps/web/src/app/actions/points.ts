@@ -188,6 +188,8 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
       action: "submitPointAdjustment",
       requestId,
     });
+
+    revalidatePath("/");
   } catch (error) {
     logError("web.action.failed", {
       action: "submitPointAdjustment",
@@ -280,6 +282,8 @@ export async function createHouse(formData: FormData): Promise<void> {
     organizationId: actor.organizationId,
     name,
   });
+
+  revalidatePath("/");
 }
 
 export async function assignUserHouse(formData: FormData): Promise<void> {
@@ -325,6 +329,8 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
     targetUserId,
     targetHouseId,
   });
+
+  revalidatePath("/");
 }
 
 export async function readAdminContext(): Promise<{

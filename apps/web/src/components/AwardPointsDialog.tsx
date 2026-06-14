@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Select from "@radix-ui/react-select";
 import { Star, CaretDown, Check, X } from "@phosphor-icons/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 import type { OrgMember, LeaderboardEntry } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -49,9 +50,18 @@ export function AwardPointsDialog({
     const deltaNum = parseInt(delta, 10);
     if (!targetHouseId || !deltaNum || !reason.trim()) return;
     startTransition(async () => {
-      await onAward(targetHouseId, deltaNum, reason);
-      reset();
-      onOpenChange(false);
+      try {
+        await onAward(targetHouseId, deltaNum, reason);
+        toast.success("Points awarded!", {
+          description: `${deltaNum > 0 ? "+" : ""}${deltaNum} pts to ${selectedHouse?.name}`,
+        });
+        reset();
+        onOpenChange(false);
+      } catch (err) {
+        toast.error("Failed to award points", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
     });
   }
 

@@ -9,6 +9,7 @@ import {
   readSessionSummary,
 } from "./actions/points";
 import { DashboardShell } from "@/components/DashboardShell";
+import { AdminForms } from "@/components/AdminForms";
 
 export const dynamic = "force-dynamic";
 
@@ -87,51 +88,12 @@ export default async function Home() {
   }));
 
   const adminSection = adminContext ? (
-    <div className="grid gap-6 sm:grid-cols-2">
-      <form action={createHouse} className="grid gap-3 rounded-xl border p-5 bg-card">
-        <h4 className="text-sm font-semibold">Create House</h4>
-        <input
-          name="name"
-          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="House name"
-          required
-        />
-        <input
-          name="color"
-          type="color"
-          defaultValue="#7c3aed"
-          className="h-9 rounded-lg border bg-background px-2"
-          title="House color"
-        />
-        <input
-          name="description"
-          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="Description (optional)"
-        />
-        <button type="submit" className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors">
-          Create
-        </button>
-      </form>
-
-      <form action={assignUserHouse} className="grid gap-3 rounded-xl border p-5 bg-card">
-        <h4 className="text-sm font-semibold">Assign User to House</h4>
-        <select name="targetUserId" className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none" required defaultValue="">
-          <option value="" disabled>Select member…</option>
-          {adminContext.users.map((u) => (
-            <option key={u.id} value={u.id}>{u.displayName}</option>
-          ))}
-        </select>
-        <select name="targetHouseId" className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none" required defaultValue="">
-          <option value="" disabled>Select house…</option>
-          {adminContext.houses.map((h) => (
-            <option key={h.id} value={h.id}>{h.name}</option>
-          ))}
-        </select>
-        <button type="submit" className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-colors">
-          Assign
-        </button>
-      </form>
-    </div>
+    <AdminForms
+      users={adminContext.users}
+      houses={adminContext.houses}
+      onCreateHouse={createHouse}
+      onAssignHouse={assignUserHouse}
+    />
   ) : undefined;
 
   return (
