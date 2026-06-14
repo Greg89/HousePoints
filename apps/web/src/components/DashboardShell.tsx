@@ -58,7 +58,7 @@ export function DashboardShell({
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <h1 className="font-display text-xl font-bold tracking-wide text-primary">
             House Points
           </h1>
@@ -117,7 +117,7 @@ export function DashboardShell({
       )}
 
       {/* Main content */}
-      <main className="max-w-5xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Welcome */}
         <div className="mb-8">
           <p className="text-muted-foreground text-sm">Welcome back,</p>
@@ -150,7 +150,7 @@ export function DashboardShell({
 
           {/* Overview tab */}
           <Tabs.Content value="overview" className="focus:outline-none">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {leaderboard.map((house, index) => (
                 <HouseCard key={house.id} house={house} rank={index + 1} />
               ))}
