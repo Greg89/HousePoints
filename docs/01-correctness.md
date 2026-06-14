@@ -9,7 +9,7 @@ Users can update their display name at `/settings`. The DB is the source of trut
 
 ---
 
-## 1.2 `revalidatePath` after mutating server actions 🔄
+## 1.2 `revalidatePath` after mutating server actions ✅
 
 **Problem:** After awarding points, creating a house, or assigning a user to a house the page doesn't re-fetch — users see stale data until they manually refresh.
 
@@ -24,7 +24,7 @@ Users can update their display name at `/settings`. The DB is the source of trut
 
 ---
 
-## 1.3 Toast feedback on success / failure 🔄
+## 1.3 Toast feedback on success / failure ✅
 
 **Problem:** Mutating actions (award points, admin operations) give no visual confirmation. Users don't know if the action succeeded.
 
@@ -65,7 +65,7 @@ await app.register(rateLimit, { max: 60, timeWindow: "1 minute" });
 
 ---
 
-## 1.5 Error boundary ⬜
+## 1.5 Error boundary ✅
 
 **Problem:** If the API is down or returns an unexpected response during a server component render, Next.js shows a generic crash page.
 
@@ -81,7 +81,7 @@ Also add `apps/web/src/app/not-found.tsx` for clean 404s.
 
 ---
 
-## 1.6 Confirm `db:deploy` on Railway start ⬜
+## 1.6 Confirm `db:deploy` on Railway start ✅
 
 **Problem:** New migrations won't apply on Railway unless the API start command runs `prisma migrate deploy` first.
 
