@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const adjustPointsSchema = z.object({
   actorAuth0Sub: z.string().min(1),
-  targetHouseId: z.string().min(1),
-  delta: z.number().int().min(-100).max(100),
+  targetUserId: z.string().min(1),
+  delta: z.number().int().min(1).max(100),
   reason: z.string().min(3).max(240),
 });
 
@@ -48,6 +48,7 @@ export type OrgMember = z.infer<typeof orgMemberSchema>;
 export const activityItemSchema = z.object({
   id: z.string(),
   actorName: z.string(),
+  targetUserName: z.string(),
   targetHouseName: z.string(),
   targetHouseColor: z.string(),
   delta: z.number().int(),

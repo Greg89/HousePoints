@@ -553,7 +553,7 @@ export async function readActivityFeed() {
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */
 export async function awardPoints(
-  targetHouseId: string,
+  targetUserId: string,
   delta: number,
   reason: string
 ): Promise<void> {
@@ -571,7 +571,7 @@ export async function awardPoints(
   const response = await fetch(`${getApiBaseUrl()}/points/adjust`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-request-id": requestId },
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetHouseId, delta, reason }),
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetUserId, delta, reason }),
     cache: "no-store",
   });
   if (!response.ok) {

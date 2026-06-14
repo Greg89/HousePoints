@@ -39,37 +39,41 @@ model House {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  auth0Sub          String             @unique
-  email             String?            @unique
-  displayName       String
-  role              Role               @default(MEMBER)
-  organizationId    String
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  houseId           String?
-  house             House?             @relation(fields: [houseId], references: [id], onDelete: Restrict)
-  pointTransactions PointTransaction[] @relation("ActorTransactions")
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                   String             @id @default(cuid())
+  auth0Sub             String             @unique
+  email                String?            @unique
+  displayName          String
+  role                 Role               @default(MEMBER)
+  organizationId       String
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  houseId              String?
+  house                House?             @relation(fields: [houseId], references: [id], onDelete: Restrict)
+  pointTransactions    PointTransaction[] @relation("ActorTransactions")
+  receivedTransactions PointTransaction[] @relation("PointsReceived")
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([organizationId])
   @@index([houseId])
 }
 
 model PointTransaction {
-  id            String   @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
-  actorUserId   String
-  targetHouseId String
-  delta         Int
-  reason        String
-  createdAt     DateTime @default(now())
+  actorUserId    String
+  targetUserId   String?
+  targetHouseId  String
+  delta          Int
+  reason         String
+  createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  actor      User  @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
-  targetHouse House @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
+  actor        User         @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
+  targetUser   User?        @relation("PointsReceived", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetHouse  House        @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
   @@index([targetHouseId, createdAt])
+  @@index([targetUserId, createdAt])
   @@index([actorUserId, createdAt])
 }

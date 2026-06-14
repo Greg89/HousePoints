@@ -12,12 +12,12 @@ import { cn } from "@/lib/cn";
 interface AwardPointsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Houses available as targets */
-  houses: LeaderboardEntry[];
-  /** All org members – shown with house context */
+  /** All org members – shown as targets */
   members: OrgMember[];
+  /** Houses available for display context only */
+  houses: LeaderboardEntry[];
   /** Server action to submit the award */
-  onAward: (targetHouseId: string, delta: number, reason: string) => Promise<void>;
+  onAward: (targetUserId: string, delta: number, reason: string) => Promise<void>;
 }
 
 const QUICK_AMOUNTS = [5, 10, 25, 50];
@@ -25,18 +25,18 @@ const QUICK_AMOUNTS = [5, 10, 25, 50];
 export function AwardPointsDialog({
   open,
   onOpenChange,
-  houses,
+  members,
   onAward,
 }: AwardPointsDialogProps) {
-  const [targetHouseId, setTargetHouseId] = useState("");
+  const [targetUserId, setTargetUserId] = useState("");
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const selectedHouse = houses.find((h) => h.id === targetHouseId);
+  const selectedMember = members.find((m) => m.id === targetUserId);
 
   function reset() {
-    setTargetHouseId("");
+    setTargetUserId("");
     setDelta("");
     setReason("");
   }
@@ -48,12 +48,12 @@ export function AwardPointsDialog({
 
   function handleSubmit() {
     const deltaNum = parseInt(delta, 10);
-    if (!targetHouseId || !deltaNum || !reason.trim()) return;
+    if (!targetUserId || !deltaNum || !reason.trim()) return;
     startTransition(async () => {
       try {
-        await onAward(targetHouseId, deltaNum, reason);
+        await onAward(targetUserId, deltaNum, reason);
         toast.success("Points awarded!", {
-          description: `${deltaNum > 0 ? "+" : ""}${deltaNum} pts to ${selectedHouse?.name}`,
+          description: `+${deltaNum} pts to ${selectedMember?.displayName}`,
         });
         reset();
         onOpenChange(false);
@@ -65,10 +65,12 @@ export function AwardPointsDialog({
     });
   }
 
+  const deltaNum = parseInt(delta, 10);
   const canSubmit =
-    !!targetHouseId &&
-    !!parseInt(delta, 10) &&
-    Math.abs(parseInt(delta, 10)) <= 100 &&
+    !!targetUserId &&
+    !isNaN(deltaNum) &&
+    deltaNum >= 1 &&
+    deltaNum <= 100 &&
     reason.trim().length >= 3;
 
   return (
@@ -96,24 +98,29 @@ export function AwardPointsDialog({
           </div>
 
           <div className="space-y-5">
-            {/* House selector */}
+            {/* Member selector */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Target House</label>
-              <Select.Root value={targetHouseId} onValueChange={setTargetHouseId}>
+              <label className="text-sm font-medium">Recipient</label>
+              <Select.Root value={targetUserId} onValueChange={setTargetUserId}>
                 <Select.Trigger
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-sm",
                     "hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
                   )}
                 >
-                  <Select.Value placeholder="Select a house…">
-                    {selectedHouse && (
+                  <Select.Value placeholder="Select a team member…">
+                    {selectedMember && (
                       <span className="flex items-center gap-2">
-                        <span
-                          className="w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: selectedHouse.color }}
-                        />
-                        {selectedHouse.name}
+                        {selectedMember.houseColor && (
+                          <span
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: selectedMember.houseColor }}
+                          />
+                        )}
+                        {selectedMember.displayName}
+                        {selectedMember.houseName && (
+                          <span className="text-muted-foreground text-xs">· {selectedMember.houseName}</span>
+                        )}
                       </span>
                     )}
                   </Select.Value>
@@ -128,21 +135,26 @@ export function AwardPointsDialog({
                     sideOffset={4}
                   >
                     <Select.Viewport className="p-1">
-                      {houses.map((house) => (
+                      {members.filter((m) => m.houseId).map((member) => (
                         <Select.Item
-                          key={house.id}
-                          value={house.id}
+                          key={member.id}
+                          value={member.id}
                           className={cn(
                             "flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer",
                             "hover:bg-accent/10 focus:bg-accent/10 outline-none select-none"
                           )}
                         >
-                          <span
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: house.color }}
-                          />
-                          <Select.ItemText>{house.name}</Select.ItemText>
-                          <Select.ItemIndicator className="ml-auto">
+                          {member.houseColor && (
+                            <span
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: member.houseColor }}
+                            />
+                          )}
+                          <Select.ItemText>{member.displayName}</Select.ItemText>
+                          {member.houseName && (
+                            <span className="text-muted-foreground text-xs ml-auto pl-4">{member.houseName}</span>
+                          )}
+                          <Select.ItemIndicator>
                             <Check size={14} />
                           </Select.ItemIndicator>
                         </Select.Item>
@@ -155,7 +167,7 @@ export function AwardPointsDialog({
 
             {/* Points input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Points (−100 to 100)</label>
+              <label className="text-sm font-medium">Points (1–100)</label>
               <div className="flex gap-2 flex-wrap mb-2">
                 {QUICK_AMOUNTS.map((n) => (
                   <button
@@ -175,7 +187,7 @@ export function AwardPointsDialog({
               </div>
               <input
                 type="number"
-                min={-100}
+                min={1}
                 max={100}
                 placeholder="Custom…"
                 value={delta}

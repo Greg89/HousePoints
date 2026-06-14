@@ -28,7 +28,7 @@ interface DashboardShellProps {
   activity: ActivityItem[];
   /** Computed per-member point totals from activity */
   memberPoints: { memberId: string; points: number }[];
-  onAward: (targetHouseId: string, delta: number, reason: string) => Promise<void>;
+  onAward: (targetUserId: string, delta: number, reason: string) => Promise<void>;
   loginUrl: string;
   logoutUrl: string;
   adminSection?: React.ReactNode;

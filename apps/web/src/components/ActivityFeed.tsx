@@ -65,13 +65,11 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                       color: item.targetHouseColor,
                     }}
                   >
-                    {item.delta > 0 ? "+" : ""}
-                    {item.delta}
+                    +{item.delta}
                   </span>
                   <span className="text-muted-foreground">to</span>
-                  <span className="font-semibold" style={{ color: item.targetHouseColor }}>
-                    {item.targetHouseName}
-                  </span>
+                  <span className="font-semibold">{item.targetUserName}</span>
+                  <span className="text-muted-foreground text-xs">({item.targetHouseName})</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{item.reason}</p>
                 <span className="text-xs text-muted-foreground mt-1 block">

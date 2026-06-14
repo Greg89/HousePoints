@@ -488,10 +488,9 @@ app.post("/points/adjust", async (request, reply) => {
   if (!actor) {
     warn(request.log, "points.actor_not_found", {
       actorAuth0Sub: parsed.data.actorAuth0Sub,
-      targetHouseId: parsed.data.targetHouseId,
+      targetUserId: parsed.data.targetUserId,
       delta: parsed.data.delta,
     });
-
     return reply.status(403).send({
       message: "Signed-in user is not mapped to an internal account",
       code: "ACTOR_NOT_MAPPED",
@@ -502,38 +501,42 @@ app.post("/points/adjust", async (request, reply) => {
     warn(request.log, "points.actor_house_unassigned", {
       actorUserId: actor.id,
       actorAuth0Sub: actor.auth0Sub,
-      targetHouseId: parsed.data.targetHouseId,
+      targetUserId: parsed.data.targetUserId,
       delta: parsed.data.delta,
     });
-
     return reply.status(403).send({
-      message: "Signed-in user must be assigned to a house before adjusting points",
+      message: "Signed-in user must be assigned to a house before awarding points",
       code: "ACTOR_HOUSE_UNASSIGNED",
     });
   }
 
-  const targetHouse = await prisma.house.findUnique({
-    where: {
-      id: parsed.data.targetHouseId,
-    },
-    select: {
-      id: true,
-      organizationId: true,
-    },
+  // Resolve the target user and derive their house
+  const targetUser = await prisma.user.findUnique({
+    where: { id: parsed.data.targetUserId },
+    select: { id: true, organizationId: true, houseId: true, displayName: true },
   });
 
-  if (!targetHouse || targetHouse.organizationId !== actor.organizationId) {
+  if (!targetUser || targetUser.organizationId !== actor.organizationId) {
     warn(request.log, "points.cross_organization_target", {
       actorUserId: actor.id,
       actorAuth0Sub: actor.auth0Sub,
       actorOrganizationId: actor.organizationId,
-      targetHouseId: parsed.data.targetHouseId,
-      targetHouseOrganizationId: targetHouse?.organizationId,
+      targetUserId: parsed.data.targetUserId,
     });
-
     return reply.status(403).send({
-      message: "Target house is outside your organization",
+      message: "Target user is outside your organization",
       code: "CROSS_ORGANIZATION_TARGET",
+    });
+  }
+
+  if (!targetUser.houseId) {
+    warn(request.log, "points.target_user_unassigned", {
+      actorUserId: actor.id,
+      targetUserId: targetUser.id,
+    });
+    return reply.status(422).send({
+      message: "Target user is not assigned to a house",
+      code: "TARGET_USER_UNASSIGNED",
     });
   }
 
@@ -541,7 +544,8 @@ app.post("/points/adjust", async (request, reply) => {
     data: {
       organizationId: actor.organizationId,
       actorUserId: actor.id,
-      targetHouseId: parsed.data.targetHouseId,
+      targetUserId: targetUser.id,
+      targetHouseId: targetUser.houseId,
       delta: parsed.data.delta,
       reason: parsed.data.reason,
     },
@@ -549,10 +553,11 @@ app.post("/points/adjust", async (request, reply) => {
 
   info(request.log, "points.adjusted", {
     transactionId: transaction.id,
-    actorUserId: transaction.actorUserId,
+    actorUserId: actor.id,
     actorAuth0Sub: actor.auth0Sub,
     organizationId: actor.organizationId,
-    targetHouseId: transaction.targetHouseId,
+    targetUserId: targetUser.id,
+    targetHouseId: targetUser.houseId,
     delta: transaction.delta,
   });
 
@@ -657,6 +662,7 @@ app.post("/transactions/recent", async (request, reply) => {
       reason: true,
       createdAt: true,
       actor: { select: { displayName: true } },
+      targetUser: { select: { displayName: true } },
       targetHouse: { select: { name: true, color: true } },
     },
   });
@@ -664,6 +670,7 @@ app.post("/transactions/recent", async (request, reply) => {
   return transactions.map((tx) => ({
     id: tx.id,
     actorName: tx.actor.displayName,
+    targetUserName: tx.targetUser?.displayName ?? "Unknown",
     targetHouseName: tx.targetHouse.name,
     targetHouseColor: tx.targetHouse.color,
     delta: tx.delta,

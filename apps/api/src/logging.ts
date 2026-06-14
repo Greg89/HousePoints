@@ -18,6 +18,7 @@ export type ApiLogEvent =
   | "leaderboard.fetched"
   | "points.actor_not_found"
   | "points.actor_house_unassigned"
+  | "points.target_user_unassigned"
   | "points.cross_organization_target"
   | "points.adjusted"
   | "users.profile.updated"
