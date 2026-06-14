@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
 import { getAuth0Client } from "@/lib/auth0";
 import { logError, logInfo, logWarn } from "@/lib/logging";
 import type {
@@ -399,6 +400,7 @@ export async function readAdminContext(): Promise<{
 export async function readSessionSummary(): Promise<{
   isAuthenticated: boolean;
   userName?: string;
+  userEmail?: string;
   userSub?: string;
   appUserId?: string;
   organizationId?: string;
@@ -440,6 +442,7 @@ export async function readSessionSummary(): Promise<{
   const summary = {
     isAuthenticated: true,
     userName: session.user.name,
+    userEmail: session.user.email,
     userSub: session.user.sub,
   };
 
@@ -568,4 +571,52 @@ export async function awardPoints(
     const body = await response.text();
     throw new Error(`Award points failed: ${body}`);
   }
+  revalidatePath("/");
+}
+
+export async function updateDisplayName(displayName: string): Promise<void> {
+  const requestId = randomUUID();
+  const auth0 = getAuth0Client();
+  if (!auth0) throw new Error("Auth0 is not configured");
+  const session = await auth0.getSession();
+  if (!session) throw new Error("Not authenticated");
+
+  const trimmed = displayName.trim();
+  if (!trimmed || trimmed.length > 120) {
+    throw new Error("Display name must be between 1 and 120 characters");
+  }
+
+  const mapping = await ensureAppUserMapping({
+    requestId,
+    auth0Sub: session.user.sub,
+    email: session.user.email,
+    displayName: session.user.name,
+  });
+
+  const response = await fetch(`${getApiBaseUrl()}/users/profile`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-request-id": requestId },
+    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, displayName: trimmed }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    logWarn("web.profile.update_failed", {
+      requestId,
+      actorUserId: mapping.id,
+      statusCode: response.status,
+      responseBody: body,
+    });
+    throw new Error(`Profile update failed with status ${response.status}`);
+  }
+
+  logInfo("web.profile.updated", {
+    requestId,
+    actorUserId: mapping.id,
+    displayName: trimmed,
+  });
+
+  revalidatePath("/");
+  revalidatePath("/settings");
 }

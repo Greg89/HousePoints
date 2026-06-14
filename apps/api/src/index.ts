@@ -8,6 +8,7 @@ import {
   assignUserHouseSchema,
   bootstrapUserSchema,
   createHouseSchema,
+  updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { error, info, warn } from "./logging.js";
@@ -556,6 +557,40 @@ app.post("/points/adjust", async (request, reply) => {
   });
 
   return reply.status(201).send(transaction);
+});
+
+// POST /users/profile - update the authenticated user's display name
+app.post("/users/profile", async (request, reply) => {
+  const parsed = updateProfileSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "users.profile.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", {
+      actorAuth0Sub: parsed.data.actorAuth0Sub,
+    });
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: actor.id },
+    data: { displayName: parsed.data.displayName },
+    select: { id: true, displayName: true },
+  });
+
+  info(request.log, "users.profile.updated", {
+    actorUserId: actor.id,
+    displayName: updated.displayName,
+  });
+
+  return updated;
 });
 
 // POST /members - returns org members for the award dialog (any authenticated member)

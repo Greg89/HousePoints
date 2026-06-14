@@ -19,7 +19,9 @@ export type ApiLogEvent =
   | "points.actor_not_found"
   | "points.actor_house_unassigned"
   | "points.cross_organization_target"
-  | "points.adjusted";
+  | "points.adjusted"
+  | "users.profile.updated"
+  | "users.profile.validation_failed";
 
 type LogContext = Record<string, unknown>;
 

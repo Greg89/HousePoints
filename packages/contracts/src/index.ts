@@ -85,3 +85,10 @@ export const assignUserHouseSchema = z.object({
   targetUserId: z.string().min(1),
   targetHouseId: z.string().min(1),
 });
+
+export const updateProfileSchema = z.object({
+  actorAuth0Sub: z.string().min(1),
+  displayName: z.string().min(1).max(120).trim(),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

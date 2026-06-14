@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { Trophy, Clock, ChartBar, Star, SignOut, User } from "@phosphor-icons/react";
+import { Trophy, Clock, ChartBar, Star, SignOut, User, Gear } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
@@ -93,13 +93,17 @@ export function DashboardShell({
               </motion.button>
             )}
             {/* User / logout */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="flex items-center gap-1">
+              <a
+                href="/settings"
+                className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors"
+                aria-label="Profile settings"
+              >
                 <User size={16} className="text-primary" />
-              </div>
+              </a>
               <a
                 href={logoutUrl}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                 aria-label="Sign out"
               >
                 <SignOut size={18} />

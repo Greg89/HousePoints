@@ -18,7 +18,9 @@ export type WebLogEvent =
   | "web.admin.user_assigned"
   | "web.admin.assignment_failed"
   | "points.adjust.requested"
-  | "points.adjust.completed";
+  | "points.adjust.completed"
+  | "web.profile.updated"
+  | "web.profile.update_failed";
 
 type LogContext = Record<string, unknown>;
 
