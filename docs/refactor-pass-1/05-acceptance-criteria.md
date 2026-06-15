@@ -15,8 +15,8 @@ Feature work may resume after all release-blocker criteria and the agreed pass-o
 ## Onboarding
 
 - A new user can create an organization.
-- The first owner can create the first house without database intervention.
-- The owner can complete the configured house-membership path.
+- Organization creation includes first-house setup.
+- The first owner is assigned to that house atomically without database intervention.
 - An invited user can join and reaches the correct assigned/unassigned state.
 - Expired, reused, malformed, and concurrently claimed invites behave deterministically.
 
@@ -65,4 +65,3 @@ Feature work may resume after all release-blocker criteria and the agreed pass-o
 - Product authorization decisions are documented.
 - The docs index links current state, roadmap, upcoming features, and this refactor record.
 - Markdown files render without corrupted characters.
-

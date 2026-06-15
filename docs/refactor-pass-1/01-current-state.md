@@ -52,9 +52,9 @@ The code does not currently limit point awards to admins, even though the README
 
 ## Structural Pressure
 
-Two files now hold most application behavior:
+At the time of the review, two files held most application behavior:
 
-- `apps/api/src/index.ts`: approximately 860 lines covering server construction, middleware, authentication lookup, every route, domain logic, and process startup.
+- `apps/api/src/index.ts`: approximately 860 lines covering server construction, middleware, authentication lookup, every route, domain logic, and process startup. The first refactor unit subsequently split this into `app.ts` and `server.ts`.
 - `apps/web/src/app/actions/points.ts`: approximately 740 lines covering session access, API transport, reads, mutations, logging, error conversion, and cache invalidation.
 
 The size itself is not the defect. The problem is that security policy, transport behavior, and domain workflows cannot be tested or changed independently.
@@ -69,7 +69,7 @@ Commands run during this review:
 | `npm run lint --workspaces --if-present` | Passed, but API/contracts/DB lint scripts are placeholders |
 | `npm run build` | API, contracts, and DB built; web build could not fetch three Google Fonts in the restricted environment |
 
-The API test run also started a real listener on port 4000. Importing `apps/api/src/index.ts` executes `app.listen()`, so the test suite has a hidden network side effect even though it uses `app.inject()`.
+At review time, the API test run also started a real listener on port 4000 because importing `apps/api/src/index.ts` executed `app.listen()`. The first refactor unit removed that hidden network side effect.
 
 ## Documentation State
 
@@ -80,4 +80,3 @@ The existing documentation is valuable but no longer a reliable representation o
 - README content is duplicated and contains conflicting Node and environment-variable instructions.
 - Several documents contain corrupted character encoding.
 - The API security model and onboarding deadlock are not documented.
-

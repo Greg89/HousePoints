@@ -70,4 +70,4 @@ type ApiError = {
 };
 ```
 
-**Work:** Audit all `reply.status(4xx).send(...)` calls in `apps/api/src/index.ts` and normalise to the above shape. Update `setErrorHandler` to use `code: "INTERNAL_ERROR"`.
+**Work:** Audit all `reply.status(4xx).send(...)` calls in `apps/api/src/app.ts` and normalise to the above shape. Update `setErrorHandler` to use `code: "INTERNAL_ERROR"`.

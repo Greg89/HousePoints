@@ -18,8 +18,6 @@ import {
 import { prisma } from "@housepoints/db";
 import { createApiLogger, error, info, warn } from "./logging.js";
 
-const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
-
 type ActorRecord = {
   id: string;
   auth0Sub: string;
@@ -116,11 +114,6 @@ export async function buildApp() {
 
   app.addHook("onClose", async () => {
     await apiLogger.close();
-  });
-
-  info(app.log, "api.starting", {
-    port,
-    seqEnabled: apiLogger.seqEnabled,
   });
 
   await app.register(cors, {
@@ -855,30 +848,5 @@ app.post("/orgs/join", async (request, reply) => {
 
   return app;
 }
-
-const app = await buildApp();
-await app.listen({ port, host: "0.0.0.0" });
-info(app.log, "api.listening", { port });
-
-let shutdownStarted = false;
-
-async function shutdown(signal: NodeJS.Signals) {
-  if (shutdownStarted) {
-    return;
-  }
-
-  shutdownStarted = true;
-  info(app.log, "api.stopping", { signal });
-
-  try {
-    await app.close();
-  } catch (err) {
-    error(app.log, "api.shutdown_failed", { signal }, err);
-    process.exitCode = 1;
-  }
-}
-
-process.once("SIGTERM", () => void shutdown("SIGTERM"));
-process.once("SIGINT", () => void shutdown("SIGINT"));
 
 

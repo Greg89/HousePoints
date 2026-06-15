@@ -28,14 +28,14 @@ npm install -D vitest -w @housepoints/api
 **Approach:** Use `app.inject()` (no real network) with a mocked Prisma client.
 
 ```typescript
-// apps/api/src/index.test.ts
+// apps/api/src/app.test.ts
 import { buildApp } from "./app.js"; // extract app setup into a factory function
 const app = await buildApp();
 const res = await app.inject({ method: "GET", url: "/health" });
 expect(res.statusCode).toBe(200);
 ```
 
-**Prerequisite:** Refactor `apps/api/src/index.ts` to export a `buildApp()` factory so tests can instantiate without starting the listener.
+**Prerequisite:** Complete. `apps/api/src/app.ts` exports a side-effect-free `buildApp()` factory, while `apps/api/src/server.ts` owns the network listener.
 
 **Key routes to test:**
 - `GET /health`

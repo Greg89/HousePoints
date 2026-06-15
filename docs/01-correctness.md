@@ -57,7 +57,7 @@ Register per-route limits:
 - All other write endpoints — 60 req / minute per IP
 
 ```typescript
-// apps/api/src/index.ts
+// apps/api/src/app.ts
 import rateLimit from "@fastify/rate-limit";
 await app.register(rateLimit, { max: 60, timeWindow: "1 minute" });
 // Then override per-route with { config: { rateLimit: { max: 20 } } }

@@ -30,7 +30,7 @@ vi.mock("@housepoints/db", () => ({
 // â”€â”€ Also mock dotenv/config (no .env file needed in CI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 vi.mock("dotenv/config", () => ({}));
 
-import { buildApp } from "./index";
+import { buildApp } from "./app";
 import { prisma } from "@housepoints/db";
 
 // Typed shorthand helpers
@@ -46,7 +46,7 @@ const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
 const HOUSE = { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null, organizationId: "org-1" };
 
-/** Full user shape returned by prisma.user.findUnique (matches select in index.ts) */
+/** Full user shape returned by prisma.user.findUnique (matches select in app.ts) */
 const makeMember = (overrides = {}) => ({
   id: "user-1",
   auth0Sub: "auth0|member",
@@ -81,9 +81,13 @@ beforeEach(() => vi.resetAllMocks());
 describe("GET /health", () => {
   it("returns 200 { ok: true }", async () => {
     const app = await buildApp();
+    expect(app.server.listening).toBe(false);
+
     const res = await app.inject({ method: "GET", url: "/health" });
+
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
+    expect(app.server.listening).toBe(false);
     await app.close();
   });
 });

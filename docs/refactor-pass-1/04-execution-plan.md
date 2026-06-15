@@ -4,16 +4,16 @@
 
 Pass one is complete when the existing product works through safer, testable boundaries. It should not implement Seasons, Dashboard Widgets, The Hex, multi-org membership, or broad visual redesign.
 
-## Phase 0: Resolve Product Decisions
+## Phase 0: Product Decisions
 
-Document decisions before changing behavior:
+Decisions confirmed by the product owner:
 
-1. Can every assigned member award points, or only admins/owners?
-2. Must owners belong to a house?
-3. Is the API directly callable by web and future mobile clients using Auth0 access tokens?
-4. Are invite links single-use, and should an already-enrolled user consume one?
+1. Every assigned member can award points.
+2. Owners must belong to a house. Organization creation must include first-house setup rather than leaving the owner in an unreachable unassigned state.
+3. The API will validate Auth0 access tokens directly so the web app and future mobile clients use the same trusted identity boundary.
+4. Invite links are single-use.
 
-Output: short architecture decision records or a decisions section in the roadmap.
+One implementation detail remains for the onboarding unit: choose whether the first house uses a default name or is explicitly entered during organization creation. The preferred direction is explicit first-house setup because it avoids creating product data the owner must immediately correct.
 
 ## Phase 1: Close Release Blockers
 
@@ -92,4 +92,3 @@ Keep changes reviewable:
 10. Documentation reconciliation.
 
 Security changes may require coordinated API and web edits, but avoid combining them with cosmetic component refactors.
-
