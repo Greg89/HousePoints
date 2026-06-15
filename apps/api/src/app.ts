@@ -109,15 +109,13 @@ function mapAppUser(user: {
 }
 
 type BuildAppOptions = {
-  verifyAccessToken?: VerifyAccessToken | false;
+  verifyAccessToken?: VerifyAccessToken;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
   const apiLogger = createApiLogger();
   const verifyAccessToken =
-    options.verifyAccessToken === false
-      ? null
-      : options.verifyAccessToken ?? createAuth0AccessTokenVerifierFromEnv();
+    options.verifyAccessToken ?? createAuth0AccessTokenVerifierFromEnv();
   const app = Fastify({
     loggerInstance: apiLogger.logger,
     requestIdHeader: "x-request-id",
@@ -136,7 +134,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   app.decorateRequest("auth");
 
   app.addHook("preValidation", async (request, reply) => {
-    if (!verifyAccessToken || request.routeOptions.url === "/health") {
+    if (request.routeOptions.url === "/health") {
       return;
     }
 
@@ -162,30 +160,6 @@ export async function buildApp(options: BuildAppOptions = {}) {
       });
     }
 
-    const body = request.body;
-    if (!body || typeof body !== "object") {
-      return;
-    }
-
-    const assertedSubject =
-      "actorAuth0Sub" in body
-        ? body.actorAuth0Sub
-        : "auth0Sub" in body
-          ? body.auth0Sub
-          : undefined;
-
-    if (
-      typeof assertedSubject === "string" &&
-      assertedSubject !== request.auth.subject
-    ) {
-      warn(request.log, "auth.subject_mismatch", {
-        tokenSubject: request.auth.subject,
-      });
-      return reply.status(403).send({
-        code: "IDENTITY_MISMATCH",
-        message: "Request identity does not match the authenticated user",
-      });
-    }
   });
 
 await app.register(rateLimit, {
@@ -237,12 +211,10 @@ app.post("/houses/leaderboard", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor) {
-    warn(request.log, "points.actor_not_found", {
-      actorAuth0Sub: parsed.data.actorAuth0Sub,
-    });
+    warn(request.log, "points.actor_not_found", {});
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
@@ -312,7 +284,7 @@ app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 mi
   } as const;
 
   const existing = await prisma.user.findUnique({
-    where: { auth0Sub: parsed.data.auth0Sub },
+    where: { auth0Sub: request.auth.subject },
     select: userSelect,
   });
 
@@ -330,7 +302,7 @@ app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 mi
   // They must then create an org (POST /orgs/create) or join one (POST /orgs/join).
   const createdUser = await prisma.user.create({
     data: {
-      auth0Sub: parsed.data.auth0Sub,
+      auth0Sub: request.auth.subject,
       email: parsed.data.email ?? null,
       displayName: parsed.data.displayName,
     },
@@ -356,12 +328,10 @@ app.post("/admin/context", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor || !isAdmin(actor.role)) {
-    warn(request.log, "admin.forbidden", {
-      actorAuth0Sub: parsed.data.actorAuth0Sub,
-    });
+    warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
 
@@ -409,12 +379,10 @@ app.post("/admin/houses", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor || !isAdmin(actor.role)) {
-    warn(request.log, "admin.forbidden", {
-      actorAuth0Sub: parsed.data.actorAuth0Sub,
-    });
+    warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
 
@@ -463,12 +431,10 @@ app.post("/admin/users/assign-house", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor || !isAdmin(actor.role)) {
-    warn(request.log, "admin.forbidden", {
-      actorAuth0Sub: parsed.data.actorAuth0Sub,
-    });
+    warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
 
@@ -522,11 +488,10 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor) {
     warn(request.log, "points.actor_not_found", {
-      actorAuth0Sub: parsed.data.actorAuth0Sub,
       targetUserId: parsed.data.targetUserId,
       delta: parsed.data.delta,
     });
@@ -615,12 +580,10 @@ app.post("/users/profile", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor) {
-    warn(request.log, "points.actor_not_found", {
-      actorAuth0Sub: parsed.data.actorAuth0Sub,
-    });
+    warn(request.log, "points.actor_not_found", {});
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
@@ -647,10 +610,10 @@ app.post("/users/scores", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor) {
-    warn(request.log, "points.actor_not_found", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    warn(request.log, "points.actor_not_found", {});
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
@@ -679,10 +642,10 @@ app.post("/members", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor) {
-    warn(request.log, "points.actor_not_found", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    warn(request.log, "points.actor_not_found", {});
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
@@ -717,10 +680,10 @@ app.post("/transactions/recent", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
 
   if (!actor) {
-    warn(request.log, "points.actor_not_found", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    warn(request.log, "points.actor_not_found", {});
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
@@ -763,7 +726,8 @@ app.post("/orgs/create", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const { auth0Sub, email, displayName, orgName, orgSlug } = parsed.data;
+  const { email, displayName, orgName, orgSlug } = parsed.data;
+  const auth0Sub = request.auth.subject;
 
   // Reject if slug is already taken
   const slugTaken = await prisma.organization.findUnique({ where: { slug: orgSlug }, select: { id: true } });
@@ -811,9 +775,9 @@ app.post("/orgs/invite", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const actor = await getActorBySub(parsed.data.actorAuth0Sub);
+  const actor = await getActorBySub(request.auth.subject);
   if (!actor || !isAdmin(actor.role)) {
-    warn(request.log, "admin.forbidden", { actorAuth0Sub: parsed.data.actorAuth0Sub });
+    warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ code: "ADMIN_REQUIRED", message: "Admin access required" });
   }
 
@@ -850,7 +814,8 @@ app.post("/orgs/join", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const { auth0Sub, email, displayName, inviteToken } = parsed.data;
+  const { email, displayName, inviteToken } = parsed.data;
+  const auth0Sub = request.auth.subject;
   const tokenHash = hashToken(inviteToken);
 
   const invite = await prisma.orgInvite.findUnique({

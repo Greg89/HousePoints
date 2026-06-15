@@ -51,20 +51,18 @@ export const TRAIT_LABELS: Record<Trait, string> = {
 export const traitSchema = z.enum(TRAITS);
 
 export const adjustPointsSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
   targetUserId: z.string().min(1),
   delta: z.number().int().min(1).max(100),
   reason: z.string().min(3).max(240),
   trait: traitSchema,
-});
+}).strict();
 
 export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
 
 export const bootstrapUserSchema = z.object({
-  auth0Sub: z.string().min(1),
   email: z.string().email().optional(),
   displayName: z.string().min(1).max(120),
-});
+}).strict();
 
 export type BootstrapUserInput = z.infer<typeof bootstrapUserSchema>;
 
@@ -122,27 +120,22 @@ export const leaderboardEntrySchema = z.object({
 
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 
-export const actorScopeSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
-});
+export const actorScopeSchema = z.object({}).strict();
 
 export const createHouseSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
   name: z.string().min(2).max(80),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7c3aed"),
   description: z.string().max(280).optional(),
-});
+}).strict();
 
 export const assignUserHouseSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
   targetUserId: z.string().min(1),
   targetHouseId: z.string().min(1),
-});
+}).strict();
 
 export const updateProfileSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
   displayName: z.string().trim().min(1).max(120),
-});
+}).strict();
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
@@ -169,38 +162,34 @@ const slugSchema = z
 // Org management schemas
 // ---------------------------------------------------------------------------
 export const createOrgSchema = z.object({
-  auth0Sub: z.string().min(1),
   email: z.string().email().optional(),
   displayName: z.string().trim().min(1).max(120),
   orgName: z.string().trim().min(2).max(80),
   orgSlug: slugSchema,
-});
+}).strict();
 
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;
 
 export const createInviteSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
   /** How many hours the invite is valid for. Defaults to 72. Max 168 (7 days). */
   expiresInHours: z.number().int().min(1).max(168).default(72),
-});
+}).strict();
 
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
 
 export const joinOrgSchema = z.object({
-  auth0Sub: z.string().min(1),
   email: z.string().email().optional(),
   displayName: z.string().trim().min(1).max(120),
   /** The raw invite token from the URL */
   inviteToken: z.string().min(1),
-});
+}).strict();
 
 export type JoinOrgInput = z.infer<typeof joinOrgSchema>;
 
 export const promoteUserSchema = z.object({
-  actorAuth0Sub: z.string().min(1),
   targetUserId: z.string().min(1),
   role: z.enum(["MEMBER", "ADMIN"]),
-});
+}).strict();
 
 export type PromoteUserInput = z.infer<typeof promoteUserSchema>;
 

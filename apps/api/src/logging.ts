@@ -10,7 +10,6 @@ export type ApiLogEvent =
   | "api.shutdown_failed"
   | "auth.token_missing"
   | "auth.token_invalid"
-  | "auth.subject_mismatch"
   | "request.received"
   | "request.completed"
   | "request.validation_failed"

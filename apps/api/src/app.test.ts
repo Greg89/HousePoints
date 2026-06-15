@@ -76,8 +76,19 @@ const makeAdmin = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => vi.resetAllMocks());
 
-function buildTestApp() {
-  return buildApp({ verifyAccessToken: false });
+async function buildTestApp(subject = "auth0|member") {
+  const app = await buildApp({
+    verifyAccessToken: vi.fn().mockResolvedValue({
+      subject,
+      claims: { sub: subject },
+    }),
+  });
+
+  app.addHook("onRequest", async (request) => {
+    request.headers.authorization ??= "Bearer test-token";
+  });
+
+  return app;
 }
 
 // â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -141,7 +152,7 @@ describe("API authentication", () => {
     await app.close();
   });
 
-  it("rejects a body identity that differs from the token subject", async () => {
+  it("rejects caller-supplied identity fields", async () => {
     const app = await buildApp({
       verifyAccessToken: vi.fn().mockResolvedValue({
         subject: "auth0|member",
@@ -156,8 +167,8 @@ describe("API authentication", () => {
       payload: { actorAuth0Sub: "auth0|admin" },
     });
 
-    expect(res.statusCode).toBe(403);
-    expect(res.json().code).toBe("IDENTITY_MISMATCH");
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
     await app.close();
   });
 
@@ -174,12 +185,15 @@ describe("API authentication", () => {
       method: "POST",
       url: "/members",
       headers: { authorization: "Bearer valid" },
-      payload: { actorAuth0Sub: "auth0|member" },
+      payload: {},
     });
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual([]);
     expect(verifyAccessToken).toHaveBeenCalledWith("valid");
+    expect(mockFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { auth0Sub: "auth0|member" } }),
+    );
     await app.close();
   });
 });
@@ -191,7 +205,7 @@ describe("POST /users/bootstrap", () => {
     const res = await app.inject({
       method: "POST",
       url: "/users/bootstrap",
-      payload: { auth0Sub: "auth0|member", displayName: "Alice" },
+      payload: { displayName: "Alice" },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -215,23 +229,28 @@ describe("POST /users/bootstrap", () => {
     mockFindUnique.mockResolvedValue(null);   // not found
     mockOrgUpsert.mockResolvedValue(ORG);
     mockCreate.mockResolvedValue(newUser);
-    const app = await buildTestApp();
+    const app = await buildTestApp("auth0|new");
     const res = await app.inject({
       method: "POST",
       url: "/users/bootstrap",
-      payload: { auth0Sub: "auth0|new", displayName: "Carol" },
+      payload: { displayName: "Carol" },
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().created).toBe(true);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ auth0Sub: "auth0|new" }),
+      }),
+    );
     await app.close();
   });
 
-  it("returns 400 VALIDATION_ERROR for missing auth0Sub", async () => {
+  it("returns 400 VALIDATION_ERROR for missing displayName", async () => {
     const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/users/bootstrap",
-      payload: { displayName: "Nobody" },
+      payload: {},
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
@@ -246,7 +265,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|ghost", targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "COLLABORATION" },
+      payload: { targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "COLLABORATION" },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
@@ -261,7 +280,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "COLLABORATION" },
+      payload: { targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "COLLABORATION" },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("CROSS_ORGANIZATION_TARGET");
@@ -276,7 +295,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "LEADERSHIP" },
+      payload: { targetUserId: "user-1", delta: 10, reason: "Great sprint work", trait: "LEADERSHIP" },
     });
     expect(res.statusCode).toBe(422);
     expect(res.json().code).toBe("TARGET_USER_UNASSIGNED");
@@ -288,7 +307,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: -5, reason: "Bad attempt", trait: "INNOVATION" },
+      payload: { targetUserId: "user-1", delta: -5, reason: "Bad attempt", trait: "INNOVATION" },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
@@ -300,7 +319,7 @@ describe("POST /points/adjust", () => {
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-1", delta: 10, reason: "Good work" },
+      payload: { targetUserId: "user-1", delta: 10, reason: "Good work" },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
@@ -328,7 +347,6 @@ describe("POST /points/adjust", () => {
       method: "POST",
       url: "/points/adjust",
       payload: {
-        actorAuth0Sub: "auth0|admin",
         targetUserId: "user-1",
         delta: 15,
         reason: "Crushed the demo",
@@ -350,7 +368,7 @@ describe("POST /admin/houses", () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/houses",
-      payload: { actorAuth0Sub: "auth0|member", name: "Gryffindor", color: "#ff0000" },
+      payload: { name: "Gryffindor", color: "#ff0000" },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
@@ -364,7 +382,7 @@ describe("POST /admin/houses", () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/houses",
-      payload: { actorAuth0Sub: "auth0|admin", name: "Phoenix", color: "#7c3aed" },
+      payload: { name: "Phoenix", color: "#7c3aed" },
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().name).toBe("Phoenix");
@@ -379,7 +397,7 @@ describe("POST /admin/users/assign-house", () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/users/assign-house",
-      payload: { actorAuth0Sub: "auth0|member", targetUserId: "user-1", targetHouseId: "house-1" },
+      payload: { targetUserId: "user-1", targetHouseId: "house-1" },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
@@ -395,7 +413,7 @@ describe("POST /admin/users/assign-house", () => {
     const res = await app.inject({
       method: "POST",
       url: "/admin/users/assign-house",
-      payload: { actorAuth0Sub: "auth0|admin", targetUserId: "user-999", targetHouseId: "house-1" },
+      payload: { targetUserId: "user-999", targetHouseId: "house-1" },
     });
     expect(res.statusCode).toBe(404);
     await app.close();
@@ -408,7 +426,7 @@ describe("POST /transactions/recent", () => {
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",
-      payload: { actorAuth0Sub: "auth0|ghost" },
+      payload: {},
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
@@ -433,7 +451,7 @@ describe("POST /transactions/recent", () => {
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",
-      payload: { actorAuth0Sub: "auth0|member" },
+      payload: {},
     });
     expect(res.statusCode).toBe(200);
     const items = res.json();
@@ -462,7 +480,7 @@ describe("POST /transactions/recent", () => {
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",
-      payload: { actorAuth0Sub: "auth0|member" },
+      payload: {},
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()[0].trait).toBeNull();

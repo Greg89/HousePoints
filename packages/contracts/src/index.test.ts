@@ -6,6 +6,10 @@ import {
   assignUserHouseSchema,
   updateProfileSchema,
   actorScopeSchema,
+  createOrgSchema,
+  createInviteSchema,
+  joinOrgSchema,
+  promoteUserSchema,
   memberScoreSchema,
   activityItemSchema,
   traitSchema,
@@ -18,7 +22,6 @@ import {
 // ---------------------------------------------------------------------------
 describe("adjustPointsSchema", () => {
   const valid = {
-    actorAuth0Sub: "auth0|abc123",
     targetUserId: "user_1",
     delta: 10,
     reason: "Great work on the sprint",
@@ -57,11 +60,6 @@ describe("adjustPointsSchema", () => {
 
   it("rejects reason longer than 240 chars", () => {
     const result = adjustPointsSchema.safeParse({ ...valid, reason: "x".repeat(241) });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects empty actorAuth0Sub", () => {
-    const result = adjustPointsSchema.safeParse({ ...valid, actorAuth0Sub: "" });
     expect(result.success).toBe(false);
   });
 
@@ -139,7 +137,6 @@ describe("activityItemSchema", () => {
 // ---------------------------------------------------------------------------
 describe("bootstrapUserSchema", () => {
   const valid = {
-    auth0Sub: "auth0|xyz",
     displayName: "Alice",
   };
 
@@ -172,7 +169,6 @@ describe("bootstrapUserSchema", () => {
 // ---------------------------------------------------------------------------
 describe("createHouseSchema", () => {
   const valid = {
-    actorAuth0Sub: "auth0|admin",
     name: "Gryffindor",
     color: "#7c3aed",
   };
@@ -182,7 +178,7 @@ describe("createHouseSchema", () => {
   });
 
   it("defaults color to #7c3aed when omitted", () => {
-    const result = createHouseSchema.safeParse({ actorAuth0Sub: "auth0|a", name: "Phoenix" });
+    const result = createHouseSchema.safeParse({ name: "Phoenix" });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.color).toBe("#7c3aed");
   });
@@ -213,7 +209,6 @@ describe("createHouseSchema", () => {
 // ---------------------------------------------------------------------------
 describe("assignUserHouseSchema", () => {
   const valid = {
-    actorAuth0Sub: "auth0|admin",
     targetUserId: "user_1",
     targetHouseId: "house_1",
   };
@@ -235,7 +230,7 @@ describe("assignUserHouseSchema", () => {
 // updateProfileSchema
 // ---------------------------------------------------------------------------
 describe("updateProfileSchema", () => {
-  const valid = { actorAuth0Sub: "auth0|abc", displayName: "Bob" };
+  const valid = { displayName: "Bob" };
 
   it("accepts valid input", () => {
     expect(updateProfileSchema.safeParse(valid).success).toBe(true);
@@ -260,12 +255,65 @@ describe("updateProfileSchema", () => {
 // actorScopeSchema
 // ---------------------------------------------------------------------------
 describe("actorScopeSchema", () => {
-  it("accepts non-empty auth0Sub", () => {
-    expect(actorScopeSchema.safeParse({ actorAuth0Sub: "auth0|abc" }).success).toBe(true);
+  it("accepts an empty request body", () => {
+    expect(actorScopeSchema.safeParse({}).success).toBe(true);
   });
 
-  it("rejects empty auth0Sub", () => {
-    expect(actorScopeSchema.safeParse({ actorAuth0Sub: "" }).success).toBe(false);
+  it("rejects caller-supplied identity", () => {
+    expect(actorScopeSchema.safeParse({ actorAuth0Sub: "auth0|abc" }).success).toBe(false);
+  });
+});
+
+describe("authenticated request schemas", () => {
+  const cases = [
+    [adjustPointsSchema, {
+      targetUserId: "user-1",
+      delta: 10,
+      reason: "Great work",
+      trait: "LEADERSHIP",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [bootstrapUserSchema, {
+      displayName: "Alice",
+      auth0Sub: "auth0|attacker",
+    }],
+    [createHouseSchema, {
+      name: "Phoenix",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [assignUserHouseSchema, {
+      targetUserId: "user-1",
+      targetHouseId: "house-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [updateProfileSchema, {
+      displayName: "Alice",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [createOrgSchema, {
+      displayName: "Alice",
+      orgName: "Acme",
+      orgSlug: "acme",
+      auth0Sub: "auth0|attacker",
+    }],
+    [createInviteSchema, {
+      expiresInHours: 72,
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [joinOrgSchema, {
+      displayName: "Alice",
+      inviteToken: "invite",
+      auth0Sub: "auth0|attacker",
+    }],
+    [promoteUserSchema, {
+      targetUserId: "user-1",
+      role: "ADMIN",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+  ] as const;
+
+  it.each(cases)("rejects identity fields from %#", (schema, input) => {
+    expect(schema.safeParse(input).success).toBe(false);
   });
 });
 

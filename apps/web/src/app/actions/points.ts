@@ -82,7 +82,6 @@ async function ensureAppUserMapping(input: {
   const response = await apiFetch(input.auth0, "/users/bootstrap", input.requestId, {
     method: "POST",
     body: JSON.stringify({
-      auth0Sub: input.auth0Sub,
       email: input.email,
       displayName: input.displayName ?? "Unknown User",
     }),
@@ -172,7 +171,6 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
     const response = await apiFetch(auth0, "/points/adjust", requestId, {
       method: "POST",
       body: JSON.stringify({
-        actorAuth0Sub,
         targetHouseId,
         delta,
         reason,
@@ -270,7 +268,6 @@ export async function createHouse(formData: FormData): Promise<void> {
   const response = await apiFetch(auth0, "/admin/houses", requestId, {
     method: "POST",
     body: JSON.stringify({
-      actorAuth0Sub: actor.auth0Sub,
       name,
       color,
       description,
@@ -311,7 +308,6 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
   const response = await apiFetch(auth0, "/admin/users/assign-house", requestId, {
     method: "POST",
     body: JSON.stringify({
-      actorAuth0Sub: actor.auth0Sub,
       targetUserId,
       targetHouseId,
     }),
@@ -372,9 +368,7 @@ export async function readAdminContext(): Promise<{
 
   const response = await apiFetch(auth0, "/admin/context", requestId, {
     method: "POST",
-    body: JSON.stringify({
-      actorAuth0Sub: mapping.auth0Sub,
-    }),
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
@@ -497,7 +491,7 @@ export async function readLeaderboard() {
   if (!auth0) return null;
   const session = await auth0.getSession();
   if (!session) return null;
-  const mapping = await ensureAppUserMapping({
+  await ensureAppUserMapping({
     auth0,
     requestId,
     auth0Sub: session.user.sub,
@@ -506,7 +500,7 @@ export async function readLeaderboard() {
   });
   const response = await apiFetch(auth0, "/houses/leaderboard", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    body: JSON.stringify({}),
   });
   if (!response.ok) return null;
   return (await response.json()) as LeaderboardEntry[];
@@ -518,7 +512,7 @@ export async function readMembers() {
   if (!auth0) return null;
   const session = await auth0.getSession();
   if (!session) return null;
-  const mapping = await ensureAppUserMapping({
+  await ensureAppUserMapping({
     auth0,
     requestId,
     auth0Sub: session.user.sub,
@@ -527,7 +521,7 @@ export async function readMembers() {
   });
   const response = await apiFetch(auth0, "/members", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    body: JSON.stringify({}),
   });
   if (!response.ok) return null;
   return (await response.json()) as OrgMember[];
@@ -539,7 +533,7 @@ export async function readActivityFeed() {
   if (!auth0) return null;
   const session = await auth0.getSession();
   if (!session) return null;
-  const mapping = await ensureAppUserMapping({
+  await ensureAppUserMapping({
     auth0,
     requestId,
     auth0Sub: session.user.sub,
@@ -548,7 +542,7 @@ export async function readActivityFeed() {
   });
   const response = await apiFetch(auth0, "/transactions/recent", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    body: JSON.stringify({}),
   });
   if (!response.ok) return null;
   return (await response.json()) as ActivityItem[];
@@ -560,7 +554,7 @@ export async function readMemberScores(): Promise<MemberScore[] | null> {
   if (!auth0) return null;
   const session = await auth0.getSession();
   if (!session) return null;
-  const mapping = await ensureAppUserMapping({
+  await ensureAppUserMapping({
     auth0,
     requestId,
     auth0Sub: session.user.sub,
@@ -569,7 +563,7 @@ export async function readMemberScores(): Promise<MemberScore[] | null> {
   });
   const response = await apiFetch(auth0, "/users/scores", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    body: JSON.stringify({}),
   });
   if (!response.ok) return null;
   return (await response.json()) as MemberScore[];
@@ -587,7 +581,7 @@ export async function awardPoints(
   if (!auth0) throw new Error("Auth0 is not configured");
   const session = await auth0.getSession();
   if (!session) throw new Error("Not authenticated");
-  const mapping = await ensureAppUserMapping({
+  await ensureAppUserMapping({
     auth0,
     requestId,
     auth0Sub: session.user.sub,
@@ -596,7 +590,7 @@ export async function awardPoints(
   });
   const response = await apiFetch(auth0, "/points/adjust", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetUserId, delta, reason, trait }),
+    body: JSON.stringify({ targetUserId, delta, reason, trait }),
   });
   if (!response.ok) {
     const body = await response.text();
@@ -627,7 +621,7 @@ export async function updateDisplayName(displayName: string): Promise<void> {
 
   const response = await apiFetch(auth0, "/users/profile", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, displayName: trimmed }),
+    body: JSON.stringify({ displayName: trimmed }),
   });
 
   if (!response.ok) {
@@ -661,7 +655,6 @@ export async function createOrg(orgName: string, orgSlug: string): Promise<void>
   const response = await apiFetch(auth0, "/orgs/create", requestId, {
     method: "POST",
     body: JSON.stringify({
-      auth0Sub: session.user.sub,
       email: session.user.email,
       displayName: session.user.name ?? "Unknown User",
       orgName: orgName.trim(),
@@ -687,7 +680,6 @@ export async function joinOrg(inviteToken: string): Promise<void> {
   const response = await apiFetch(auth0, "/orgs/join", requestId, {
     method: "POST",
     body: JSON.stringify({
-      auth0Sub: session.user.sub,
       email: session.user.email,
       displayName: session.user.name ?? "Unknown User",
       inviteToken,
@@ -709,7 +701,7 @@ export async function createInviteLink(): Promise<{ token: string; expiresAt: st
   const session = await auth0.getSession();
   if (!session) throw new Error("Not authenticated");
 
-  const mapping = await ensureAppUserMapping({
+  await ensureAppUserMapping({
     auth0,
     requestId,
     auth0Sub: session.user.sub,
@@ -719,7 +711,7 @@ export async function createInviteLink(): Promise<{ token: string; expiresAt: st
 
   const response = await apiFetch(auth0, "/orgs/invite", requestId, {
     method: "POST",
-    body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
