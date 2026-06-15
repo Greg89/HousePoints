@@ -2,7 +2,12 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { getAuth0Client } from "@/lib/auth0";
+import {
+  apiFetch,
+  getOptionalAuthenticatedApiContext,
+  requireAuthenticatedApiContext,
+} from "@/lib/api-client";
+import { getCurrentUser } from "@/lib/current-user";
 import { logError, logInfo, logWarn } from "@/lib/logging";
 import type {
   ActivityItem,
@@ -12,20 +17,6 @@ import type {
   Trait,
   UserRole,
 } from "@housepoints/contracts";
-
-type AppUserMapping = {
-  id: string;
-  auth0Sub: string;
-  email: string | null;
-  displayName: string;
-  role: UserRole;
-  organizationId: string | null;
-  organizationSlug: string | null;
-  houseId: string | null;
-  houseName: string | null;
-  houseColor: string | null;
-  created: boolean;
-};
 
 type AdminUser = {
   id: string;
@@ -40,115 +31,19 @@ type AdminHouse = {
   name: string;
 };
 
-function getApiBaseUrl(): string {
-  const apiBaseUrl = process.env.APP_API_BASE_URL;
-
-  if (!apiBaseUrl) {
-    throw new Error("APP_API_BASE_URL is not configured");
-  }
-
-  return apiBaseUrl;
-}
-
-type Auth0Client = NonNullable<ReturnType<typeof getAuth0Client>>;
-
-async function apiFetch(
-  auth0: Auth0Client,
-  path: string,
-  requestId: string,
-  init: RequestInit,
-): Promise<Response> {
-  const { token } = await auth0.getAccessToken();
-
-  return fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      ...init.headers,
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      "x-request-id": requestId,
-    },
-    cache: "no-store",
-  });
-}
-
-async function ensureAppUserMapping(input: {
-  auth0: Auth0Client;
-  requestId: string;
-  auth0Sub: string;
-  email?: string;
-  displayName?: string;
-}): Promise<AppUserMapping> {
-  const response = await apiFetch(input.auth0, "/users/bootstrap", input.requestId, {
-    method: "POST",
-    body: JSON.stringify({
-      email: input.email,
-      displayName: input.displayName ?? "Unknown User",
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    logWarn("web.user.mapping_failed", {
-      requestId: input.requestId,
-      auth0Sub: input.auth0Sub,
-      statusCode: response.status,
-      responseBody: body,
-    });
-    throw new Error(`User mapping bootstrap failed with status ${response.status}`);
-  }
-
-  const user = (await response.json()) as AppUserMapping;
-
-  logInfo("web.user.mapping_ensured", {
-    requestId: input.requestId,
-    userId: user.id,
-    auth0Sub: user.auth0Sub,
-    created: user.created,
-    hasHouse: Boolean(user.houseId),
-  });
-
-  return user;
-}
-
 export async function submitPointAdjustment(formData: FormData): Promise<void> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
 
   logInfo("web.action.invoked", {
     action: "submitPointAdjustment",
     requestId,
   });
 
-  if (!auth0) {
-    logWarn("web.auth.not_configured", {
-      action: "submitPointAdjustment",
-      requestId,
-    });
-    throw new Error("Auth0 is not configured");
-  }
-
-  const session = await auth0.getSession();
-
-  if (!session) {
-    logWarn("web.auth.session_missing", {
-      action: "submitPointAdjustment",
-      requestId,
-    });
-    throw new Error("You must be logged in to adjust points");
-  }
-
   const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   const delta = Number(formData.get("delta") ?? 0);
-  const actorAuth0Sub = session.user.sub;
-  const mapping = await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
+  const mapping = await getCurrentUser();
+  const actorAuth0Sub = mapping.auth0Sub;
 
   if (!mapping.houseId) {
     logWarn("web.user.house_unassigned", {
@@ -164,11 +59,11 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
     actorAuth0Sub,
     targetHouseId,
     delta,
-    userSub: session.user.sub,
+    userSub: mapping.auth0Sub,
   });
 
   try {
-    const response = await apiFetch(auth0, "/points/adjust", requestId, {
+    const response = await apiFetch("/points/adjust", requestId, {
       method: "POST",
       body: JSON.stringify({
         targetHouseId,
@@ -219,27 +114,7 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
 }
 
 async function getActorMappingForAdmin(action: string, requestId: string) {
-  const auth0 = getAuth0Client();
-
-  if (!auth0) {
-    logWarn("web.auth.not_configured", { action, requestId });
-    throw new Error("Auth0 is not configured");
-  }
-
-  const session = await auth0.getSession();
-
-  if (!session) {
-    logWarn("web.auth.session_missing", { action, requestId });
-    throw new Error("You must be logged in");
-  }
-
-  const mapping = await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
+  const mapping = await getCurrentUser();
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     logWarn("web.admin.forbidden", {
@@ -251,12 +126,12 @@ async function getActorMappingForAdmin(action: string, requestId: string) {
     throw new Error("Admin role required");
   }
 
-  return { auth0, mapping };
+  return mapping;
 }
 
 export async function createHouse(formData: FormData): Promise<void> {
   const requestId = randomUUID();
-  const { auth0, mapping: actor } = await getActorMappingForAdmin("createHouse", requestId);
+  const actor = await getActorMappingForAdmin("createHouse", requestId);
   const name = String(formData.get("name") ?? "").trim();
   const color = String(formData.get("color") ?? "#7c3aed").trim();
   const description = String(formData.get("description") ?? "").trim() || undefined;
@@ -265,7 +140,7 @@ export async function createHouse(formData: FormData): Promise<void> {
     throw new Error("House name is required");
   }
 
-  const response = await apiFetch(auth0, "/admin/houses", requestId, {
+  const response = await apiFetch("/admin/houses", requestId, {
     method: "POST",
     body: JSON.stringify({
       name,
@@ -297,7 +172,7 @@ export async function createHouse(formData: FormData): Promise<void> {
 
 export async function assignUserHouse(formData: FormData): Promise<void> {
   const requestId = randomUUID();
-  const { auth0, mapping: actor } = await getActorMappingForAdmin("assignUserHouse", requestId);
+  const actor = await getActorMappingForAdmin("assignUserHouse", requestId);
   const targetUserId = String(formData.get("targetUserId") ?? "").trim();
   const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
 
@@ -305,7 +180,7 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
     throw new Error("Target user and house are required");
   }
 
-  const response = await apiFetch(auth0, "/admin/users/assign-house", requestId, {
+  const response = await apiFetch("/admin/users/assign-house", requestId, {
     method: "POST",
     body: JSON.stringify({
       targetUserId,
@@ -343,30 +218,18 @@ export async function readAdminContext(): Promise<{
   houses: AdminHouse[];
 } | null> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-
-  if (!auth0) {
+  const authContext = await getOptionalAuthenticatedApiContext();
+  if (!authContext) {
     return null;
   }
 
-  const session = await auth0.getSession();
-  if (!session) {
-    return null;
-  }
-
-  const mapping = await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
+  const mapping = await getCurrentUser();
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     return null;
   }
 
-  const response = await apiFetch(auth0, "/admin/context", requestId, {
+  const response = await apiFetch("/admin/context", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -422,19 +285,9 @@ export async function readSessionSummary(): Promise<{
     requestId,
   });
 
-  const auth0 = getAuth0Client();
+  const authContext = await getOptionalAuthenticatedApiContext();
 
-  if (!auth0) {
-    logWarn("web.auth.not_configured", {
-      action: "readSessionSummary",
-      requestId,
-    });
-    return { isAuthenticated: false };
-  }
-
-  const session = await auth0.getSession();
-
-  if (!session) {
+  if (!authContext) {
     logWarn("web.auth.session_missing", {
       action: "readSessionSummary",
       requestId,
@@ -445,18 +298,12 @@ export async function readSessionSummary(): Promise<{
 
   const summary = {
     isAuthenticated: true,
-    userName: session.user.name,
-    userEmail: session.user.email,
-    userSub: session.user.sub,
+    userName: authContext.user.name,
+    userEmail: authContext.user.email,
+    userSub: authContext.user.sub,
   };
 
-  const mapping = await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
+  const mapping = await getCurrentUser();
 
   logInfo("web.session.read", {
     requestId,
@@ -487,18 +334,9 @@ export async function readSessionSummary(): Promise<{
 
 export async function readLeaderboard() {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) return null;
-  const session = await auth0.getSession();
-  if (!session) return null;
-  await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
-  const response = await apiFetch(auth0, "/houses/leaderboard", requestId, {
+  if (!(await getOptionalAuthenticatedApiContext())) return null;
+  await getCurrentUser();
+  const response = await apiFetch("/houses/leaderboard", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -508,18 +346,9 @@ export async function readLeaderboard() {
 
 export async function readMembers() {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) return null;
-  const session = await auth0.getSession();
-  if (!session) return null;
-  await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
-  const response = await apiFetch(auth0, "/members", requestId, {
+  if (!(await getOptionalAuthenticatedApiContext())) return null;
+  await getCurrentUser();
+  const response = await apiFetch("/members", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -529,18 +358,9 @@ export async function readMembers() {
 
 export async function readActivityFeed() {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) return null;
-  const session = await auth0.getSession();
-  if (!session) return null;
-  await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
-  const response = await apiFetch(auth0, "/transactions/recent", requestId, {
+  if (!(await getOptionalAuthenticatedApiContext())) return null;
+  await getCurrentUser();
+  const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -550,18 +370,9 @@ export async function readActivityFeed() {
 
 export async function readMemberScores(): Promise<MemberScore[] | null> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) return null;
-  const session = await auth0.getSession();
-  if (!session) return null;
-  await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
-  const response = await apiFetch(auth0, "/users/scores", requestId, {
+  if (!(await getOptionalAuthenticatedApiContext())) return null;
+  await getCurrentUser();
+  const response = await apiFetch("/users/scores", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -577,18 +388,8 @@ export async function awardPoints(
   trait: Trait
 ): Promise<void> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) throw new Error("Auth0 is not configured");
-  const session = await auth0.getSession();
-  if (!session) throw new Error("Not authenticated");
-  await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
-  const response = await apiFetch(auth0, "/points/adjust", requestId, {
+  await getCurrentUser();
+  const response = await apiFetch("/points/adjust", requestId, {
     method: "POST",
     body: JSON.stringify({ targetUserId, delta, reason, trait }),
   });
@@ -601,25 +402,15 @@ export async function awardPoints(
 
 export async function updateDisplayName(displayName: string): Promise<void> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) throw new Error("Auth0 is not configured");
-  const session = await auth0.getSession();
-  if (!session) throw new Error("Not authenticated");
 
   const trimmed = displayName.trim();
   if (!trimmed || trimmed.length > 120) {
     throw new Error("Display name must be between 1 and 120 characters");
   }
 
-  const mapping = await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
+  const mapping = await getCurrentUser();
 
-  const response = await apiFetch(auth0, "/users/profile", requestId, {
+  const response = await apiFetch("/users/profile", requestId, {
     method: "POST",
     body: JSON.stringify({ displayName: trimmed }),
   });
@@ -652,16 +443,13 @@ export async function createOrg(
   firstHouseColor: string,
 ): Promise<void> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) throw new Error("Auth0 is not configured");
-  const session = await auth0.getSession();
-  if (!session) throw new Error("Not authenticated");
+  const { user } = await requireAuthenticatedApiContext();
 
-  const response = await apiFetch(auth0, "/orgs/create", requestId, {
+  const response = await apiFetch("/orgs/create", requestId, {
     method: "POST",
     body: JSON.stringify({
-      email: session.user.email,
-      displayName: session.user.name ?? "Unknown User",
+      email: user.email,
+      displayName: user.name ?? "Unknown User",
       orgName: orgName.trim(),
       orgSlug: orgSlug.trim(),
       firstHouseName: firstHouseName.trim(),
@@ -679,16 +467,13 @@ export async function createOrg(
 
 export async function joinOrg(inviteToken: string): Promise<void> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) throw new Error("Auth0 is not configured");
-  const session = await auth0.getSession();
-  if (!session) throw new Error("Not authenticated");
+  const { user } = await requireAuthenticatedApiContext();
 
-  const response = await apiFetch(auth0, "/orgs/join", requestId, {
+  const response = await apiFetch("/orgs/join", requestId, {
     method: "POST",
     body: JSON.stringify({
-      email: session.user.email,
-      displayName: session.user.name ?? "Unknown User",
+      email: user.email,
+      displayName: user.name ?? "Unknown User",
       inviteToken,
     }),
   });
@@ -703,20 +488,9 @@ export async function joinOrg(inviteToken: string): Promise<void> {
 
 export async function createInviteLink(): Promise<{ token: string; expiresAt: string }> {
   const requestId = randomUUID();
-  const auth0 = getAuth0Client();
-  if (!auth0) throw new Error("Auth0 is not configured");
-  const session = await auth0.getSession();
-  if (!session) throw new Error("Not authenticated");
+  await getCurrentUser();
 
-  await ensureAppUserMapping({
-    auth0,
-    requestId,
-    auth0Sub: session.user.sub,
-    email: session.user.email,
-    displayName: session.user.name,
-  });
-
-  const response = await apiFetch(auth0, "/orgs/invite", requestId, {
+  const response = await apiFetch("/orgs/invite", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "npm run build -w @housepoints/contracts && next build",
     "start": "next start",
+    "test": "vitest run",
     "lint": "eslint"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
@@ -35,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }
