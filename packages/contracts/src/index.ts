@@ -59,6 +59,14 @@ export const adjustPointsSchema = z.object({
 
 export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
 
+export const pointAdjustmentResponseSchema = z.object({
+  id: z.string().min(1),
+});
+
+export type PointAdjustmentResponse = z.infer<
+  typeof pointAdjustmentResponseSchema
+>;
+
 export const bootstrapUserSchema = z.object({
   email: z.string().email().optional(),
   displayName: z.string().min(1).max(120),

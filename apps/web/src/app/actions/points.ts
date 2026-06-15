@@ -16,6 +16,7 @@ import {
   leaderboardSchema,
   memberScoresSchema,
   orgMembersSchema,
+  pointAdjustmentResponseSchema,
   type Trait,
   type UserRole,
 } from "@housepoints/contracts";
@@ -373,10 +374,11 @@ export async function awardPoints(
     method: "POST",
     body: JSON.stringify({ targetUserId, delta, reason, trait }),
   });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Award points failed: ${body}`);
-  }
+  await parseApiResponse(
+    response,
+    pointAdjustmentResponseSchema,
+    "Points could not be awarded. Please try again.",
+  );
   revalidatePath("/");
 }
 

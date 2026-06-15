@@ -17,6 +17,7 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   adminContextSchema,
+  pointAdjustmentResponseSchema,
   traitSchema,
   TRAITS,
   TRAIT_LABELS,
@@ -440,5 +441,25 @@ describe("adminContextSchema", () => {
         houses: [{ ...valid.houses[0], color: null }],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("pointAdjustmentResponseSchema", () => {
+  it("accepts a point adjustment response with a transaction id", () => {
+    expect(
+      pointAdjustmentResponseSchema.parse({
+        id: "tx-1",
+        delta: 10,
+      }),
+    ).toEqual({ id: "tx-1" });
+  });
+
+  it("rejects a response without a transaction id", () => {
+    expect(
+      pointAdjustmentResponseSchema.safeParse({ delta: 10 }).success,
+    ).toBe(false);
+    expect(pointAdjustmentResponseSchema.safeParse({ id: "" }).success).toBe(
+      false,
+    );
   });
 });

@@ -35,10 +35,11 @@ Completed units:
 - Restricted CORS to validated, configured origins.
 - Added shared dashboard response schemas and stopped rendering failed dashboard reads as empty data.
 - Added runtime validation for admin context and stopped hiding admin tools on dependency failure.
+- Added runtime validation and safe error handling for point-award responses.
 
 Current unit verification:
 
-- `npm test`: 113 tests passed.
+- `npm test`: 115 tests passed.
 - Workspace lint passed.
 - Full production build passed.
 
