@@ -8,6 +8,7 @@ import {
   actorScopeSchema,
   createOrgSchema,
   createInviteSchema,
+  inviteLinkSchema,
   joinOrgSchema,
   promoteUserSchema,
   memberScoreSchema,
@@ -461,5 +462,30 @@ describe("pointAdjustmentResponseSchema", () => {
     expect(pointAdjustmentResponseSchema.safeParse({ id: "" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("inviteLinkSchema", () => {
+  const valid = {
+    id: "invite-1",
+    token: "single-use-token",
+    expiresAt: "2026-06-18T12:00:00.000Z",
+    usedAt: null,
+  };
+
+  it("accepts the one-time invite response", () => {
+    expect(inviteLinkSchema.parse(valid)).toEqual(valid);
+  });
+
+  it("rejects missing tokens and malformed expiration timestamps", () => {
+    expect(
+      inviteLinkSchema.safeParse({ ...valid, token: "" }).success,
+    ).toBe(false);
+    expect(
+      inviteLinkSchema.safeParse({ ...valid, expiresAt: "tomorrow" }).success,
+    ).toBe(false);
+    expect(
+      inviteLinkSchema.safeParse({ ...valid, usedAt: "yesterday" }).success,
+    ).toBe(false);
   });
 });

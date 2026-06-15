@@ -36,10 +36,11 @@ Completed units:
 - Added shared dashboard response schemas and stopped rendering failed dashboard reads as empty data.
 - Added runtime validation for admin context and stopped hiding admin tools on dependency failure.
 - Added runtime validation and safe error handling for point-award responses.
+- Corrected the invite response contract and added safe runtime validation for generated invite tokens.
 
 Current unit verification:
 
-- `npm test`: 115 tests passed.
+- `npm test`: 117 tests passed.
 - Workspace lint passed.
 - Full production build passed.
 

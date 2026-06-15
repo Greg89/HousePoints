@@ -251,10 +251,10 @@ export const orgSettingsSchema = z.object({
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 
 export const inviteLinkSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  expiresAt: z.string(),
-  usedAt: z.string().nullable(),
+  id: z.string().min(1),
+  token: z.string().min(1),
+  expiresAt: z.string().datetime(),
+  usedAt: z.string().datetime().nullable(),
 });
 
 export type InviteLink = z.infer<typeof inviteLinkSchema>;

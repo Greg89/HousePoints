@@ -13,6 +13,7 @@ import { logError, logInfo, logWarn } from "@/lib/logging";
 import {
   adminContextSchema,
   activityFeedSchema,
+  inviteLinkSchema,
   leaderboardSchema,
   memberScoresSchema,
   orgMembersSchema,
@@ -477,11 +478,10 @@ export async function createInviteLink(): Promise<{ token: string; expiresAt: st
     body: JSON.stringify({}),
   });
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ message: "Unknown error" }));
-    throw new Error(body.message ?? `Create invite failed with status ${response.status}`);
-  }
-
-  const data = await response.json();
+  const data = await parseApiResponse(
+    response,
+    inviteLinkSchema,
+    "An invite could not be generated. Please try again.",
+  );
   return { token: data.token, expiresAt: data.expiresAt };
 }
