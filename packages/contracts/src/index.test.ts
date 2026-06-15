@@ -294,6 +294,8 @@ describe("authenticated request schemas", () => {
       displayName: "Alice",
       orgName: "Acme",
       orgSlug: "acme",
+      firstHouseName: "Phoenix",
+      firstHouseColor: "#7c3aed",
       auth0Sub: "auth0|attacker",
     }],
     [createInviteSchema, {
@@ -314,6 +316,39 @@ describe("authenticated request schemas", () => {
 
   it.each(cases)("rejects identity fields from %#", (schema, input) => {
     expect(schema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("createOrgSchema", () => {
+  const valid = {
+    displayName: "Alice",
+    orgName: "Acme",
+    orgSlug: "acme",
+    firstHouseName: "Phoenix",
+    firstHouseColor: "#7c3aed",
+  };
+
+  it("accepts organization and first-house setup", () => {
+    expect(createOrgSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("defaults the first house color", () => {
+    const { firstHouseColor: _color, ...withoutColor } = valid;
+    const result = createOrgSchema.safeParse(withoutColor);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.firstHouseColor).toBe("#7c3aed");
+    }
+  });
+
+  it("requires a valid first house", () => {
+    expect(
+      createOrgSchema.safeParse({ ...valid, firstHouseName: "" }).success,
+    ).toBe(false);
+    expect(
+      createOrgSchema.safeParse({ ...valid, firstHouseColor: "purple" }).success,
+    ).toBe(false);
   });
 });
 

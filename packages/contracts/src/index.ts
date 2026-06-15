@@ -166,6 +166,8 @@ export const createOrgSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
   orgName: z.string().trim().min(2).max(80),
   orgSlug: slugSchema,
+  firstHouseName: z.string().trim().min(2).max(80),
+  firstHouseColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7c3aed"),
 }).strict();
 
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;

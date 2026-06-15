@@ -7,7 +7,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // â”€â”€ Mock @housepoints/db before importing anything that uses it â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 vi.mock("@housepoints/db", () => ({
   prisma: {
-    organization: { upsert: vi.fn() },
+    $transaction: vi.fn(),
+    organization: {
+      upsert: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
     user: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -16,6 +21,7 @@ vi.mock("@housepoints/db", () => ({
     },
     house: {
       upsert: vi.fn(),
+      create: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
@@ -36,11 +42,16 @@ import { prisma } from "@housepoints/db";
 // Typed shorthand helpers
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
+const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>;
+const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
+const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 
 // â”€â”€ Shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
@@ -74,7 +85,12 @@ const makeAdmin = (overrides = {}) => ({
 });
 
 // Reset all mock implementations before each test to ensure isolation
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  mockTransaction.mockImplementation(
+    async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
+  );
+});
 
 async function buildTestApp(subject = "auth0|member") {
   const app = await buildApp({
@@ -484,6 +500,92 @@ describe("POST /transactions/recent", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()[0].trait).toBeNull();
+    await app.close();
+  });
+});
+
+describe("POST /orgs/create", () => {
+  const payload = {
+    displayName: "Alice",
+    email: "alice@example.com",
+    orgName: "Acme Corp",
+    orgSlug: "acme",
+    firstHouseName: "Phoenix",
+    firstHouseColor: "#7c3aed",
+  };
+
+  it("atomically creates the organization, first house, and assigned owner", async () => {
+    mockOrgFindUnique.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: null,
+    });
+    mockOrgCreate.mockResolvedValue(ORG);
+    mockHouseCreate.mockResolvedValue(HOUSE);
+    mockUserUpdate.mockResolvedValue(
+      makeMember({
+        role: "OWNER",
+        email: "alice@example.com",
+        organization: { slug: "acme" },
+      }),
+    );
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/create",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      role: "OWNER",
+      organizationId: "org-1",
+      houseId: "house-1",
+      houseName: "Phoenix",
+    });
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockHouseCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        name: "Phoenix",
+        color: "#7c3aed",
+      },
+      select: { id: true, name: true, color: true },
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          organizationId: "org-1",
+          houseId: "house-1",
+          role: "OWNER",
+        }),
+      }),
+    );
+    await app.close();
+  });
+
+  it("returns an error when the atomic setup transaction fails", async () => {
+    mockOrgFindUnique.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: null,
+    });
+    mockTransaction.mockRejectedValue(new Error("transaction failed"));
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/create",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({
+      code: "INTERNAL_ERROR",
+      message: "Internal server error",
+    });
+    expect(mockTransaction).toHaveBeenCalledOnce();
     await app.close();
   });
 });

@@ -645,7 +645,12 @@ export async function updateDisplayName(displayName: string): Promise<void> {
   revalidatePath("/settings");
 }
 
-export async function createOrg(orgName: string, orgSlug: string): Promise<void> {
+export async function createOrg(
+  orgName: string,
+  orgSlug: string,
+  firstHouseName: string,
+  firstHouseColor: string,
+): Promise<void> {
   const requestId = randomUUID();
   const auth0 = getAuth0Client();
   if (!auth0) throw new Error("Auth0 is not configured");
@@ -659,6 +664,8 @@ export async function createOrg(orgName: string, orgSlug: string): Promise<void>
       displayName: session.user.name ?? "Unknown User",
       orgName: orgName.trim(),
       orgSlug: orgSlug.trim(),
+      firstHouseName: firstHouseName.trim(),
+      firstHouseColor,
     }),
   });
 

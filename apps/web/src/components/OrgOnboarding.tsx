@@ -29,6 +29,8 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
   // Create org state
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
+  const [firstHouseName, setFirstHouseName] = useState("");
+  const [firstHouseColor, setFirstHouseColor] = useState("#7c3aed");
   const [slugEdited, setSlugEdited] = useState(false);
 
   // Join org state
@@ -47,10 +49,10 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
   }
 
   function handleCreate() {
-    if (!orgName.trim() || !orgSlug) return;
+    if (!orgName.trim() || !orgSlug || !firstHouseName.trim()) return;
     startTransition(async () => {
       try {
-        await createOrg(orgName, orgSlug);
+        await createOrg(orgName, orgSlug, firstHouseName, firstHouseColor);
         toast.success("Organisation created!", { description: `Welcome to ${orgName}` });
       } catch (err) {
         toast.error("Could not create organisation", {
@@ -167,6 +169,32 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Your first house</label>
+              <p className="text-xs text-muted-foreground">
+                You&apos;ll join this house as the organisation owner.
+              </p>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Phoenix"
+                  value={firstHouseName}
+                  onChange={(e) => setFirstHouseName(e.target.value)}
+                  className={cn(
+                    "min-w-0 flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm",
+                    "focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                  )}
+                />
+                <input
+                  type="color"
+                  aria-label="First house color"
+                  value={firstHouseColor}
+                  onChange={(e) => setFirstHouseColor(e.target.value)}
+                  className="h-11 w-14 cursor-pointer rounded-lg border bg-background p-1"
+                />
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-1">
               <button
                 onClick={() => setView("pick")}
@@ -176,10 +204,10 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!orgName.trim() || !orgSlug || isPending}
+                disabled={!orgName.trim() || !orgSlug || !firstHouseName.trim() || isPending}
                 className={cn(
                   "flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
-                  orgName.trim() && orgSlug && !isPending
+                  orgName.trim() && orgSlug && firstHouseName.trim() && !isPending
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}

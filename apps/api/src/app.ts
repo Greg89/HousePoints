@@ -726,7 +726,14 @@ app.post("/orgs/create", async (request, reply) => {
     return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
   }
 
-  const { email, displayName, orgName, orgSlug } = parsed.data;
+  const {
+    email,
+    displayName,
+    orgName,
+    orgSlug,
+    firstHouseName,
+    firstHouseColor,
+  } = parsed.data;
   const auth0Sub = request.auth.subject;
 
   // Reject if slug is already taken
@@ -746,24 +753,66 @@ app.post("/orgs/create", async (request, reply) => {
     return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
   }
 
-  const org = await prisma.organization.create({
-    data: { name: orgName, slug: orgSlug },
-    select: { id: true, slug: true, name: true },
+  const { org, house, user } = await prisma.$transaction(async (tx) => {
+    const org = await tx.organization.create({
+      data: { name: orgName, slug: orgSlug },
+      select: { id: true, slug: true, name: true },
+    });
+
+    const house = await tx.house.create({
+      data: {
+        organizationId: org.id,
+        name: firstHouseName,
+        color: firstHouseColor,
+      },
+      select: { id: true, name: true, color: true },
+    });
+
+    const userSelect = {
+      id: true,
+      auth0Sub: true,
+      email: true,
+      displayName: true,
+      role: true,
+      organizationId: true,
+      organization: { select: { slug: true } },
+      houseId: true,
+      house: { select: { name: true, color: true } },
+    } as const;
+
+    const user = existingUser
+      ? await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            organizationId: org.id,
+            houseId: house.id,
+            role: "OWNER",
+            displayName,
+            email: email ?? null,
+          },
+          select: userSelect,
+        })
+      : await tx.user.create({
+          data: {
+            auth0Sub,
+            email: email ?? null,
+            displayName,
+            organizationId: org.id,
+            houseId: house.id,
+            role: "OWNER",
+          },
+          select: userSelect,
+        });
+
+    return { org, house, user };
   });
 
-  // Create or update the user row as OWNER
-  const user = existingUser
-    ? await prisma.user.update({
-        where: { id: existingUser.id },
-        data: { organizationId: org.id, role: "OWNER", displayName, email: email ?? null },
-        select: { id: true, auth0Sub: true, email: true, displayName: true, role: true, organizationId: true, organization: { select: { slug: true } }, houseId: true, house: { select: { name: true, color: true } } },
-      })
-    : await prisma.user.create({
-        data: { auth0Sub, email: email ?? null, displayName, organizationId: org.id, role: "OWNER" },
-        select: { id: true, auth0Sub: true, email: true, displayName: true, role: true, organizationId: true, organization: { select: { slug: true } }, houseId: true, house: { select: { name: true, color: true } } },
-      });
-
-  info(request.log, "orgs.created", { orgId: org.id, orgSlug: org.slug, ownerId: user.id });
+  info(request.log, "orgs.created", {
+    orgId: org.id,
+    orgSlug: org.slug,
+    houseId: house.id,
+    ownerId: user.id,
+  });
   return reply.status(201).send({ ...mapAppUser(user), created: true });
 });
 
