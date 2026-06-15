@@ -37,10 +37,11 @@ Completed units:
 - Added runtime validation for admin context and stopped hiding admin tools on dependency failure.
 - Added runtime validation and safe error handling for point-award responses.
 - Corrected the invite response contract and added safe runtime validation for generated invite tokens.
+- Added runtime validation and safe error handling for profile-update responses.
 
 Current unit verification:
 
-- `npm test`: 117 tests passed.
+- `npm test`: 120 tests passed.
 - Workspace lint passed.
 - Full production build passed.
 

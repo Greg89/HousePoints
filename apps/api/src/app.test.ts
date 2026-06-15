@@ -572,6 +572,36 @@ describe("POST /admin/users/assign-house", () => {
     await app.close();
   });
 });
+
+describe("POST /users/profile", () => {
+  it("updates and returns the authenticated user's display name", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockUserUpdate.mockResolvedValue({
+      id: "user-1",
+      displayName: "Alice Updated",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/profile",
+      payload: { displayName: "Alice Updated" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "user-1",
+      displayName: "Alice Updated",
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { displayName: "Alice Updated" },
+      select: { id: true, displayName: true },
+    });
+    await app.close();
+  });
+});
+
 describe("POST /transactions/recent", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);

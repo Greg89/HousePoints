@@ -20,6 +20,7 @@ import {
   pointAdjustmentResponseSchema,
   type Trait,
   type UserRole,
+  updateProfileResponseSchema,
 } from "@housepoints/contracts";
 
 export async function submitPointAdjustment(formData: FormData): Promise<void> {
@@ -391,28 +392,23 @@ export async function updateDisplayName(displayName: string): Promise<void> {
     throw new Error("Display name must be between 1 and 120 characters");
   }
 
-  const mapping = await getCurrentUser();
+  await getCurrentUser();
 
   const response = await apiFetch("/users/profile", requestId, {
     method: "POST",
     body: JSON.stringify({ displayName: trimmed }),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    logWarn("web.profile.update_failed", {
-      requestId,
-      actorUserId: mapping.id,
-      statusCode: response.status,
-      responseBody: body,
-    });
-    throw new Error(`Profile update failed with status ${response.status}`);
-  }
+  const updated = await parseApiResponse(
+    response,
+    updateProfileResponseSchema,
+    "Your display name could not be updated. Please try again.",
+  );
 
   logInfo("web.profile.updated", {
     requestId,
-    actorUserId: mapping.id,
-    displayName: trimmed,
+    actorUserId: updated.id,
+    displayName: updated.displayName,
   });
 
   revalidatePath("/");

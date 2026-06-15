@@ -5,6 +5,7 @@ import {
   createHouseSchema,
   assignUserHouseSchema,
   updateProfileSchema,
+  updateProfileResponseSchema,
   actorScopeSchema,
   createOrgSchema,
   createInviteSchema,
@@ -486,6 +487,32 @@ describe("inviteLinkSchema", () => {
     ).toBe(false);
     expect(
       inviteLinkSchema.safeParse({ ...valid, usedAt: "yesterday" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("updateProfileResponseSchema", () => {
+  it("accepts an updated user summary", () => {
+    const response = {
+      id: "user-1",
+      displayName: "Alice Updated",
+    };
+
+    expect(updateProfileResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it("rejects missing user ids and invalid display names", () => {
+    expect(
+      updateProfileResponseSchema.safeParse({
+        id: "",
+        displayName: "Alice",
+      }).success,
+    ).toBe(false);
+    expect(
+      updateProfileResponseSchema.safeParse({
+        id: "user-1",
+        displayName: "",
+      }).success,
     ).toBe(false);
   });
 });

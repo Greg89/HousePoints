@@ -150,6 +150,15 @@ export const updateProfileSchema = z.object({
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
+export const updateProfileResponseSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1).max(120),
+});
+
+export type UpdateProfileResponse = z.infer<
+  typeof updateProfileResponseSchema
+>;
+
 export const memberScoreSchema = z.object({
   memberId: z.string(),
   points: z.number().int(),
