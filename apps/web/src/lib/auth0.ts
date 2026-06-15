@@ -7,7 +7,8 @@ function hasRequiredAuthEnv(): boolean {
 		process.env.AUTH0_DOMAIN &&
 			process.env.AUTH0_CLIENT_ID &&
 			process.env.AUTH0_CLIENT_SECRET &&
-			process.env.AUTH0_SECRET,
+			process.env.AUTH0_SECRET &&
+			process.env.AUTH0_AUDIENCE,
 	);
 }
 
@@ -17,7 +18,11 @@ export function getAuth0Client(): Auth0Client | null {
 	}
 
 	if (!auth0Client) {
-		auth0Client = new Auth0Client();
+		auth0Client = new Auth0Client({
+			authorizationParameters: {
+				audience: process.env.AUTH0_AUDIENCE,
+			},
+		});
 	}
 
 	return auth0Client;

@@ -18,6 +18,7 @@
     "@housepoints/db": "*",
     "dotenv": "^17.2.3",
     "fastify": "^5.6.1",
+    "jose": "^6.2.3",
     "pino": "^10.3.1",
     "pino-seq": "^4.0.0",
     "zod": "^4.4.3"

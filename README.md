@@ -83,17 +83,23 @@ DATABASE_URL=postgresql://user:password@localhost:5432/housepoints
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/housepoints
 PORT=4000
+AUTH0_DOMAIN=<your-tenant>.us.auth0.com
+AUTH0_AUDIENCE=https://api.housepoints.example
 ```
 
 **`apps/web/.env.local`**
 ```env
 AUTH0_SECRET=<random 32+ char string>
-AUTH0_BASE_URL=http://localhost:3000
-AUTH0_ISSUER_BASE_URL=https://<your-tenant>.auth0.com
+AUTH0_DOMAIN=<your-tenant>.us.auth0.com
 AUTH0_CLIENT_ID=<your-client-id>
 AUTH0_CLIENT_SECRET=<your-client-secret>
+AUTH0_AUDIENCE=https://api.housepoints.example
+APP_BASE_URL=http://localhost:3000
 APP_API_BASE_URL=http://localhost:4000
 ```
+
+Create an Auth0 API with RS256 signing and use its Identifier as
+`AUTH0_AUDIENCE` in both services.
 
 ### 3. Set up the database
 
@@ -178,8 +184,10 @@ Error responses always have the shape `{ code: string, message: string }`.
 1. Create a Postgres service in Railway.
 2. Create two services from this repo — one for `apps/api`, one for `apps/web`.
 3. Set environment variables per service:
-   - **API**: `DATABASE_URL`, `PORT` (Railway injects `PORT` automatically)
-   - **Web**: all `AUTH0_*` vars + `APP_API_BASE_URL` pointing to the Railway API service URL
+   - **API**: `DATABASE_URL`, `AUTH0_DOMAIN`, and `AUTH0_AUDIENCE`; Railway injects `PORT` automatically
+   - **Web**: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`, and `APP_API_BASE_URL`
+   - Use the same Auth0 API Identifier for `AUTH0_AUDIENCE` in both services.
+   - Point `APP_API_BASE_URL` at the Railway API service URL.
 4. Set the API release command to `npm run db:deploy` so migrations run on every deploy.
 
 ---
@@ -246,7 +254,9 @@ Copy-Item packages/db/.env.example packages/db/.env
 Set at minimum:
 
 - `DATABASE_URL` in `apps/api/.env` and `packages/db/.env`
-- Auth0 variables in `apps/web/.env` (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL`)
+- `AUTH0_DOMAIN` and `AUTH0_AUDIENCE` in `apps/api/.env`
+- Auth0 variables in `apps/web/.env` (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`)
+- `APP_API_BASE_URL` in `apps/web/.env`
 
 ## Install
 

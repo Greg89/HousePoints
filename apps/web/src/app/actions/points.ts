@@ -50,24 +50,42 @@ function getApiBaseUrl(): string {
   return apiBaseUrl;
 }
 
+type Auth0Client = NonNullable<ReturnType<typeof getAuth0Client>>;
+
+async function apiFetch(
+  auth0: Auth0Client,
+  path: string,
+  requestId: string,
+  init: RequestInit,
+): Promise<Response> {
+  const { token } = await auth0.getAccessToken();
+
+  return fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers: {
+      ...init.headers,
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "x-request-id": requestId,
+    },
+    cache: "no-store",
+  });
+}
+
 async function ensureAppUserMapping(input: {
+  auth0: Auth0Client;
   requestId: string;
   auth0Sub: string;
   email?: string;
   displayName?: string;
 }): Promise<AppUserMapping> {
-  const response = await fetch(`${getApiBaseUrl()}/users/bootstrap`, {
+  const response = await apiFetch(input.auth0, "/users/bootstrap", input.requestId, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-request-id": input.requestId,
-    },
     body: JSON.stringify({
       auth0Sub: input.auth0Sub,
       email: input.email,
       displayName: input.displayName ?? "Unknown User",
     }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -126,6 +144,7 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
   const delta = Number(formData.get("delta") ?? 0);
   const actorAuth0Sub = session.user.sub;
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
@@ -150,19 +169,14 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
   });
 
   try {
-    const response = await fetch(`${getApiBaseUrl()}/points/adjust`, {
+    const response = await apiFetch(auth0, "/points/adjust", requestId, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-request-id": requestId,
-      },
       body: JSON.stringify({
         actorAuth0Sub,
         targetHouseId,
         delta,
         reason,
       }),
-      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -222,6 +236,7 @@ async function getActorMappingForAdmin(action: string, requestId: string) {
   }
 
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
@@ -238,12 +253,12 @@ async function getActorMappingForAdmin(action: string, requestId: string) {
     throw new Error("Admin role required");
   }
 
-  return mapping;
+  return { auth0, mapping };
 }
 
 export async function createHouse(formData: FormData): Promise<void> {
   const requestId = randomUUID();
-  const actor = await getActorMappingForAdmin("createHouse", requestId);
+  const { auth0, mapping: actor } = await getActorMappingForAdmin("createHouse", requestId);
   const name = String(formData.get("name") ?? "").trim();
   const color = String(formData.get("color") ?? "#7c3aed").trim();
   const description = String(formData.get("description") ?? "").trim() || undefined;
@@ -252,19 +267,14 @@ export async function createHouse(formData: FormData): Promise<void> {
     throw new Error("House name is required");
   }
 
-  const response = await fetch(`${getApiBaseUrl()}/admin/houses`, {
+  const response = await apiFetch(auth0, "/admin/houses", requestId, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-request-id": requestId,
-    },
     body: JSON.stringify({
       actorAuth0Sub: actor.auth0Sub,
       name,
       color,
       description,
     }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -290,7 +300,7 @@ export async function createHouse(formData: FormData): Promise<void> {
 
 export async function assignUserHouse(formData: FormData): Promise<void> {
   const requestId = randomUUID();
-  const actor = await getActorMappingForAdmin("assignUserHouse", requestId);
+  const { auth0, mapping: actor } = await getActorMappingForAdmin("assignUserHouse", requestId);
   const targetUserId = String(formData.get("targetUserId") ?? "").trim();
   const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
 
@@ -298,18 +308,13 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
     throw new Error("Target user and house are required");
   }
 
-  const response = await fetch(`${getApiBaseUrl()}/admin/users/assign-house`, {
+  const response = await apiFetch(auth0, "/admin/users/assign-house", requestId, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-request-id": requestId,
-    },
     body: JSON.stringify({
       actorAuth0Sub: actor.auth0Sub,
       targetUserId,
       targetHouseId,
     }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -354,6 +359,7 @@ export async function readAdminContext(): Promise<{
   }
 
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
@@ -364,16 +370,11 @@ export async function readAdminContext(): Promise<{
     return null;
   }
 
-  const response = await fetch(`${getApiBaseUrl()}/admin/context`, {
+  const response = await apiFetch(auth0, "/admin/context", requestId, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-request-id": requestId,
-    },
     body: JSON.stringify({
       actorAuth0Sub: mapping.auth0Sub,
     }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -456,6 +457,7 @@ export async function readSessionSummary(): Promise<{
   };
 
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
@@ -496,16 +498,15 @@ export async function readLeaderboard() {
   const session = await auth0.getSession();
   if (!session) return null;
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
-  const response = await fetch(`${getApiBaseUrl()}/houses/leaderboard`, {
+  const response = await apiFetch(auth0, "/houses/leaderboard", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
-    cache: "no-store",
   });
   if (!response.ok) return null;
   return (await response.json()) as LeaderboardEntry[];
@@ -518,16 +519,15 @@ export async function readMembers() {
   const session = await auth0.getSession();
   if (!session) return null;
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
-  const response = await fetch(`${getApiBaseUrl()}/members`, {
+  const response = await apiFetch(auth0, "/members", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
-    cache: "no-store",
   });
   if (!response.ok) return null;
   return (await response.json()) as OrgMember[];
@@ -540,16 +540,15 @@ export async function readActivityFeed() {
   const session = await auth0.getSession();
   if (!session) return null;
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
-  const response = await fetch(`${getApiBaseUrl()}/transactions/recent`, {
+  const response = await apiFetch(auth0, "/transactions/recent", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
-    cache: "no-store",
   });
   if (!response.ok) return null;
   return (await response.json()) as ActivityItem[];
@@ -562,16 +561,15 @@ export async function readMemberScores(): Promise<MemberScore[] | null> {
   const session = await auth0.getSession();
   if (!session) return null;
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
-  const response = await fetch(`${getApiBaseUrl()}/users/scores`, {
+  const response = await apiFetch(auth0, "/users/scores", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
-    cache: "no-store",
   });
   if (!response.ok) return null;
   return (await response.json()) as MemberScore[];
@@ -590,16 +588,15 @@ export async function awardPoints(
   const session = await auth0.getSession();
   if (!session) throw new Error("Not authenticated");
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
-  const response = await fetch(`${getApiBaseUrl()}/points/adjust`, {
+  const response = await apiFetch(auth0, "/points/adjust", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, targetUserId, delta, reason, trait }),
-    cache: "no-store",
   });
   if (!response.ok) {
     const body = await response.text();
@@ -621,17 +618,16 @@ export async function updateDisplayName(displayName: string): Promise<void> {
   }
 
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
 
-  const response = await fetch(`${getApiBaseUrl()}/users/profile`, {
+  const response = await apiFetch(auth0, "/users/profile", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub, displayName: trimmed }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -662,9 +658,8 @@ export async function createOrg(orgName: string, orgSlug: string): Promise<void>
   const session = await auth0.getSession();
   if (!session) throw new Error("Not authenticated");
 
-  const response = await fetch(`${getApiBaseUrl()}/orgs/create`, {
+  const response = await apiFetch(auth0, "/orgs/create", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({
       auth0Sub: session.user.sub,
       email: session.user.email,
@@ -672,7 +667,6 @@ export async function createOrg(orgName: string, orgSlug: string): Promise<void>
       orgName: orgName.trim(),
       orgSlug: orgSlug.trim(),
     }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -690,16 +684,14 @@ export async function joinOrg(inviteToken: string): Promise<void> {
   const session = await auth0.getSession();
   if (!session) throw new Error("Not authenticated");
 
-  const response = await fetch(`${getApiBaseUrl()}/orgs/join`, {
+  const response = await apiFetch(auth0, "/orgs/join", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({
       auth0Sub: session.user.sub,
       email: session.user.email,
       displayName: session.user.name ?? "Unknown User",
       inviteToken,
     }),
-    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -718,17 +710,16 @@ export async function createInviteLink(): Promise<{ token: string; expiresAt: st
   if (!session) throw new Error("Not authenticated");
 
   const mapping = await ensureAppUserMapping({
+    auth0,
     requestId,
     auth0Sub: session.user.sub,
     email: session.user.email,
     displayName: session.user.name,
   });
 
-  const response = await fetch(`${getApiBaseUrl()}/orgs/invite`, {
+  const response = await apiFetch(auth0, "/orgs/invite", requestId, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify({ actorAuth0Sub: mapping.auth0Sub }),
-    cache: "no-store",
   });
 
   if (!response.ok) {

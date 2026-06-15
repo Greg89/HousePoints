@@ -16,6 +16,11 @@ import {
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import {
+  createAuth0AccessTokenVerifierFromEnv,
+  readBearerToken,
+  type VerifyAccessToken,
+} from "./auth.js";
 import { createApiLogger, error, info, warn } from "./logging.js";
 
 type ActorRecord = {
@@ -103,8 +108,16 @@ function mapAppUser(user: {
   };
 }
 
-export async function buildApp() {
+type BuildAppOptions = {
+  verifyAccessToken?: VerifyAccessToken | false;
+};
+
+export async function buildApp(options: BuildAppOptions = {}) {
   const apiLogger = createApiLogger();
+  const verifyAccessToken =
+    options.verifyAccessToken === false
+      ? null
+      : options.verifyAccessToken ?? createAuth0AccessTokenVerifierFromEnv();
   const app = Fastify({
     loggerInstance: apiLogger.logger,
     requestIdHeader: "x-request-id",
@@ -118,6 +131,61 @@ export async function buildApp() {
 
   await app.register(cors, {
     origin: true,
+  });
+
+  app.decorateRequest("auth");
+
+  app.addHook("preValidation", async (request, reply) => {
+    if (!verifyAccessToken || request.routeOptions.url === "/health") {
+      return;
+    }
+
+    const token = readBearerToken(request.headers.authorization);
+
+    if (!token) {
+      warn(request.log, "auth.token_missing", {});
+      return reply.status(401).send({
+        code: "AUTHENTICATION_REQUIRED",
+        message: "A valid bearer token is required",
+      });
+    }
+
+    try {
+      request.auth = await verifyAccessToken(token);
+    } catch (err) {
+      warn(request.log, "auth.token_invalid", {
+        error: err instanceof Error ? err.message : "unknown",
+      });
+      return reply.status(401).send({
+        code: "INVALID_ACCESS_TOKEN",
+        message: "The access token is invalid or expired",
+      });
+    }
+
+    const body = request.body;
+    if (!body || typeof body !== "object") {
+      return;
+    }
+
+    const assertedSubject =
+      "actorAuth0Sub" in body
+        ? body.actorAuth0Sub
+        : "auth0Sub" in body
+          ? body.auth0Sub
+          : undefined;
+
+    if (
+      typeof assertedSubject === "string" &&
+      assertedSubject !== request.auth.subject
+    ) {
+      warn(request.log, "auth.subject_mismatch", {
+        tokenSubject: request.auth.subject,
+      });
+      return reply.status(403).send({
+        code: "IDENTITY_MISMATCH",
+        message: "Request identity does not match the authenticated user",
+      });
+    }
   });
 
 await app.register(rateLimit, {

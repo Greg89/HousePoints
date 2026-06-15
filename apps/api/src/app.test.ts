@@ -76,11 +76,15 @@ const makeAdmin = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => vi.resetAllMocks());
 
+function buildTestApp() {
+  return buildApp({ verifyAccessToken: false });
+}
+
 // â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("GET /health", () => {
   it("returns 200 { ok: true }", async () => {
-    const app = await buildApp();
+    const app = await buildTestApp();
     expect(app.server.listening).toBe(false);
 
     const res = await app.inject({ method: "GET", url: "/health" });
@@ -92,10 +96,98 @@ describe("GET /health", () => {
   });
 });
 
+describe("API authentication", () => {
+  it("keeps the health endpoint public", async () => {
+    const verifyAccessToken = vi.fn();
+    const app = await buildApp({ verifyAccessToken });
+
+    const res = await app.inject({ method: "GET", url: "/health" });
+
+    expect(res.statusCode).toBe(200);
+    expect(verifyAccessToken).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects a protected endpoint without a bearer token", async () => {
+    const app = await buildApp({
+      verifyAccessToken: vi.fn(),
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/members",
+      payload: { actorAuth0Sub: "auth0|member" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json().code).toBe("AUTHENTICATION_REQUIRED");
+    await app.close();
+  });
+
+  it("rejects an invalid bearer token", async () => {
+    const app = await buildApp({
+      verifyAccessToken: vi.fn().mockRejectedValue(new Error("invalid token")),
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/members",
+      headers: { authorization: "Bearer invalid" },
+      payload: { actorAuth0Sub: "auth0|member" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json().code).toBe("INVALID_ACCESS_TOKEN");
+    await app.close();
+  });
+
+  it("rejects a body identity that differs from the token subject", async () => {
+    const app = await buildApp({
+      verifyAccessToken: vi.fn().mockResolvedValue({
+        subject: "auth0|member",
+        claims: { sub: "auth0|member" },
+      }),
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/members",
+      headers: { authorization: "Bearer valid" },
+      payload: { actorAuth0Sub: "auth0|admin" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("IDENTITY_MISMATCH");
+    await app.close();
+  });
+
+  it("allows a valid token whose subject matches the request identity", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    const verifyAccessToken = vi.fn().mockResolvedValue({
+      subject: "auth0|member",
+      claims: { sub: "auth0|member" },
+    });
+    const app = await buildApp({ verifyAccessToken });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/members",
+      headers: { authorization: "Bearer valid" },
+      payload: { actorAuth0Sub: "auth0|member" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual([]);
+    expect(verifyAccessToken).toHaveBeenCalledWith("valid");
+    await app.close();
+  });
+});
+
 describe("POST /users/bootstrap", () => {
   it("returns existing user (created: false) when already mapped", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/users/bootstrap",
@@ -123,7 +215,7 @@ describe("POST /users/bootstrap", () => {
     mockFindUnique.mockResolvedValue(null);   // not found
     mockOrgUpsert.mockResolvedValue(ORG);
     mockCreate.mockResolvedValue(newUser);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/users/bootstrap",
@@ -135,7 +227,7 @@ describe("POST /users/bootstrap", () => {
   });
 
   it("returns 400 VALIDATION_ERROR for missing auth0Sub", async () => {
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/users/bootstrap",
@@ -150,7 +242,7 @@ describe("POST /users/bootstrap", () => {
 describe("POST /points/adjust", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -165,7 +257,7 @@ describe("POST /points/adjust", () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
       .mockResolvedValueOnce(makeMember({ organizationId: "org-OTHER" })); // target user
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -180,7 +272,7 @@ describe("POST /points/adjust", () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())   // getActorBySub
       .mockResolvedValueOnce(makeMember({ houseId: null })); // target user: no house
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -192,7 +284,7 @@ describe("POST /points/adjust", () => {
   });
 
   it("returns 400 VALIDATION_ERROR for negative delta", async () => {
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -204,7 +296,7 @@ describe("POST /points/adjust", () => {
   });
 
   it("returns 400 VALIDATION_ERROR when trait is missing", async () => {
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -231,7 +323,7 @@ describe("POST /points/adjust", () => {
       trait: "TECHNICAL_EXCELLENCE",
       createdAt: new Date(),
     });
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -254,7 +346,7 @@ describe("POST /points/adjust", () => {
 describe("POST /admin/houses", () => {
   it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
     mockFindUnique.mockResolvedValue(makeMember()); // role = MEMBER
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/admin/houses",
@@ -268,7 +360,7 @@ describe("POST /admin/houses", () => {
   it("returns 201 and creates house when actor is admin", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
     mockHouseUpsert.mockResolvedValue(HOUSE);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/admin/houses",
@@ -283,7 +375,7 @@ describe("POST /admin/houses", () => {
 describe("POST /admin/users/assign-house", () => {
   it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/admin/users/assign-house",
@@ -299,7 +391,7 @@ describe("POST /admin/users/assign-house", () => {
     // targetUser and targetHouse both null â€” returned via Promise.all
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
     mockHouseFindUnique.mockResolvedValue(HOUSE);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/admin/users/assign-house",
@@ -312,7 +404,7 @@ describe("POST /admin/users/assign-house", () => {
 describe("POST /transactions/recent", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",
@@ -337,7 +429,7 @@ describe("POST /transactions/recent", () => {
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
       },
     ]);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",
@@ -366,7 +458,7 @@ describe("POST /transactions/recent", () => {
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
       },
     ]);
-    const app = await buildApp();
+    const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",

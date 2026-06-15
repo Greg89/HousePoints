@@ -37,7 +37,8 @@ jobs:
           # Stub required env vars so Next.js / Fastify don't crash at build time
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
           AUTH0_SECRET: ci-secret-placeholder-32-chars-ok
-          AUTH0_BASE_URL: http://localhost:3000
-          AUTH0_ISSUER_BASE_URL: https://example.auth0.com
+          APP_BASE_URL: http://localhost:3000
+          AUTH0_DOMAIN: example.auth0.com
+          AUTH0_AUDIENCE: https://api.housepoints.example
           AUTH0_CLIENT_ID: ci-client-id
           AUTH0_CLIENT_SECRET: ci-client-secret
