@@ -25,6 +25,11 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
+    orgInvite: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      updateMany: vi.fn(),
+    },
     pointTransaction: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -49,6 +54,8 @@ const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
+const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
+const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
@@ -586,6 +593,191 @@ describe("POST /orgs/create", () => {
       message: "Internal server error",
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
+    await app.close();
+  });
+});
+
+describe("POST /orgs/join", () => {
+  const payload = {
+    displayName: "Alice",
+    email: "alice@example.com",
+    inviteToken: "single-use-token",
+  };
+  const invite = {
+    id: "invite-1",
+    organizationId: "org-1",
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+    usedAt: null,
+  };
+  const joinedUser = makeMember({
+    email: "alice@example.com",
+    houseId: null,
+    house: null,
+  });
+
+  it("rejects a malformed invite before starting a transaction", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload: { ...payload, inviteToken: "" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns INVITE_NOT_FOUND for an unknown token", async () => {
+    mockInviteFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("INVITE_NOT_FOUND");
+    await app.close();
+  });
+
+  it("returns INVITE_USED for an already claimed token", async () => {
+    mockInviteFindUnique.mockResolvedValue({
+      ...invite,
+      usedAt: new Date("2026-01-01T00:00:00Z"),
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("INVITE_USED");
+    await app.close();
+  });
+
+  it("returns INVITE_EXPIRED for an expired token", async () => {
+    mockInviteFindUnique.mockResolvedValue({
+      ...invite,
+      expiresAt: new Date("2020-01-01T00:00:00Z"),
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(410);
+    expect(res.json().code).toBe("INVITE_EXPIRED");
+    await app.close();
+  });
+
+  it("updates membership and claims the invite in one transaction", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      organizationId: "org-1",
+      houseId: null,
+      created: true,
+    });
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockInviteUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: "invite-1",
+        usedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      data: {
+        usedAt: expect.any(Date),
+        usedById: "user-1",
+      },
+    });
+    await app.close();
+  });
+
+  it("does not claim an invite for a user already in another organization", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: "org-other",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ALREADY_IN_ORG");
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows exactly one winner when two requests claim the same invite", async () => {
+    let readers = 0;
+    let releaseReaders: (() => void) | undefined;
+    const bothReadersReady = new Promise<void>((resolve) => {
+      releaseReaders = resolve;
+    });
+    let claimed = false;
+
+    mockInviteFindUnique.mockImplementation(async () => {
+      readers += 1;
+      if (readers === 2) {
+        releaseReaders?.();
+      }
+      await bothReadersReady;
+      return invite;
+    });
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: null,
+    });
+    mockUserUpdate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockImplementation(async () => {
+      if (claimed) {
+        return { count: 0 };
+      }
+      claimed = true;
+      return { count: 1 };
+    });
+    const app = await buildTestApp();
+
+    const responses = await Promise.all([
+      app.inject({ method: "POST", url: "/orgs/join", payload }),
+      app.inject({ method: "POST", url: "/orgs/join", payload }),
+    ]);
+
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([
+      200,
+      409,
+    ]);
+    expect(
+      responses.find((response) => response.statusCode === 409)?.json().code,
+    ).toBe("INVITE_USED");
+    expect(mockInviteUpdateMany).toHaveBeenCalledTimes(2);
     await app.close();
   });
 });

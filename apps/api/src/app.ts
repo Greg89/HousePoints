@@ -42,6 +42,24 @@ function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
+type InviteJoinErrorCode =
+  | "INVITE_NOT_FOUND"
+  | "INVITE_USED"
+  | "INVITE_EXPIRED"
+  | "ALREADY_IN_ORG";
+
+class InviteJoinError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly code: InviteJoinErrorCode,
+    message: string,
+    readonly inviteId?: string,
+  ) {
+    super(message);
+    this.name = "InviteJoinError";
+  }
+}
+
 /** OWNER inherits all ADMIN privileges */
 function isAdmin(role: "MEMBER" | "ADMIN" | "OWNER"): boolean {
   return role === "ADMIN" || role === "OWNER";
@@ -867,65 +885,144 @@ app.post("/orgs/join", async (request, reply) => {
   const auth0Sub = request.auth.subject;
   const tokenHash = hashToken(inviteToken);
 
-  const invite = await prisma.orgInvite.findUnique({
-    where: { tokenHash },
-    select: { id: true, organizationId: true, expiresAt: true, usedAt: true },
-  });
-
-  if (!invite) {
-    warn(request.log, "orgs.join.invalid_token", { auth0Sub });
-    return reply.status(404).send({ code: "INVITE_NOT_FOUND", message: "Invite link is invalid or has already been used." });
-  }
-
-  if (invite.usedAt) {
-    warn(request.log, "orgs.join.token_already_used", { auth0Sub, inviteId: invite.id });
-    return reply.status(409).send({ code: "INVITE_USED", message: "This invite link has already been used." });
-  }
-
-  if (invite.expiresAt < new Date()) {
-    warn(request.log, "orgs.join.token_expired", { auth0Sub, inviteId: invite.id });
-    return reply.status(410).send({ code: "INVITE_EXPIRED", message: "This invite link has expired. Ask an admin to generate a new one." });
-  }
-
-  // Block users already in a different org
-  const existingUser = await prisma.user.findUnique({
-    where: { auth0Sub },
-    select: { id: true, organizationId: true },
-  });
-  if (existingUser?.organizationId && existingUser.organizationId !== invite.organizationId) {
-    warn(request.log, "orgs.join.already_in_org", { auth0Sub, existingOrgId: existingUser.organizationId });
-    return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
-  }
-  // If already in the same org, still mark invite used and return current mapping
-  if (existingUser?.organizationId === invite.organizationId) {
-    await prisma.orgInvite.update({ where: { id: invite.id }, data: { usedAt: new Date(), usedById: existingUser.id } });
-  }
-
   const userSelect = {
     id: true, auth0Sub: true, email: true, displayName: true, role: true,
     organizationId: true, organization: { select: { slug: true } },
     houseId: true, house: { select: { name: true, color: true } },
   } as const;
+  const claimedAt = new Date();
 
-  const user = existingUser
-    ? await prisma.user.update({
-        where: { id: existingUser.id },
-        data: { organizationId: invite.organizationId, displayName, email: email ?? undefined },
-        select: userSelect,
-      })
-    : await prisma.user.create({
-        data: { auth0Sub, email: email ?? null, displayName, organizationId: invite.organizationId },
-        select: userSelect,
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const invite = await tx.orgInvite.findUnique({
+        where: { tokenHash },
+        select: { id: true, organizationId: true, expiresAt: true, usedAt: true },
       });
 
-  // Mark invite as used (idempotent — already done above if org matched)
-  await prisma.orgInvite.update({
-    where: { id: invite.id },
-    data: { usedAt: new Date(), usedById: user.id },
-  });
+      if (!invite) {
+        throw new InviteJoinError(
+          404,
+          "INVITE_NOT_FOUND",
+          "Invite link is invalid or has already been used.",
+        );
+      }
 
-  info(request.log, "orgs.join.success", { userId: user.id, orgId: invite.organizationId, inviteId: invite.id });
-  return reply.status(200).send({ ...mapAppUser(user), created: !existingUser });
+      if (invite.usedAt) {
+        throw new InviteJoinError(
+          409,
+          "INVITE_USED",
+          "This invite link has already been used.",
+          invite.id,
+        );
+      }
+
+      if (invite.expiresAt <= claimedAt) {
+        throw new InviteJoinError(
+          410,
+          "INVITE_EXPIRED",
+          "This invite link has expired. Ask an admin to generate a new one.",
+          invite.id,
+        );
+      }
+
+      const existingUser = await tx.user.findUnique({
+        where: { auth0Sub },
+        select: { id: true, organizationId: true },
+      });
+
+      if (
+        existingUser?.organizationId &&
+        existingUser.organizationId !== invite.organizationId
+      ) {
+        throw new InviteJoinError(
+          409,
+          "ALREADY_IN_ORG",
+          "You are already a member of an organisation.",
+          invite.id,
+        );
+      }
+
+      const user = existingUser
+        ? await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              organizationId: invite.organizationId,
+              displayName,
+              email: email ?? undefined,
+            },
+            select: userSelect,
+          })
+        : await tx.user.create({
+            data: {
+              auth0Sub,
+              email: email ?? null,
+              displayName,
+              organizationId: invite.organizationId,
+            },
+            select: userSelect,
+          });
+
+      const claim = await tx.orgInvite.updateMany({
+        where: {
+          id: invite.id,
+          usedAt: null,
+          expiresAt: { gt: claimedAt },
+        },
+        data: {
+          usedAt: claimedAt,
+          usedById: user.id,
+        },
+      });
+
+      if (claim.count !== 1) {
+        throw new InviteJoinError(
+          409,
+          "INVITE_USED",
+          "This invite link has already been used.",
+          invite.id,
+        );
+      }
+
+      return {
+        user,
+        created: !existingUser,
+        inviteId: invite.id,
+        organizationId: invite.organizationId,
+      };
+    });
+
+    info(request.log, "orgs.join.success", {
+      userId: result.user.id,
+      orgId: result.organizationId,
+      inviteId: result.inviteId,
+    });
+    return reply.status(200).send({
+      ...mapAppUser(result.user),
+      created: result.created,
+    });
+  } catch (err) {
+    if (!(err instanceof InviteJoinError)) {
+      throw err;
+    }
+
+    const event =
+      err.code === "INVITE_NOT_FOUND"
+        ? "orgs.join.invalid_token"
+        : err.code === "INVITE_EXPIRED"
+          ? "orgs.join.token_expired"
+          : err.code === "INVITE_USED"
+            ? "orgs.join.token_already_used"
+            : "orgs.join.already_in_org";
+
+    warn(request.log, event, {
+      auth0Sub,
+      inviteId: err.inviteId,
+    });
+    return reply.status(err.statusCode).send({
+      code: err.code,
+      message: err.message,
+    });
+  }
 });
 
   return app;
