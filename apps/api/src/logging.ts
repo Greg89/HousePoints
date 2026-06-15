@@ -116,11 +116,11 @@ export function createApiLogger(): ApiLogger {
 }
 
 export function info(logger: FastifyBaseLogger, event: ApiLogEvent, context: LogContext = {}): void {
-  logger.info({ event, ...context });
+  logger.info({ event, ...context }, event);
 }
 
 export function warn(logger: FastifyBaseLogger, event: ApiLogEvent, context: LogContext = {}): void {
-  logger.warn({ event, ...context });
+  logger.warn({ event, ...context }, event);
 }
 
 export function error(
@@ -130,9 +130,9 @@ export function error(
   err?: unknown,
 ): void {
   if (err) {
-    logger.error({ event, ...context, err });
+    logger.error({ event, ...context, err }, event);
     return;
   }
 
-  logger.error({ event, ...context });
+  logger.error({ event, ...context }, event);
 }
