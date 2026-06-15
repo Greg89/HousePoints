@@ -1,5 +1,11 @@
 # Execution Plan
 
+Status markers:
+
+- `[x]` complete
+- `[-]` partially complete
+- `[ ]` not started
+
 ## Scope Of Pass One
 
 Pass one is complete when the existing product works through safer, testable boundaries. It should not implement Seasons, Dashboard Widgets, The Hex, multi-org membership, or broad visual redesign.
@@ -17,64 +23,64 @@ One implementation detail remains for the onboarding unit: choose whether the fi
 
 ## Phase 1: Close Release Blockers
 
-1. Add API credential verification.
-2. Derive actor subject from the verified credential.
-3. Remove actor identity from request contracts.
-4. Restrict CORS origins.
-5. Repair first-owner setup so house creation and self-assignment are reachable.
-6. Add tests proving impersonation attempts fail.
-7. Add an end-to-end or integration-level first-owner setup test.
+1. [x] Add API credential verification.
+2. [x] Derive actor subject from the verified credential.
+3. [x] Remove actor identity from request contracts.
+4. [x] Restrict CORS origins.
+5. [x] Repair first-owner setup so house creation and self-assignment are reachable.
+6. [x] Add tests proving impersonation attempts fail.
+7. [x] Add an integration-level first-owner setup test.
 
 Keep route behavior otherwise stable in this phase.
 
 ## Phase 2: Establish Testable Boundaries
 
-1. Move Fastify construction to `app.ts`.
-2. Move listening and shutdown handling to `server.ts`.
-3. Add central error and auth plugins.
-4. Extract actor resolution and authorization helpers.
-5. Split routes into domain modules without redesigning every query.
-6. Update tests to import only the side-effect-free app factory.
+1. [x] Move Fastify construction to `app.ts`.
+2. [x] Move listening and shutdown handling to `server.ts`.
+3. [-] Add central error and auth plugins. Shared hooks exist, but they remain in `app.ts`.
+4. [-] Extract actor resolution and authorization helpers. Shared functions exist, but they remain in `app.ts`.
+5. [ ] Split routes into domain modules without redesigning every query.
+6. [x] Update tests to import only the side-effect-free app factory.
 
 Add characterization tests before moving each route group.
 
 ## Phase 3: Consolidate Web Server Code
 
-1. Create a cached `getCurrentSession()`/`getCurrentUser()` server-only module.
-2. Create one authenticated API client with timeout and request ID support.
-3. Split the 740-line action file by domain.
-4. Convert expected action failures to typed results.
-5. Stop converting read failures to empty arrays.
-6. Add route or section-level loading/error states where useful.
+1. [x] Create a cached `getCurrentSession()`/`getCurrentUser()` server-only module.
+2. [x] Create one authenticated API client with timeout and request ID support.
+3. [ ] Split the action file by domain.
+4. [-] Convert expected action failures to typed results. Dashboard reads now use typed response errors; mutation actions still throw generic errors.
+5. [x] Stop converting dashboard read failures to empty arrays.
+6. [-] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary; section-level recovery is not implemented.
 
 Expected result: one bootstrap/current-user resolution per render, not one per query.
 
 ## Phase 4: Harden Workflows And Contracts
 
-1. Make org creation atomic.
-2. Make invite consumption atomic and concurrency-safe.
-3. Export response and error schemas from contracts.
-4. Parse all API responses in the web client.
-5. Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims.
-6. Add stable database constraints for settled ledger rules.
+1. [x] Make org creation atomic.
+2. [x] Make invite consumption atomic and concurrency-safe.
+3. [-] Export response and error schemas from contracts. Current-user and dashboard response schemas exist; remaining operations still need schemas.
+4. [-] Parse all API responses in the web client. Current-user and dashboard reads are parsed; mutation and admin responses remain.
+5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims. Core auth, role, tenant, onboarding, and invite cases exist; coverage is not yet complete.
+6. [ ] Add stable database constraints for settled ledger rules.
 
 ## Phase 5: Improve Queries And Tooling
 
-1. Aggregate leaderboard totals in PostgreSQL.
-2. Add cursor pagination to activity.
-3. Add real ESLint/type-check scripts for API, contracts, and DB.
-4. Add coverage reporting with meaningful thresholds for security-critical modules.
-5. Remove recursive duplicate workspace builds.
-6. Make font/build assets reproducible without external network access where practical.
-7. Add database-backed integration tests for transaction and constraint behavior.
+1. [ ] Aggregate leaderboard totals in PostgreSQL.
+2. [ ] Add cursor pagination to activity.
+3. [ ] Add real ESLint/type-check scripts for API, contracts, and DB.
+4. [ ] Add coverage reporting with meaningful thresholds for security-critical modules.
+5. [ ] Remove recursive duplicate workspace builds.
+6. [ ] Make font/build assets reproducible without external network access where practical.
+7. [ ] Add database-backed integration tests for transaction and constraint behavior.
 
 ## Phase 6: Reconcile Documentation
 
-1. Update README to one canonical setup guide.
-2. Mark org management as implemented, partial, or deferred by sub-feature.
-3. Rebuild the roadmap around current priorities.
-4. Repair text encoding.
-5. Link architecture decisions and migrations to the relevant roadmap items.
+1. [ ] Update README to one canonical setup guide.
+2. [ ] Mark org management as implemented, partial, or deferred by sub-feature.
+3. [ ] Rebuild the roadmap around current priorities.
+4. [ ] Repair text encoding.
+5. [ ] Link architecture decisions and migrations to the relevant roadmap items.
 
 ## Recommended Pull Request Sequence
 

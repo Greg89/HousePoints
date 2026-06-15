@@ -93,6 +93,7 @@ export const orgMemberSchema = z.object({
 });
 
 export type OrgMember = z.infer<typeof orgMemberSchema>;
+export const orgMembersSchema = z.array(orgMemberSchema);
 
 export const activityItemSchema = z.object({
   id: z.string(),
@@ -107,6 +108,7 @@ export const activityItemSchema = z.object({
 });
 
 export type ActivityItem = z.infer<typeof activityItemSchema>;
+export const activityFeedSchema = z.array(activityItemSchema);
 
 export const leaderboardEntrySchema = z.object({
   id: z.string(),
@@ -119,6 +121,7 @@ export const leaderboardEntrySchema = z.object({
 });
 
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
+export const leaderboardSchema = z.array(leaderboardEntrySchema);
 
 export const actorScopeSchema = z.object({}).strict();
 
@@ -145,6 +148,14 @@ export const memberScoreSchema = z.object({
 });
 
 export type MemberScore = z.infer<typeof memberScoreSchema>;
+export const memberScoresSchema = z.array(memberScoreSchema);
+
+export const apiErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+});
+
+export type ApiError = z.infer<typeof apiErrorSchema>;
 
 // ---------------------------------------------------------------------------
 // Slug validation — shared rule used by org create and invite flows

@@ -21,6 +21,30 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 4. [Execution Plan](./04-execution-plan.md) defines the recommended refactor order and limits the scope of pass one.
 5. [Acceptance Criteria](./05-acceptance-criteria.md) defines what must be true before feature development resumes.
 
+## Progress Snapshot
+
+Last updated: June 15, 2026
+
+Completed units:
+
+- Split API construction from process startup.
+- Added Auth0 access-token verification and removed caller-supplied identity.
+- Made organization creation and single-use invite joining atomic.
+- Added first-house setup and assigned the first owner during organization creation.
+- Centralized authenticated web API transport and cached current-user loading.
+- Restricted CORS to validated, configured origins.
+- Added shared dashboard response schemas and stopped rendering failed dashboard reads as empty data.
+
+Current unit verification:
+
+- `npm test`: 110 tests passed.
+- Workspace lint passed.
+- Full production build passed.
+
+The detailed status of remaining work is tracked in
+[Execution Plan](./04-execution-plan.md) and
+[Acceptance Criteria](./05-acceptance-criteria.md).
+
 ## Pass-One Principle
 
 Do not begin by moving files. First establish a trustworthy identity boundary and repair the onboarding lifecycle. Then extract modules around tested behavior. A cleaner folder tree that preserves the current authorization model would only make the primary defect harder to see.

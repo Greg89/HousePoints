@@ -11,7 +11,11 @@ import {
   joinOrgSchema,
   promoteUserSchema,
   memberScoreSchema,
+  memberScoresSchema,
   activityItemSchema,
+  activityFeedSchema,
+  leaderboardSchema,
+  orgMembersSchema,
   traitSchema,
   TRAITS,
   TRAIT_LABELS,
@@ -366,5 +370,31 @@ describe("memberScoreSchema", () => {
 
   it("rejects fractional points", () => {
     expect(memberScoreSchema.safeParse({ memberId: "u1", points: 1.5 }).success).toBe(false);
+  });
+});
+
+describe("dashboard response schemas", () => {
+  it("accepts valid empty dashboard collections", () => {
+    expect(leaderboardSchema.parse([])).toEqual([]);
+    expect(orgMembersSchema.parse([])).toEqual([]);
+    expect(activityFeedSchema.parse([])).toEqual([]);
+    expect(memberScoresSchema.parse([])).toEqual([]);
+  });
+
+  it("rejects malformed items inside dashboard collections", () => {
+    expect(
+      leaderboardSchema.safeParse([{ id: "house-1", score: "10" }]).success,
+    ).toBe(false);
+    expect(
+      orgMembersSchema.safeParse([{ id: "user-1", role: "SUPER_ADMIN" }])
+        .success,
+    ).toBe(false);
+    expect(
+      activityFeedSchema.safeParse([{ id: "tx-1", delta: "10" }]).success,
+    ).toBe(false);
+    expect(
+      memberScoresSchema.safeParse([{ memberId: "user-1", points: 1.5 }])
+        .success,
+    ).toBe(false);
   });
 });

@@ -2,6 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 import type { User } from "@auth0/nextjs-auth0/types";
+import { apiErrorSchema } from "@housepoints/contracts";
+import type { ZodType } from "zod";
 import { getAuth0Client } from "@/lib/auth0";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -13,6 +15,18 @@ export class WebAuthenticationError extends Error {
   ) {
     super(message);
     this.name = "WebAuthenticationError";
+  }
+}
+
+export class ApiResponseError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly code: string,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "ApiResponseError";
   }
 }
 
@@ -51,6 +65,36 @@ export function createApiRequester(dependencies: ApiRequestDependencies) {
       },
     );
   };
+}
+
+export async function parseApiResponse<T>(
+  response: Response,
+  schema: ZodType<T>,
+  safeMessage: string,
+): Promise<T> {
+  if (!response.ok) {
+    const errorPayload = await response
+      .json()
+      .then((body) => apiErrorSchema.safeParse(body))
+      .catch(() => null);
+
+    throw new ApiResponseError(
+      response.status,
+      errorPayload?.success ? errorPayload.data.code : "API_REQUEST_FAILED",
+      safeMessage,
+    );
+  }
+
+  try {
+    return schema.parse(await response.json());
+  } catch (cause) {
+    throw new ApiResponseError(
+      response.status,
+      "INVALID_API_RESPONSE",
+      safeMessage,
+      { cause },
+    );
+  }
 }
 
 export const getOptionalAuthenticatedApiContext = cache(

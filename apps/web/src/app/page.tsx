@@ -84,8 +84,6 @@ export default async function Home() {
     (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext() : Promise.resolve(null),
   ]);
 
-  const memberPoints = memberScores ?? [];
-
   const adminSection = adminContext ? (
     <AdminForms
       users={adminContext.users}
@@ -105,10 +103,10 @@ export default async function Home() {
         houseColor: session.houseColor ?? null,
         role: session.role ?? "MEMBER",
       }}
-      leaderboard={leaderboard ?? []}
-      members={members ?? []}
-      activity={activity ?? []}
-      memberPoints={memberPoints}
+      leaderboard={leaderboard}
+      members={members}
+      activity={activity}
+      memberPoints={memberScores}
       onAward={awardPoints}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"

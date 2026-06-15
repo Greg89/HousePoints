@@ -5,17 +5,18 @@ import { revalidatePath } from "next/cache";
 import {
   apiFetch,
   getOptionalAuthenticatedApiContext,
+  parseApiResponse,
   requireAuthenticatedApiContext,
 } from "@/lib/api-client";
 import { getCurrentUser } from "@/lib/current-user";
 import { logError, logInfo, logWarn } from "@/lib/logging";
-import type {
-  ActivityItem,
-  LeaderboardEntry,
-  MemberScore,
-  OrgMember,
-  Trait,
-  UserRole,
+import {
+  activityFeedSchema,
+  leaderboardSchema,
+  memberScoresSchema,
+  orgMembersSchema,
+  type Trait,
+  type UserRole,
 } from "@housepoints/contracts";
 
 type AdminUser = {
@@ -334,50 +335,58 @@ export async function readSessionSummary(): Promise<{
 
 export async function readLeaderboard() {
   const requestId = randomUUID();
-  if (!(await getOptionalAuthenticatedApiContext())) return null;
   await getCurrentUser();
   const response = await apiFetch("/houses/leaderboard", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
-  if (!response.ok) return null;
-  return (await response.json()) as LeaderboardEntry[];
+  return parseApiResponse(
+    response,
+    leaderboardSchema,
+    "Dashboard data could not be loaded. Please try again.",
+  );
 }
 
 export async function readMembers() {
   const requestId = randomUUID();
-  if (!(await getOptionalAuthenticatedApiContext())) return null;
   await getCurrentUser();
   const response = await apiFetch("/members", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
-  if (!response.ok) return null;
-  return (await response.json()) as OrgMember[];
+  return parseApiResponse(
+    response,
+    orgMembersSchema,
+    "Dashboard data could not be loaded. Please try again.",
+  );
 }
 
 export async function readActivityFeed() {
   const requestId = randomUUID();
-  if (!(await getOptionalAuthenticatedApiContext())) return null;
   await getCurrentUser();
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
-  if (!response.ok) return null;
-  return (await response.json()) as ActivityItem[];
+  return parseApiResponse(
+    response,
+    activityFeedSchema,
+    "Dashboard data could not be loaded. Please try again.",
+  );
 }
 
-export async function readMemberScores(): Promise<MemberScore[] | null> {
+export async function readMemberScores() {
   const requestId = randomUUID();
-  if (!(await getOptionalAuthenticatedApiContext())) return null;
   await getCurrentUser();
   const response = await apiFetch("/users/scores", requestId, {
     method: "POST",
     body: JSON.stringify({}),
   });
-  if (!response.ok) return null;
-  return (await response.json()) as MemberScore[];
+  return parseApiResponse(
+    response,
+    memberScoresSchema,
+    "Dashboard data could not be loaded. Please try again.",
+  );
 }
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */
