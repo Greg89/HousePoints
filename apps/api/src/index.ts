@@ -16,10 +16,8 @@ import {
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { error, info, warn } from "./logging.js";
+import { createApiLogger, error, info, warn } from "./logging.js";
 
-const serviceName = process.env.SERVICE_NAME ?? "housepoints-api";
-const logLevel = process.env.LOG_LEVEL ?? "info";
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
 
 type ActorRecord = {
@@ -108,20 +106,22 @@ function mapAppUser(user: {
 }
 
 export async function buildApp() {
+  const apiLogger = createApiLogger();
   const app = Fastify({
-    logger: {
-      level: logLevel,
-      base: {
-        service: serviceName,
-        env: process.env.NODE_ENV ?? "development",
-      },
-    },
+    loggerInstance: apiLogger.logger,
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
     disableRequestLogging: true,
   });
 
-  info(app.log, "api.starting", { port });
+  app.addHook("onClose", async () => {
+    await apiLogger.close();
+  });
+
+  info(app.log, "api.starting", {
+    port,
+    seqEnabled: apiLogger.seqEnabled,
+  });
 
   await app.register(cors, {
     origin: true,
@@ -859,5 +859,26 @@ app.post("/orgs/join", async (request, reply) => {
 const app = await buildApp();
 await app.listen({ port, host: "0.0.0.0" });
 info(app.log, "api.listening", { port });
+
+let shutdownStarted = false;
+
+async function shutdown(signal: NodeJS.Signals) {
+  if (shutdownStarted) {
+    return;
+  }
+
+  shutdownStarted = true;
+  info(app.log, "api.stopping", { signal });
+
+  try {
+    await app.close();
+  } catch (err) {
+    error(app.log, "api.shutdown_failed", { signal }, err);
+    process.exitCode = 1;
+  }
+}
+
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));
 
 

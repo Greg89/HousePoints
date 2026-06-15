@@ -1,8 +1,13 @@
 import type { FastifyBaseLogger } from "fastify";
+import { finished } from "node:stream/promises";
+import pino from "pino";
+import { createStream, type PinoSeqStream } from "pino-seq";
 
 export type ApiLogEvent =
   | "api.starting"
   | "api.listening"
+  | "api.stopping"
+  | "api.shutdown_failed"
   | "request.received"
   | "request.completed"
   | "request.validation_failed"
@@ -34,6 +39,81 @@ export type ApiLogEvent =
   | "orgs.join.success";
 
 type LogContext = Record<string, unknown>;
+
+type ApiLogger = {
+  logger: FastifyBaseLogger;
+  seqEnabled: boolean;
+  close: () => Promise<void>;
+};
+
+export function createApiLogger(): ApiLogger {
+  const service = process.env.SERVICE_NAME ?? "housepoints-api";
+  const environment =
+    process.env.RAILWAY_ENVIRONMENT_NAME ??
+    process.env.NODE_ENV ??
+    "development";
+  const seqServerUrl = process.env.SEQ_SERVER_URL?.trim().replace(/\/+$/, "");
+  let seqStream: PinoSeqStream | undefined;
+
+  const streams: pino.StreamEntry[] = [{ stream: process.stdout }];
+
+  if (seqServerUrl) {
+    seqStream = createStream({
+      serverUrl: seqServerUrl,
+      apiKey: process.env.SEQ_API_KEY?.trim() || undefined,
+      maxBatchingTime: 2_000,
+      additionalProperties: {
+        service,
+        environment,
+      },
+      onError: (err) => {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            service,
+            environment,
+            event: "seq.delivery_failed",
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      },
+    });
+    streams.push({ stream: seqStream });
+  }
+
+  const logger = pino(
+    {
+      level: process.env.LOG_LEVEL ?? "info",
+      base: {
+        service,
+        environment,
+        deploymentId: process.env.RAILWAY_DEPLOYMENT_ID,
+        replicaId: process.env.RAILWAY_REPLICA_ID,
+      },
+      redact: {
+        paths: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          "headers.authorization",
+          "headers.cookie",
+        ],
+        censor: "[REDACTED]",
+      },
+    },
+    pino.multistream(streams),
+  );
+
+  return {
+    logger,
+    seqEnabled: Boolean(seqStream),
+    close: async () => {
+      if (seqStream && !seqStream.destroyed) {
+        seqStream.end();
+        await finished(seqStream);
+      }
+    },
+  };
+}
 
 export function info(logger: FastifyBaseLogger, event: ApiLogEvent, context: LogContext = {}): void {
   logger.info({ event, ...context });
