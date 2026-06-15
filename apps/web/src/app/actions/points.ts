@@ -11,6 +11,7 @@ import {
 import { getCurrentUser } from "@/lib/current-user";
 import { logError, logInfo, logWarn } from "@/lib/logging";
 import {
+  adminContextSchema,
   activityFeedSchema,
   leaderboardSchema,
   memberScoresSchema,
@@ -18,19 +19,6 @@ import {
   type Trait,
   type UserRole,
 } from "@housepoints/contracts";
-
-type AdminUser = {
-  id: string;
-  displayName: string;
-  email: string | null;
-  role: UserRole;
-  houseId: string | null;
-};
-
-type AdminHouse = {
-  id: string;
-  name: string;
-};
 
 export async function submitPointAdjustment(formData: FormData): Promise<void> {
   const requestId = randomUUID();
@@ -212,12 +200,7 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-export async function readAdminContext(): Promise<{
-  organizationId: string;
-  organizationSlug: string;
-  users: AdminUser[];
-  houses: AdminHouse[];
-} | null> {
+export async function readAdminContext() {
   const requestId = randomUUID();
   const authContext = await getOptionalAuthenticatedApiContext();
   if (!authContext) {
@@ -235,23 +218,11 @@ export async function readAdminContext(): Promise<{
     body: JSON.stringify({}),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    logWarn("web.admin.context_failed", {
-      requestId,
-      actorUserId: mapping.id,
-      statusCode: response.status,
-      responseBody: body,
-    });
-    return null;
-  }
-
-  const context = (await response.json()) as {
-    organizationId: string;
-    organizationSlug: string;
-    users: AdminUser[];
-    houses: AdminHouse[];
-  };
+  const context = await parseApiResponse(
+    response,
+    adminContextSchema,
+    "Admin tools could not be loaded. Please try again.",
+  );
 
   logInfo("web.admin.context_loaded", {
     requestId,

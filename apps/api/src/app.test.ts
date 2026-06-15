@@ -92,6 +92,15 @@ const makeAdmin = (overrides = {}) => ({
   ...overrides,
 });
 
+const makeOwner = (overrides = {}) => ({
+  ...makeAdmin(),
+  id: "user-owner",
+  auth0Sub: "auth0|owner",
+  displayName: "Olivia",
+  role: "OWNER" as const,
+  ...overrides,
+});
+
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
@@ -476,6 +485,60 @@ describe("POST /admin/houses", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().name).toBe("Phoenix");
+    await app.close();
+  });
+});
+
+describe("POST /admin/context", () => {
+  it("allows an owner and returns the complete organization context", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "user-owner",
+        displayName: "Olivia",
+        email: "owner@acme.com",
+        role: "OWNER",
+        houseId: "house-1",
+      },
+    ]);
+    (prisma.house.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "house-1",
+        name: "Phoenix",
+        color: "#7c3aed",
+        description: null,
+      },
+    ]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      users: [
+        {
+          id: "user-owner",
+          displayName: "Olivia",
+          email: "owner@acme.com",
+          role: "OWNER",
+          houseId: "house-1",
+        },
+      ],
+      houses: [
+        {
+          id: "house-1",
+          name: "Phoenix",
+          color: "#7c3aed",
+          description: null,
+        },
+      ],
+    });
     await app.close();
   });
 });

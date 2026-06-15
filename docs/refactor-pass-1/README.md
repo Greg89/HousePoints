@@ -34,10 +34,11 @@ Completed units:
 - Centralized authenticated web API transport and cached current-user loading.
 - Restricted CORS to validated, configured origins.
 - Added shared dashboard response schemas and stopped rendering failed dashboard reads as empty data.
+- Added runtime validation for admin context and stopped hiding admin tools on dependency failure.
 
 Current unit verification:
 
-- `npm test`: 110 tests passed.
+- `npm test`: 113 tests passed.
 - Workspace lint passed.
 - Full production build passed.
 

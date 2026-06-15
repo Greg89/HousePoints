@@ -150,6 +150,34 @@ export const memberScoreSchema = z.object({
 export type MemberScore = z.infer<typeof memberScoreSchema>;
 export const memberScoresSchema = z.array(memberScoreSchema);
 
+export const adminUserSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  email: z.string().nullable(),
+  role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
+  houseId: z.string().nullable(),
+});
+
+export type AdminUser = z.infer<typeof adminUserSchema>;
+
+export const adminHouseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+  description: z.string().nullable(),
+});
+
+export type AdminHouse = z.infer<typeof adminHouseSchema>;
+
+export const adminContextSchema = z.object({
+  organizationId: z.string(),
+  organizationSlug: z.string(),
+  users: z.array(adminUserSchema),
+  houses: z.array(adminHouseSchema),
+});
+
+export type AdminContext = z.infer<typeof adminContextSchema>;
+
 export const apiErrorSchema = z.object({
   code: z.string(),
   message: z.string(),

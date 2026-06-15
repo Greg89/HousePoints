@@ -16,6 +16,7 @@ import {
   activityFeedSchema,
   leaderboardSchema,
   orgMembersSchema,
+  adminContextSchema,
   traitSchema,
   TRAITS,
   TRAIT_LABELS,
@@ -395,6 +396,49 @@ describe("dashboard response schemas", () => {
     expect(
       memberScoresSchema.safeParse([{ memberId: "user-1", points: 1.5 }])
         .success,
+    ).toBe(false);
+  });
+});
+
+describe("adminContextSchema", () => {
+  const valid = {
+    organizationId: "org-1",
+    organizationSlug: "acme",
+    users: [
+      {
+        id: "user-1",
+        displayName: "Alice",
+        email: "alice@example.com",
+        role: "OWNER",
+        houseId: "house-1",
+      },
+    ],
+    houses: [
+      {
+        id: "house-1",
+        name: "Phoenix",
+        color: "#7c3aed",
+        description: null,
+      },
+    ],
+  };
+
+  it("accepts the complete admin context response", () => {
+    expect(adminContextSchema.parse(valid)).toEqual(valid);
+  });
+
+  it("rejects malformed users and houses", () => {
+    expect(
+      adminContextSchema.safeParse({
+        ...valid,
+        users: [{ ...valid.users[0], role: "SUPER_ADMIN" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      adminContextSchema.safeParse({
+        ...valid,
+        houses: [{ ...valid.houses[0], color: null }],
+      }).success,
     ).toBe(false);
   });
 });

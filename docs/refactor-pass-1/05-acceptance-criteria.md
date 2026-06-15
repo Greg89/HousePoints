@@ -13,7 +13,7 @@ Status markers:
 - [x] Every non-health API route rejects requests without valid credentials.
 - [x] Actor identity comes only from verified credentials.
 - [x] Request schemas no longer accept `actorAuth0Sub`.
-- [-] Admin and owner routes have explicit role tests. Admin and member cases exist; owner coverage should be expanded.
+- [x] Admin and owner routes have explicit role tests.
 - [-] Tenant-isolation tests cover reads and mutations. Mutation coverage exists; read coverage should be expanded.
 - [x] CORS is configured for known origins.
 - [x] Logs do not record access tokens, invite tokens, or sensitive authorization headers.
@@ -36,7 +36,7 @@ Status markers:
 
 ## Contracts And Errors
 
-- [-] API inputs and web-consumed outputs are validated with shared schemas. Dashboard reads and current-user mapping are covered; remaining responses are not.
+- [-] API inputs and web-consumed outputs are validated with shared schemas. Dashboard reads, admin context, and current-user mapping are covered; mutation responses remain.
 - [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, but mutation UI handling remains incomplete.
 - [x] A failed dashboard dependency is not rendered as valid empty data.
 - [x] Dashboard error messages shown to users do not expose raw internal responses.
