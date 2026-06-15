@@ -40,5 +40,6 @@ jobs:
           APP_BASE_URL: http://localhost:3000
           AUTH0_DOMAIN: example.auth0.com
           AUTH0_AUDIENCE: https://api.housepoints.example
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
           AUTH0_CLIENT_ID: ci-client-id
           AUTH0_CLIENT_SECRET: ci-client-secret

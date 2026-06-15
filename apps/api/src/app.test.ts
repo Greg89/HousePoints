@@ -59,6 +59,7 @@ const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
+const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
 // â”€â”€ Shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
@@ -101,6 +102,7 @@ beforeEach(() => {
 
 async function buildTestApp(subject = "auth0|member") {
   const app = await buildApp({
+    corsAllowedOrigins: TEST_CORS_ORIGINS,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
       claims: { sub: subject },
@@ -133,7 +135,10 @@ describe("GET /health", () => {
 describe("API authentication", () => {
   it("keeps the health endpoint public", async () => {
     const verifyAccessToken = vi.fn();
-    const app = await buildApp({ verifyAccessToken });
+    const app = await buildApp({
+      corsAllowedOrigins: TEST_CORS_ORIGINS,
+      verifyAccessToken,
+    });
 
     const res = await app.inject({ method: "GET", url: "/health" });
 
@@ -144,6 +149,7 @@ describe("API authentication", () => {
 
   it("rejects a protected endpoint without a bearer token", async () => {
     const app = await buildApp({
+      corsAllowedOrigins: TEST_CORS_ORIGINS,
       verifyAccessToken: vi.fn(),
     });
 
@@ -160,6 +166,7 @@ describe("API authentication", () => {
 
   it("rejects an invalid bearer token", async () => {
     const app = await buildApp({
+      corsAllowedOrigins: TEST_CORS_ORIGINS,
       verifyAccessToken: vi.fn().mockRejectedValue(new Error("invalid token")),
     });
 
@@ -177,6 +184,7 @@ describe("API authentication", () => {
 
   it("rejects caller-supplied identity fields", async () => {
     const app = await buildApp({
+      corsAllowedOrigins: TEST_CORS_ORIGINS,
       verifyAccessToken: vi.fn().mockResolvedValue({
         subject: "auth0|member",
         claims: { sub: "auth0|member" },
@@ -202,7 +210,10 @@ describe("API authentication", () => {
       subject: "auth0|member",
       claims: { sub: "auth0|member" },
     });
-    const app = await buildApp({ verifyAccessToken });
+    const app = await buildApp({
+      corsAllowedOrigins: TEST_CORS_ORIGINS,
+      verifyAccessToken,
+    });
 
     const res = await app.inject({
       method: "POST",
@@ -217,6 +228,62 @@ describe("API authentication", () => {
     expect(mockFindUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { auth0Sub: "auth0|member" } }),
     );
+    await app.close();
+  });
+});
+
+describe("CORS", () => {
+  it("allows configured browser origins", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/members",
+      headers: {
+        origin: "http://localhost:3000",
+        "access-control-request-method": "POST",
+        "access-control-request-headers":
+          "authorization,content-type,x-request-id",
+      },
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:3000",
+    );
+    expect(res.headers["access-control-allow-methods"]).toContain("POST");
+    expect(res.headers["access-control-allow-headers"]).toBe(
+      "authorization, content-type, x-request-id",
+    );
+    await app.close();
+  });
+
+  it("does not grant CORS access to unconfigured origins", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/members",
+      headers: {
+        origin: "https://attacker.example",
+        "access-control-request-method": "POST",
+      },
+    });
+
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    await app.close();
+  });
+
+  it("allows non-browser requests without adding CORS headers", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/health",
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
     await app.close();
   });
 });

@@ -85,6 +85,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/housepoints
 PORT=4000
 AUTH0_DOMAIN=<your-tenant>.us.auth0.com
 AUTH0_AUDIENCE=https://api.housepoints.example
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 **`apps/web/.env.local`**
@@ -184,7 +185,7 @@ Error responses always have the shape `{ code: string, message: string }`.
 1. Create a Postgres service in Railway.
 2. Create two services from this repo — one for `apps/api`, one for `apps/web`.
 3. Set environment variables per service:
-   - **API**: `DATABASE_URL`, `AUTH0_DOMAIN`, and `AUTH0_AUDIENCE`; Railway injects `PORT` automatically
+   - **API**: `DATABASE_URL`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, and `CORS_ALLOWED_ORIGINS`; Railway injects `PORT` automatically
    - **Web**: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`, and `APP_API_BASE_URL`
    - Use the same Auth0 API Identifier for `AUTH0_AUDIENCE` in both services.
    - Point `APP_API_BASE_URL` at the Railway API service URL.
@@ -255,6 +256,7 @@ Set at minimum:
 
 - `DATABASE_URL` in `apps/api/.env` and `packages/db/.env`
 - `AUTH0_DOMAIN` and `AUTH0_AUDIENCE` in `apps/api/.env`
+- `CORS_ALLOWED_ORIGINS` in `apps/api/.env` as a comma-separated list of exact web origins
 - Auth0 variables in `apps/web/.env` (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`)
 - `APP_API_BASE_URL` in `apps/web/.env`
 

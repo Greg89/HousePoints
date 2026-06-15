@@ -21,6 +21,7 @@ import {
   readBearerToken,
   type VerifyAccessToken,
 } from "./auth.js";
+import { readCorsAllowedOriginsFromEnv } from "./config.js";
 import { createApiLogger, error, info, warn } from "./logging.js";
 
 type ActorRecord = {
@@ -128,12 +129,15 @@ function mapAppUser(user: {
 
 type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
+  corsAllowedOrigins?: readonly string[];
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
   const apiLogger = createApiLogger();
   const verifyAccessToken =
     options.verifyAccessToken ?? createAuth0AccessTokenVerifierFromEnv();
+  const corsAllowedOrigins =
+    options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const app = Fastify({
     loggerInstance: apiLogger.logger,
     requestIdHeader: "x-request-id",
@@ -146,7 +150,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   await app.register(cors, {
-    origin: true,
+    origin: [...corsAllowedOrigins],
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["authorization", "content-type", "x-request-id"],
+    maxAge: 600,
   });
 
   app.decorateRequest("auth");
