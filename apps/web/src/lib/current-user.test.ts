@@ -1,4 +1,7 @@
-import type { AuthenticatedApiContext } from "@/lib/api-client";
+import {
+  ApiResponseError,
+  type AuthenticatedApiContext,
+} from "@/lib/api-client";
 import { createCurrentUserLoader } from "@/lib/current-user";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -81,9 +84,11 @@ describe("createCurrentUserLoader", () => {
       new Response("service unavailable", { status: 503 }),
     );
 
-    await expect(loadCurrentUser()).rejects.toThrow(
-      "User mapping bootstrap failed with status 503",
-    );
+    await expect(loadCurrentUser()).rejects.toMatchObject({
+      statusCode: 503,
+      code: "API_REQUEST_FAILED",
+      message: "User mapping could not be loaded. Please try again.",
+    });
   });
 
   it("rejects API responses that do not match the shared user schema", async () => {
@@ -91,6 +96,28 @@ describe("createCurrentUserLoader", () => {
       Response.json({ ...appUser, organizationId: 42 }),
     );
 
-    await expect(loadCurrentUser()).rejects.toThrow();
+    await expect(loadCurrentUser()).rejects.toMatchObject({
+      statusCode: 200,
+      code: "INVALID_API_RESPONSE",
+      message: "User mapping could not be loaded. Please try again.",
+    });
+  });
+
+  it("preserves stable bootstrap API error codes", async () => {
+    request.mockResolvedValue(
+      Response.json(
+        { code: "VALIDATION_ERROR", message: "Internal validation detail" },
+        { status: 400 },
+      ),
+    );
+
+    const error = await loadCurrentUser().catch((cause) => cause);
+
+    expect(error).toBeInstanceOf(ApiResponseError);
+    expect(error).toMatchObject({
+      statusCode: 400,
+      code: "VALIDATION_ERROR",
+      message: "User mapping could not be loaded. Please try again.",
+    });
   });
 });

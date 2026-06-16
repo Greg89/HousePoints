@@ -32,6 +32,7 @@ Completed units:
 - Made organization creation and single-use invite joining atomic.
 - Added first-house setup and assigned the first owner during organization creation.
 - Centralized authenticated web API transport and cached current-user loading.
+- Moved current-user bootstrap onto the shared API response parser.
 - Restricted CORS to validated, configured origins.
 - Added shared dashboard response schemas and stopped rendering failed dashboard reads as empty data.
 - Added runtime validation for admin context and stopped hiding admin tools on dependency failure.
@@ -45,7 +46,7 @@ Completed units:
 
 Current unit verification:
 
-- `npm test`: 136 tests passed.
+- `npm test`: 137 tests passed.
 - Workspace lint passed.
 - Full production build passed.
 

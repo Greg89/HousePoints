@@ -5,10 +5,11 @@ import { cache } from "react";
 import { appUserSchema, type AppUser } from "@housepoints/contracts";
 import {
   apiFetch,
+  parseApiResponse,
   requireAuthenticatedApiContext,
   type AuthenticatedApiContext,
 } from "@/lib/api-client";
-import { logInfo, logWarn } from "@/lib/logging";
+import { logInfo } from "@/lib/logging";
 
 type CurrentUserDependencies = {
   getContext: () => Promise<AuthenticatedApiContext>;
@@ -36,20 +37,11 @@ export function createCurrentUserLoader(dependencies: CurrentUserDependencies) {
       },
     );
 
-    if (!response.ok) {
-      const responseBody = await response.text();
-      logWarn("web.user.mapping_failed", {
-        requestId,
-        auth0Sub: context.user.sub,
-        statusCode: response.status,
-        responseBody,
-      });
-      throw new Error(
-        `User mapping bootstrap failed with status ${response.status}`,
-      );
-    }
-
-    const user = appUserSchema.parse(await response.json());
+    const user = await parseApiResponse(
+      response,
+      appUserSchema,
+      "User mapping could not be loaded. Please try again.",
+    );
 
     logInfo("web.user.mapping_ensured", {
       requestId,
