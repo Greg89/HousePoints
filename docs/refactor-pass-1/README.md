@@ -38,6 +38,7 @@ Completed units:
 - Added runtime validation and safe error handling for point-award responses.
 - Corrected the invite response contract and added safe runtime validation for generated invite tokens.
 - Added runtime validation and safe error handling for profile-update responses.
+- Added runtime validation and safe error handling for house-creation responses.
 
 Current unit verification:
 

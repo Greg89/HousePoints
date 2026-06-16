@@ -49,7 +49,7 @@ Add characterization tests before moving each route group.
 1. [x] Create a cached `getCurrentSession()`/`getCurrentUser()` server-only module.
 2. [x] Create one authenticated API client with timeout and request ID support.
 3. [ ] Split the action file by domain.
-4. [-] Convert expected action failures to typed results. Dashboard and admin-context reads use typed response errors; point awards, invite creation, and profile updates preserve typed API errors, while mutation actions still throw rather than return expected failures.
+4. [-] Convert expected action failures to typed results. Dashboard and admin-context reads use typed response errors; point awards, invite creation, profile updates, and house creation preserve typed API errors, while mutation actions still throw rather than return expected failures.
 5. [x] Stop converting dashboard read failures to empty arrays.
 6. [-] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary; section-level recovery is not implemented.
 
@@ -60,7 +60,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 1. [x] Make org creation atomic.
 2. [x] Make invite consumption atomic and concurrency-safe.
 3. [-] Export response and error schemas from contracts. Current-user, dashboard, admin-context, point-adjustment, invite-link, and profile-update response schemas exist; remaining operations still need schemas.
-4. [-] Parse all API responses in the web client. Current-user, dashboard, admin-context, point-award, invite-creation, and profile-update responses are parsed; remaining mutation responses are not.
+4. [-] Parse all API responses in the web client. Current-user, dashboard, admin-context, point-award, invite-creation, profile-update, and house-creation responses are parsed; remaining mutation responses are not.
 5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims. Core auth, role, tenant, onboarding, and invite cases exist; coverage is not yet complete.
 6. [ ] Add stable database constraints for settled ledger rules.
 

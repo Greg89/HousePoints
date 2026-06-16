@@ -36,7 +36,7 @@ Status markers:
 
 ## Contracts And Errors
 
-- [-] API inputs and web-consumed outputs are validated with shared schemas. Dashboard reads, admin context, current-user mapping, point-award responses, invite creation, and profile updates are covered; remaining mutation responses are not.
+- [-] API inputs and web-consumed outputs are validated with shared schemas. Dashboard reads, admin context, current-user mapping, point-award responses, invite creation, profile updates, and house creation are covered; remaining mutation responses are not.
 - [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, but mutation UI handling remains incomplete.
 - [x] A failed dashboard dependency is not rendered as valid empty data.
 - [x] Dashboard error messages shown to users do not expose raw internal responses.

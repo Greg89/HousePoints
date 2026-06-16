@@ -11,6 +11,7 @@ import {
 import { getCurrentUser } from "@/lib/current-user";
 import { logError, logInfo, logWarn } from "@/lib/logging";
 import {
+  adminHouseSchema,
   adminContextSchema,
   activityFeedSchema,
   inviteLinkSchema,
@@ -141,22 +142,18 @@ export async function createHouse(formData: FormData): Promise<void> {
     }),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    logWarn("web.admin.house_create_failed", {
-      requestId,
-      actorUserId: actor.id,
-      statusCode: response.status,
-      responseBody: body,
-    });
-    throw new Error(`Create house failed with status ${response.status}`);
-  }
+  const createdHouse = await parseApiResponse(
+    response,
+    adminHouseSchema,
+    "The house could not be created. Please try again.",
+  );
 
   logInfo("web.admin.house_created", {
     requestId,
     actorUserId: actor.id,
     organizationId: actor.organizationId,
-    name,
+    houseId: createdHouse.id,
+    name: createdHouse.name,
   });
 
   revalidatePath("/");
