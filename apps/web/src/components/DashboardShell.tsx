@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { Trophy, Clock, ChartBar, Star, SignOut, User } from "@phosphor-icons/react";
+import { Trophy, Clock, ChartBar, Star, SignOut, User, Wrench } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
@@ -41,6 +41,8 @@ const TABS = [
   { id: "leaderboard", label: "Leaderboard", icon: Trophy },
 ] as const;
 
+type TabId = (typeof TABS)[number]["id"] | "manage";
+
 export function DashboardShell({
   session,
   leaderboard,
@@ -52,7 +54,10 @@ export function DashboardShell({
   adminSection,
 }: DashboardShellProps) {
   const [awardOpen, setAwardOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "activity" | "leaderboard">("overview");
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const visibleTabs = adminSection
+    ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
+    : TABS;
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,7 +130,7 @@ export function DashboardShell({
         >
           {/* Tab bar */}
           <Tabs.List className="flex gap-1 border-b mb-8">
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {visibleTabs.map(({ id, label, icon: Icon }) => (
               <Tabs.Trigger
                 key={id}
                 value={id}
@@ -150,14 +155,6 @@ export function DashboardShell({
                 <HouseCard key={house.id} house={house} rank={index + 1} />
               ))}
             </div>
-            {adminSection && (
-              <div className="mt-10 border-t pt-8">
-                <h3 className="font-display text-xl font-semibold mb-6 text-muted-foreground">
-                  Admin Controls
-                </h3>
-                {adminSection}
-              </div>
-            )}
           </Tabs.Content>
 
           {/* Activity tab */}
@@ -169,6 +166,12 @@ export function DashboardShell({
           <Tabs.Content value="leaderboard" className="focus:outline-none">
             <Leaderboard members={members} memberPoints={memberPoints} />
           </Tabs.Content>
+
+          {adminSection && (
+            <Tabs.Content value="manage" className="focus:outline-none">
+              {adminSection}
+            </Tabs.Content>
+          )}
         </Tabs.Root>
       </main>
 
