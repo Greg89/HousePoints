@@ -63,7 +63,8 @@ describe("AdminForms", () => {
 
     await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());
 
-    const formData = props.onCreateHouse.mock.calls[0][0] as FormData;
+    const createHouseMock = props.onCreateHouse as ReturnType<typeof vi.fn>;
+    const formData = createHouseMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({
       name: "Hufflepuff",
       color: "#facc15",
@@ -95,7 +96,8 @@ describe("AdminForms", () => {
 
     await waitFor(() => expect(props.onAssignHouse).toHaveBeenCalledOnce());
 
-    const formData = props.onAssignHouse.mock.calls[0][0] as FormData;
+    const assignHouseMock = props.onAssignHouse as ReturnType<typeof vi.fn>;
+    const formData = assignHouseMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({
       targetUserId: "user-2",
       targetHouseId: "house-2",

@@ -15,6 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "node -e \"console.log('No contracts lint rules configured yet')\""
   },
   "dependencies": {

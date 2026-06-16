@@ -18,6 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "node -e \"console.log('No DB lint rules configured yet')\""
   },
   "dependencies": {

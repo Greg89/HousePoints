@@ -43,10 +43,12 @@ Completed units:
 - Added runtime validation and safe error handling for profile-update responses.
 - Added runtime validation and safe error handling for house-creation responses.
 - Added runtime validation and safe error handling for house-assignment responses.
+- Added explicit workspace type-check scripts and wired them into preflight.
 
 Current unit verification:
 
 - `npm test`: 137 tests passed.
+- Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.
 

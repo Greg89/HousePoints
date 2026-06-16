@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "node -e \"console.log('No API lint rules configured yet')\""
   },
   "dependencies": {

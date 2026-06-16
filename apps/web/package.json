@@ -7,6 +7,7 @@
     "build": "npm run build -w @housepoints/contracts && next build",
     "start": "next start",
     "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint"
   },
   "dependencies": {
