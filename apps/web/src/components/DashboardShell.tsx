@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
+import { OverviewReports } from "./OverviewReports";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import type {
   LeaderboardEntry,
@@ -55,9 +56,11 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const [awardOpen, setAwardOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
   const visibleTabs = adminSection
     ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
     : TABS;
+  const selectedHouse = leaderboard.find((house) => house.id === selectedHouseId) ?? null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,10 +153,43 @@ export function DashboardShell({
 
           {/* Overview tab */}
           <Tabs.Content value="overview" className="focus:outline-none">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-display text-xl font-semibold">House standings</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select a house to focus the report widgets below.
+                </p>
+              </div>
+              {selectedHouse && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedHouseId(null)}
+                  className="self-start rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground sm:self-auto"
+                >
+                  Back to all houses
+                </button>
+              )}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {leaderboard.map((house, index) => (
-                <HouseCard key={house.id} house={house} rank={index + 1} />
+                <HouseCard
+                  key={house.id}
+                  house={house}
+                  rank={index + 1}
+                  selected={house.id === selectedHouseId}
+                  onSelect={() => setSelectedHouseId((current) => current === house.id ? null : house.id)}
+                />
               ))}
+            </div>
+            <div className="mt-8">
+              <OverviewReports
+                houses={leaderboard}
+                members={members}
+                activity={activity}
+                memberPoints={memberPoints}
+                selectedHouse={selectedHouse}
+                onShowActivity={() => setActiveTab("activity")}
+              />
             </div>
           </Tabs.Content>
 

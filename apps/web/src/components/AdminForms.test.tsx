@@ -114,7 +114,7 @@ describe("AdminForms", () => {
       "Assigned members",
     ]);
     expect(options).toEqual([
-      "Select member...",
+      "Select member... 1 needs assignment",
       "Ben Unassigned - Needs assignment",
       "Alice Assigned",
     ]);

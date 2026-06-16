@@ -7,17 +7,22 @@ import type { LeaderboardEntry } from "@housepoints/contracts";
 interface HouseCardProps {
   house: LeaderboardEntry;
   rank: number;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
-export function HouseCard({ house, rank }: HouseCardProps) {
+export function HouseCard({ house, rank, selected = false, onSelect }: HouseCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: rank * 0.05 }}
     >
-      <div
-        className="relative overflow-hidden rounded-xl border bg-card transition-all hover:shadow-lg hover:-translate-y-0.5"
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="relative block h-full w-full overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring"
         style={{ borderTop: `4px solid ${house.color}` }}
       >
         <div
@@ -62,8 +67,11 @@ export function HouseCard({ house, rank }: HouseCardProps) {
               <div className="text-xs text-muted-foreground">points</div>
             </div>
           </div>
+          <p className="mt-4 text-xs font-medium text-muted-foreground">
+            {selected ? "Showing house report" : "Open house report"}
+          </p>
         </div>
-      </div>
+      </button>
     </motion.div>
   );
 }
