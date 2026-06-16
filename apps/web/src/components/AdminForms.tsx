@@ -91,7 +91,11 @@ export function AdminForms({
   const [copied, setCopied] = useState(false);
   const [editHouseName, setEditHouseName] = useState("");
   const [editHouseColor, setEditHouseColor] = useState(DEFAULT_HOUSE_COLOR);
-  const unassignedCount = users.filter((user) => !user.houseId).length;
+  const unassignedUsers = users.filter((user) => !user.houseId);
+  const assignedUsers = users.filter((user) => user.houseId);
+  const unassignedCount = unassignedUsers.length;
+  const unassignedSummary =
+    unassignedCount === 1 ? "1 needs assignment" : `${unassignedCount} need assignment`;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -313,9 +317,16 @@ export function AdminForms({
             onSubmit={handleAssign}
             className="grid gap-3 rounded-xl border p-5 bg-card"
           >
-            <h5 className="text-sm font-semibold flex items-center gap-2">
-              <UserSwitch size={16} />
-              Assign User to House
+            <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
+              <span className="flex items-center gap-2">
+                <UserSwitch size={16} />
+                Assign User to House
+              </span>
+              {unassignedCount > 0 ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  {unassignedSummary}
+                </span>
+              ) : null}
             </h5>
             <select
               name="targetUserId"
@@ -324,11 +335,29 @@ export function AdminForms({
               required
               defaultValue=""
             >
-              <option value="" disabled>Select member...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.displayName}</option>
-              ))}
+              <option value="" disabled>
+                {unassignedCount > 0 ? `Select member... ${unassignedSummary}` : "Select member..."}
+              </option>
+              {unassignedUsers.length > 0 ? (
+                <optgroup label={`Needs assignment (${unassignedUsers.length})`}>
+                  {unassignedUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.displayName} - Needs assignment</option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {assignedUsers.length > 0 ? (
+                <optgroup label="Assigned members">
+                  {assignedUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.displayName}</option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
+            <p className="text-xs text-muted-foreground">
+              {unassignedCount > 0
+                ? `${unassignedCount} ${unassignedCount === 1 ? "member needs" : "members need"} a house. They appear first in this list.`
+                : "All members currently have a house. Select anyone to move them."}
+            </p>
             <select
               name="targetHouseId"
               aria-label="House assignment"

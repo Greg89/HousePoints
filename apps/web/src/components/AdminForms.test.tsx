@@ -102,6 +102,25 @@ describe("AdminForms", () => {
     });
   });
 
+  it("keeps unassigned members visible first in the assignment dropdown", () => {
+    setupAdminForms();
+    const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
+    const memberSelect = assignForm.getByLabelText("Member to assign") as HTMLSelectElement;
+    const groups = Array.from(memberSelect.querySelectorAll("optgroup"));
+    const options = Array.from(memberSelect.options).map((option) => option.textContent);
+
+    expect(groups.map((group) => group.label)).toEqual([
+      "Needs assignment (1)",
+      "Assigned members",
+    ]);
+    expect(options).toEqual([
+      "Select member...",
+      "Ben Unassigned - Needs assignment",
+      "Alice Assigned",
+    ]);
+    expect(assignForm.getByText("1 member needs a house. They appear first in this list.")).toBeInTheDocument();
+  });
+
   it("shows generated invite tokens in the invite card", async () => {
     const { user, props } = setupAdminForms();
 
