@@ -14,6 +14,7 @@ import {
   adminHouseSchema,
   adminContextSchema,
   activityFeedSchema,
+  appUserSchema,
   assignUserHouseResponseSchema,
   inviteLinkSchema,
   leaderboardSchema,
@@ -420,10 +421,11 @@ export async function createOrg(
     }),
   });
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ message: "Unknown error" }));
-    throw new Error(body.message ?? `Create org failed with status ${response.status}`);
-  }
+  await parseApiResponse(
+    response,
+    appUserSchema,
+    "The organisation could not be created. Please try again.",
+  );
 
   revalidatePath("/");
 }
@@ -441,10 +443,11 @@ export async function joinOrg(inviteToken: string): Promise<void> {
     }),
   });
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ message: "Unknown error" }));
-    throw new Error(body.message ?? `Join org failed with status ${response.status}`);
-  }
+  await parseApiResponse(
+    response,
+    appUserSchema,
+    "The invite could not be joined. Please try again.",
+  );
 
   revalidatePath("/");
 }

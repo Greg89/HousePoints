@@ -17,6 +17,7 @@ import {
   memberScoresSchema,
   activityItemSchema,
   activityFeedSchema,
+  appUserSchema,
   leaderboardSchema,
   orgMembersSchema,
   adminContextSchema,
@@ -401,6 +402,34 @@ describe("dashboard response schemas", () => {
       memberScoresSchema.safeParse([{ memberId: "user-1", points: 1.5 }])
         .success,
     ).toBe(false);
+  });
+});
+
+describe("appUserSchema", () => {
+  const valid = {
+    id: "user-1",
+    auth0Sub: "auth0|user-1",
+    email: "alice@example.com",
+    displayName: "Alice",
+    role: "OWNER" as const,
+    organizationId: "org-1",
+    organizationSlug: "acme",
+    houseId: "house-1",
+    houseName: "Phoenix",
+    houseColor: "#7c3aed",
+    created: true,
+  };
+
+  it("accepts the user mapping returned by onboarding responses", () => {
+    expect(appUserSchema.parse(valid)).toEqual(valid);
+  });
+
+  it("rejects invalid roles and missing creation state", () => {
+    expect(appUserSchema.safeParse({ ...valid, role: "SUPER_ADMIN" }).success)
+      .toBe(false);
+    const { created: _created, ...withoutCreated } = valid;
+
+    expect(appUserSchema.safeParse(withoutCreated).success).toBe(false);
   });
 });
 
