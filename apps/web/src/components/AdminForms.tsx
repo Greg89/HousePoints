@@ -33,6 +33,35 @@ interface AdminFormsProps {
   onCreateInvite: () => Promise<{ token: string; expiresAt: string }>;
 }
 
+function ColorField({
+  id,
+  label,
+  defaultValue = "#7c3aed",
+}: {
+  id: string;
+  label: string;
+  defaultValue?: string;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className="flex items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2"
+    >
+      <span>
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="block text-xs text-muted-foreground">Choose a house accent color</span>
+      </span>
+      <input
+        id={id}
+        name="color"
+        type="color"
+        defaultValue={defaultValue}
+        className="h-9 w-12 flex-shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
+      />
+    </label>
+  );
+}
+
 export function AdminForms({
   users,
   houses,
@@ -174,7 +203,11 @@ export function AdminForms({
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <form onSubmit={handleCreate} className="grid gap-3 rounded-xl border p-5 bg-card">
+            <form
+              aria-label="Create house"
+              onSubmit={handleCreate}
+              className="grid gap-3 rounded-xl border p-5 bg-card"
+            >
               <h5 className="text-sm font-semibold flex items-center gap-2">
                 <Plus size={16} />
                 Create House
@@ -185,13 +218,7 @@ export function AdminForms({
                 placeholder="House name"
                 required
               />
-              <input
-                name="color"
-                type="color"
-                defaultValue="#7c3aed"
-                className="h-9 w-full rounded-lg border bg-background px-2 cursor-pointer"
-                title="House color"
-              />
+              <ColorField id="create-house-color" label="House color" />
               <input
                 name="description"
                 className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -206,13 +233,18 @@ export function AdminForms({
               </button>
             </form>
 
-            <form onSubmit={handleEdit} className="grid gap-3 rounded-xl border p-5 bg-card">
+            <form
+              aria-label="Edit house"
+              onSubmit={handleEdit}
+              className="grid gap-3 rounded-xl border p-5 bg-card"
+            >
               <h5 className="text-sm font-semibold flex items-center gap-2">
                 <PencilSimple size={16} />
                 Edit House
               </h5>
               <select
                 name="name"
+                aria-label="House to edit"
                 className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
                 required
                 defaultValue=""
@@ -222,13 +254,7 @@ export function AdminForms({
                   <option key={h.id} value={h.name}>{h.name}</option>
                 ))}
               </select>
-              <input
-                name="color"
-                type="color"
-                defaultValue="#7c3aed"
-                className="h-9 w-full rounded-lg border bg-background px-2 cursor-pointer"
-                title="New color"
-              />
+              <ColorField id="edit-house-color" label="New color" />
               <input
                 name="description"
                 className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -253,13 +279,18 @@ export function AdminForms({
             </p>
           </div>
 
-          <form onSubmit={handleAssign} className="grid gap-3 rounded-xl border p-5 bg-card">
+          <form
+            aria-label="Assign user to house"
+            onSubmit={handleAssign}
+            className="grid gap-3 rounded-xl border p-5 bg-card"
+          >
             <h5 className="text-sm font-semibold flex items-center gap-2">
               <UserSwitch size={16} />
               Assign User to House
             </h5>
             <select
               name="targetUserId"
+              aria-label="Member to assign"
               className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
               required
               defaultValue=""
@@ -271,6 +302,7 @@ export function AdminForms({
             </select>
             <select
               name="targetHouseId"
+              aria-label="House assignment"
               className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
               required
               defaultValue=""
