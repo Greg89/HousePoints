@@ -571,6 +571,48 @@ describe("POST /admin/users/assign-house", () => {
     expect(res.statusCode).toBe(404);
     await app.close();
   });
+
+  it("assigns a user to a house and returns the updated user summary", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "user-1",
+      organizationId: "org-1",
+    });
+    mockHouseFindUnique.mockResolvedValue({
+      id: "house-1",
+      organizationId: "org-1",
+      name: "Phoenix",
+    });
+    mockUserUpdate.mockResolvedValue({
+      id: "user-1",
+      displayName: "Alice",
+      houseId: "house-1",
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/assign-house",
+      payload: { targetUserId: "user-1", targetHouseId: "house-1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "user-1",
+      displayName: "Alice",
+      houseId: "house-1",
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { houseId: "house-1" },
+      select: {
+        id: true,
+        displayName: true,
+        houseId: true,
+      },
+    });
+    await app.close();
+  });
 });
 
 describe("POST /users/profile", () => {

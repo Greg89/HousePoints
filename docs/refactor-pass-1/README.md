@@ -39,10 +39,11 @@ Completed units:
 - Corrected the invite response contract and added safe runtime validation for generated invite tokens.
 - Added runtime validation and safe error handling for profile-update responses.
 - Added runtime validation and safe error handling for house-creation responses.
+- Added runtime validation and safe error handling for house-assignment responses.
 
 Current unit verification:
 
-- `npm test`: 120 tests passed.
+- `npm test`: 134 tests passed.
 - Workspace lint passed.
 - Full production build passed.
 

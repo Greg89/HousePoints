@@ -4,6 +4,7 @@ import {
   bootstrapUserSchema,
   createHouseSchema,
   assignUserHouseSchema,
+  assignUserHouseResponseSchema,
   updateProfileSchema,
   updateProfileResponseSchema,
   actorScopeSchema,
@@ -512,6 +513,42 @@ describe("updateProfileResponseSchema", () => {
       updateProfileResponseSchema.safeParse({
         id: "user-1",
         displayName: "",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("assignUserHouseResponseSchema", () => {
+  it("accepts an assigned user summary", () => {
+    const response = {
+      id: "user-1",
+      displayName: "Alice",
+      houseId: "house-1",
+    };
+
+    expect(assignUserHouseResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it("rejects missing ids and display names", () => {
+    expect(
+      assignUserHouseResponseSchema.safeParse({
+        id: "",
+        displayName: "Alice",
+        houseId: "house-1",
+      }).success,
+    ).toBe(false);
+    expect(
+      assignUserHouseResponseSchema.safeParse({
+        id: "user-1",
+        displayName: "",
+        houseId: "house-1",
+      }).success,
+    ).toBe(false);
+    expect(
+      assignUserHouseResponseSchema.safeParse({
+        id: "user-1",
+        displayName: "Alice",
+        houseId: "",
       }).success,
     ).toBe(false);
   });

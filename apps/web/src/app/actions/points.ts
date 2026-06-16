@@ -14,6 +14,7 @@ import {
   adminHouseSchema,
   adminContextSchema,
   activityFeedSchema,
+  assignUserHouseResponseSchema,
   inviteLinkSchema,
   leaderboardSchema,
   memberScoresSchema,
@@ -177,24 +178,17 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
     }),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    logWarn("web.admin.assignment_failed", {
-      requestId,
-      actorUserId: actor.id,
-      targetUserId,
-      targetHouseId,
-      statusCode: response.status,
-      responseBody: body,
-    });
-    throw new Error(`Assign house failed with status ${response.status}`);
-  }
+  const updatedUser = await parseApiResponse(
+    response,
+    assignUserHouseResponseSchema,
+    "The user could not be assigned to that house. Please try again.",
+  );
 
   logInfo("web.admin.user_assigned", {
     requestId,
     actorUserId: actor.id,
-    targetUserId,
-    targetHouseId,
+    targetUserId: updatedUser.id,
+    targetHouseId: updatedUser.houseId,
   });
 
   revalidatePath("/");

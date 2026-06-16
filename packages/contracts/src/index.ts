@@ -144,6 +144,16 @@ export const assignUserHouseSchema = z.object({
   targetHouseId: z.string().min(1),
 }).strict();
 
+export const assignUserHouseResponseSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1),
+  houseId: z.string().min(1),
+});
+
+export type AssignUserHouseResponse = z.infer<
+  typeof assignUserHouseResponseSchema
+>;
+
 export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
 }).strict();
