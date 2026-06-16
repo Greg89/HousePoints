@@ -71,6 +71,20 @@ describe("AdminForms", () => {
     });
   });
 
+  it("sets the edit color to the selected house color", async () => {
+    const { user } = setupAdminForms();
+    const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
+    const colorInput = editHouseForm.getByLabelText(/New color/) as HTMLInputElement;
+
+    expect(colorInput.value).toBe("#7c3aed");
+
+    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
+    expect(colorInput.value).toBe("#1d4ed8");
+
+    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Slytherin");
+    expect(colorInput.value).toBe("#22c55e");
+  });
+
   it("submits assignment data from the team setup card", async () => {
     const { user, props } = setupAdminForms();
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));

@@ -33,14 +33,25 @@ interface AdminFormsProps {
   onCreateInvite: () => Promise<{ token: string; expiresAt: string }>;
 }
 
+const DEFAULT_HOUSE_COLOR = "#7c3aed";
+const HEX_COLOR_PATTERN = /^#[\da-f]{6}$/i;
+
+function getHouseColor(house?: AdminHouse) {
+  return house?.color && HEX_COLOR_PATTERN.test(house.color) ? house.color : DEFAULT_HOUSE_COLOR;
+}
+
 function ColorField({
   id,
   label,
-  defaultValue = "#7c3aed",
+  value,
+  defaultValue = DEFAULT_HOUSE_COLOR,
+  onChange,
 }: {
   id: string;
   label: string;
+  value?: string;
   defaultValue?: string;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label
@@ -55,7 +66,9 @@ function ColorField({
         id={id}
         name="color"
         type="color"
-        defaultValue={defaultValue}
+        value={value}
+        defaultValue={value === undefined ? defaultValue : undefined}
+        onChange={(event) => onChange?.(event.target.value)}
         className="h-9 w-12 flex-shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
       />
     </label>
@@ -76,6 +89,8 @@ export function AdminForms({
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editHouseName, setEditHouseName] = useState("");
+  const [editHouseColor, setEditHouseColor] = useState(DEFAULT_HOUSE_COLOR);
   const unassignedCount = users.filter((user) => !user.houseId).length;
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -105,6 +120,8 @@ export function AdminForms({
       try {
         await onCreateHouse(formData);
         toast.success("House updated", { description: name });
+        setEditHouseName("");
+        setEditHouseColor(DEFAULT_HOUSE_COLOR);
         form.reset();
       } catch (err) {
         toast.error("Failed to update house", {
@@ -247,14 +264,26 @@ export function AdminForms({
                 aria-label="House to edit"
                 className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
                 required
-                defaultValue=""
+                value={editHouseName}
+                onChange={(event) => {
+                  const selectedHouseName = event.target.value;
+                  setEditHouseName(selectedHouseName);
+                  setEditHouseColor(
+                    getHouseColor(houses.find((house) => house.name === selectedHouseName)),
+                  );
+                }}
               >
                 <option value="" disabled>Select house...</option>
                 {houses.map((h) => (
                   <option key={h.id} value={h.name}>{h.name}</option>
                 ))}
               </select>
-              <ColorField id="edit-house-color" label="New color" />
+              <ColorField
+                id="edit-house-color"
+                label="New color"
+                value={editHouseColor}
+                onChange={setEditHouseColor}
+              />
               <input
                 name="description"
                 className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
