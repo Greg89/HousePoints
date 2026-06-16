@@ -66,18 +66,11 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
       }),
     });
 
-    if (!response.ok) {
-      const body = await response.text();
-      logWarn("web.action.failed", {
-        action: "submitPointAdjustment",
-        requestId,
-        statusCode: response.status,
-        responseBody: body,
-      });
-      throw new Error(`Point adjustment failed with status ${response.status}`);
-    }
-
-    const transaction = (await response.json()) as { id: string };
+    const transaction = await parseApiResponse(
+      response,
+      pointAdjustmentResponseSchema,
+      "Points could not be adjusted. Please try again.",
+    );
 
     logInfo("points.adjust.completed", {
       requestId,
