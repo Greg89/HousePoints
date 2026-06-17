@@ -10,6 +10,7 @@ export type WebLogEvent =
   | "web.request.failed"
   | "web.auth.not_configured"
   | "web.auth.session_missing"
+  | "web.auth.access_token_expired"
   | "web.session.read"
   | "web.user.mapping_ensured"
   | "web.user.mapping_failed"

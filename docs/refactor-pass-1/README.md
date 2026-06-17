@@ -47,6 +47,7 @@ Completed units:
 - Added real ESLint scripts for the API, contracts, and DB workspaces.
 - Added read-side tenant isolation tests for dashboard and organization-scoped reads.
 - Added web render error instrumentation so production dashboard failures emit structured logs.
+- Handled expired Auth0 access-token sessions without refresh tokens as re-authentication instead of dashboard 500s.
 
 Current unit verification:
 

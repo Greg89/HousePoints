@@ -5,6 +5,7 @@ import type { User } from "@auth0/nextjs-auth0/types";
 import { apiErrorSchema } from "@housepoints/contracts";
 import type { ZodType } from "zod";
 import { getAuth0Client } from "@/lib/auth0";
+import { logWarn, serializeErrorForLog } from "@/lib/logging";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -34,6 +35,19 @@ export type AuthenticatedApiContext = {
   user: User;
   accessToken: string;
 };
+
+function isRecoverableAccessTokenError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const errorWithCode = error as Error & { code?: unknown };
+
+  return (
+    error.name === "AccessTokenError" &&
+    errorWithCode.code === "missing_refresh_token"
+  );
+}
 
 type ApiRequestDependencies = {
   baseUrl: string;
@@ -111,7 +125,22 @@ export const getOptionalAuthenticatedApiContext = cache(
       return null;
     }
 
-    const { token } = await auth0.getAccessToken();
+    let token: string;
+
+    try {
+      ({ token } = await auth0.getAccessToken());
+    } catch (error) {
+      if (!isRecoverableAccessTokenError(error)) {
+        throw error;
+      }
+
+      logWarn("web.auth.access_token_expired", {
+        ...serializeErrorForLog(error),
+        userSub: session.user.sub,
+      });
+
+      return null;
+    }
 
     return {
       user: session.user,
