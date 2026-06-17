@@ -50,6 +50,7 @@ Completed units:
 - Added web render error instrumentation so production dashboard failures emit structured logs.
 - Handled expired Auth0 access-token sessions without refresh tokens as re-authentication instead of dashboard 500s.
 - Added an observability and logging plan for unified SEQ logging, correlation, redaction, and chaos-readiness.
+- Wired web server logs to SEQ with structured Pino output and redaction.
 
 Current unit verification:
 

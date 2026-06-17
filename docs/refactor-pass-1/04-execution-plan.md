@@ -73,7 +73,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 5. [ ] Remove recursive duplicate workspace builds.
 6. [ ] Make font/build assets reproducible without external network access where practical.
 7. [ ] Add database-backed integration tests for transaction and constraint behavior.
-8. [-] Unify structured web and API logs in SEQ. Web render/auth instrumentation exists and a target plan is documented; web logs are not yet delivered to SEQ.
+8. [-] Unify structured web and API logs in SEQ. Web render/auth instrumentation exists and web logs are delivered to SEQ when configured; request context propagation still needs to be made consistent across full render flows.
 
 ## Phase 6: Reconcile Documentation
 

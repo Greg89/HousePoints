@@ -36,7 +36,7 @@ Gaps:
 
 ### Web
 
-The web app writes JSON-shaped logs to `console.info`, `console.warn`, and `console.error`.
+The web app uses Pino to write structured logs to stdout and, when `SEQ_SERVER_URL` is configured, SEQ.
 
 Strengths:
 
@@ -44,14 +44,14 @@ Strengths:
 - Next.js `onRequestError` instrumentation captures Server Component render failures.
 - Expired Auth0 access-token sessions are logged and treated as re-authentication instead of dashboard 500s.
 - Web calls send `x-request-id` to the API.
+- Sensitive web log fields are redacted before logs are written.
 
 Gaps:
 
-- Web logs do not currently go to SEQ.
-- Web log redaction is not centralized.
+- Web and API redaction rules are not yet shared from one module.
 - Server render logs and action logs do not yet share one request context.
 - Browser/client-side errors are not captured centrally.
-- Railway access logs, web logs, and API SEQ logs must still be checked separately.
+- Railway access logs must still be checked separately from application logs.
 
 ## Target State
 
@@ -239,11 +239,11 @@ This can live in a small shared package or be duplicated briefly while the shape
 
 Add a web logger that mirrors the API logger behavior:
 
-- stdout remains enabled;
-- SEQ is enabled when `SEQ_SERVER_URL` is configured;
-- `SEQ_API_KEY` is optional;
-- redaction rules apply before sending;
-- delivery failures are logged without crashing requests.
+- [x] stdout remains enabled;
+- [x] SEQ is enabled when `SEQ_SERVER_URL` is configured;
+- [x] `SEQ_API_KEY` is optional;
+- [x] redaction rules apply before sending;
+- [x] delivery failures are logged without crashing requests.
 
 Acceptance:
 
@@ -352,6 +352,4 @@ Do not run chaos experiments in production until staging has representative obse
 
 ## Near-Term Recommendation
 
-Implement Slice 2 next: send web logs to SEQ using the same environment variables as the API.
-
-That solves the current operational pain without changing product behavior. Then implement request context propagation so one SEQ query can follow a full dashboard render across web and API.
+Implement request context propagation next so one SEQ query can follow a full dashboard render across web and API.

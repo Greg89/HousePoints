@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { serializeErrorForLog } from "@/lib/logging";
+import { redactLogContext, serializeErrorForLog } from "@/lib/logging";
 
 describe("serializeErrorForLog", () => {
   it("preserves safe operational metadata from errors", () => {
@@ -29,6 +29,42 @@ describe("serializeErrorForLog", () => {
     expect(serializeErrorForLog("failed")).toEqual({
       errorType: "string",
       errorMessage: "failed",
+    });
+  });
+});
+
+describe("redactLogContext", () => {
+  it("redacts sensitive fields before logs are written", () => {
+    expect(
+      redactLogContext({
+        requestId: "request-1",
+        accessToken: "access-token",
+        headers: {
+          authorization: "Bearer secret",
+          cookie: "appSession=value",
+          "x-request-id": "request-1",
+        },
+        nested: [
+          {
+            inviteToken: "invite-token",
+            safe: "present",
+          },
+        ],
+      }),
+    ).toEqual({
+      requestId: "request-1",
+      accessToken: "[REDACTED]",
+      headers: {
+        authorization: "[REDACTED]",
+        cookie: "[REDACTED]",
+        "x-request-id": "request-1",
+      },
+      nested: [
+        {
+          inviteToken: "[REDACTED]",
+          safe: "present",
+        },
+      ],
     });
   });
 });
