@@ -44,10 +44,11 @@ Completed units:
 - Added runtime validation and safe error handling for house-creation responses.
 - Added runtime validation and safe error handling for house-assignment responses.
 - Added explicit workspace type-check scripts and wired them into preflight.
+- Added read-side tenant isolation tests for dashboard and organization-scoped reads.
 
 Current unit verification:
 
-- `npm test`: 137 tests passed.
+- `npm test`: 144 tests passed.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.
