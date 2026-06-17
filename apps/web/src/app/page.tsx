@@ -5,6 +5,7 @@ import {
   createInviteLink,
   readActivityFeed,
   readAdminContext,
+  readDashboardSummary,
   readLeaderboard,
   readMemberScores,
   readMembers,
@@ -76,11 +77,12 @@ export default async function Home() {
   }
 
   // Fetch dashboard data in parallel
-  const [leaderboard, members, activity, memberScores, adminContext] = await Promise.all([
+  const [leaderboard, members, activity, memberScores, dashboardSummary, adminContext] = await Promise.all([
     readLeaderboard(),
     readMembers(),
     readActivityFeed(),
     readMemberScores(),
+    readDashboardSummary(),
     (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext() : Promise.resolve(null),
   ]);
 
@@ -107,6 +109,7 @@ export default async function Home() {
       members={members}
       activity={activity}
       memberPoints={memberScores}
+      dashboardSummary={dashboardSummary}
       onAward={awardPoints}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"

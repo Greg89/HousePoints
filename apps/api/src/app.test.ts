@@ -58,6 +58,7 @@ const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
+const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -709,6 +710,176 @@ describe("POST /transactions/recent", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()[0].trait).toBeNull();
+    await app.close();
+  });
+});
+
+describe("POST /dashboard/summary", () => {
+  it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/dashboard/summary",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
+    await app.close();
+  });
+
+  it("returns organization-wide reporting summary", async () => {
+    const now = new Date();
+    mockFindUnique.mockResolvedValue(makeMember());
+    (prisma.house.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: "house-1", name: "Phoenix", color: "#7c3aed" },
+      { id: "house-2", name: "Ember", color: "#ef4444" },
+    ]);
+    mockTxGroupBy
+      .mockResolvedValueOnce([
+        { targetUserId: "user-1", targetHouseId: "house-1", _sum: { delta: 30 } },
+        { targetUserId: "user-3", targetHouseId: "house-2", _sum: { delta: 10 } },
+      ])
+      .mockResolvedValueOnce([
+        { targetHouseId: "house-1", trait: "COLLABORATION", _count: { trait: 2 } },
+        { targetHouseId: "house-1", trait: "LEADERSHIP", _count: { trait: 1 } },
+        { targetHouseId: "house-2", trait: "INNOVATION", _count: { trait: 1 } },
+      ])
+      .mockResolvedValueOnce([
+        { targetUserId: "user-1", _sum: { delta: 55 } },
+        { targetUserId: "user-2", _sum: { delta: 5 } },
+        { targetUserId: "user-3", _sum: { delta: 10 } },
+      ]);
+    mockTxFindMany
+      .mockResolvedValueOnce([
+        {
+          id: "tx-1",
+          delta: 12,
+          reason: "Great collaboration",
+          trait: "COLLABORATION",
+          createdAt: now,
+          actor: { displayName: "Bob" },
+          targetUser: { displayName: "Alice" },
+          targetHouse: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ])
+      .mockResolvedValueOnce([
+        { targetHouseId: "house-1", delta: 12, createdAt: now },
+        { targetHouseId: "house-2", delta: 4, createdAt: now },
+      ]);
+    (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "user-1",
+        displayName: "Alice",
+        role: "MEMBER",
+        houseId: "house-1",
+      },
+      {
+        id: "user-2",
+        displayName: "Bob",
+        role: "ADMIN",
+        houseId: "house-1",
+      },
+      {
+        id: "user-3",
+        displayName: "Cora",
+        role: "MEMBER",
+        houseId: "house-2",
+      },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/dashboard/summary",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.generatedAt).toEqual(expect.any(String));
+    expect(body.monthStartsAt).toEqual(expect.any(String));
+    expect(body.monthlyStandout).toEqual({
+      memberId: "user-1",
+      memberName: "Alice",
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
+      points: 30,
+    });
+    expect(body.monthlyStandoutsByHouse).toEqual([
+      {
+        houseId: "house-1",
+        standout: {
+          memberId: "user-1",
+          memberName: "Alice",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          points: 30,
+        },
+      },
+      {
+        houseId: "house-2",
+        standout: {
+          memberId: "user-3",
+          memberName: "Cora",
+          houseId: "house-2",
+          houseName: "Ember",
+          houseColor: "#ef4444",
+          points: 10,
+        },
+      },
+    ]);
+    expect(body.traitLeaders).toEqual([
+      {
+        houseId: "house-1",
+        houseName: "Phoenix",
+        houseColor: "#7c3aed",
+        trait: "COLLABORATION",
+        count: 2,
+      },
+      {
+        houseId: "house-2",
+        houseName: "Ember",
+        houseColor: "#ef4444",
+        trait: "INNOVATION",
+        count: 1,
+      },
+    ]);
+    expect(body.recentActivity).toEqual([
+      {
+        id: "tx-1",
+        actorName: "Bob",
+        targetUserName: "Alice",
+        targetHouseName: "Phoenix",
+        targetHouseColor: "#7c3aed",
+        delta: 12,
+        reason: "Great collaboration",
+        trait: "COLLABORATION",
+        createdAt: now.toISOString(),
+      },
+    ]);
+    expect(body.pointsVelocity).toHaveLength(2);
+    expect(body.pointsVelocity[0].days).toHaveLength(14);
+    expect(body.pointsVelocity[0].days.at(-1).points).toBe(12);
+    expect(body.houseMemberRankings).toEqual([
+      {
+        houseId: "house-1",
+        members: [
+          { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 55 },
+          { memberId: "user-2", displayName: "Bob", role: "ADMIN", points: 5 },
+        ],
+      },
+      {
+        houseId: "house-2",
+        members: [
+          { memberId: "user-3", displayName: "Cora", role: "MEMBER", points: 10 },
+        ],
+      },
+    ]);
     await app.close();
   });
 });

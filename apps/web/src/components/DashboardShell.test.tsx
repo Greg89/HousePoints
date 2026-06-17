@@ -132,6 +132,117 @@ const baseProps = {
     { memberId: "member-1", points: 5 },
     { memberId: "member-3", points: 10 },
   ],
+  dashboardSummary: {
+    generatedAt: new Date().toISOString(),
+    monthStartsAt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString(),
+    monthlyStandout: {
+      memberId: "member-2",
+      memberName: "Ben Scorer",
+      houseId: "house-1",
+      houseName: "Slytherin",
+      houseColor: "#22c55e",
+      points: 25,
+    },
+    monthlyStandoutsByHouse: [
+      {
+        houseId: "house-1",
+        standout: {
+          memberId: "member-2",
+          memberName: "Ben Scorer",
+          houseId: "house-1",
+          houseName: "Slytherin",
+          houseColor: "#22c55e",
+          points: 25,
+        },
+      },
+      {
+        houseId: "house-2",
+        standout: {
+          memberId: "member-3",
+          memberName: "Cara Clever",
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          points: 10,
+        },
+      },
+    ],
+    traitLeaders: [
+      {
+        houseId: "house-1",
+        houseName: "Slytherin",
+        houseColor: "#22c55e",
+        trait: "COLLABORATION" as const,
+        count: 1,
+      },
+      {
+        houseId: "house-2",
+        houseName: "Ravenclaw",
+        houseColor: "#1d4ed8",
+        trait: "INNOVATION" as const,
+        count: 1,
+      },
+    ],
+    recentActivity: [
+      {
+        id: "activity-1",
+        actorName: "Gregory Dodson",
+        targetUserName: "Ben Scorer",
+        targetHouseName: "Slytherin",
+        targetHouseColor: "#22c55e",
+        delta: 25,
+        reason: "Helped the team",
+        trait: "COLLABORATION" as const,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "activity-2",
+        actorName: "Gregory Dodson",
+        targetUserName: "Cara Clever",
+        targetHouseName: "Ravenclaw",
+        targetHouseColor: "#1d4ed8",
+        delta: 10,
+        reason: "Great research",
+        trait: "INNOVATION" as const,
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    pointsVelocity: [
+      {
+        houseId: "house-1",
+        houseName: "Slytherin",
+        houseColor: "#22c55e",
+        days: [
+          { date: "2026-06-01", points: 0 },
+          { date: "2026-06-02", points: 25 },
+        ],
+      },
+      {
+        houseId: "house-2",
+        houseName: "Ravenclaw",
+        houseColor: "#1d4ed8",
+        days: [
+          { date: "2026-06-01", points: 10 },
+          { date: "2026-06-02", points: 0 },
+        ],
+      },
+    ],
+    houseMemberRankings: [
+      {
+        houseId: "house-1",
+        members: [
+          { memberId: "member-2", displayName: "Ben Scorer", role: "ADMIN" as const, points: 25 },
+          { memberId: "member-1", displayName: "Alice Assigned", role: "MEMBER" as const, points: 5 },
+        ],
+      },
+      {
+        houseId: "house-2",
+        members: [
+          { memberId: "member-3", displayName: "Cara Clever", role: "MEMBER" as const, points: 10 },
+        ],
+      },
+    ],
+  },
   onAward: async () => {},
   loginUrl: "/auth/login",
   logoutUrl: "/auth/logout",

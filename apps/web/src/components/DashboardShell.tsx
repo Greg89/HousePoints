@@ -10,6 +10,7 @@ import { ActivityFeed } from "./ActivityFeed";
 import { OverviewReports } from "./OverviewReports";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import type {
+  DashboardSummary,
   LeaderboardEntry,
   OrgMember,
   ActivityItem,
@@ -30,6 +31,7 @@ interface DashboardShellProps {
   activity: ActivityItem[];
   /** Computed per-member point totals from activity */
   memberPoints: { memberId: string; points: number }[];
+  dashboardSummary: DashboardSummary;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<void>;
   loginUrl: string;
   logoutUrl: string;
@@ -50,6 +52,7 @@ export function DashboardShell({
   members,
   activity,
   memberPoints,
+  dashboardSummary,
   onAward,
   logoutUrl,
   adminSection,
@@ -183,10 +186,7 @@ export function DashboardShell({
             </div>
             <div className="mt-8">
               <OverviewReports
-                houses={leaderboard}
-                members={members}
-                activity={activity}
-                memberPoints={memberPoints}
+                dashboardSummary={dashboardSummary}
                 selectedHouse={selectedHouse}
                 onShowActivity={() => setActiveTab("activity")}
               />

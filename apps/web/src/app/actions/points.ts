@@ -16,6 +16,7 @@ import {
   activityFeedSchema,
   appUserSchema,
   assignUserHouseResponseSchema,
+  dashboardSummarySchema,
   inviteLinkSchema,
   leaderboardSchema,
   memberScoresSchema,
@@ -345,6 +346,20 @@ export async function readMemberScores() {
     response,
     memberScoresSchema,
     "Dashboard data could not be loaded. Please try again.",
+  );
+}
+
+export async function readDashboardSummary() {
+  const requestId = randomUUID();
+  await getCurrentUser();
+  const response = await apiFetch("/dashboard/summary", requestId, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return parseApiResponse(
+    response,
+    dashboardSummarySchema,
+    "Dashboard summary could not be loaded. Please try again.",
   );
 }
 

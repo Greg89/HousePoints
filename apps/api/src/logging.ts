@@ -23,6 +23,7 @@ export type ApiLogEvent =
   | "admin.house.created"
   | "admin.user.house_assigned"
   | "leaderboard.fetched"
+  | "dashboard.summary.loaded"
   | "points.actor_not_found"
   | "points.actor_house_unassigned"
   | "points.target_user_unassigned"

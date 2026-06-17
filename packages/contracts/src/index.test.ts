@@ -17,6 +17,7 @@ import {
   memberScoresSchema,
   activityItemSchema,
   activityFeedSchema,
+  dashboardSummarySchema,
   appUserSchema,
   leaderboardSchema,
   orgMembersSchema,
@@ -380,6 +381,18 @@ describe("memberScoreSchema", () => {
 });
 
 describe("dashboard response schemas", () => {
+  const activityItem = {
+    id: "tx-1",
+    actorName: "Bob",
+    targetUserName: "Alice",
+    targetHouseName: "Phoenix",
+    targetHouseColor: "#7c3aed",
+    delta: 10,
+    reason: "Great work",
+    trait: "LEADERSHIP" as const,
+    createdAt: "2026-06-01T12:00:00.000Z",
+  };
+
   it("accepts valid empty dashboard collections", () => {
     expect(leaderboardSchema.parse([])).toEqual([]);
     expect(orgMembersSchema.parse([])).toEqual([]);
@@ -401,6 +414,94 @@ describe("dashboard response schemas", () => {
     expect(
       memberScoresSchema.safeParse([{ memberId: "user-1", points: 1.5 }])
         .success,
+    ).toBe(false);
+  });
+
+  it("accepts a complete dashboard summary", () => {
+    const summary = {
+      generatedAt: "2026-06-16T12:00:00.000Z",
+      monthStartsAt: "2026-06-01T00:00:00.000Z",
+      monthlyStandout: {
+        memberId: "user-1",
+        memberName: "Alice",
+        houseId: "house-1",
+        houseName: "Phoenix",
+        houseColor: "#7c3aed",
+        points: 42,
+      },
+      monthlyStandoutsByHouse: [
+        {
+          houseId: "house-1",
+          standout: {
+            memberId: "user-1",
+            memberName: "Alice",
+            houseId: "house-1",
+            houseName: "Phoenix",
+            houseColor: "#7c3aed",
+            points: 42,
+          },
+        },
+      ],
+      traitLeaders: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          trait: "LEADERSHIP",
+          count: 3,
+        },
+      ],
+      recentActivity: [activityItem],
+      pointsVelocity: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          days: [{ date: "2026-06-16", points: 10 }],
+        },
+      ],
+      houseMemberRankings: [
+        {
+          houseId: "house-1",
+          members: [
+            {
+              memberId: "user-1",
+              displayName: "Alice",
+              role: "MEMBER",
+              points: 42,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(dashboardSummarySchema.parse(summary)).toEqual(summary);
+  });
+
+  it("rejects malformed dashboard summary fields", () => {
+    expect(
+      dashboardSummarySchema.safeParse({
+        generatedAt: "today",
+        monthStartsAt: "2026-06-01T00:00:00.000Z",
+        monthlyStandout: null,
+        monthlyStandoutsByHouse: [],
+        traitLeaders: [],
+        recentActivity: [],
+        pointsVelocity: [],
+        houseMemberRankings: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      dashboardSummarySchema.safeParse({
+        generatedAt: "2026-06-16T12:00:00.000Z",
+        monthStartsAt: "2026-06-01T00:00:00.000Z",
+        monthlyStandout: null,
+        monthlyStandoutsByHouse: [],
+        traitLeaders: [],
+        recentActivity: [],
+        pointsVelocity: [{ houseId: "house-1", houseName: "Phoenix", houseColor: "#7c3aed", days: [{ date: "06/16/2026", points: 1 }] }],
+        houseMemberRankings: [],
+      }).success,
     ).toBe(false);
   });
 });

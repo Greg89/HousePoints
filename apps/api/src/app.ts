@@ -13,6 +13,7 @@ import {
   createOrgSchema,
   joinOrgSchema,
   promoteUserSchema,
+  type Trait,
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -124,6 +125,46 @@ function mapAppUser(user: {
     houseId: user.houseId,
     houseName: user.house?.name ?? null,
     houseColor: user.house?.color ?? null,
+  };
+}
+
+function startOfUtcMonth(now: Date) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+function utcDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function lastUtcDateKeys(days: number, now: Date) {
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(end);
+    date.setUTCDate(end.getUTCDate() - (days - 1 - index));
+    return utcDateKey(date);
+  });
+}
+
+function mapActivityItem(tx: {
+  id: string;
+  actor: { displayName: string };
+  targetUser: { displayName: string } | null;
+  targetHouse: { name: string; color: string };
+  delta: number;
+  reason: string;
+  trait: Trait | null;
+  createdAt: Date;
+}) {
+  return {
+    id: tx.id,
+    actorName: tx.actor.displayName,
+    targetUserName: tx.targetUser?.displayName ?? "Unknown",
+    targetHouseName: tx.targetHouse.name,
+    targetHouseColor: tx.targetHouse.color,
+    delta: tx.delta,
+    reason: tx.reason,
+    trait: tx.trait ?? null,
+    createdAt: tx.createdAt.toISOString(),
   };
 }
 
@@ -284,6 +325,219 @@ app.post("/houses/leaderboard", async (request, reply) => {
   });
 
   return leaderboard;
+});
+
+app.post("/dashboard/summary", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(request.auth.subject);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", {});
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  const now = new Date();
+  const monthStartsAt = startOfUtcMonth(now);
+  const velocityDates = lastUtcDateKeys(14, now);
+  const velocityStartsAt = new Date(`${velocityDates[0]}T00:00:00.000Z`);
+
+  const [
+    houses,
+    monthlyMemberTotals,
+    monthlyTraitTotals,
+    recentTransactions,
+    velocityTransactions,
+    memberTotals,
+    members,
+  ] = await Promise.all([
+    prisma.house.findMany({
+      where: { organizationId: actor.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetUserId", "targetHouseId"],
+      where: {
+        organizationId: actor.organizationId,
+        targetUserId: { not: null },
+        createdAt: { gte: monthStartsAt },
+      },
+      _sum: { delta: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId", "trait"],
+      where: {
+        organizationId: actor.organizationId,
+        trait: { not: null },
+        createdAt: { gte: monthStartsAt },
+      },
+      _count: { trait: true },
+    }),
+    prisma.pointTransaction.findMany({
+      where: { organizationId: actor.organizationId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        delta: true,
+        reason: true,
+        trait: true,
+        createdAt: true,
+        actor: { select: { displayName: true } },
+        targetUser: { select: { displayName: true } },
+        targetHouse: { select: { name: true, color: true } },
+      },
+    }),
+    prisma.pointTransaction.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        createdAt: { gte: velocityStartsAt },
+      },
+      select: {
+        targetHouseId: true,
+        delta: true,
+        createdAt: true,
+      },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetUserId"],
+      where: {
+        organizationId: actor.organizationId,
+        targetUserId: { not: null },
+      },
+      _sum: { delta: true },
+    }),
+    prisma.user.findMany({
+      where: { organizationId: actor.organizationId },
+      orderBy: { displayName: "asc" },
+      select: {
+        id: true,
+        displayName: true,
+        role: true,
+        houseId: true,
+      },
+    }),
+  ]);
+
+  const houseById = new Map(houses.map((house) => [house.id, house]));
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const memberPoints = new Map(
+    memberTotals
+      .filter((row) => row.targetUserId)
+      .map((row) => [row.targetUserId as string, row._sum.delta ?? 0]),
+  );
+
+  function toStandout(row: (typeof monthlyMemberTotals)[number] | undefined) {
+    if (!row?.targetUserId) return null;
+    const member = memberById.get(row.targetUserId);
+    const house = houseById.get(row.targetHouseId);
+    if (!member || !house) return null;
+
+    return {
+      memberId: member.id,
+      memberName: member.displayName,
+      houseId: house.id,
+      houseName: house.name,
+      houseColor: house.color,
+      points: row._sum.delta ?? 0,
+    };
+  }
+
+  const monthlyMemberTotalsByMember = new Map<string, (typeof monthlyMemberTotals)[number]>();
+  for (const row of monthlyMemberTotals.filter((entry) => entry.targetUserId)) {
+    const existing = monthlyMemberTotalsByMember.get(row.targetUserId as string);
+    if (!existing) {
+      monthlyMemberTotalsByMember.set(row.targetUserId as string, row);
+      continue;
+    }
+
+    monthlyMemberTotalsByMember.set(row.targetUserId as string, {
+      ...existing,
+      _sum: { delta: (existing._sum.delta ?? 0) + (row._sum.delta ?? 0) },
+    });
+  }
+
+  const monthlyStandoutRow = Array.from(monthlyMemberTotalsByMember.values())
+    .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0];
+
+  const traitLeaders = houses.map((house) => {
+    const topTrait = monthlyTraitTotals
+      .filter((row) => row.targetHouseId === house.id && row.trait)
+      .sort((a, b) => b._count.trait - a._count.trait)[0];
+
+    return {
+      houseId: house.id,
+      houseName: house.name,
+      houseColor: house.color,
+      trait: topTrait?.trait ?? null,
+      count: topTrait?._count.trait ?? 0,
+    };
+  });
+
+  const velocityPoints = new Map<string, Map<string, number>>();
+  for (const house of houses) {
+    velocityPoints.set(house.id, new Map(velocityDates.map((date) => [date, 0])));
+  }
+  for (const transaction of velocityTransactions) {
+    const housePoints = velocityPoints.get(transaction.targetHouseId);
+    if (!housePoints) continue;
+    const key = utcDateKey(transaction.createdAt);
+    if (!housePoints.has(key)) continue;
+    housePoints.set(key, (housePoints.get(key) ?? 0) + transaction.delta);
+  }
+
+  const houseMemberRankings = houses.map((house) => ({
+    houseId: house.id,
+    members: members
+      .filter((member) => member.houseId === house.id)
+      .map((member) => ({
+        memberId: member.id,
+        displayName: member.displayName,
+        role: member.role,
+        points: memberPoints.get(member.id) ?? 0,
+      }))
+      .sort((a, b) => b.points - a.points || a.displayName.localeCompare(b.displayName)),
+  }));
+
+  info(request.log, "dashboard.summary.loaded", {
+    organizationId: actor.organizationId,
+    houses: houses.length,
+    recentActivity: recentTransactions.length,
+  });
+
+  return {
+    generatedAt: now.toISOString(),
+    monthStartsAt: monthStartsAt.toISOString(),
+    monthlyStandout: toStandout(monthlyStandoutRow),
+    monthlyStandoutsByHouse: houses.map((house) => ({
+      houseId: house.id,
+      standout: toStandout(
+        monthlyMemberTotals
+          .filter((row) => row.targetHouseId === house.id && row.targetUserId)
+          .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0],
+      ),
+    })),
+    traitLeaders,
+    recentActivity: recentTransactions.map(mapActivityItem),
+    pointsVelocity: houses.map((house) => ({
+      houseId: house.id,
+      houseName: house.name,
+      houseColor: house.color,
+      days: velocityDates.map((date) => ({
+        date,
+        points: velocityPoints.get(house.id)?.get(date) ?? 0,
+      })),
+    })),
+    houseMemberRankings,
+  };
 });
 
 app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
@@ -728,17 +982,7 @@ app.post("/transactions/recent", async (request, reply) => {
     },
   });
 
-  return transactions.map((tx) => ({
-    id: tx.id,
-    actorName: tx.actor.displayName,
-    targetUserName: tx.targetUser?.displayName ?? "Unknown",
-    targetHouseName: tx.targetHouse.name,
-    targetHouseColor: tx.targetHouse.color,
-    delta: tx.delta,
-    reason: tx.reason,
-    trait: tx.trait ?? null,
-    createdAt: tx.createdAt.toISOString(),
-  }));
+  return transactions.map(mapActivityItem);
 });
 
 // ── Org management ───────────────────────────────────────────────────────────

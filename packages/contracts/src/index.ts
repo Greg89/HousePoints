@@ -118,6 +118,53 @@ export const activityItemSchema = z.object({
 export type ActivityItem = z.infer<typeof activityItemSchema>;
 export const activityFeedSchema = z.array(activityItemSchema);
 
+const dashboardStandoutSchema = z.object({
+  memberId: z.string(),
+  memberName: z.string(),
+  houseId: z.string(),
+  houseName: z.string(),
+  houseColor: z.string(),
+  points: z.number().int(),
+});
+
+export const dashboardSummarySchema = z.object({
+  generatedAt: z.string().datetime(),
+  monthStartsAt: z.string().datetime(),
+  monthlyStandout: dashboardStandoutSchema.nullable(),
+  monthlyStandoutsByHouse: z.array(z.object({
+    houseId: z.string(),
+    standout: dashboardStandoutSchema.nullable(),
+  })),
+  traitLeaders: z.array(z.object({
+    houseId: z.string(),
+    houseName: z.string(),
+    houseColor: z.string(),
+    trait: traitSchema.nullable(),
+    count: z.number().int().nonnegative(),
+  })),
+  recentActivity: z.array(activityItemSchema),
+  pointsVelocity: z.array(z.object({
+    houseId: z.string(),
+    houseName: z.string(),
+    houseColor: z.string(),
+    days: z.array(z.object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      points: z.number().int(),
+    })),
+  })),
+  houseMemberRankings: z.array(z.object({
+    houseId: z.string(),
+    members: z.array(z.object({
+      memberId: z.string(),
+      displayName: z.string(),
+      role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
+      points: z.number().int(),
+    })),
+  })),
+});
+
+export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+
 export const leaderboardEntrySchema = z.object({
   id: z.string(),
   name: z.string(),
