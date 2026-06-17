@@ -46,6 +46,7 @@ Completed units:
 - Added explicit workspace type-check scripts and wired them into preflight.
 - Added real ESLint scripts for the API, contracts, and DB workspaces.
 - Added read-side tenant isolation tests for dashboard and organization-scoped reads.
+- Added web render error instrumentation so production dashboard failures emit structured logs.
 
 Current unit verification:
 
