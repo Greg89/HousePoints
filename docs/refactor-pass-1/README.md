@@ -20,6 +20,7 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 3. [Target Architecture](./03-target-architecture.md) proposes boundaries for the API, web data layer, contracts, and database.
 4. [Execution Plan](./04-execution-plan.md) defines the recommended refactor order and limits the scope of pass one.
 5. [Acceptance Criteria](./05-acceptance-criteria.md) defines what must be true before feature development resumes.
+6. [Observability And Logging Plan](./06-observability-logging-plan.md) defines the target logging architecture, event schema, redaction rules, and chaos-readiness path.
 
 ## Progress Snapshot
 
@@ -48,6 +49,7 @@ Completed units:
 - Added read-side tenant isolation tests for dashboard and organization-scoped reads.
 - Added web render error instrumentation so production dashboard failures emit structured logs.
 - Handled expired Auth0 access-token sessions without refresh tokens as re-authentication instead of dashboard 500s.
+- Added an observability and logging plan for unified SEQ logging, correlation, redaction, and chaos-readiness.
 
 Current unit verification:
 
