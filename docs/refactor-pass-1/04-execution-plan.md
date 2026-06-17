@@ -68,7 +68,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 
 1. [ ] Aggregate leaderboard totals in PostgreSQL.
 2. [ ] Add cursor pagination to activity.
-3. [-] Add real ESLint/type-check scripts for API, contracts, and DB. Type-check scripts now exist for every workspace; API/contracts/DB lint scripts are still placeholders.
+3. [x] Add real ESLint/type-check scripts for API, contracts, and DB.
 4. [ ] Add coverage reporting with meaningful thresholds for security-critical modules.
 5. [ ] Remove recursive duplicate workspace builds.
 6. [ ] Make font/build assets reproducible without external network access where practical.

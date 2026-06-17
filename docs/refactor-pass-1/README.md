@@ -44,6 +44,7 @@ Completed units:
 - Added runtime validation and safe error handling for house-creation responses.
 - Added runtime validation and safe error handling for house-assignment responses.
 - Added explicit workspace type-check scripts and wired them into preflight.
+- Added real ESLint scripts for the API, contracts, and DB workspaces.
 - Added read-side tenant isolation tests for dashboard and organization-scoped reads.
 
 Current unit verification:

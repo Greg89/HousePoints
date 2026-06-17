@@ -80,7 +80,9 @@ describe("adjustPointsSchema", () => {
   });
 
   it("rejects missing trait", () => {
-    const { trait: _t, ...withoutTrait } = valid;
+    const withoutTrait: Partial<typeof valid> = { ...valid };
+    delete withoutTrait.trait;
+
     const result = adjustPointsSchema.safeParse(withoutTrait);
     expect(result.success).toBe(false);
     expect(result.error?.flatten().fieldErrors.trait).toBeDefined();
@@ -344,7 +346,9 @@ describe("createOrgSchema", () => {
   });
 
   it("defaults the first house color", () => {
-    const { firstHouseColor: _color, ...withoutColor } = valid;
+    const withoutColor: Partial<typeof valid> = { ...valid };
+    delete withoutColor.firstHouseColor;
+
     const result = createOrgSchema.safeParse(withoutColor);
 
     expect(result.success).toBe(true);
@@ -528,7 +532,8 @@ describe("appUserSchema", () => {
   it("rejects invalid roles and missing creation state", () => {
     expect(appUserSchema.safeParse({ ...valid, role: "SUPER_ADMIN" }).success)
       .toBe(false);
-    const { created: _created, ...withoutCreated } = valid;
+    const withoutCreated: Partial<typeof valid> = { ...valid };
+    delete withoutCreated.created;
 
     expect(appUserSchema.safeParse(withoutCreated).success).toBe(false);
   });

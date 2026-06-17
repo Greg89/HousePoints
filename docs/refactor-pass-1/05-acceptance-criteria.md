@@ -58,7 +58,7 @@ Status markers:
 ## Quality Gates
 
 - [x] `npm test` passes without starting a real listener.
-- [-] Every TypeScript workspace has a real lint and type-check command. Type-check commands exist for every workspace; API/contracts/DB lint scripts are still placeholders.
+- [x] Every TypeScript workspace has a real lint and type-check command.
 - [-] Security-critical services have direct tests. Authentication and onboarding are covered; extracted services do not yet exist.
 - [ ] At least one database-backed integration suite validates transactions and constraints.
 - [ ] The production build does not depend on unplanned external network access.
