@@ -59,20 +59,21 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 
 1. [x] Make org creation atomic.
 2. [x] Make invite consumption atomic and concurrency-safe.
-3. [-] Export response and error schemas from contracts. Current-user/onboarding user mapping, dashboard, admin-context, point-adjustment, invite-link, profile-update, and house-assignment response schemas exist; remaining operations still need schemas.
-4. [-] Parse all API responses in the web client. Current-user bootstrap, onboarding create/join, dashboard, admin-context, point-award, legacy point-adjustment, invite-creation, profile-update, house-creation, and house-assignment responses are parsed; remaining mutation responses are not.
-5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims. Core auth, role, tenant, onboarding, and invite cases exist; coverage is not yet complete.
+3. [-] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API responses; future operations should add schemas with their endpoint contracts.
+4. [x] Parse all API responses in the web client. Web-consumed responses now flow through the shared response parser and contract schemas.
+5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims. Core auth, role, read/write tenant isolation, onboarding, and invite cases exist; coverage is not yet complete.
 6. [ ] Add stable database constraints for settled ledger rules.
 
 ## Phase 5: Improve Queries And Tooling
 
 1. [ ] Aggregate leaderboard totals in PostgreSQL.
 2. [ ] Add cursor pagination to activity.
-3. [-] Add real ESLint/type-check scripts for API, contracts, and DB. Type-check scripts now exist for every workspace; API/contracts/DB lint scripts are still placeholders.
+3. [x] Add real ESLint/type-check scripts for API, contracts, and DB.
 4. [ ] Add coverage reporting with meaningful thresholds for security-critical modules.
 5. [ ] Remove recursive duplicate workspace builds.
 6. [ ] Make font/build assets reproducible without external network access where practical.
 7. [ ] Add database-backed integration tests for transaction and constraint behavior.
+8. [-] Unify structured web and API logs in SEQ. Web render/auth instrumentation exists and web logs are delivered to SEQ when configured; request context propagation still needs to be made consistent across full render flows.
 
 ## Phase 6: Reconcile Documentation
 

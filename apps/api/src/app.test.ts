@@ -46,6 +46,7 @@ import { prisma } from "@housepoints/db";
 
 // Typed shorthand helpers
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
@@ -53,6 +54,7 @@ const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
+const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
@@ -461,6 +463,39 @@ describe("POST /points/adjust", () => {
   });
 });
 
+describe("POST /houses/leaderboard", () => {
+  it("scopes leaderboard houses to the authenticated actor's organization", async () => {
+    mockFindUnique.mockResolvedValue(
+      makeMember({ organizationId: "org-secure" }),
+    );
+    mockHouseFindMany.mockResolvedValue([
+      {
+        id: "house-1",
+        name: "Phoenix",
+        color: "#7c3aed",
+        description: null,
+        _count: { transactions: 1, users: 2 },
+        transactions: [{ delta: 10 }],
+      },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/houses/leaderboard",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockHouseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-secure" },
+      }),
+    );
+    await app.close();
+  });
+});
+
 describe("POST /admin/houses", () => {
   it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
     mockFindUnique.mockResolvedValue(makeMember()); // role = MEMBER
@@ -493,7 +528,7 @@ describe("POST /admin/houses", () => {
 describe("POST /admin/context", () => {
   it("allows an owner and returns the complete organization context", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
-    (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+    mockUserFindMany.mockResolvedValue([
       {
         id: "user-owner",
         displayName: "Olivia",
@@ -502,7 +537,7 @@ describe("POST /admin/context", () => {
         houseId: "house-1",
       },
     ]);
-    (prisma.house.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+    mockHouseFindMany.mockResolvedValue([
       {
         id: "house-1",
         name: "Phoenix",
@@ -540,6 +575,16 @@ describe("POST /admin/context", () => {
         },
       ],
     });
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1" },
+      }),
+    );
+    expect(mockHouseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1" },
+      }),
+    );
     await app.close();
   });
 });
@@ -685,6 +730,11 @@ describe("POST /transactions/recent", () => {
     expect(items[0].trait).toBe("COLLABORATION");
     expect(items[0].actorName).toBe("Bob");
     expect(items[0].delta).toBe(10);
+    expect(mockTxFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1" },
+      }),
+    );
     await app.close();
   });
 
@@ -714,6 +764,67 @@ describe("POST /transactions/recent", () => {
   });
 });
 
+describe("POST /users/scores", () => {
+  it("scopes member scores to the authenticated actor's organization", async () => {
+    mockFindUnique.mockResolvedValue(
+      makeMember({ organizationId: "org-secure" }),
+    );
+    mockTxGroupBy.mockResolvedValue([
+      { targetUserId: "user-1", _sum: { delta: 42 } },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/scores",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTxGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-secure",
+          targetUserId: { not: null },
+        },
+      }),
+    );
+    await app.close();
+  });
+});
+
+describe("POST /members", () => {
+  it("scopes member reads to the authenticated actor's organization", async () => {
+    mockFindUnique.mockResolvedValue(
+      makeMember({ organizationId: "org-secure" }),
+    );
+    mockUserFindMany.mockResolvedValue([
+      {
+        id: "user-1",
+        displayName: "Alice",
+        role: "MEMBER",
+        houseId: "house-1",
+        house: { name: "Phoenix", color: "#7c3aed" },
+      },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/members",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-secure" },
+      }),
+    );
+    await app.close();
+  });
+});
+
 describe("POST /dashboard/summary", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);
@@ -733,7 +844,7 @@ describe("POST /dashboard/summary", () => {
   it("returns organization-wide reporting summary", async () => {
     const now = new Date();
     mockFindUnique.mockResolvedValue(makeMember());
-    (prisma.house.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+    mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed" },
       { id: "house-2", name: "Ember", color: "#ef4444" },
     ]);
@@ -769,7 +880,7 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-1", delta: 12, createdAt: now },
         { targetHouseId: "house-2", delta: 4, createdAt: now },
       ]);
-    (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+    mockUserFindMany.mockResolvedValue([
       {
         id: "user-1",
         displayName: "Alice",
@@ -880,6 +991,32 @@ describe("POST /dashboard/summary", () => {
         ],
       },
     ]);
+    for (const call of mockHouseFindMany.mock.calls) {
+      expect(call[0]).toEqual(
+        expect.objectContaining({
+          where: { organizationId: "org-1" },
+        }),
+      );
+    }
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1" },
+      }),
+    );
+    for (const call of mockTxFindMany.mock.calls) {
+      expect(call[0]).toEqual(
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId: "org-1" }),
+        }),
+      );
+    }
+    for (const call of mockTxGroupBy.mock.calls) {
+      expect(call[0]).toEqual(
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId: "org-1" }),
+        }),
+      );
+    }
     await app.close();
   });
 });

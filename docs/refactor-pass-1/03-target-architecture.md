@@ -167,3 +167,11 @@ Dashboard data should be assembled through a small number of purpose-built queri
 
 Do not add a dashboard mega-endpoint until widget requirements are stable. First remove repeated identity calls and measure the remaining request cost.
 
+## Observability
+
+Web, API, and future worker logs should use one structured logging contract and one primary operational destination. SEQ should receive server-side application logs from every service, while Railway logs remain a platform-level fallback.
+
+Every user-visible operation should be traceable with a request ID across web render/action logs and API logs. User-facing errors should stay safe and terse; operator logs should include structured context, stable error codes, request IDs, route names, and Next.js digests where available.
+
+See [Observability And Logging Plan](./06-observability-logging-plan.md) for the detailed schema, redaction rules, rollout slices, and chaos engineering readiness checklist.
+

@@ -14,10 +14,28 @@ import {
 import { DashboardShell } from "@/components/DashboardShell";
 import { AdminForms } from "@/components/AdminForms";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
+import { logError, logInfo, serializeErrorForLog } from "@/lib/logging";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  try {
+    return await renderHome();
+  } catch (error) {
+    logError("web.dashboard.render_failed", {
+      ...serializeErrorForLog(error),
+      route: "/",
+    });
+
+    throw error;
+  }
+}
+
+async function renderHome() {
+  logInfo("web.dashboard.render_started", {
+    route: "/",
+  });
+
   const session = await readSessionSummary();
 
   // Redirect to login if not authenticated
@@ -85,6 +103,12 @@ export default async function Home() {
     readDashboardSummary(),
     (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext() : Promise.resolve(null),
   ]);
+
+  logInfo("web.dashboard.render_completed", {
+    route: "/",
+    role: session.role,
+    hasAdminContext: Boolean(adminContext),
+  });
 
   const adminSection = adminContext ? (
     <AdminForms

@@ -20,6 +20,7 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 3. [Target Architecture](./03-target-architecture.md) proposes boundaries for the API, web data layer, contracts, and database.
 4. [Execution Plan](./04-execution-plan.md) defines the recommended refactor order and limits the scope of pass one.
 5. [Acceptance Criteria](./05-acceptance-criteria.md) defines what must be true before feature development resumes.
+6. [Observability And Logging Plan](./06-observability-logging-plan.md) defines the target logging architecture, event schema, redaction rules, and chaos-readiness path.
 
 ## Progress Snapshot
 
@@ -44,10 +45,16 @@ Completed units:
 - Added runtime validation and safe error handling for house-creation responses.
 - Added runtime validation and safe error handling for house-assignment responses.
 - Added explicit workspace type-check scripts and wired them into preflight.
+- Added real ESLint scripts for the API, contracts, and DB workspaces.
+- Added read-side tenant isolation tests for dashboard and organization-scoped reads.
+- Added web render error instrumentation so production dashboard failures emit structured logs.
+- Handled expired Auth0 access-token sessions without refresh tokens as re-authentication instead of dashboard 500s.
+- Added an observability and logging plan for unified SEQ logging, correlation, redaction, and chaos-readiness.
+- Wired web server logs to SEQ with structured Pino output and redaction.
 
 Current unit verification:
 
-- `npm test`: 137 tests passed.
+- `npm test`: 144 tests passed.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.

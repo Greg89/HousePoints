@@ -19,7 +19,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "node -e \"console.log('No DB lint rules configured yet')\""
+    "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\" \"prisma/**/*.ts\" \"prisma.config.ts\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

@@ -12,7 +12,6 @@ import {
   createInviteSchema,
   createOrgSchema,
   joinOrgSchema,
-  promoteUserSchema,
   type Trait,
   updateProfileSchema,
 } from "@housepoints/contracts";
