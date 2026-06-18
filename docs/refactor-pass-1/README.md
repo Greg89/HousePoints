@@ -51,6 +51,7 @@ Completed units:
 - Handled expired Auth0 access-token sessions without refresh tokens as re-authentication instead of dashboard 500s.
 - Added an observability and logging plan for unified SEQ logging, correlation, redaction, and chaos-readiness.
 - Wired web server logs to SEQ with structured Pino output and redaction.
+- Threaded one dashboard render request ID through web render logs and dashboard API reads.
 
 Current unit verification:
 

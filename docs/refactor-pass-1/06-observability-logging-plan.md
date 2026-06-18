@@ -255,10 +255,10 @@ Acceptance:
 
 Make request correlation consistent:
 
-- create or read request ID at the web boundary;
-- attach request ID to dashboard render logs;
-- pass request ID to all API calls in the render;
-- ensure API logs use the incoming ID;
+- [x] create or read request ID at the web boundary for dashboard renders;
+- [x] attach request ID to dashboard render logs;
+- [x] pass request ID to all API calls in the render;
+- [x] ensure API logs use the incoming ID;
 - include request ID in Server Action logs.
 
 Acceptance:

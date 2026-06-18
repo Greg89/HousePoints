@@ -8,7 +8,7 @@ import {
   parseApiResponse,
   requireAuthenticatedApiContext,
 } from "@/lib/api-client";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, getCurrentUserForRequest } from "@/lib/current-user";
 import { logError, logInfo, logWarn } from "@/lib/logging";
 import {
   adminHouseSchema,
@@ -197,14 +197,13 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-export async function readAdminContext() {
-  const requestId = randomUUID();
+export async function readAdminContext(requestId = randomUUID()) {
   const authContext = await getOptionalAuthenticatedApiContext();
   if (!authContext) {
     return null;
   }
 
-  const mapping = await getCurrentUser();
+  const mapping = await getCurrentUserForRequest(requestId);
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     return null;
@@ -232,7 +231,7 @@ export async function readAdminContext() {
   return context;
 }
 
-export async function readSessionSummary(): Promise<{
+export async function readSessionSummary(requestId = randomUUID()): Promise<{
   isAuthenticated: boolean;
   userName?: string;
   userEmail?: string;
@@ -247,8 +246,6 @@ export async function readSessionSummary(): Promise<{
   needsOrg?: boolean;
   needsHouseAssignment?: boolean;
 }> {
-  const requestId = randomUUID();
-
   logInfo("web.action.invoked", {
     action: "readSessionSummary",
     requestId,
@@ -272,7 +269,7 @@ export async function readSessionSummary(): Promise<{
     userSub: authContext.user.sub,
   };
 
-  const mapping = await getCurrentUser();
+  const mapping = await getCurrentUserForRequest(requestId);
 
   logInfo("web.session.read", {
     requestId,
@@ -301,9 +298,8 @@ export async function readSessionSummary(): Promise<{
   };
 }
 
-export async function readLeaderboard() {
-  const requestId = randomUUID();
-  await getCurrentUser();
+export async function readLeaderboard(requestId = randomUUID()) {
+  await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/houses/leaderboard", requestId, {
     method: "POST",
     body: JSON.stringify({}),
@@ -315,9 +311,8 @@ export async function readLeaderboard() {
   );
 }
 
-export async function readMembers() {
-  const requestId = randomUUID();
-  await getCurrentUser();
+export async function readMembers(requestId = randomUUID()) {
+  await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/members", requestId, {
     method: "POST",
     body: JSON.stringify({}),
@@ -329,9 +324,8 @@ export async function readMembers() {
   );
 }
 
-export async function readActivityFeed() {
-  const requestId = randomUUID();
-  await getCurrentUser();
+export async function readActivityFeed(requestId = randomUUID()) {
+  await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
     body: JSON.stringify({}),
@@ -343,9 +337,11 @@ export async function readActivityFeed() {
   );
 }
 
-export async function readMemberScores(seasonId?: string): Promise<MemberScore[]> {
-  const requestId = randomUUID();
-  await getCurrentUser();
+export async function readMemberScores(
+  seasonId?: string,
+  requestId = randomUUID(),
+): Promise<MemberScore[]> {
+  await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/users/scores", requestId, {
     method: "POST",
     body: JSON.stringify(seasonId ? { seasonId } : {}),
@@ -357,9 +353,11 @@ export async function readMemberScores(seasonId?: string): Promise<MemberScore[]
   );
 }
 
-export async function readDashboardSummary(seasonId?: string): Promise<DashboardSummary> {
-  const requestId = randomUUID();
-  await getCurrentUser();
+export async function readDashboardSummary(
+  seasonId?: string,
+  requestId = randomUUID(),
+): Promise<DashboardSummary> {
+  await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/dashboard/summary", requestId, {
     method: "POST",
     body: JSON.stringify(seasonId ? { seasonId } : {}),
@@ -371,9 +369,8 @@ export async function readDashboardSummary(seasonId?: string): Promise<Dashboard
   );
 }
 
-export async function readSeasonContext(): Promise<SeasonContext> {
-  const requestId = randomUUID();
-  await getCurrentUser();
+export async function readSeasonContext(requestId = randomUUID()): Promise<SeasonContext> {
+  await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/seasons/context", requestId, {
     method: "POST",
     body: JSON.stringify({}),
@@ -389,9 +386,10 @@ export async function readSeasonReports(seasonId?: string): Promise<{
   dashboardSummary: DashboardSummary;
   memberPoints: MemberScore[];
 }> {
+  const requestId = randomUUID();
   const [dashboardSummary, memberPoints] = await Promise.all([
-    readDashboardSummary(seasonId),
-    readMemberScores(seasonId),
+    readDashboardSummary(seasonId, requestId),
+    readMemberScores(seasonId, requestId),
   ]);
 
   return { dashboardSummary, memberPoints };

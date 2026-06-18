@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   assignUserHouse,
   awardPoints,
@@ -36,11 +37,14 @@ export default async function Home() {
 }
 
 async function renderHome() {
+  const requestId = randomUUID();
+
   logInfo("web.dashboard.render_started", {
+    requestId,
     route: "/",
   });
 
-  const session = await readSessionSummary();
+  const session = await readSessionSummary(requestId);
 
   // Redirect to login if not authenticated
   if (!session.isAuthenticated) {
@@ -100,16 +104,17 @@ async function renderHome() {
 
   // Fetch dashboard data in parallel
   const [leaderboard, members, activity, memberScores, dashboardSummary, seasonContext, adminContext] = await Promise.all([
-    readLeaderboard(),
-    readMembers(),
-    readActivityFeed(),
-    readMemberScores(),
-    readDashboardSummary(),
-    readSeasonContext(),
-    (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext() : Promise.resolve(null),
+    readLeaderboard(requestId),
+    readMembers(requestId),
+    readActivityFeed(requestId),
+    readMemberScores(undefined, requestId),
+    readDashboardSummary(undefined, requestId),
+    readSeasonContext(requestId),
+    (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext(requestId) : Promise.resolve(null),
   ]);
 
   logInfo("web.dashboard.render_completed", {
+    requestId,
     route: "/",
     role: session.role,
     hasAdminContext: Boolean(adminContext),

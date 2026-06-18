@@ -62,3 +62,15 @@ export const getCurrentUser = cache(
     createRequestId: randomUUID,
   }),
 );
+
+export const getCurrentUserForRequest = cache(
+  async (requestId: string): Promise<AppUser> => {
+    const loadCurrentUser = createCurrentUserLoader({
+      getContext: requireAuthenticatedApiContext,
+      request: apiFetch,
+      createRequestId: () => requestId,
+    });
+
+    return loadCurrentUser();
+  },
+);
