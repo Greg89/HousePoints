@@ -388,7 +388,7 @@ app.post("/seasons/context", async (request, reply) => {
   const activeSeason = seasons.find((season) => season.isActive);
 
   if (!activeSeason) {
-    error(request.log, "seasons.active_missing", {
+    warn(request.log, "seasons.active_missing", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
     });
@@ -498,7 +498,7 @@ app.post("/seasons/start", async (request, reply) => {
     };
   } catch (err) {
     if (err instanceof SeasonScopeError) {
-      error(request.log, "seasons.active_missing", {
+      warn(request.log, "seasons.active_missing", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
       });
@@ -615,7 +615,7 @@ app.post("/houses/leaderboard", async (request, reply) => {
     season = await resolveSeasonScope(actor);
   } catch (err) {
     if (err instanceof SeasonScopeError) {
-      error(request.log, "seasons.active_missing", {
+      warn(request.log, "seasons.active_missing", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
       });
@@ -1200,7 +1200,7 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
     activeSeason = await resolveSeasonScope(actor);
   } catch (err) {
     if (err instanceof SeasonScopeError) {
-      error(request.log, "points.active_season_missing", {
+      warn(request.log, "points.active_season_missing", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
       });

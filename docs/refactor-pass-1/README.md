@@ -53,10 +53,11 @@ Completed units:
 - Wired web server logs to SEQ with structured Pino output and redaction.
 - Threaded one dashboard render request ID through web render logs and dashboard API reads.
 - Added shared Server Action logging context so action logs, current-user bootstrap, and API calls use one request ID.
+- Normalized expected web action and active-season setup failures to warning-level logs.
 
 Current unit verification:
 
-- `npm test`: 181 tests passed.
+- `npm test`: 182 tests passed.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.

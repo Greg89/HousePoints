@@ -1,9 +1,11 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { ApiResponseError, WebAuthenticationError } from "@/lib/api-client";
 import {
   logError,
   logInfo,
+  logWarn,
   serializeErrorForLog,
   type LogContext,
 } from "@/lib/logging";
@@ -41,9 +43,19 @@ export function logServerActionFailed(
   error: unknown,
   extraContext: LogContext = {},
 ): void {
-  logError("web.action.failed", {
+  const log = isExpectedServerActionFailure(error) ? logWarn : logError;
+
+  log("web.action.failed", {
     ...context,
     ...extraContext,
     ...serializeErrorForLog(error),
   });
+}
+
+function isExpectedServerActionFailure(error: unknown): boolean {
+  if (error instanceof WebAuthenticationError) {
+    return true;
+  }
+
+  return error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500;
 }

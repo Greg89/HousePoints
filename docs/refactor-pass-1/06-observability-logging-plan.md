@@ -276,6 +276,8 @@ Examples:
 - missing session on anonymous homepage load: `warn` or `info`, depending on route
 - validation error: `warn`
 - forbidden action: `warn`
+- handled API 4xx responses from Server Actions: `warn`
+- missing active season setup: `warn`
 - unhandled exception: `error`
 - dependency outage: `error`
 

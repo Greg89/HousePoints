@@ -73,7 +73,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 5. [ ] Remove recursive duplicate workspace builds.
 6. [ ] Make font/build assets reproducible without external network access where practical.
 7. [ ] Add database-backed integration tests for transaction and constraint behavior.
-8. [-] Unify structured web and API logs in SEQ. Web render/auth instrumentation exists, web logs are delivered to SEQ when configured, dashboard renders share one request ID across web logs and API reads, and Server Actions now use a shared action logging context; remaining work is shared schema/redaction extraction, expected-failure normalization, and dashboards/alerts.
+8. [-] Unify structured web and API logs in SEQ. Web render/auth instrumentation exists, web logs are delivered to SEQ when configured, dashboard renders share one request ID across web logs and API reads, Server Actions use a shared action logging context, and common expected failures are warning-level; remaining work is shared schema/redaction extraction, full expected-failure audit, and dashboards/alerts.
 
 ## Phase 6: Reconcile Documentation
 
