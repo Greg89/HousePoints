@@ -54,6 +54,7 @@ Completed units:
 - Threaded one dashboard render request ID through web render logs and dashboard API reads.
 - Added shared Server Action logging context so action logs, current-user bootstrap, and API calls use one request ID.
 - Normalized expected web action and active-season setup failures to warning-level logs.
+- Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 
 Current unit verification:
 

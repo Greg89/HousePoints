@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build -w @housepoints/contracts && next build",
+    "build": "npm run build -w @housepoints/contracts && npm run build:app",
+    "build:app": "next build",
     "start": "next start",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",

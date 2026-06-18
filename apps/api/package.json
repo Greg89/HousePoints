@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && tsc -p tsconfig.json",
+    "build": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run build:app",
+    "build:app": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -16,7 +16,7 @@
     "dev:web": "npm run dev -w @housepoints/web",
     "dev:api": "npm run dev -w @housepoints/api",
     "preflight": "npm run db:generate && npm run lint && npm run typecheck && npm test && npm run build",
-    "build": "npm run build --workspaces",
+    "build": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run build:app -w @housepoints/api && npm run build:app -w @housepoints/web",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces",
