@@ -78,6 +78,18 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                     {TRAIT_LABELS[item.trait]}
                   </span>
                 )}
+                {item.season ? (
+                  <span
+                    className={[
+                      "ml-2 inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full",
+                      item.season.isActive
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700",
+                    ].join(" ")}
+                  >
+                    {item.season.name}
+                  </span>
+                ) : null}
                 <span className="text-xs text-muted-foreground mt-1 block">
                   {relativeTime(item.createdAt)}
                 </span>

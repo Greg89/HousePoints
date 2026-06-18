@@ -38,7 +38,21 @@ vi.mock("./HouseCard", () => ({
 }));
 
 vi.mock("./Leaderboard", () => ({
-  Leaderboard: () => <section>Leaderboard content</section>,
+  Leaderboard: ({
+    memberPoints,
+    seasonName,
+  }: {
+    memberPoints: { memberId: string; points: number }[];
+    seasonName?: string;
+  }) => (
+    <section>
+      Leaderboard content
+      {seasonName ? <span>{seasonName}</span> : null}
+      {memberPoints.map((memberPoint) => (
+        <span key={memberPoint.memberId}>{memberPoint.points}</span>
+      ))}
+    </section>
+  ),
 }));
 
 vi.mock("./ActivityFeed", () => ({
@@ -57,10 +71,24 @@ const activeSeason = {
   isActive: true,
 };
 
+const historicalSeason = {
+  id: "season-0",
+  name: "Season 0",
+  startsAt: "2026-06-01T00:00:00.000Z",
+  endsAt: "2026-07-01T00:00:00.000Z",
+  isActive: false,
+};
+
 const activitySeason = {
   id: activeSeason.id,
   name: activeSeason.name,
   isActive: activeSeason.isActive,
+};
+
+const historicalActivitySeason = {
+  id: historicalSeason.id,
+  name: historicalSeason.name,
+  isActive: historicalSeason.isActive,
 };
 
 const baseProps = {
@@ -295,6 +323,108 @@ const baseProps = {
       },
     ],
   },
+  seasonContext: {
+    activeSeason,
+    seasons: [activeSeason, historicalSeason],
+  },
+  onSeasonChange: vi.fn(async () => ({
+    dashboardSummary: {
+      generatedAt: new Date().toISOString(),
+      selectedSeason: historicalSeason,
+      seasonStartsAt: historicalSeason.startsAt,
+      seasonStandout: {
+        memberId: "member-3",
+        memberName: "Cara Clever",
+        houseId: "house-2",
+        houseName: "Ravenclaw",
+        houseColor: "#1d4ed8",
+        points: 10,
+      },
+      seasonStandoutsByHouse: [
+        {
+          houseId: "house-1",
+          standout: null,
+        },
+        {
+          houseId: "house-2",
+          standout: {
+            memberId: "member-3",
+            memberName: "Cara Clever",
+            houseId: "house-2",
+            houseName: "Ravenclaw",
+            houseColor: "#1d4ed8",
+            points: 10,
+          },
+        },
+      ],
+      monthStartsAt: historicalSeason.startsAt,
+      monthlyStandout: {
+        memberId: "member-3",
+        memberName: "Cara Clever",
+        houseId: "house-2",
+        houseName: "Ravenclaw",
+        houseColor: "#1d4ed8",
+        points: 10,
+      },
+      monthlyStandoutsByHouse: [
+        {
+          houseId: "house-1",
+          standout: null,
+        },
+        {
+          houseId: "house-2",
+          standout: {
+            memberId: "member-3",
+            memberName: "Cara Clever",
+            houseId: "house-2",
+            houseName: "Ravenclaw",
+            houseColor: "#1d4ed8",
+            points: 10,
+          },
+        },
+      ],
+      traitLeaders: [
+        {
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          trait: "INNOVATION" as const,
+          count: 1,
+        },
+      ],
+      recentActivity: [
+        {
+          id: "activity-historical",
+          actorName: "Gregory Dodson",
+          targetUserName: "Cara Clever",
+          targetHouseName: "Ravenclaw",
+          targetHouseColor: "#1d4ed8",
+          delta: 10,
+          reason: "Great research",
+          trait: "INNOVATION" as const,
+          createdAt: new Date().toISOString(),
+          season: historicalActivitySeason,
+        },
+      ],
+      pointsVelocity: [
+        {
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          days: [{ date: "2026-06-01", points: 10 }],
+        },
+      ],
+      houseMemberRankings: [
+        {
+          houseId: "house-2",
+          members: [
+            { memberId: "member-3", displayName: "Cara Clever", role: "MEMBER" as const, points: 10 },
+          ],
+        },
+      ],
+    },
+    memberPoints: [{ memberId: "member-3", points: 10 }],
+  })),
   onAward: async () => {},
   loginUrl: "/auth/login",
   logoutUrl: "/auth/logout",
@@ -333,11 +463,30 @@ describe("DashboardShell", () => {
     render(<DashboardShell {...baseProps} />);
 
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Organization report");
-    expect(screen.getByText("This month's standout")).toBeInTheDocument();
+    expect(screen.getByText("Season standout")).toBeInTheDocument();
+    expect(screen.getByLabelText(/reporting season/i)).toHaveValue("season-active");
     expect(screen.getByText("Trait leader per house")).toBeInTheDocument();
     expect(screen.getByText("Recent activity strip")).toBeInTheDocument();
     expect(screen.getByText("Points velocity")).toBeInTheDocument();
     expect(screen.getAllByText("Ben Scorer").length).toBeGreaterThan(0);
+  });
+
+  it("loads overview and leaderboard reports for a selected historical season", async () => {
+    const user = userEvent.setup();
+    const onSeasonChange = vi.fn(baseProps.onSeasonChange);
+    render(<DashboardShell {...baseProps} onSeasonChange={onSeasonChange} />);
+
+    await user.selectOptions(screen.getByLabelText(/reporting season/i), "season-0");
+
+    expect(onSeasonChange).toHaveBeenCalledWith("season-0");
+    expect(await screen.findByText("Historical view")).toBeInTheDocument();
+    expect(screen.getByText("Historical season view")).toBeInTheDocument();
+    expect(screen.getAllByText("Cara Clever").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("tab", { name: /leaderboard/i }));
+
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Season 0");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("10");
   });
 
   it("drills into a house report from a house card and can return to all houses", async () => {

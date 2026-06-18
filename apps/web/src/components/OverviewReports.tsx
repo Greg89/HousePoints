@@ -20,9 +20,11 @@ export function OverviewReports({
   onShowActivity,
 }: OverviewReportsProps) {
   const scopeLabel = selectedHouse ? selectedHouse.name : "All houses";
+  const seasonName = dashboardSummary.selectedSeason.name;
+  const isHistoricalSeason = !dashboardSummary.selectedSeason.isActive;
   const standout = selectedHouse
-    ? dashboardSummary.monthlyStandoutsByHouse.find((entry) => entry.houseId === selectedHouse.id)?.standout ?? null
-    : dashboardSummary.monthlyStandout;
+    ? dashboardSummary.seasonStandoutsByHouse.find((entry) => entry.houseId === selectedHouse.id)?.standout ?? null
+    : dashboardSummary.seasonStandout;
   const traitLeaders = selectedHouse
     ? dashboardSummary.traitLeaders.filter((entry) => entry.houseId === selectedHouse.id)
     : dashboardSummary.traitLeaders;
@@ -53,16 +55,19 @@ export function OverviewReports({
         </div>
         <p className="text-sm text-muted-foreground">
           {selectedHouse
-            ? "Focused reporting for the selected house."
-            : "A quick read on recognition across the organization."}
+            ? `Focused reporting for ${seasonName}.`
+            : `A quick read on recognition during ${seasonName}.`}
         </p>
+        {isHistoricalSeason ? (
+          <p className="text-xs font-semibold text-amber-700">Historical season view</p>
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-4">
         <article className="rounded-xl border bg-card p-5 lg:col-span-1">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Sparkle size={18} className="text-primary" />
-            This month&apos;s standout
+            Season standout
           </div>
           {standout ? (
             <div className="mt-5">
@@ -77,10 +82,10 @@ export function OverviewReports({
               <p className="mt-4 font-number text-3xl font-bold" style={{ color: standout.houseColor }}>
                 {standout.points.toLocaleString()}
               </p>
-              <p className="text-xs text-muted-foreground">points this month</p>
+              <p className="text-xs text-muted-foreground">points this season</p>
             </div>
           ) : (
-            <p className="mt-5 text-sm text-muted-foreground">No points found for this month yet.</p>
+            <p className="mt-5 text-sm text-muted-foreground">No points found for this season yet.</p>
           )}
         </article>
 

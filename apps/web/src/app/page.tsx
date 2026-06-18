@@ -9,6 +9,8 @@ import {
   readLeaderboard,
   readMemberScores,
   readMembers,
+  readSeasonContext,
+  readSeasonReports,
   readSessionSummary,
 } from "./actions/points";
 import { DashboardShell } from "@/components/DashboardShell";
@@ -95,12 +97,13 @@ async function renderHome() {
   }
 
   // Fetch dashboard data in parallel
-  const [leaderboard, members, activity, memberScores, dashboardSummary, adminContext] = await Promise.all([
+  const [leaderboard, members, activity, memberScores, dashboardSummary, seasonContext, adminContext] = await Promise.all([
     readLeaderboard(),
     readMembers(),
     readActivityFeed(),
     readMemberScores(),
     readDashboardSummary(),
+    readSeasonContext(),
     (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext() : Promise.resolve(null),
   ]);
 
@@ -134,6 +137,8 @@ async function renderHome() {
       activity={activity}
       memberPoints={memberScores}
       dashboardSummary={dashboardSummary}
+      seasonContext={seasonContext}
+      onSeasonChange={readSeasonReports}
       onAward={awardPoints}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"

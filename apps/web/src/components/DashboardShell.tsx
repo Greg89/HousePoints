@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { Trophy, Clock, ChartBar, Star, SignOut, User, Wrench } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
@@ -14,6 +14,8 @@ import type {
   LeaderboardEntry,
   OrgMember,
   ActivityItem,
+  MemberScore,
+  SeasonContext,
   Trait,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
@@ -30,8 +32,13 @@ interface DashboardShellProps {
   members: OrgMember[];
   activity: ActivityItem[];
   /** Computed per-member point totals from activity */
-  memberPoints: { memberId: string; points: number }[];
+  memberPoints: MemberScore[];
   dashboardSummary: DashboardSummary;
+  seasonContext: SeasonContext;
+  onSeasonChange: (seasonId?: string) => Promise<{
+    dashboardSummary: DashboardSummary;
+    memberPoints: MemberScore[];
+  }>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<void>;
   loginUrl: string;
   logoutUrl: string;
@@ -53,6 +60,8 @@ export function DashboardShell({
   activity,
   memberPoints,
   dashboardSummary,
+  seasonContext,
+  onSeasonChange,
   onAward,
   logoutUrl,
   adminSection,
@@ -60,10 +69,37 @@ export function DashboardShell({
   const [awardOpen, setAwardOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
+  const [selectedSeasonId, setSelectedSeasonId] = useState(dashboardSummary.selectedSeason.id);
+  const [scopedDashboardSummary, setScopedDashboardSummary] = useState(dashboardSummary);
+  const [scopedMemberPoints, setScopedMemberPoints] = useState(memberPoints);
+  const [seasonError, setSeasonError] = useState<string | null>(null);
+  const [isSeasonPending, startSeasonTransition] = useTransition();
   const visibleTabs = adminSection
     ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
     : TABS;
   const selectedHouse = leaderboard.find((house) => house.id === selectedHouseId) ?? null;
+  const selectedSeason = useMemo(
+    () => seasonContext.seasons.find((season) => season.id === selectedSeasonId) ?? seasonContext.activeSeason,
+    [seasonContext.activeSeason, seasonContext.seasons, selectedSeasonId],
+  );
+  const isHistoricalSeason = !selectedSeason.isActive;
+
+  function handleSeasonChange(nextSeasonId: string) {
+    setSelectedSeasonId(nextSeasonId);
+    setSeasonError(null);
+
+    startSeasonTransition(async () => {
+      try {
+        const nextReports = await onSeasonChange(nextSeasonId);
+        setScopedDashboardSummary(nextReports.dashboardSummary);
+        setScopedMemberPoints(nextReports.memberPoints);
+        setSelectedHouseId(null);
+      } catch (error) {
+        setSeasonError(error instanceof Error ? error.message : "Season reports could not be loaded.");
+        setSelectedSeasonId(scopedDashboardSummary.selectedSeason.id);
+      }
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -163,16 +199,48 @@ export function DashboardShell({
                   Select a house to focus the report widgets below.
                 </p>
               </div>
-              {selectedHouse && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedHouseId(null)}
-                  className="self-start rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground sm:self-auto"
-                >
-                  Back to all houses
-                </button>
-              )}
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+                  Reporting season
+                  <select
+                    value={selectedSeasonId}
+                    onChange={(event) => handleSeasonChange(event.target.value)}
+                    disabled={isSeasonPending}
+                    className="min-w-48 rounded-lg border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {seasonContext.seasons.map((season) => (
+                      <option key={season.id} value={season.id}>
+                        {season.name}{season.isActive ? " (current)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {isHistoricalSeason ? (
+                    <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Historical view
+                    </span>
+                  ) : null}
+                  {isSeasonPending ? (
+                    <span className="text-xs text-muted-foreground">Loading season reports...</span>
+                  ) : null}
+                  {selectedHouse && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedHouseId(null)}
+                      className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                    >
+                      Back to all houses
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
+            {seasonError ? (
+              <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {seasonError}
+              </p>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {leaderboard.map((house, index) => (
                 <HouseCard
@@ -186,7 +254,7 @@ export function DashboardShell({
             </div>
             <div className="mt-8">
               <OverviewReports
-                dashboardSummary={dashboardSummary}
+                dashboardSummary={scopedDashboardSummary}
                 selectedHouse={selectedHouse}
                 onShowActivity={() => setActiveTab("activity")}
               />
@@ -200,7 +268,12 @@ export function DashboardShell({
 
           {/* Leaderboard tab */}
           <Tabs.Content value="leaderboard" className="focus:outline-none">
-            <Leaderboard members={members} memberPoints={memberPoints} />
+            <Leaderboard
+              members={members}
+              memberPoints={scopedMemberPoints}
+              seasonName={scopedDashboardSummary.selectedSeason.name}
+              isHistoricalSeason={!scopedDashboardSummary.selectedSeason.isActive}
+            />
           </Tabs.Content>
 
           {adminSection && (

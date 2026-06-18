@@ -22,6 +22,10 @@ import {
   memberScoresSchema,
   orgMembersSchema,
   pointAdjustmentResponseSchema,
+  seasonContextSchema,
+  type DashboardSummary,
+  type MemberScore,
+  type SeasonContext,
   type Trait,
   type UserRole,
   updateProfileResponseSchema,
@@ -335,12 +339,12 @@ export async function readActivityFeed() {
   );
 }
 
-export async function readMemberScores() {
+export async function readMemberScores(seasonId?: string): Promise<MemberScore[]> {
   const requestId = randomUUID();
   await getCurrentUser();
   const response = await apiFetch("/users/scores", requestId, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify(seasonId ? { seasonId } : {}),
   });
   return parseApiResponse(
     response,
@@ -349,18 +353,44 @@ export async function readMemberScores() {
   );
 }
 
-export async function readDashboardSummary() {
+export async function readDashboardSummary(seasonId?: string): Promise<DashboardSummary> {
   const requestId = randomUUID();
   await getCurrentUser();
   const response = await apiFetch("/dashboard/summary", requestId, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify(seasonId ? { seasonId } : {}),
   });
   return parseApiResponse(
     response,
     dashboardSummarySchema,
     "Dashboard summary could not be loaded. Please try again.",
   );
+}
+
+export async function readSeasonContext(): Promise<SeasonContext> {
+  const requestId = randomUUID();
+  await getCurrentUser();
+  const response = await apiFetch("/seasons/context", requestId, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return parseApiResponse(
+    response,
+    seasonContextSchema,
+    "Season context could not be loaded. Please try again.",
+  );
+}
+
+export async function readSeasonReports(seasonId?: string): Promise<{
+  dashboardSummary: DashboardSummary;
+  memberPoints: MemberScore[];
+}> {
+  const [dashboardSummary, memberPoints] = await Promise.all([
+    readDashboardSummary(seasonId),
+    readMemberScores(seasonId),
+  ]);
+
+  return { dashboardSummary, memberPoints };
 }
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */

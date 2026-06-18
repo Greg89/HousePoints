@@ -9,6 +9,8 @@ interface LeaderboardProps {
   members: OrgMember[];
   /** Sorted by points desc — produced server-side */
   memberPoints: { memberId: string; points: number }[];
+  seasonName?: string;
+  isHistoricalSeason?: boolean;
 }
 
 function getRankIcon(rank: number) {
@@ -26,7 +28,12 @@ function initials(name: string) {
     .join("");
 }
 
-export function Leaderboard({ members, memberPoints }: LeaderboardProps) {
+export function Leaderboard({
+  members,
+  memberPoints,
+  seasonName,
+  isHistoricalSeason = false,
+}: LeaderboardProps) {
   const memberMap = new Map(members.map((m) => [m.id, m]));
 
   const ranked = memberPoints
@@ -42,10 +49,24 @@ export function Leaderboard({ members, memberPoints }: LeaderboardProps) {
   return (
     <div className="rounded-xl border bg-card">
       <div className="p-6 border-b">
-        <h2 className="font-display text-xl font-semibold flex items-center gap-2">
-          <Trophy weight="fill" className="text-accent" size={22} />
-          Top Contributors
-        </h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-xl font-semibold flex items-center gap-2">
+              <Trophy weight="fill" className="text-accent" size={22} />
+              Top Contributors
+            </h2>
+            {seasonName ? (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Points received during {seasonName}.
+              </p>
+            ) : null}
+          </div>
+          {isHistoricalSeason ? (
+            <span className="self-start rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 sm:self-auto">
+              Historical view
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className="p-4 space-y-2">
         {ranked.length === 0 ? (
