@@ -108,7 +108,7 @@ export function AdminForms({
   const [seasonList, setSeasonList] = useState(seasons);
   const [currentSeason, setCurrentSeason] = useState(activeSeason);
   const [renameSeasonId, setRenameSeasonId] = useState(activeSeason.id);
-  const canStartSeason = actorRole === "OWNER";
+  const canStartSeason = actorRole === "OWNER" || actorRole === "ADMIN";
   const unassignedUsers = users.filter((user) => !user.houseId);
   const assignedUsers = users.filter((user) => user.houseId);
   const unassignedCount = unassignedUsers.length;
@@ -327,7 +327,9 @@ export function AdminForms({
                 disabled={!canStartSeason}
               />
               {!canStartSeason ? (
-                <p className="text-xs text-muted-foreground">Only owners can start a new season.</p>
+                <p className="text-xs text-muted-foreground">
+                  Admins and owners can start a new season.
+                </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
                   Starting a season immediately closes the current active season.

@@ -40,19 +40,19 @@ All new point transactions attach to that active season. If an org somehow has n
 
 ### Who can manage seasons
 
-Only `OWNER` can start a new season in version one.
+`OWNER` and `ADMIN` can start a new season in version one.
 
-Admins can award points and manage houses, but season rollover changes the competitive frame for the whole organization. That is owner-level authority.
+Season rollover changes the competitive frame for the whole organization, but starting the next season is also part of day-to-day program operation. Owners and admins can run that workflow for now. This can be narrowed later if the org-level settings model needs stricter controls.
 
 Owners and admins can rename seasons. Renaming changes display metadata only; it does not change membership, transactions, dates, or scores.
 
 ### Starting the next season
 
-Starting a season should close the current active season and create the new active season in one database transaction. The first version starts immediately at the time the owner confirms the action.
+Starting a season should close the current active season and create the new active season in one database transaction. The first version starts immediately at the time the owner or admin confirms the action.
 
 No manual "end season" action for the first version. It adds states that are easy to misunderstand, such as no active season or an ended season with no replacement.
 
-Future scheduled starts can be added later, but the initial workflow is deliberately immediate: active season exists, owner creates a new season, old season closes, new season starts.
+Future scheduled starts can be added later, but the initial workflow is deliberately immediate: active season exists, an owner or admin creates a new season, old season closes, new season starts.
 
 ### Viewing seasons
 
@@ -179,7 +179,7 @@ Returns active season plus historical season list for the actor's organization.
 
 `POST /seasons/start`
 
-Owner-only. Closes the current active season and creates the next active season in one transaction.
+Owner/admin-only. Closes the current active season and creates the next active season in one transaction.
 
 `POST /seasons/rename`
 
@@ -252,7 +252,7 @@ Add a compact season selector near the overview tab heading:
 Add a "Seasons" card under Manage:
 
 - Shows current active season.
-- Owners can start a new season.
+- Owners and admins can start a new season.
 - Owners and admins can rename seasons.
 - Requires season name.
 - Uses a confirmation step that explains: "This starts a fresh scoreboard. Existing transactions remain available in history."
@@ -272,7 +272,7 @@ Add a "Seasons" card under Manage:
 - Activity feed returns all activity and includes season badge metadata.
 - Cross-org `seasonId` is rejected.
 - Starting a season:
-  - requires `OWNER`;
+  - requires `OWNER` or `ADMIN`;
   - closes the previous active season;
   - creates a new active season;
   - is atomic.

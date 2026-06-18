@@ -401,10 +401,6 @@ export async function startSeason(formData: FormData): Promise<SeasonTransition>
   const requestId = randomUUID();
   const actor = await getActorMappingForAdmin("startSeason", requestId);
 
-  if (actor.role !== "OWNER") {
-    throw new Error("Owner role required");
-  }
-
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
     throw new Error("Season name is required");

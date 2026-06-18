@@ -422,9 +422,9 @@ app.post("/seasons/start", async (request, reply) => {
 
   const actor = await getActorBySub(request.auth.subject);
 
-  if (!actor || actor.role !== "OWNER") {
+  if (!actor || !isAdmin(actor.role)) {
     warn(request.log, "seasons.start.forbidden", {});
-    return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
+    return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
 
   try {

@@ -105,13 +105,19 @@ describe("AdminForms", () => {
     confirmSpy.mockRestore();
   });
 
-  it("disables season start controls for admins", () => {
-    setupAdminForms({ actorRole: "ADMIN" });
+  it("confirms and starts a new season for admins", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms({ actorRole: "ADMIN" });
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
-    expect(startSeasonForm.getByPlaceholderText("New season name")).toBeDisabled();
-    expect(startSeasonForm.getByRole("button", { name: "Start season" })).toBeDisabled();
-    expect(startSeasonForm.getByText("Only owners can start a new season.")).toBeInTheDocument();
+    await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+
+    await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Start "Q4 2026" now? This will close Q3 2026 and reset current-season scoring.',
+    );
+    confirmSpy.mockRestore();
   });
 
   it("submits rename-season data", async () => {
