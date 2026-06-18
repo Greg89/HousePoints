@@ -132,6 +132,11 @@ describe("activityItemSchema", () => {
     delta: 10,
     reason: "Great work",
     createdAt: new Date().toISOString(),
+    season: {
+      id: "season-active",
+      name: "Q3 2026",
+      isActive: true,
+    },
   };
 
   it("accepts a valid item with a known trait", () => {
@@ -496,6 +501,11 @@ describe("dashboard response schemas", () => {
     reason: "Great work",
     trait: "LEADERSHIP" as const,
     createdAt: "2026-06-01T12:00:00.000Z",
+    season: {
+      id: "season-active",
+      name: "Q3 2026",
+      isActive: true,
+    },
   };
 
   it("accepts valid empty dashboard collections", () => {
@@ -525,6 +535,35 @@ describe("dashboard response schemas", () => {
   it("accepts a complete dashboard summary", () => {
     const summary = {
       generatedAt: "2026-06-16T12:00:00.000Z",
+      selectedSeason: {
+        id: "season-active",
+        name: "Q3 2026",
+        startsAt: "2026-06-01T00:00:00.000Z",
+        endsAt: null,
+        isActive: true,
+      },
+      seasonStartsAt: "2026-06-01T00:00:00.000Z",
+      seasonStandout: {
+        memberId: "user-1",
+        memberName: "Alice",
+        houseId: "house-1",
+        houseName: "Phoenix",
+        houseColor: "#7c3aed",
+        points: 42,
+      },
+      seasonStandoutsByHouse: [
+        {
+          houseId: "house-1",
+          standout: {
+            memberId: "user-1",
+            memberName: "Alice",
+            houseId: "house-1",
+            houseName: "Phoenix",
+            houseColor: "#7c3aed",
+            points: 42,
+          },
+        },
+      ],
       monthStartsAt: "2026-06-01T00:00:00.000Z",
       monthlyStandout: {
         memberId: "user-1",
@@ -587,6 +626,16 @@ describe("dashboard response schemas", () => {
     expect(
       dashboardSummarySchema.safeParse({
         generatedAt: "today",
+        selectedSeason: {
+          id: "season-active",
+          name: "Q3 2026",
+          startsAt: "2026-06-01T00:00:00.000Z",
+          endsAt: null,
+          isActive: true,
+        },
+        seasonStartsAt: "2026-06-01T00:00:00.000Z",
+        seasonStandout: null,
+        seasonStandoutsByHouse: [],
         monthStartsAt: "2026-06-01T00:00:00.000Z",
         monthlyStandout: null,
         monthlyStandoutsByHouse: [],
@@ -599,6 +648,16 @@ describe("dashboard response schemas", () => {
     expect(
       dashboardSummarySchema.safeParse({
         generatedAt: "2026-06-16T12:00:00.000Z",
+        selectedSeason: {
+          id: "season-active",
+          name: "Q3 2026",
+          startsAt: "2026-06-01T00:00:00.000Z",
+          endsAt: null,
+          isActive: true,
+        },
+        seasonStartsAt: "2026-06-01T00:00:00.000Z",
+        seasonStandout: null,
+        seasonStandoutsByHouse: [],
         monthStartsAt: "2026-06-01T00:00:00.000Z",
         monthlyStandout: null,
         monthlyStandoutsByHouse: [],

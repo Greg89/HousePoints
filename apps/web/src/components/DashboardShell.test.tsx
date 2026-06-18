@@ -49,6 +49,20 @@ vi.mock("./AwardPointsDialog", () => ({
   AwardPointsDialog: () => null,
 }));
 
+const activeSeason = {
+  id: "season-active",
+  name: "Q3 2026",
+  startsAt: "2026-07-01T00:00:00.000Z",
+  endsAt: null,
+  isActive: true,
+};
+
+const activitySeason = {
+  id: activeSeason.id,
+  name: activeSeason.name,
+  isActive: activeSeason.isActive,
+};
+
 const baseProps = {
   session: {
     userName: "Gregory Dodson",
@@ -114,6 +128,7 @@ const baseProps = {
       reason: "Helped the team",
       trait: "COLLABORATION" as const,
       createdAt: new Date().toISOString(),
+      season: activitySeason,
     },
     {
       id: "activity-2",
@@ -125,6 +140,7 @@ const baseProps = {
       reason: "Great research",
       trait: "INNOVATION" as const,
       createdAt: new Date().toISOString(),
+      season: activitySeason,
     },
   ],
   memberPoints: [
@@ -134,7 +150,41 @@ const baseProps = {
   ],
   dashboardSummary: {
     generatedAt: new Date().toISOString(),
-    monthStartsAt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)).toISOString(),
+    selectedSeason: activeSeason,
+    seasonStartsAt: activeSeason.startsAt,
+    seasonStandout: {
+      memberId: "member-2",
+      memberName: "Ben Scorer",
+      houseId: "house-1",
+      houseName: "Slytherin",
+      houseColor: "#22c55e",
+      points: 25,
+    },
+    seasonStandoutsByHouse: [
+      {
+        houseId: "house-1",
+        standout: {
+          memberId: "member-2",
+          memberName: "Ben Scorer",
+          houseId: "house-1",
+          houseName: "Slytherin",
+          houseColor: "#22c55e",
+          points: 25,
+        },
+      },
+      {
+        houseId: "house-2",
+        standout: {
+          memberId: "member-3",
+          memberName: "Cara Clever",
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          points: 10,
+        },
+      },
+    ],
+    monthStartsAt: activeSeason.startsAt,
     monthlyStandout: {
       memberId: "member-2",
       memberName: "Ben Scorer",
@@ -194,6 +244,7 @@ const baseProps = {
         reason: "Helped the team",
         trait: "COLLABORATION" as const,
         createdAt: new Date().toISOString(),
+        season: activitySeason,
       },
       {
         id: "activity-2",
@@ -205,6 +256,7 @@ const baseProps = {
         reason: "Great research",
         trait: "INNOVATION" as const,
         createdAt: new Date().toISOString(),
+        season: activitySeason,
       },
     ],
     pointsVelocity: [

@@ -139,10 +139,6 @@ function mapAppUser(user: {
   };
 }
 
-function startOfUtcMonth(now: Date) {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-}
-
 function utcDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -165,6 +161,7 @@ function mapActivityItem(tx: {
   reason: string;
   trait: Trait | null;
   createdAt: Date;
+  season?: { id: string; name: string; isActive: boolean } | null;
 }) {
   return {
     id: tx.id,
@@ -176,6 +173,13 @@ function mapActivityItem(tx: {
     reason: tx.reason,
     trait: tx.trait ?? null,
     createdAt: tx.createdAt.toISOString(),
+    season: tx.season
+      ? {
+          id: tx.season.id,
+          name: tx.season.name,
+          isActive: tx.season.isActive,
+        }
+      : null,
   };
 }
 
@@ -474,7 +478,7 @@ app.post("/houses/leaderboard", async (request, reply) => {
 });
 
 app.post("/dashboard/summary", async (request, reply) => {
-  const parsed = actorScopeSchema.safeParse(request.body);
+  const parsed = seasonScopedRequestSchema.safeParse(request.body);
 
   if (!parsed.success) {
     warn(request.log, "request.validation_failed", {
@@ -490,8 +494,22 @@ app.post("/dashboard/summary", async (request, reply) => {
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
+  let season;
+  try {
+    season = await resolveSeasonScope(actor, parsed.data.seasonId);
+  } catch (err) {
+    if (err instanceof SeasonScopeError) {
+      warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        seasonId: parsed.data.seasonId,
+      });
+      return reply.status(err.statusCode).send({ message: err.message, code: err.code });
+    }
+    throw err;
+  }
+
   const now = new Date();
-  const monthStartsAt = startOfUtcMonth(now);
   const velocityDates = lastUtcDateKeys(14, now);
   const velocityStartsAt = new Date(`${velocityDates[0]}T00:00:00.000Z`);
 
@@ -513,8 +531,8 @@ app.post("/dashboard/summary", async (request, reply) => {
       by: ["targetUserId", "targetHouseId"],
       where: {
         organizationId: actor.organizationId,
+        seasonId: season.id,
         targetUserId: { not: null },
-        createdAt: { gte: monthStartsAt },
       },
       _sum: { delta: true },
     }),
@@ -522,13 +540,16 @@ app.post("/dashboard/summary", async (request, reply) => {
       by: ["targetHouseId", "trait"],
       where: {
         organizationId: actor.organizationId,
+        seasonId: season.id,
         trait: { not: null },
-        createdAt: { gte: monthStartsAt },
       },
       _count: { trait: true },
     }),
     prisma.pointTransaction.findMany({
-      where: { organizationId: actor.organizationId },
+      where: {
+        organizationId: actor.organizationId,
+        seasonId: season.id,
+      },
       orderBy: { createdAt: "desc" },
       take: 10,
       select: {
@@ -540,11 +561,13 @@ app.post("/dashboard/summary", async (request, reply) => {
         actor: { select: { displayName: true } },
         targetUser: { select: { displayName: true } },
         targetHouse: { select: { name: true, color: true } },
+        season: { select: { id: true, name: true, isActive: true } },
       },
     }),
     prisma.pointTransaction.findMany({
       where: {
         organizationId: actor.organizationId,
+        seasonId: season.id,
         createdAt: { gte: velocityStartsAt },
       },
       select: {
@@ -557,6 +580,7 @@ app.post("/dashboard/summary", async (request, reply) => {
       by: ["targetUserId"],
       where: {
         organizationId: actor.organizationId,
+        seasonId: season.id,
         targetUserId: { not: null },
       },
       _sum: { delta: true },
@@ -655,22 +679,30 @@ app.post("/dashboard/summary", async (request, reply) => {
 
   info(request.log, "dashboard.summary.loaded", {
     organizationId: actor.organizationId,
+    seasonId: season.id,
     houses: houses.length,
     recentActivity: recentTransactions.length,
   });
 
+  const seasonStandout = toStandout(monthlyStandoutRow);
+  const seasonStandoutsByHouse = houses.map((house) => ({
+    houseId: house.id,
+    standout: toStandout(
+      monthlyMemberTotals
+        .filter((row) => row.targetHouseId === house.id && row.targetUserId)
+        .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0],
+    ),
+  }));
+
   return {
     generatedAt: now.toISOString(),
-    monthStartsAt: monthStartsAt.toISOString(),
-    monthlyStandout: toStandout(monthlyStandoutRow),
-    monthlyStandoutsByHouse: houses.map((house) => ({
-      houseId: house.id,
-      standout: toStandout(
-        monthlyMemberTotals
-          .filter((row) => row.targetHouseId === house.id && row.targetUserId)
-          .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0],
-      ),
-    })),
+    selectedSeason: mapSeason(season),
+    seasonStartsAt: season.startsAt.toISOString(),
+    seasonStandout,
+    seasonStandoutsByHouse,
+    monthStartsAt: season.startsAt.toISOString(),
+    monthlyStandout: seasonStandout,
+    monthlyStandoutsByHouse: seasonStandoutsByHouse,
     traitLeaders,
     recentActivity: recentTransactions.map(mapActivityItem),
     pointsVelocity: houses.map((house) => ({
@@ -1159,6 +1191,7 @@ app.post("/transactions/recent", async (request, reply) => {
       actor: { select: { displayName: true } },
       targetUser: { select: { displayName: true } },
       targetHouse: { select: { name: true, color: true } },
+      season: { select: { id: true, name: true, isActive: true } },
     },
   });
 

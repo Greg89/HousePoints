@@ -843,6 +843,7 @@ describe("POST /transactions/recent", () => {
         actor: { displayName: "Bob" },
         targetUser: { displayName: "Alice" },
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
+        season: { id: "season-active", name: "Q3 2026", isActive: true },
       },
     ]);
     const app = await buildTestApp();
@@ -855,6 +856,11 @@ describe("POST /transactions/recent", () => {
     const items = res.json();
     expect(items).toHaveLength(1);
     expect(items[0].trait).toBe("COLLABORATION");
+    expect(items[0].season).toEqual({
+      id: "season-active",
+      name: "Q3 2026",
+      isActive: true,
+    });
     expect(items[0].actorName).toBe("Bob");
     expect(items[0].delta).toBe(10);
     expect(mockTxFindMany).toHaveBeenCalledWith(
@@ -877,6 +883,7 @@ describe("POST /transactions/recent", () => {
         actor: { displayName: "Bob" },
         targetUser: { displayName: "Alice" },
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
+        season: null,
       },
     ]);
     const app = await buildTestApp();
@@ -1023,6 +1030,7 @@ describe("POST /dashboard/summary", () => {
   it("returns organization-wide reporting summary", async () => {
     const now = new Date();
     mockFindUnique.mockResolvedValue(makeMember());
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed" },
       { id: "house-2", name: "Ember", color: "#ef4444" },
@@ -1053,6 +1061,7 @@ describe("POST /dashboard/summary", () => {
           actor: { displayName: "Bob" },
           targetUser: { displayName: "Alice" },
           targetHouse: { name: "Phoenix", color: "#7c3aed" },
+          season: { id: "season-active", name: "Q3 2026", isActive: true },
         },
       ])
       .mockResolvedValueOnce([
@@ -1090,7 +1099,23 @@ describe("POST /dashboard/summary", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.generatedAt).toEqual(expect.any(String));
-    expect(body.monthStartsAt).toEqual(expect.any(String));
+    expect(body.selectedSeason).toEqual({
+      id: "season-active",
+      name: "Q3 2026",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: null,
+      isActive: true,
+    });
+    expect(body.seasonStartsAt).toBe("2026-07-01T00:00:00.000Z");
+    expect(body.monthStartsAt).toBe("2026-07-01T00:00:00.000Z");
+    expect(body.seasonStandout).toEqual({
+      memberId: "user-1",
+      memberName: "Alice",
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
+      points: 30,
+    });
     expect(body.monthlyStandout).toEqual({
       memberId: "user-1",
       memberName: "Alice",
@@ -1150,6 +1175,11 @@ describe("POST /dashboard/summary", () => {
         reason: "Great collaboration",
         trait: "COLLABORATION",
         createdAt: now.toISOString(),
+        season: {
+          id: "season-active",
+          name: "Q3 2026",
+          isActive: true,
+        },
       },
     ]);
     expect(body.pointsVelocity).toHaveLength(2);
@@ -1185,14 +1215,62 @@ describe("POST /dashboard/summary", () => {
     for (const call of mockTxFindMany.mock.calls) {
       expect(call[0]).toEqual(
         expect.objectContaining({
-          where: expect.objectContaining({ organizationId: "org-1" }),
+          where: expect.objectContaining({
+            organizationId: "org-1",
+            seasonId: "season-active",
+          }),
         }),
       );
     }
     for (const call of mockTxGroupBy.mock.calls) {
       expect(call[0]).toEqual(
         expect.objectContaining({
-          where: expect.objectContaining({ organizationId: "org-1" }),
+          where: expect.objectContaining({
+            organizationId: "org-1",
+            seasonId: "season-active",
+          }),
+        }),
+      );
+    }
+    await app.close();
+  });
+
+  it("uses a requested historical season for reporting summary", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
+    mockHouseFindMany.mockResolvedValue([]);
+    mockTxGroupBy.mockResolvedValue([]);
+    mockTxFindMany.mockResolvedValue([]);
+    mockUserFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/dashboard/summary",
+      payload: { seasonId: "season-0" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "season-0",
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(res.json().selectedSeason.id).toBe("season-0");
+    for (const call of mockTxFindMany.mock.calls) {
+      expect(call[0]).toEqual(
+        expect.objectContaining({
+          where: expect.objectContaining({ seasonId: "season-0" }),
+        }),
+      );
+    }
+    for (const call of mockTxGroupBy.mock.calls) {
+      expect(call[0]).toEqual(
+        expect.objectContaining({
+          where: expect.objectContaining({ seasonId: "season-0" }),
         }),
       );
     }

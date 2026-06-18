@@ -103,6 +103,16 @@ export const orgMemberSchema = z.object({
 export type OrgMember = z.infer<typeof orgMemberSchema>;
 export const orgMembersSchema = z.array(orgMemberSchema);
 
+export const seasonSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime().nullable(),
+  isActive: z.boolean(),
+});
+
+export type Season = z.infer<typeof seasonSchema>;
+
 export const activityItemSchema = z.object({
   id: z.string(),
   actorName: z.string(),
@@ -113,6 +123,11 @@ export const activityItemSchema = z.object({
   reason: z.string(),
   trait: traitSchema.nullable(),
   createdAt: z.string(),
+  season: z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    isActive: z.boolean(),
+  }).nullable(),
 });
 
 export type ActivityItem = z.infer<typeof activityItemSchema>;
@@ -129,6 +144,13 @@ const dashboardStandoutSchema = z.object({
 
 export const dashboardSummarySchema = z.object({
   generatedAt: z.string().datetime(),
+  selectedSeason: seasonSchema,
+  seasonStartsAt: z.string().datetime(),
+  seasonStandout: dashboardStandoutSchema.nullable(),
+  seasonStandoutsByHouse: z.array(z.object({
+    houseId: z.string(),
+    standout: dashboardStandoutSchema.nullable(),
+  })),
   monthStartsAt: z.string().datetime(),
   monthlyStandout: dashboardStandoutSchema.nullable(),
   monthlyStandoutsByHouse: z.array(z.object({
@@ -179,16 +201,6 @@ export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
 export const leaderboardSchema = z.array(leaderboardEntrySchema);
 
 export const actorScopeSchema = z.object({}).strict();
-
-export const seasonSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  startsAt: z.string().datetime(),
-  endsAt: z.string().datetime().nullable(),
-  isActive: z.boolean(),
-});
-
-export type Season = z.infer<typeof seasonSchema>;
 
 export const seasonContextSchema = z.object({
   activeSeason: seasonSchema,
