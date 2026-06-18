@@ -93,6 +93,8 @@ export function DashboardShell({
     [seasonContext.activeSeason, seasonContext.seasons, selectedSeasonId],
   );
   const isHistoricalSeason = !selectedSeason.isActive;
+  const hasMultipleSeasons = seasonContext.seasons.length > 1;
+  const selectedSeasonLabel = `${selectedSeason.name}${selectedSeason.isActive ? " (current)" : ""}`;
 
   function handleSeasonChange(nextSeasonId: string) {
     setSelectedSeasonId(nextSeasonId);
@@ -210,26 +212,39 @@ export function DashboardShell({
                 </p>
               </div>
               <div className="flex flex-col items-start gap-2 sm:items-end">
-                <label className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors focus-within:ring-2 focus-within:ring-primary/30">
-                  <span className="sr-only">Reporting season</span>
-                  <CalendarBlank size={15} className="text-primary" aria-hidden="true" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Viewing
-                  </span>
-                  <select
-                    value={selectedSeasonId}
-                    onChange={(event) => handleSeasonChange(event.target.value)}
-                    disabled={isSeasonPending}
-                    className="max-w-52 appearance-none bg-transparent pr-5 text-sm font-semibold text-foreground focus:outline-none disabled:cursor-wait disabled:opacity-70"
+                {hasMultipleSeasons ? (
+                  <label className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors focus-within:ring-2 focus-within:ring-primary/30">
+                    <span className="sr-only">Reporting season</span>
+                    <CalendarBlank size={15} className="text-primary" aria-hidden="true" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Viewing
+                    </span>
+                    <select
+                      value={selectedSeasonId}
+                      onChange={(event) => handleSeasonChange(event.target.value)}
+                      disabled={isSeasonPending}
+                      className="max-w-52 appearance-none bg-transparent pr-5 text-sm font-semibold text-foreground focus:outline-none disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {seasonContext.seasons.map((season) => (
+                        <option key={season.id} value={season.id}>
+                          {season.name}{season.isActive ? " (current)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <CaretDown size={14} className="-ml-5 text-muted-foreground" aria-hidden="true" />
+                  </label>
+                ) : (
+                  <div
+                    className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
+                    aria-label={`Reporting season: ${selectedSeasonLabel}`}
                   >
-                    {seasonContext.seasons.map((season) => (
-                      <option key={season.id} value={season.id}>
-                        {season.name}{season.isActive ? " (current)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <CaretDown size={14} className="-ml-5 text-muted-foreground" aria-hidden="true" />
-                </label>
+                    <CalendarBlank size={15} className="text-primary" aria-hidden="true" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Viewing
+                    </span>
+                    <span className="font-semibold">{selectedSeasonLabel}</span>
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   {isHistoricalSeason ? (
                     <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">

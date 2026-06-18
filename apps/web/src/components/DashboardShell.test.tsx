@@ -471,6 +471,21 @@ describe("DashboardShell", () => {
     expect(screen.getAllByText("Ben Scorer").length).toBeGreaterThan(0);
   });
 
+  it("shows static season context when there is only one season", () => {
+    render(
+      <DashboardShell
+        {...baseProps}
+        seasonContext={{
+          activeSeason,
+          seasons: [activeSeason],
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("combobox", { name: /reporting season/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Reporting season: Q3 2026 (current)")).toBeInTheDocument();
+  });
+
   it("loads overview and leaderboard reports for a selected historical season", async () => {
     const user = userEvent.setup();
     const onSeasonChange = vi.fn(baseProps.onSeasonChange);
