@@ -259,7 +259,7 @@ Make request correlation consistent:
 - [x] attach request ID to dashboard render logs;
 - [x] pass request ID to all API calls in the render;
 - [x] ensure API logs use the incoming ID;
-- include request ID in Server Action logs.
+- [x] include request ID in Server Action logs.
 
 Acceptance:
 

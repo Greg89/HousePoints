@@ -34,7 +34,7 @@ export type WebLogEvent =
   | "web.profile.updated"
   | "web.profile.update_failed";
 
-type LogContext = Record<string, unknown>;
+export type LogContext = Record<string, unknown>;
 
 type WebLogger = {
   logger: pino.Logger;

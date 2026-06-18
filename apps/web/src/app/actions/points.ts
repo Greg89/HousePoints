@@ -8,8 +8,9 @@ import {
   parseApiResponse,
   requireAuthenticatedApiContext,
 } from "@/lib/api-client";
-import { getCurrentUser, getCurrentUserForRequest } from "@/lib/current-user";
-import { logError, logInfo, logWarn } from "@/lib/logging";
+import { runServerAction } from "@/lib/action-context";
+import { getCurrentUserForRequest } from "@/lib/current-user";
+import { logInfo, logWarn } from "@/lib/logging";
 import {
   adminHouseSchema,
   adminContextSchema,
@@ -36,37 +37,30 @@ import {
 } from "@housepoints/contracts";
 
 export async function submitPointAdjustment(formData: FormData): Promise<void> {
-  const requestId = randomUUID();
+  await runServerAction("submitPointAdjustment", async ({ requestId }) => {
+    const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
+    const reason = String(formData.get("reason") ?? "").trim();
+    const delta = Number(formData.get("delta") ?? 0);
+    const mapping = await getCurrentUserForRequest(requestId);
+    const actorAuth0Sub = mapping.auth0Sub;
 
-  logInfo("web.action.invoked", {
-    action: "submitPointAdjustment",
-    requestId,
-  });
+    if (!mapping.houseId) {
+      logWarn("web.user.house_unassigned", {
+        requestId,
+        userId: mapping.id,
+        auth0Sub: mapping.auth0Sub,
+      });
+      throw new Error("You must be assigned to a house before adjusting points");
+    }
 
-  const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
-  const reason = String(formData.get("reason") ?? "").trim();
-  const delta = Number(formData.get("delta") ?? 0);
-  const mapping = await getCurrentUser();
-  const actorAuth0Sub = mapping.auth0Sub;
-
-  if (!mapping.houseId) {
-    logWarn("web.user.house_unassigned", {
+    logInfo("points.adjust.requested", {
       requestId,
-      userId: mapping.id,
-      auth0Sub: mapping.auth0Sub,
+      actorAuth0Sub,
+      targetHouseId,
+      delta,
+      userSub: mapping.auth0Sub,
     });
-    throw new Error("You must be assigned to a house before adjusting points");
-  }
 
-  logInfo("points.adjust.requested", {
-    requestId,
-    actorAuth0Sub,
-    targetHouseId,
-    delta,
-    userSub: mapping.auth0Sub,
-  });
-
-  try {
     const response = await apiFetch("/points/adjust", requestId, {
       method: "POST",
       body: JSON.stringify({
@@ -90,28 +84,12 @@ export async function submitPointAdjustment(formData: FormData): Promise<void> {
       delta,
     });
 
-    logInfo("web.action.completed", {
-      action: "submitPointAdjustment",
-      requestId,
-    });
-
     revalidatePath("/");
-  } catch (error) {
-    logError("web.action.failed", {
-      action: "submitPointAdjustment",
-      requestId,
-      actorAuth0Sub,
-      targetHouseId,
-      delta,
-      reason,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    throw error;
-  }
+  });
 }
 
 async function getActorMappingForAdmin(action: string, requestId: string) {
-  const mapping = await getCurrentUser();
+  const mapping = await getCurrentUserForRequest(requestId);
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     logWarn("web.admin.forbidden", {
@@ -127,77 +105,79 @@ async function getActorMappingForAdmin(action: string, requestId: string) {
 }
 
 export async function createHouse(formData: FormData): Promise<void> {
-  const requestId = randomUUID();
-  const actor = await getActorMappingForAdmin("createHouse", requestId);
-  const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#7c3aed").trim();
-  const description = String(formData.get("description") ?? "").trim() || undefined;
+  await runServerAction("createHouse", async ({ requestId }) => {
+    const actor = await getActorMappingForAdmin("createHouse", requestId);
+    const name = String(formData.get("name") ?? "").trim();
+    const color = String(formData.get("color") ?? "#7c3aed").trim();
+    const description = String(formData.get("description") ?? "").trim() || undefined;
 
-  if (!name) {
-    throw new Error("House name is required");
-  }
+    if (!name) {
+      throw new Error("House name is required");
+    }
 
-  const response = await apiFetch("/admin/houses", requestId, {
-    method: "POST",
-    body: JSON.stringify({
-      name,
-      color,
-      description,
-    }),
+    const response = await apiFetch("/admin/houses", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        color,
+        description,
+      }),
+    });
+
+    const createdHouse = await parseApiResponse(
+      response,
+      adminHouseSchema,
+      "The house could not be created. Please try again.",
+    );
+
+    logInfo("web.admin.house_created", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      houseId: createdHouse.id,
+      name: createdHouse.name,
+    });
+
+    revalidatePath("/");
   });
-
-  const createdHouse = await parseApiResponse(
-    response,
-    adminHouseSchema,
-    "The house could not be created. Please try again.",
-  );
-
-  logInfo("web.admin.house_created", {
-    requestId,
-    actorUserId: actor.id,
-    organizationId: actor.organizationId,
-    houseId: createdHouse.id,
-    name: createdHouse.name,
-  });
-
-  revalidatePath("/");
 }
 
 export async function assignUserHouse(formData: FormData): Promise<void> {
-  const requestId = randomUUID();
-  const actor = await getActorMappingForAdmin("assignUserHouse", requestId);
-  const targetUserId = String(formData.get("targetUserId") ?? "").trim();
-  const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
+  await runServerAction("assignUserHouse", async ({ requestId }) => {
+    const actor = await getActorMappingForAdmin("assignUserHouse", requestId);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+    const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
 
-  if (!targetUserId || !targetHouseId) {
-    throw new Error("Target user and house are required");
-  }
+    if (!targetUserId || !targetHouseId) {
+      throw new Error("Target user and house are required");
+    }
 
-  const response = await apiFetch("/admin/users/assign-house", requestId, {
-    method: "POST",
-    body: JSON.stringify({
-      targetUserId,
-      targetHouseId,
-    }),
+    const response = await apiFetch("/admin/users/assign-house", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId,
+        targetHouseId,
+      }),
+    });
+
+    const updatedUser = await parseApiResponse(
+      response,
+      assignUserHouseResponseSchema,
+      "The user could not be assigned to that house. Please try again.",
+    );
+
+    logInfo("web.admin.user_assigned", {
+      requestId,
+      actorUserId: actor.id,
+      targetUserId: updatedUser.id,
+      targetHouseId: updatedUser.houseId,
+    });
+
+    revalidatePath("/");
   });
-
-  const updatedUser = await parseApiResponse(
-    response,
-    assignUserHouseResponseSchema,
-    "The user could not be assigned to that house. Please try again.",
-  );
-
-  logInfo("web.admin.user_assigned", {
-    requestId,
-    actorUserId: actor.id,
-    targetUserId: updatedUser.id,
-    targetHouseId: updatedUser.houseId,
-  });
-
-  revalidatePath("/");
 }
 
-export async function readAdminContext(requestId = randomUUID()) {
+export async function readAdminContext(requestId: string = randomUUID()) {
   const authContext = await getOptionalAuthenticatedApiContext();
   if (!authContext) {
     return null;
@@ -231,7 +211,7 @@ export async function readAdminContext(requestId = randomUUID()) {
   return context;
 }
 
-export async function readSessionSummary(requestId = randomUUID()): Promise<{
+export async function readSessionSummary(requestId: string = randomUUID()): Promise<{
   isAuthenticated: boolean;
   userName?: string;
   userEmail?: string;
@@ -298,7 +278,7 @@ export async function readSessionSummary(requestId = randomUUID()): Promise<{
   };
 }
 
-export async function readLeaderboard(requestId = randomUUID()) {
+export async function readLeaderboard(requestId: string = randomUUID()) {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/houses/leaderboard", requestId, {
     method: "POST",
@@ -311,7 +291,7 @@ export async function readLeaderboard(requestId = randomUUID()) {
   );
 }
 
-export async function readMembers(requestId = randomUUID()) {
+export async function readMembers(requestId: string = randomUUID()) {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/members", requestId, {
     method: "POST",
@@ -324,7 +304,7 @@ export async function readMembers(requestId = randomUUID()) {
   );
 }
 
-export async function readActivityFeed(requestId = randomUUID()) {
+export async function readActivityFeed(requestId: string = randomUUID()) {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
@@ -339,7 +319,7 @@ export async function readActivityFeed(requestId = randomUUID()) {
 
 export async function readMemberScores(
   seasonId?: string,
-  requestId = randomUUID(),
+  requestId: string = randomUUID(),
 ): Promise<MemberScore[]> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/users/scores", requestId, {
@@ -355,7 +335,7 @@ export async function readMemberScores(
 
 export async function readDashboardSummary(
   seasonId?: string,
-  requestId = randomUUID(),
+  requestId: string = randomUUID(),
 ): Promise<DashboardSummary> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/dashboard/summary", requestId, {
@@ -369,7 +349,7 @@ export async function readDashboardSummary(
   );
 }
 
-export async function readSeasonContext(requestId = randomUUID()): Promise<SeasonContext> {
+export async function readSeasonContext(requestId: string = randomUUID()): Promise<SeasonContext> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/seasons/context", requestId, {
     method: "POST",
@@ -386,76 +366,79 @@ export async function readSeasonReports(seasonId?: string): Promise<{
   dashboardSummary: DashboardSummary;
   memberPoints: MemberScore[];
 }> {
-  const requestId = randomUUID();
-  const [dashboardSummary, memberPoints] = await Promise.all([
-    readDashboardSummary(seasonId, requestId),
-    readMemberScores(seasonId, requestId),
-  ]);
+  return runServerAction("readSeasonReports", async ({ requestId }) => {
+    const [dashboardSummary, memberPoints] = await Promise.all([
+      readDashboardSummary(seasonId, requestId),
+      readMemberScores(seasonId, requestId),
+    ]);
 
-  return { dashboardSummary, memberPoints };
+    return { dashboardSummary, memberPoints };
+  });
 }
 
 export async function startSeason(formData: FormData): Promise<SeasonTransition> {
-  const requestId = randomUUID();
-  const actor = await getActorMappingForAdmin("startSeason", requestId);
+  return runServerAction("startSeason", async ({ requestId }) => {
+    const actor = await getActorMappingForAdmin("startSeason", requestId);
 
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) {
-    throw new Error("Season name is required");
-  }
+    const name = String(formData.get("name") ?? "").trim();
+    if (!name) {
+      throw new Error("Season name is required");
+    }
 
-  const response = await apiFetch("/seasons/start", requestId, {
-    method: "POST",
-    body: JSON.stringify({ name }),
+    const response = await apiFetch("/seasons/start", requestId, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+
+    const transition = await parseApiResponse(
+      response,
+      seasonTransitionSchema,
+      "The season could not be started. Please try again.",
+    );
+
+    logInfo("web.seasons.started", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      name,
+    });
+
+    revalidatePath("/");
+    return transition;
   });
-
-  const transition = await parseApiResponse(
-    response,
-    seasonTransitionSchema,
-    "The season could not be started. Please try again.",
-  );
-
-  logInfo("web.seasons.started", {
-    requestId,
-    actorUserId: actor.id,
-    organizationId: actor.organizationId,
-    name,
-  });
-
-  revalidatePath("/");
-  return transition;
 }
 
 export async function renameSeason(formData: FormData): Promise<Season> {
-  const requestId = randomUUID();
-  const actor = await getActorMappingForAdmin("renameSeason", requestId);
-  const seasonId = String(formData.get("seasonId") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim();
+  return runServerAction("renameSeason", async ({ requestId }) => {
+    const actor = await getActorMappingForAdmin("renameSeason", requestId);
+    const seasonId = String(formData.get("seasonId") ?? "").trim();
+    const name = String(formData.get("name") ?? "").trim();
 
-  if (!seasonId || !name) {
-    throw new Error("Season and name are required");
-  }
+    if (!seasonId || !name) {
+      throw new Error("Season and name are required");
+    }
 
-  const response = await apiFetch("/seasons/rename", requestId, {
-    method: "POST",
-    body: JSON.stringify({ seasonId, name }),
+    const response = await apiFetch("/seasons/rename", requestId, {
+      method: "POST",
+      body: JSON.stringify({ seasonId, name }),
+    });
+
+    const season = await parseApiResponse(
+      response,
+      seasonSchema,
+      "The season could not be renamed. Please try again.",
+    );
+
+    logInfo("web.seasons.renamed", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      seasonId,
+    });
+
+    revalidatePath("/");
+    return season;
   });
-
-  const season = await parseApiResponse(
-    response,
-    seasonSchema,
-    "The season could not be renamed. Please try again.",
-  );
-
-  logInfo("web.seasons.renamed", {
-    requestId,
-    actorUserId: actor.id,
-    organizationId: actor.organizationId,
-    seasonId,
-  });
-
-  revalidatePath("/");
-  return season;
 }
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */
@@ -465,49 +448,50 @@ export async function awardPoints(
   reason: string,
   trait: Trait
 ): Promise<void> {
-  const requestId = randomUUID();
-  await getCurrentUser();
-  const response = await apiFetch("/points/adjust", requestId, {
-    method: "POST",
-    body: JSON.stringify({ targetUserId, delta, reason, trait }),
+  await runServerAction("awardPoints", async ({ requestId }) => {
+    await getCurrentUserForRequest(requestId);
+    const response = await apiFetch("/points/adjust", requestId, {
+      method: "POST",
+      body: JSON.stringify({ targetUserId, delta, reason, trait }),
+    });
+    await parseApiResponse(
+      response,
+      pointAdjustmentResponseSchema,
+      "Points could not be awarded. Please try again.",
+    );
+    revalidatePath("/");
   });
-  await parseApiResponse(
-    response,
-    pointAdjustmentResponseSchema,
-    "Points could not be awarded. Please try again.",
-  );
-  revalidatePath("/");
 }
 
 export async function updateDisplayName(displayName: string): Promise<void> {
-  const requestId = randomUUID();
+  await runServerAction("updateDisplayName", async ({ requestId }) => {
+    const trimmed = displayName.trim();
+    if (!trimmed || trimmed.length > 120) {
+      throw new Error("Display name must be between 1 and 120 characters");
+    }
 
-  const trimmed = displayName.trim();
-  if (!trimmed || trimmed.length > 120) {
-    throw new Error("Display name must be between 1 and 120 characters");
-  }
+    await getCurrentUserForRequest(requestId);
 
-  await getCurrentUser();
+    const response = await apiFetch("/users/profile", requestId, {
+      method: "POST",
+      body: JSON.stringify({ displayName: trimmed }),
+    });
 
-  const response = await apiFetch("/users/profile", requestId, {
-    method: "POST",
-    body: JSON.stringify({ displayName: trimmed }),
+    const updated = await parseApiResponse(
+      response,
+      updateProfileResponseSchema,
+      "Your display name could not be updated. Please try again.",
+    );
+
+    logInfo("web.profile.updated", {
+      requestId,
+      actorUserId: updated.id,
+      displayName: updated.displayName,
+    });
+
+    revalidatePath("/");
+    revalidatePath("/settings");
   });
-
-  const updated = await parseApiResponse(
-    response,
-    updateProfileResponseSchema,
-    "Your display name could not be updated. Please try again.",
-  );
-
-  logInfo("web.profile.updated", {
-    requestId,
-    actorUserId: updated.id,
-    displayName: updated.displayName,
-  });
-
-  revalidatePath("/");
-  revalidatePath("/settings");
 }
 
 export async function createOrg(
@@ -516,65 +500,68 @@ export async function createOrg(
   firstHouseName: string,
   firstHouseColor: string,
 ): Promise<void> {
-  const requestId = randomUUID();
-  const { user } = await requireAuthenticatedApiContext();
+  await runServerAction("createOrg", async ({ requestId }) => {
+    const { user } = await requireAuthenticatedApiContext();
 
-  const response = await apiFetch("/orgs/create", requestId, {
-    method: "POST",
-    body: JSON.stringify({
-      email: user.email,
-      displayName: user.name ?? "Unknown User",
-      orgName: orgName.trim(),
-      orgSlug: orgSlug.trim(),
-      firstHouseName: firstHouseName.trim(),
-      firstHouseColor,
-    }),
+    const response = await apiFetch("/orgs/create", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        email: user.email,
+        displayName: user.name ?? "Unknown User",
+        orgName: orgName.trim(),
+        orgSlug: orgSlug.trim(),
+        firstHouseName: firstHouseName.trim(),
+        firstHouseColor,
+      }),
+    });
+
+    await parseApiResponse(
+      response,
+      appUserSchema,
+      "The organisation could not be created. Please try again.",
+    );
+
+    revalidatePath("/");
   });
-
-  await parseApiResponse(
-    response,
-    appUserSchema,
-    "The organisation could not be created. Please try again.",
-  );
-
-  revalidatePath("/");
 }
 
 export async function joinOrg(inviteToken: string): Promise<void> {
-  const requestId = randomUUID();
-  const { user } = await requireAuthenticatedApiContext();
+  await runServerAction("joinOrg", async ({ requestId }) => {
+    const { user } = await requireAuthenticatedApiContext();
 
-  const response = await apiFetch("/orgs/join", requestId, {
-    method: "POST",
-    body: JSON.stringify({
-      email: user.email,
-      displayName: user.name ?? "Unknown User",
-      inviteToken,
-    }),
+    const response = await apiFetch("/orgs/join", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        email: user.email,
+        displayName: user.name ?? "Unknown User",
+        inviteToken,
+      }),
+    });
+
+    await parseApiResponse(
+      response,
+      appUserSchema,
+      "The invite could not be joined. Please try again.",
+    );
+
+    revalidatePath("/");
   });
-
-  await parseApiResponse(
-    response,
-    appUserSchema,
-    "The invite could not be joined. Please try again.",
-  );
-
-  revalidatePath("/");
 }
 
 export async function createInviteLink(): Promise<{ token: string; expiresAt: string }> {
-  const requestId = randomUUID();
-  await getCurrentUser();
+  return runServerAction("createInviteLink", async ({ requestId }) => {
+    await getCurrentUserForRequest(requestId);
 
-  const response = await apiFetch("/orgs/invite", requestId, {
-    method: "POST",
-    body: JSON.stringify({}),
+    const response = await apiFetch("/orgs/invite", requestId, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    const data = await parseApiResponse(
+      response,
+      inviteLinkSchema,
+      "An invite could not be generated. Please try again.",
+    );
+    return { token: data.token, expiresAt: data.expiresAt };
   });
-
-  const data = await parseApiResponse(
-    response,
-    inviteLinkSchema,
-    "An invite could not be generated. Please try again.",
-  );
-  return { token: data.token, expiresAt: data.expiresAt };
 }

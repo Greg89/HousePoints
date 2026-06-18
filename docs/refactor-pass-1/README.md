@@ -52,10 +52,11 @@ Completed units:
 - Added an observability and logging plan for unified SEQ logging, correlation, redaction, and chaos-readiness.
 - Wired web server logs to SEQ with structured Pino output and redaction.
 - Threaded one dashboard render request ID through web render logs and dashboard API reads.
+- Added shared Server Action logging context so action logs, current-user bootstrap, and API calls use one request ID.
 
 Current unit verification:
 
-- `npm test`: 144 tests passed.
+- `npm test`: 181 tests passed.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.
