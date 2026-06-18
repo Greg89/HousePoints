@@ -12,6 +12,7 @@ import {
   createInviteSchema,
   createOrgSchema,
   joinOrgSchema,
+  seasonScopedRequestSchema,
   type Trait,
   updateProfileSchema,
 } from "@housepoints/contracts";
@@ -58,6 +59,17 @@ class InviteJoinError extends Error {
   ) {
     super(message);
     this.name = "InviteJoinError";
+  }
+}
+
+class SeasonScopeError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly code: "SEASON_NOT_FOUND" | "ACTIVE_SEASON_REQUIRED",
+    message: string,
+  ) {
+    super(message);
+    this.name = "SeasonScopeError";
   }
 }
 
@@ -167,6 +179,66 @@ function mapActivityItem(tx: {
   };
 }
 
+function mapSeason(season: {
+  id: string;
+  name: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  isActive: boolean;
+}) {
+  return {
+    id: season.id,
+    name: season.name,
+    startsAt: season.startsAt.toISOString(),
+    endsAt: season.endsAt?.toISOString() ?? null,
+    isActive: season.isActive,
+  };
+}
+
+async function resolveSeasonScope(actor: ActorRecord, requestedSeasonId?: string) {
+  if (requestedSeasonId) {
+    const requestedSeason = await prisma.season.findFirst({
+      where: {
+        id: requestedSeasonId,
+        organizationId: actor.organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        isActive: true,
+      },
+    });
+
+    if (!requestedSeason) {
+      throw new SeasonScopeError(404, "SEASON_NOT_FOUND", "Season not found");
+    }
+
+    return requestedSeason;
+  }
+
+  const activeSeason = await prisma.season.findFirst({
+    where: {
+      organizationId: actor.organizationId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      isActive: true,
+    },
+  });
+
+  if (!activeSeason) {
+    throw new SeasonScopeError(409, "ACTIVE_SEASON_REQUIRED", "An active season is required");
+  }
+
+  return activeSeason;
+}
+
 type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
   corsAllowedOrigins?: readonly string[];
@@ -266,6 +338,63 @@ app.get("/health", async (request) => {
   return { ok: true };
 });
 
+app.post("/seasons/context", async (request, reply) => {
+  const parsed = actorScopeSchema.safeParse(request.body);
+
+  if (!parsed.success) {
+    warn(request.log, "request.validation_failed", {
+      issues: parsed.error.issues,
+    });
+    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+  }
+
+  const actor = await getActorBySub(request.auth.subject);
+
+  if (!actor) {
+    warn(request.log, "points.actor_not_found", {});
+    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  const seasons = await prisma.season.findMany({
+    where: {
+      organizationId: actor.organizationId,
+    },
+    orderBy: {
+      startsAt: "desc",
+    },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      isActive: true,
+    },
+  });
+  const activeSeason = seasons.find((season) => season.isActive);
+
+  if (!activeSeason) {
+    error(request.log, "seasons.active_missing", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+    });
+    return reply.status(409).send({
+      message: "An active season is required",
+      code: "ACTIVE_SEASON_REQUIRED",
+    });
+  }
+
+  info(request.log, "seasons.context.loaded", {
+    organizationId: actor.organizationId,
+    seasons: seasons.length,
+    activeSeasonId: activeSeason.id,
+  });
+
+  return {
+    activeSeason: mapSeason(activeSeason),
+    seasons: seasons.map(mapSeason),
+  };
+});
+
 app.post("/houses/leaderboard", async (request, reply) => {
   const parsed = actorScopeSchema.safeParse(request.body);
 
@@ -281,6 +410,20 @@ app.post("/houses/leaderboard", async (request, reply) => {
   if (!actor) {
     warn(request.log, "points.actor_not_found", {});
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+  }
+
+  let season;
+  try {
+    season = await resolveSeasonScope(actor);
+  } catch (err) {
+    if (err instanceof SeasonScopeError) {
+      error(request.log, "seasons.active_missing", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+      });
+      return reply.status(err.statusCode).send({ message: err.message, code: err.code });
+    }
+    throw err;
   }
 
   const houses = await prisma.house.findMany({
@@ -299,6 +442,9 @@ app.post("/houses/leaderboard", async (request, reply) => {
         },
       },
       transactions: {
+        where: {
+          seasonId: season.id,
+        },
         select: {
           delta: true,
         },
@@ -313,13 +459,14 @@ app.post("/houses/leaderboard", async (request, reply) => {
       color: house.color,
       description: house.description,
       score: house.transactions.reduce((total, tx) => total + tx.delta, 0),
-      transactions: house._count.transactions,
+      transactions: house.transactions.length,
       memberCount: house._count.users,
     }))
     .sort((a, b) => b.score - a.score);
 
   info(request.log, "leaderboard.fetched", {
     organizationId: actor.organizationId,
+    seasonId: season.id,
     houses: leaderboard.length,
   });
 
@@ -822,25 +969,21 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
     });
   }
 
-  const activeSeason = await prisma.season.findFirst({
-    where: {
-      organizationId: actor.organizationId,
-      isActive: true,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!activeSeason) {
-    error(request.log, "points.active_season_missing", {
-      actorUserId: actor.id,
-      organizationId: actor.organizationId,
-    });
-    return reply.status(409).send({
-      message: "An active season is required before points can be awarded",
-      code: "ACTIVE_SEASON_REQUIRED",
-    });
+  let activeSeason;
+  try {
+    activeSeason = await resolveSeasonScope(actor);
+  } catch (err) {
+    if (err instanceof SeasonScopeError) {
+      error(request.log, "points.active_season_missing", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+      });
+      return reply.status(err.statusCode).send({
+        message: "An active season is required before points can be awarded",
+        code: err.code,
+      });
+    }
+    throw err;
   }
 
   const transaction = await prisma.pointTransaction.create({
@@ -903,7 +1046,7 @@ app.post("/users/profile", async (request, reply) => {
 
 // POST /users/scores - per-member point totals (sum of delta grouped by targetUserId)
 app.post("/users/scores", async (request, reply) => {
-  const parsed = actorScopeSchema.safeParse(request.body);
+  const parsed = seasonScopedRequestSchema.safeParse(request.body);
 
   if (!parsed.success) {
     warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
@@ -917,10 +1060,26 @@ app.post("/users/scores", async (request, reply) => {
     return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
   }
 
+  let season;
+  try {
+    season = await resolveSeasonScope(actor, parsed.data.seasonId);
+  } catch (err) {
+    if (err instanceof SeasonScopeError) {
+      warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        seasonId: parsed.data.seasonId,
+      });
+      return reply.status(err.statusCode).send({ message: err.message, code: err.code });
+    }
+    throw err;
+  }
+
   const grouped = await prisma.pointTransaction.groupBy({
     by: ["targetUserId"],
     where: {
       organizationId: actor.organizationId,
+      seasonId: season.id,
       targetUserId: { not: null },
     },
     _sum: { delta: true },

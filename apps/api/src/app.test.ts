@@ -32,6 +32,7 @@ vi.mock("@housepoints/db", () => ({
     },
     season: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     pointTransaction: {
       create: vi.fn(),
@@ -62,6 +63,7 @@ const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
+const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
@@ -71,6 +73,20 @@ const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 // â”€â”€ Shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
 const HOUSE = { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null, organizationId: "org-1" };
+const ACTIVE_SEASON = {
+  id: "season-active",
+  name: "Q3 2026",
+  startsAt: new Date("2026-07-01T00:00:00.000Z"),
+  endsAt: null,
+  isActive: true,
+};
+const SEASON_ZERO = {
+  id: "season-0",
+  name: "Season 0",
+  startsAt: new Date("2026-06-01T00:00:00.000Z"),
+  endsAt: new Date("2026-07-01T00:00:00.000Z"),
+  isActive: false,
+};
 
 /** Full user shape returned by prisma.user.findUnique (matches select in app.ts) */
 const makeMember = (overrides = {}) => ({
@@ -437,7 +453,7 @@ describe("POST /points/adjust", () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
       .mockResolvedValueOnce(targetUser);  // target user lookup
-    mockSeasonFindFirst.mockResolvedValue({ id: "season-active" });
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({
       id: "tx-abc",
       organizationId: "org-1",
@@ -503,11 +519,76 @@ describe("POST /points/adjust", () => {
   });
 });
 
+describe("POST /seasons/context", () => {
+  it("returns active season and historical seasons for the actor's organization", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindMany.mockResolvedValue([ACTIVE_SEASON, SEASON_ZERO]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-secure" },
+        orderBy: { startsAt: "desc" },
+      }),
+    );
+    expect(res.json()).toEqual({
+      activeSeason: {
+        id: "season-active",
+        name: "Q3 2026",
+        startsAt: "2026-07-01T00:00:00.000Z",
+        endsAt: null,
+        isActive: true,
+      },
+      seasons: [
+        {
+          id: "season-active",
+          name: "Q3 2026",
+          startsAt: "2026-07-01T00:00:00.000Z",
+          endsAt: null,
+          isActive: true,
+        },
+        {
+          id: "season-0",
+          name: "Season 0",
+          startsAt: "2026-06-01T00:00:00.000Z",
+          endsAt: "2026-07-01T00:00:00.000Z",
+          isActive: false,
+        },
+      ],
+    });
+    await app.close();
+  });
+
+  it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockSeasonFindMany.mockResolvedValue([SEASON_ZERO]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
+    await app.close();
+  });
+});
+
 describe("POST /houses/leaderboard", () => {
   it("scopes leaderboard houses to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
       makeMember({ organizationId: "org-secure" }),
     );
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockHouseFindMany.mockResolvedValue([
       {
         id: "house-1",
@@ -530,6 +611,12 @@ describe("POST /houses/leaderboard", () => {
     expect(mockHouseFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { organizationId: "org-secure" },
+        select: expect.objectContaining({
+          transactions: {
+            where: { seasonId: "season-active" },
+            select: { delta: true },
+          },
+        }),
       }),
     );
     await app.close();
@@ -809,6 +896,7 @@ describe("POST /users/scores", () => {
     mockFindUnique.mockResolvedValue(
       makeMember({ organizationId: "org-secure" }),
     );
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxGroupBy.mockResolvedValue([
       { targetUserId: "user-1", _sum: { delta: 42 } },
     ]);
@@ -825,10 +913,61 @@ describe("POST /users/scores", () => {
       expect.objectContaining({
         where: {
           organizationId: "org-secure",
+          seasonId: "season-active",
           targetUserId: { not: null },
         },
       }),
     );
+    await app.close();
+  });
+
+  it("uses a requested historical season for member scores", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
+    mockTxGroupBy.mockResolvedValue([
+      { targetUserId: "user-1", _sum: { delta: 12 } },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/scores",
+      payload: { seasonId: "season-0" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "season-0",
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(mockTxGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          seasonId: "season-0",
+        }),
+      }),
+    );
+    await app.close();
+  });
+
+  it("rejects cross-organization or unknown season IDs for member scores", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/scores",
+      payload: { seasonId: "other-season" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("SEASON_NOT_FOUND");
+    expect(mockTxGroupBy).not.toHaveBeenCalled();
     await app.close();
   });
 });
