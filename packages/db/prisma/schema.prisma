@@ -43,6 +43,7 @@ model Organization {
   houses       House[]
   transactions PointTransaction[]
   invites      OrgInvite[]
+  seasons      Season[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 }
@@ -94,6 +95,7 @@ model User {
   receivedTransactions PointTransaction[] @relation("PointsReceived")
   createdInvites       OrgInvite[]        @relation("CreatedInvites")
   usedInvite           OrgInvite[]        @relation("UsedInvites")
+  createdSeasons       Season[]           @relation("CreatedSeasons")
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -101,9 +103,30 @@ model User {
   @@index([houseId])
 }
 
+model Season {
+  id             String             @id @default(cuid())
+  organizationId String
+  name           String
+  startsAt       DateTime
+  endsAt         DateTime?
+  isActive       Boolean            @default(false)
+  createdById    String?
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?              @relation("CreatedSeasons", fields: [createdById], references: [id], onDelete: SetNull)
+  transactions   PointTransaction[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@index([organizationId, startsAt])
+  @@index([createdById])
+}
+
 model PointTransaction {
   id             String   @id @default(cuid())
   organizationId String
+  seasonId       String
   actorUserId    String
   targetUserId   String?
   targetHouseId  String
@@ -113,12 +136,16 @@ model PointTransaction {
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  season       Season       @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   actor        User         @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
   targetUser   User?        @relation("PointsReceived", fields: [targetUserId], references: [id], onDelete: SetNull)
   targetHouse  House        @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, seasonId, createdAt])
   @@index([targetHouseId, createdAt])
+  @@index([targetHouseId, seasonId, createdAt])
   @@index([targetUserId, createdAt])
+  @@index([targetUserId, seasonId, createdAt])
   @@index([actorUserId, createdAt])
 }

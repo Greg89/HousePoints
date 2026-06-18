@@ -30,6 +30,9 @@ vi.mock("@housepoints/db", () => ({
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
+    season: {
+      findFirst: vi.fn(),
+    },
     pointTransaction: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -58,6 +61,7 @@ const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
+const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
@@ -433,9 +437,11 @@ describe("POST /points/adjust", () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
       .mockResolvedValueOnce(targetUser);  // target user lookup
+    mockSeasonFindFirst.mockResolvedValue({ id: "season-active" });
     mockTxCreate.mockResolvedValue({
       id: "tx-abc",
       organizationId: "org-1",
+      seasonId: "season-active",
       actorUserId: "user-2",
       targetUserId: "user-1",
       targetHouseId: "house-1",
@@ -459,6 +465,40 @@ describe("POST /points/adjust", () => {
     const body = res.json();
     expect(body.id).toBe("tx-abc");
     expect(body.trait).toBe("TECHNICAL_EXCELLENCE");
+    expect(mockTxCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          organizationId: "org-1",
+          seasonId: "season-active",
+          actorUserId: "user-2",
+          targetUserId: "user-1",
+          targetHouseId: "house-1",
+        }),
+      }),
+    );
+    await app.close();
+  });
+
+  it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
+    const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin())
+      .mockResolvedValueOnce(targetUser);
+    mockSeasonFindFirst.mockResolvedValue(null);
+    const app = await buildTestApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1",
+        delta: 15,
+        reason: "Crushed the demo",
+        trait: "TECHNICAL_EXCELLENCE",
+      },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
     await app.close();
   });
 });

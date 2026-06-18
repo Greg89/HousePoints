@@ -822,9 +822,31 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
     });
   }
 
+  const activeSeason = await prisma.season.findFirst({
+    where: {
+      organizationId: actor.organizationId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!activeSeason) {
+    error(request.log, "points.active_season_missing", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+    });
+    return reply.status(409).send({
+      message: "An active season is required before points can be awarded",
+      code: "ACTIVE_SEASON_REQUIRED",
+    });
+  }
+
   const transaction = await prisma.pointTransaction.create({
     data: {
       organizationId: actor.organizationId,
+      seasonId: activeSeason.id,
       actorUserId: actor.id,
       targetUserId: targetUser.id,
       targetHouseId: targetUser.houseId,

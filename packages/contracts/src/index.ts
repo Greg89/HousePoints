@@ -180,6 +180,49 @@ export const leaderboardSchema = z.array(leaderboardEntrySchema);
 
 export const actorScopeSchema = z.object({}).strict();
 
+export const seasonSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime().nullable(),
+  isActive: z.boolean(),
+});
+
+export type Season = z.infer<typeof seasonSchema>;
+
+export const seasonContextSchema = z.object({
+  activeSeason: seasonSchema,
+  seasons: z.array(seasonSchema),
+});
+
+export type SeasonContext = z.infer<typeof seasonContextSchema>;
+
+export const seasonScopedRequestSchema = z.object({
+  seasonId: z.string().min(1).optional(),
+}).strict();
+
+export type SeasonScopedRequest = z.infer<typeof seasonScopedRequestSchema>;
+
+export const createSeasonSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+}).strict();
+
+export type CreateSeasonInput = z.infer<typeof createSeasonSchema>;
+
+export const renameSeasonSchema = z.object({
+  seasonId: z.string().min(1),
+  name: z.string().trim().min(2).max(80),
+}).strict();
+
+export type RenameSeasonInput = z.infer<typeof renameSeasonSchema>;
+
+export const seasonTransitionSchema = z.object({
+  previousSeason: seasonSchema,
+  activeSeason: seasonSchema,
+});
+
+export type SeasonTransition = z.infer<typeof seasonTransitionSchema>;
+
 export const createHouseSchema = z.object({
   name: z.string().min(2).max(80),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7c3aed"),

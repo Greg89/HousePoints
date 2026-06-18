@@ -8,11 +8,16 @@ import {
   updateProfileSchema,
   updateProfileResponseSchema,
   actorScopeSchema,
+  createSeasonSchema,
   createOrgSchema,
   createInviteSchema,
   inviteLinkSchema,
   joinOrgSchema,
   promoteUserSchema,
+  renameSeasonSchema,
+  seasonContextSchema,
+  seasonScopedRequestSchema,
+  seasonTransitionSchema,
   memberScoreSchema,
   memberScoresSchema,
   activityItemSchema,
@@ -325,6 +330,19 @@ describe("authenticated request schemas", () => {
       role: "ADMIN",
       actorAuth0Sub: "auth0|attacker",
     }],
+    [seasonScopedRequestSchema, {
+      seasonId: "season-1",
+      organizationId: "org-1",
+    }],
+    [createSeasonSchema, {
+      name: "Q3 2026",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [renameSeasonSchema, {
+      seasonId: "season-1",
+      name: "Q3 2026",
+      actorAuth0Sub: "auth0|attacker",
+    }],
   ] as const;
 
   it.each(cases)("rejects identity fields from %#", (schema, input) => {
@@ -364,6 +382,89 @@ describe("createOrgSchema", () => {
     expect(
       createOrgSchema.safeParse({ ...valid, firstHouseColor: "purple" }).success,
     ).toBe(false);
+  });
+});
+
+describe("season schemas", () => {
+  const activeSeason = {
+    id: "season-1",
+    name: "Q3 2026",
+    startsAt: "2026-07-01T00:00:00.000Z",
+    endsAt: null,
+    isActive: true,
+  };
+  const previousSeason = {
+    id: "season-0",
+    name: "Season 0",
+    startsAt: "2026-06-01T00:00:00.000Z",
+    endsAt: "2026-07-01T00:00:00.000Z",
+    isActive: false,
+  };
+
+  it("accepts season context with active and historical seasons", () => {
+    expect(
+      seasonContextSchema.parse({
+        activeSeason,
+        seasons: [activeSeason, previousSeason],
+      }),
+    ).toEqual({
+      activeSeason,
+      seasons: [activeSeason, previousSeason],
+    });
+  });
+
+  it("accepts empty and explicit season-scoped read requests", () => {
+    expect(seasonScopedRequestSchema.parse({})).toEqual({});
+    expect(seasonScopedRequestSchema.parse({ seasonId: "season-1" })).toEqual({
+      seasonId: "season-1",
+    });
+  });
+
+  it("accepts immediate season creation input only", () => {
+    expect(createSeasonSchema.parse({ name: " Q4 2026 " })).toEqual({
+      name: "Q4 2026",
+    });
+    expect(
+      createSeasonSchema.safeParse({
+        name: "Q4 2026",
+        startsAt: "2026-10-01T00:00:00.000Z",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts season rename input", () => {
+    expect(
+      renameSeasonSchema.parse({
+        seasonId: "season-1",
+        name: " Fall 2026 ",
+      }),
+    ).toEqual({
+      seasonId: "season-1",
+      name: "Fall 2026",
+    });
+  });
+
+  it("accepts the start-season transition response", () => {
+    expect(
+      seasonTransitionSchema.parse({
+        previousSeason,
+        activeSeason,
+      }),
+    ).toEqual({
+      previousSeason,
+      activeSeason,
+    });
+  });
+
+  it("rejects malformed season fields", () => {
+    expect(
+      seasonContextSchema.safeParse({
+        activeSeason: { ...activeSeason, startsAt: "today" },
+        seasons: [],
+      }).success,
+    ).toBe(false);
+    expect(createSeasonSchema.safeParse({ name: "Q" }).success).toBe(false);
+    expect(renameSeasonSchema.safeParse({ seasonId: "", name: "Q4 2026" }).success).toBe(false);
   });
 });
 
