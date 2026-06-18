@@ -113,6 +113,16 @@ export function DashboardShell({
     });
   }
 
+  function handleTabChange(nextTab: string) {
+    const nextActiveTab = nextTab as TabId;
+
+    if (nextActiveTab !== "overview") {
+      setSelectedHouseId(null);
+    }
+
+    setActiveTab(nextActiveTab);
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -180,7 +190,7 @@ export function DashboardShell({
 
         <Tabs.Root
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+          onValueChange={handleTabChange}
         >
           {/* Tab bar */}
           <Tabs.List className="flex gap-1 border-b mb-8">

@@ -520,6 +520,21 @@ describe("DashboardShell", () => {
     expect(screen.getByText("Organization report")).toBeInTheDocument();
   });
 
+  it("clears house report focus when leaving the overview tab", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Slytherin" }));
+
+    expect(screen.getByText("House report")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /activity/i }));
+    await user.click(screen.getByRole("tab", { name: /overview/i }));
+
+    expect(screen.getByText("Organization report")).toBeInTheDocument();
+    expect(screen.queryByText("Slytherin members by points received")).not.toBeInTheDocument();
+  });
+
   it("opens the activity tab from the overview activity strip", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps} />);
