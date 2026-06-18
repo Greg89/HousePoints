@@ -77,7 +77,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 
 ## Phase 6: Reconcile Documentation
 
-1. [ ] Update README to one canonical setup guide.
+1. [x] Update README to one canonical setup guide.
 2. [ ] Mark org management as implemented, partial, or deferred by sub-feature.
 3. [ ] Rebuild the roadmap around current priorities.
 4. [ ] Repair text encoding.

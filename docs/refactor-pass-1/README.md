@@ -55,6 +55,7 @@ Completed units:
 - Added shared Server Action logging context so action logs, current-user bootstrap, and API calls use one request ID.
 - Normalized expected web action and active-season setup failures to warning-level logs.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
+- Replaced the duplicated root README with one canonical current setup and deployment guide.
 
 Current unit verification:
 
