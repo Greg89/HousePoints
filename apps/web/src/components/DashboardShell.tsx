@@ -2,7 +2,17 @@
 
 import { useMemo, useState, useTransition } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { Trophy, Clock, ChartBar, Star, SignOut, User, Wrench } from "@phosphor-icons/react";
+import {
+  CaretDown,
+  CalendarBlank,
+  Trophy,
+  Clock,
+  ChartBar,
+  Star,
+  SignOut,
+  User,
+  Wrench,
+} from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
@@ -200,13 +210,17 @@ export function DashboardShell({
                 </p>
               </div>
               <div className="flex flex-col items-start gap-2 sm:items-end">
-                <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-                  Reporting season
+                <label className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors focus-within:ring-2 focus-within:ring-primary/30">
+                  <span className="sr-only">Reporting season</span>
+                  <CalendarBlank size={15} className="text-primary" aria-hidden="true" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Viewing
+                  </span>
                   <select
                     value={selectedSeasonId}
                     onChange={(event) => handleSeasonChange(event.target.value)}
                     disabled={isSeasonPending}
-                    className="min-w-48 rounded-lg border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-wait disabled:opacity-70"
+                    className="max-w-52 appearance-none bg-transparent pr-5 text-sm font-semibold text-foreground focus:outline-none disabled:cursor-wait disabled:opacity-70"
                   >
                     {seasonContext.seasons.map((season) => (
                       <option key={season.id} value={season.id}>
@@ -214,6 +228,7 @@ export function DashboardShell({
                       </option>
                     ))}
                   </select>
+                  <CaretDown size={14} className="-ml-5 text-muted-foreground" aria-hidden="true" />
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   {isHistoricalSeason ? (
