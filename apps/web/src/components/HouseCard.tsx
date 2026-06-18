@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Users } from "@phosphor-icons/react";
 import type { LeaderboardEntry } from "@housepoints/contracts";
+import { cn } from "@/lib/cn";
 
 interface HouseCardProps {
   house: LeaderboardEntry;
@@ -22,7 +23,10 @@ export function HouseCard({ house, rank, selected = false, onSelect }: HouseCard
         type="button"
         onClick={onSelect}
         aria-pressed={selected}
-        className="relative block h-full w-full overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring"
+        className={cn(
+          "relative block h-full w-full overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          selected && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
+        )}
         style={{ borderTop: `4px solid ${house.color}` }}
       >
         <div
