@@ -41,8 +41,20 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
               initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.04, duration: 0.2 }}
-              className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/20 transition-colors"
+              className="relative flex items-start gap-3 rounded-lg border p-3 pr-28 transition-colors hover:bg-muted/20 sm:pr-36"
             >
+              {item.season ? (
+                <span
+                  className={[
+                    "absolute right-3 top-3 rounded-full px-2 py-0.5 text-xs font-medium",
+                    item.season.isActive
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700",
+                  ].join(" ")}
+                >
+                  {item.season.name}
+                </span>
+              ) : null}
               {/* Actor initial avatar */}
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                 {item.actorName[0]?.toUpperCase()}
@@ -78,18 +90,6 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
                     {TRAIT_LABELS[item.trait]}
                   </span>
                 )}
-                {item.season ? (
-                  <span
-                    className={[
-                      "ml-2 inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full",
-                      item.season.isActive
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-amber-50 text-amber-700",
-                    ].join(" ")}
-                  >
-                    {item.season.name}
-                  </span>
-                ) : null}
                 <span className="text-xs text-muted-foreground mt-1 block">
                   {relativeTime(item.createdAt)}
                 </span>
