@@ -31,8 +31,10 @@ vi.mock("@housepoints/db", () => ({
       updateMany: vi.fn(),
     },
     season: {
+      create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
     },
     pointTransaction: {
       create: vi.fn(),
@@ -64,6 +66,8 @@ const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
+const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
+const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
@@ -579,6 +583,171 @@ describe("POST /seasons/context", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
+    await app.close();
+  });
+});
+
+describe("POST /seasons/start", () => {
+  it("allows an owner to close the current season and start the next one", async () => {
+    const nextSeason = {
+      id: "season-next",
+      name: "Q4 2026",
+      startsAt: new Date("2026-08-01T12:00:00.000Z"),
+      endsAt: null,
+      isActive: true,
+    };
+    const closedSeason = {
+      ...ACTIVE_SEASON,
+      endsAt: new Date("2026-08-01T12:00:00.000Z"),
+      isActive: false,
+    };
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonUpdate.mockResolvedValue(closedSeason);
+    mockSeasonCreate.mockResolvedValue(nextSeason);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/start",
+      payload: { name: "Q4 2026" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-secure",
+          isActive: true,
+        },
+      }),
+    );
+    expect(mockSeasonUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "season-active" },
+        data: expect.objectContaining({
+          isActive: false,
+          endsAt: expect.any(Date),
+        }),
+      }),
+    );
+    expect(mockSeasonCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          organizationId: "org-secure",
+          name: "Q4 2026",
+          isActive: true,
+          createdById: "user-owner",
+        }),
+      }),
+    );
+    expect(res.json()).toEqual({
+      previousSeason: {
+        id: "season-active",
+        name: "Q3 2026",
+        startsAt: "2026-07-01T00:00:00.000Z",
+        endsAt: "2026-08-01T12:00:00.000Z",
+        isActive: false,
+      },
+      activeSeason: {
+        id: "season-next",
+        name: "Q4 2026",
+        startsAt: "2026-08-01T12:00:00.000Z",
+        endsAt: null,
+        isActive: true,
+      },
+    });
+    await app.close();
+  });
+
+  it("rejects non-owner users when starting a season", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/start",
+      payload: { name: "Q4 2026" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 when starting a season without an active season", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockSeasonFindFirst.mockResolvedValue(null);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/start",
+      payload: { name: "Q4 2026" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /seasons/rename", () => {
+  it("allows an admin to rename a season in their organization", async () => {
+    const renamedSeason = { ...ACTIVE_SEASON, name: "Summer 2026" };
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue({ id: "season-active" });
+    mockSeasonUpdate.mockResolvedValue(renamedSeason);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/rename",
+      payload: { seasonId: "season-active", name: "Summer 2026" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "season-active",
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(mockSeasonUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "season-active" },
+        data: { name: "Summer 2026" },
+      }),
+    );
+    expect(res.json()).toEqual({
+      id: "season-active",
+      name: "Summer 2026",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: null,
+      isActive: true,
+    });
+    await app.close();
+  });
+
+  it("rejects cross-organization or unknown season IDs when renaming", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(null);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/rename",
+      payload: { seasonId: "other-season", name: "Summer 2026" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("SEASON_NOT_FOUND");
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
     await app.close();
   });
 });

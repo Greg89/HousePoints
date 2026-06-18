@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   Check,
+  Calendar,
   Copy,
   House,
   LinkSimple,
@@ -12,6 +13,7 @@ import {
   UserSwitch,
   UsersThree,
 } from "@phosphor-icons/react";
+import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 
 interface AdminUser {
   id: string;
@@ -28,9 +30,14 @@ interface AdminHouse {
 interface AdminFormsProps {
   users: AdminUser[];
   houses: AdminHouse[];
+  seasons: Season[];
+  activeSeason: Season;
+  actorRole: UserRole;
   onCreateHouse: (formData: FormData) => Promise<void>;
   onAssignHouse: (formData: FormData) => Promise<void>;
   onCreateInvite: () => Promise<{ token: string; expiresAt: string }>;
+  onStartSeason: (formData: FormData) => Promise<SeasonTransition>;
+  onRenameSeason: (formData: FormData) => Promise<Season>;
 }
 
 const DEFAULT_HOUSE_COLOR = "#7c3aed";
@@ -78,19 +85,30 @@ function ColorField({
 export function AdminForms({
   users,
   houses,
+  seasons,
+  activeSeason,
+  actorRole,
   onCreateHouse,
   onAssignHouse,
   onCreateInvite,
+  onStartSeason,
+  onRenameSeason,
 }: AdminFormsProps) {
   const [createPending, startCreate] = useTransition();
   const [editPending, startEdit] = useTransition();
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
+  const [startSeasonPending, startStartSeason] = useTransition();
+  const [renameSeasonPending, startRenameSeason] = useTransition();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [editHouseName, setEditHouseName] = useState("");
   const [editHouseColor, setEditHouseColor] = useState(DEFAULT_HOUSE_COLOR);
+  const [seasonList, setSeasonList] = useState(seasons);
+  const [currentSeason, setCurrentSeason] = useState(activeSeason);
+  const [renameSeasonId, setRenameSeasonId] = useState(activeSeason.id);
+  const canStartSeason = actorRole === "OWNER";
   const unassignedUsers = users.filter((user) => !user.houseId);
   const assignedUsers = users.filter((user) => user.houseId);
   const unassignedCount = unassignedUsers.length;
@@ -178,6 +196,69 @@ export function AdminForms({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function handleStartSeason(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!canStartSeason) return;
+
+    const formData = new FormData(e.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
+    const form = e.currentTarget;
+
+    const confirmed = window.confirm(
+      `Start "${name}" now? This will close ${currentSeason.name} and reset current-season scoring.`,
+    );
+
+    if (!confirmed) return;
+
+    startStartSeason(async () => {
+      try {
+        const transition = await onStartSeason(formData);
+        setCurrentSeason(transition.activeSeason);
+        setRenameSeasonId(transition.activeSeason.id);
+        setSeasonList((existing) => [
+          transition.activeSeason,
+          transition.previousSeason,
+          ...existing.filter(
+            (season) =>
+              season.id !== transition.activeSeason.id &&
+              season.id !== transition.previousSeason.id,
+          ),
+        ]);
+        toast.success("Season started", { description: transition.activeSeason.name });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to start season", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
+  function handleRenameSeason(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+
+    startRenameSeason(async () => {
+      try {
+        const renamedSeason = await onRenameSeason(formData);
+        setSeasonList((existing) =>
+          existing.map((season) => (season.id === renamedSeason.id ? renamedSeason : season)),
+        );
+        if (currentSeason.id === renamedSeason.id) {
+          setCurrentSeason(renamedSeason);
+        }
+        toast.success("Season renamed", { description: renamedSeason.name });
+        form.reset();
+        setRenameSeasonId(renamedSeason.id);
+      } catch (err) {
+        toast.error("Failed to rename season", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border bg-card p-6">
@@ -217,6 +298,94 @@ export function AdminForms({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
         <section className="space-y-6">
+          <div>
+            <h4 className="font-display text-lg font-semibold">Seasons</h4>
+            <p className="text-sm text-muted-foreground">
+              Rename reporting seasons or start the next competition window.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <form
+              aria-label="Start season"
+              onSubmit={handleStartSeason}
+              className="grid gap-3 rounded-xl border p-5 bg-card"
+            >
+              <h5 className="text-sm font-semibold flex items-center gap-2">
+                <Calendar size={16} />
+                Start New Season
+              </h5>
+              <p className="text-xs text-muted-foreground">
+                Current active season: <span className="font-semibold text-foreground">{currentSeason.name}</span>
+              </p>
+              <input
+                name="name"
+                className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="New season name"
+                required
+                minLength={2}
+                maxLength={80}
+                disabled={!canStartSeason}
+              />
+              {!canStartSeason ? (
+                <p className="text-xs text-muted-foreground">Only owners can start a new season.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Starting a season immediately closes the current active season.
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={startSeasonPending || !canStartSeason}
+                className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {startSeasonPending ? "Starting..." : "Start season"}
+              </button>
+            </form>
+
+            <form
+              aria-label="Rename season"
+              onSubmit={handleRenameSeason}
+              className="grid gap-3 rounded-xl border p-5 bg-card"
+            >
+              <h5 className="text-sm font-semibold flex items-center gap-2">
+                <PencilSimple size={16} />
+                Rename Season
+              </h5>
+              <select
+                name="seasonId"
+                aria-label="Season to rename"
+                className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
+                required
+                value={renameSeasonId}
+                onChange={(event) => setRenameSeasonId(event.target.value)}
+              >
+                {seasonList.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name}{season.isActive ? " (current)" : ""}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="name"
+                className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Updated season name"
+                required
+                minLength={2}
+                maxLength={80}
+              />
+              <p className="text-xs text-muted-foreground">
+                Renaming changes display text only. Scores and dates stay the same.
+              </p>
+              <button
+                type="submit"
+                disabled={renameSeasonPending}
+                className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {renameSeasonPending ? "Saving..." : "Rename season"}
+              </button>
+            </form>
+          </div>
+
           <div>
             <h4 className="font-display text-lg font-semibold">Houses</h4>
             <p className="text-sm text-muted-foreground">

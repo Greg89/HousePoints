@@ -20,15 +20,48 @@ const houses = [
   { id: "house-2", name: "Ravenclaw", color: "#1d4ed8" },
 ];
 
+const activeSeason = {
+  id: "season-active",
+  name: "Q3 2026",
+  startsAt: "2026-07-01T00:00:00.000Z",
+  endsAt: null,
+  isActive: true,
+};
+
+const historicalSeason = {
+  id: "season-0",
+  name: "Season 0",
+  startsAt: "2026-06-01T00:00:00.000Z",
+  endsAt: "2026-07-01T00:00:00.000Z",
+  isActive: false,
+};
+
 function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminForms>> = {}) {
   const props = {
     users,
     houses,
+    seasons: [activeSeason, historicalSeason],
+    activeSeason,
+    actorRole: "OWNER" as const,
     onCreateHouse: vi.fn().mockResolvedValue(undefined),
     onAssignHouse: vi.fn().mockResolvedValue(undefined),
     onCreateInvite: vi.fn().mockResolvedValue({
       token: "invite-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
+    }),
+    onStartSeason: vi.fn().mockResolvedValue({
+      previousSeason: { ...activeSeason, endsAt: "2026-08-01T00:00:00.000Z", isActive: false },
+      activeSeason: {
+        id: "season-next",
+        name: "Q4 2026",
+        startsAt: "2026-08-01T00:00:00.000Z",
+        endsAt: null,
+        isActive: true,
+      },
+    }),
+    onRenameSeason: vi.fn().mockResolvedValue({
+      ...activeSeason,
+      name: "Summer Sprint",
     }),
     ...overrides,
   };
@@ -42,6 +75,62 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
 }
 
 describe("AdminForms", () => {
+  it("shows season management controls with the current active season", () => {
+    setupAdminForms();
+
+    expect(screen.getByRole("form", { name: "Start season" })).toHaveTextContent(
+      "Current active season: Q3 2026",
+    );
+    expect(screen.getByRole("form", { name: "Rename season" })).toBeInTheDocument();
+  });
+
+  it("confirms and starts a new season for owners", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms();
+    const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
+
+    await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+
+    await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Start "Q4 2026" now? This will close Q3 2026 and reset current-season scoring.',
+    );
+
+    const startSeasonMock = props.onStartSeason as ReturnType<typeof vi.fn>;
+    const formData = startSeasonMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({ name: "Q4 2026" });
+    await screen.findByText(/Current active season:/);
+    expect(startSeasonForm.getByText("Q4 2026")).toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
+
+  it("disables season start controls for admins", () => {
+    setupAdminForms({ actorRole: "ADMIN" });
+    const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
+
+    expect(startSeasonForm.getByPlaceholderText("New season name")).toBeDisabled();
+    expect(startSeasonForm.getByRole("button", { name: "Start season" })).toBeDisabled();
+    expect(startSeasonForm.getByText("Only owners can start a new season.")).toBeInTheDocument();
+  });
+
+  it("submits rename-season data", async () => {
+    const { user, props } = setupAdminForms();
+    const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
+
+    await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
+    await user.type(renameSeasonForm.getByPlaceholderText("Updated season name"), "Launch Season");
+    await user.click(renameSeasonForm.getByRole("button", { name: "Rename season" }));
+
+    await waitFor(() => expect(props.onRenameSeason).toHaveBeenCalledOnce());
+    const renameSeasonMock = props.onRenameSeason as ReturnType<typeof vi.fn>;
+    const formData = renameSeasonMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      seasonId: "season-0",
+      name: "Launch Season",
+    });
+  });
+
   it("uses compact, labelled color controls for house forms", () => {
     setupAdminForms();
 

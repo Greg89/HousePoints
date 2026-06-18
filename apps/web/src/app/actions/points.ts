@@ -22,10 +22,14 @@ import {
   memberScoresSchema,
   orgMembersSchema,
   pointAdjustmentResponseSchema,
+  seasonSchema,
   seasonContextSchema,
+  seasonTransitionSchema,
   type DashboardSummary,
   type MemberScore,
+  type Season,
   type SeasonContext,
+  type SeasonTransition,
   type Trait,
   type UserRole,
   updateProfileResponseSchema,
@@ -391,6 +395,73 @@ export async function readSeasonReports(seasonId?: string): Promise<{
   ]);
 
   return { dashboardSummary, memberPoints };
+}
+
+export async function startSeason(formData: FormData): Promise<SeasonTransition> {
+  const requestId = randomUUID();
+  const actor = await getActorMappingForAdmin("startSeason", requestId);
+
+  if (actor.role !== "OWNER") {
+    throw new Error("Owner role required");
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) {
+    throw new Error("Season name is required");
+  }
+
+  const response = await apiFetch("/seasons/start", requestId, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+
+  const transition = await parseApiResponse(
+    response,
+    seasonTransitionSchema,
+    "The season could not be started. Please try again.",
+  );
+
+  logInfo("web.seasons.started", {
+    requestId,
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    name,
+  });
+
+  revalidatePath("/");
+  return transition;
+}
+
+export async function renameSeason(formData: FormData): Promise<Season> {
+  const requestId = randomUUID();
+  const actor = await getActorMappingForAdmin("renameSeason", requestId);
+  const seasonId = String(formData.get("seasonId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!seasonId || !name) {
+    throw new Error("Season and name are required");
+  }
+
+  const response = await apiFetch("/seasons/rename", requestId, {
+    method: "POST",
+    body: JSON.stringify({ seasonId, name }),
+  });
+
+  const season = await parseApiResponse(
+    response,
+    seasonSchema,
+    "The season could not be renamed. Please try again.",
+  );
+
+  logInfo("web.seasons.renamed", {
+    requestId,
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    seasonId,
+  });
+
+  revalidatePath("/");
+  return season;
 }
 
 /** Called by AwardPointsDialog – takes typed args instead of FormData */

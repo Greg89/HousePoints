@@ -12,6 +12,8 @@ import {
   readSeasonContext,
   readSeasonReports,
   readSessionSummary,
+  renameSeason,
+  startSeason,
 } from "./actions/points";
 import { DashboardShell } from "@/components/DashboardShell";
 import { AdminForms } from "@/components/AdminForms";
@@ -117,9 +119,14 @@ async function renderHome() {
     <AdminForms
       users={adminContext.users}
       houses={adminContext.houses}
+      seasons={seasonContext.seasons}
+      activeSeason={seasonContext.activeSeason}
+      actorRole={session.role ?? "MEMBER"}
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
       onCreateInvite={createInviteLink}
+      onStartSeason={startSeason}
+      onRenameSeason={renameSeason}
     />
   ) : undefined;
 
