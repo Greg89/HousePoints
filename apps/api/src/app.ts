@@ -34,6 +34,7 @@ import {
 } from "./api-hooks.js";
 import { readCorsAllowedOriginsFromEnv } from "./config.js";
 import { createApiLogger, info, warn } from "./logging.js";
+import { registerHealthRoutes } from "./routes/health.js";
 
 import { createHash, randomBytes } from "node:crypto";
 
@@ -243,22 +244,19 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   registerAuthenticationHook(app, verifyAccessToken);
 
-await app.register(rateLimit, {
-  global: true,
-  max: 60,
-  timeWindow: "1 minute",
-  errorResponseBuilder: () => ({
-    code: "RATE_LIMITED",
-    message: "Too many requests â€” please slow down.",
-  }),
-});
+  await app.register(rateLimit, {
+    global: true,
+    max: 60,
+    timeWindow: "1 minute",
+    errorResponseBuilder: () => ({
+      code: "RATE_LIMITED",
+      message: "Too many requests â€” please slow down.",
+    }),
+  });
 
-registerRequestLifecycleHooks(app);
+  registerRequestLifecycleHooks(app);
 
-app.get("/health", async (request) => {
-  info(request.log, "health.checked", {});
-  return { ok: true };
-});
+  await registerHealthRoutes(app);
 
 app.post("/seasons/context", async (request, reply) => {
   const parsed = actorScopeSchema.safeParse(request.body);

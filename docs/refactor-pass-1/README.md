@@ -59,6 +59,7 @@ Completed units:
 - Added a SEQ query runbook and marked the server-side logging baseline complete for pass one.
 - Extracted API actor lookup and admin-role checks into a tested actor module.
 - Extracted API authentication, request logging, response logging, and unhandled-error hooks into a shared hooks module.
+- Extracted the API health route into the first route module to establish the route-registration pattern.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 
