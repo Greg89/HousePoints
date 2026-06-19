@@ -65,6 +65,7 @@ Completed units:
 - Extracted the API org create, invite, and join routes into a focused route module without changing route contracts.
 - Extracted the API user bootstrap, profile, and member-directory routes into a focused route module without changing route contracts.
 - Extracted the API point adjustment, user score, and recent transaction routes into a focused route module without changing route contracts.
+- Extracted the API dashboard summary and house leaderboard routes into a focused route module, completing the API route-module extraction pass.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 
