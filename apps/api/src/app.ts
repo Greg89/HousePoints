@@ -20,21 +20,17 @@ import {
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import {
+  getActorBySub,
+  isAdminRole,
+  type ActorRecord,
+} from "./actor.js";
+import {
   createAuth0AccessTokenVerifierFromEnv,
   readBearerToken,
   type VerifyAccessToken,
 } from "./auth.js";
 import { readCorsAllowedOriginsFromEnv } from "./config.js";
 import { createApiLogger, error, info, warn } from "./logging.js";
-
-type ActorRecord = {
-  id: string;
-  auth0Sub: string;
-  role: "MEMBER" | "ADMIN" | "OWNER";
-  houseId: string | null;
-  organizationId: string;
-  organizationSlug: string;
-};
 
 import { createHash, randomBytes } from "node:crypto";
 
@@ -75,11 +71,6 @@ class SeasonScopeError extends Error {
   }
 }
 
-/** OWNER inherits all ADMIN privileges */
-function isAdmin(role: "MEMBER" | "ADMIN" | "OWNER"): boolean {
-  return role === "ADMIN" || role === "OWNER";
-}
-
 function isUniqueConstraintError(err: unknown): boolean {
   return (
     typeof err === "object" &&
@@ -87,42 +78,6 @@ function isUniqueConstraintError(err: unknown): boolean {
     "code" in err &&
     (err as { code?: unknown }).code === "P2002"
   );
-}
-
-async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
-  const actor = await prisma.user.findUnique({
-    where: { auth0Sub },
-    select: {
-      id: true,
-      auth0Sub: true,
-      role: true,
-      houseId: true,
-      organizationId: true,
-      organization: {
-        select: {
-          slug: true,
-        },
-      },
-    },
-  });
-
-  if (!actor) {
-    return null;
-  }
-
-  // Users without an org can't act on any org-scoped endpoint
-  if (!actor.organizationId || !actor.organization) {
-    return null;
-  }
-
-  return {
-    id: actor.id,
-    auth0Sub: actor.auth0Sub,
-    role: actor.role,
-    houseId: actor.houseId,
-    organizationId: actor.organizationId,
-    organizationSlug: actor.organization.slug,
-  };
 }
 
 function mapAppUser(user: {
@@ -422,7 +377,7 @@ app.post("/seasons/start", async (request, reply) => {
 
   const actor = await getActorBySub(request.auth.subject);
 
-  if (!actor || !isAdmin(actor.role)) {
+  if (!actor || !isAdminRole(actor.role)) {
     warn(request.log, "seasons.start.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
@@ -533,7 +488,7 @@ app.post("/seasons/rename", async (request, reply) => {
 
   const actor = await getActorBySub(request.auth.subject);
 
-  if (!actor || !isAdmin(actor.role)) {
+  if (!actor || !isAdminRole(actor.role)) {
     warn(request.log, "seasons.rename.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
@@ -981,7 +936,7 @@ app.post("/admin/context", async (request, reply) => {
 
   const actor = await getActorBySub(request.auth.subject);
 
-  if (!actor || !isAdmin(actor.role)) {
+  if (!actor || !isAdminRole(actor.role)) {
     warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
@@ -1032,7 +987,7 @@ app.post("/admin/houses", async (request, reply) => {
 
   const actor = await getActorBySub(request.auth.subject);
 
-  if (!actor || !isAdmin(actor.role)) {
+  if (!actor || !isAdminRole(actor.role)) {
     warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
@@ -1084,7 +1039,7 @@ app.post("/admin/users/assign-house", async (request, reply) => {
 
   const actor = await getActorBySub(request.auth.subject);
 
-  if (!actor || !isAdmin(actor.role)) {
+  if (!actor || !isAdminRole(actor.role)) {
     warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
   }
@@ -1501,7 +1456,7 @@ app.post("/orgs/invite", async (request, reply) => {
   }
 
   const actor = await getActorBySub(request.auth.subject);
-  if (!actor || !isAdmin(actor.role)) {
+  if (!actor || !isAdminRole(actor.role)) {
     warn(request.log, "admin.forbidden", {});
     return reply.status(403).send({ code: "ADMIN_REQUIRED", message: "Admin access required" });
   }

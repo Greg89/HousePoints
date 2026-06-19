@@ -25,7 +25,7 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 
 ## Progress Snapshot
 
-Last updated: June 15, 2026
+Last updated: June 19, 2026
 
 Completed units:
 
@@ -57,12 +57,13 @@ Completed units:
 - Normalized expected web action and active-season setup failures to warning-level logs.
 - Shared logging redaction and error serialization through contracts and applied shared context redaction in the API logger.
 - Added a SEQ query runbook and marked the server-side logging baseline complete for pass one.
+- Extracted API actor lookup and admin-role checks into a tested actor module.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 
 Current unit verification:
 
-- `npm test`: 186 tests passed.
+- `npm test`: 190 tests passed.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.

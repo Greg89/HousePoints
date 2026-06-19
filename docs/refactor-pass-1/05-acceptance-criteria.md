@@ -30,7 +30,7 @@ Status markers:
 
 - [x] Importing the API app factory does not open a network port.
 - [ ] API routes are grouped by domain.
-- [-] Authorization and actor resolution are shared and testable, but remain in `app.ts`.
+- [x] Authorization and actor resolution are shared and testable.
 - [x] Web session lookup and HTTP transport are centralized in server-only modules.
 - [ ] Server Actions contain minimal orchestration and revalidation logic.
 
@@ -59,7 +59,7 @@ Status markers:
 
 - [x] `npm test` passes without starting a real listener.
 - [x] Every TypeScript workspace has a real lint and type-check command.
-- [-] Security-critical services have direct tests. Authentication and onboarding are covered; extracted services do not yet exist.
+- [-] Security-critical services have direct tests. Authentication, actor resolution, and onboarding are covered; more extracted services should receive direct tests as they appear.
 - [ ] At least one database-backed integration suite validates transactions and constraints.
 - [ ] The production build does not depend on unplanned external network access.
 - [ ] CI runs install, generate, lint, type-check, test, and build as distinct visible steps.
