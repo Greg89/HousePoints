@@ -1,7 +1,17 @@
 import "server-only";
 
+import {
+  redactLogContext,
+  type LogContext,
+} from "@housepoints/contracts";
 import pino from "pino";
 import { createStream, type PinoSeqStream } from "pino-seq";
+
+export {
+  redactLogContext,
+  serializeErrorForLog,
+} from "@housepoints/contracts";
+export type { LogContext } from "@housepoints/contracts";
 
 type WebLogLevel = "info" | "warn" | "error";
 
@@ -34,58 +44,10 @@ export type WebLogEvent =
   | "web.profile.updated"
   | "web.profile.update_failed";
 
-export type LogContext = Record<string, unknown>;
-
 type WebLogger = {
   logger: pino.Logger;
   seqEnabled: boolean;
 };
-
-const REDACTED = "[REDACTED]";
-
-const sensitiveKeyFragments = [
-  "authorization",
-  "clientsecret",
-  "cookie",
-  "idtoken",
-  "invitetoken",
-  "refreshtoken",
-  "secret",
-  "token",
-];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isSensitiveKey(key: string): boolean {
-  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  return sensitiveKeyFragments.some((fragment) => normalized.includes(fragment));
-}
-
-export function redactLogContext(context: LogContext): LogContext {
-  return Object.fromEntries(
-    Object.entries(context).map(([key, value]) => {
-      if (isSensitiveKey(key)) {
-        return [key, REDACTED];
-      }
-
-      if (Array.isArray(value)) {
-        return [
-          key,
-          value.map((item) => (isRecord(item) ? redactLogContext(item) : item)),
-        ];
-      }
-
-      if (isRecord(value)) {
-        return [key, redactLogContext(value)];
-      }
-
-      return [key, value];
-    }),
-  );
-}
 
 function getEnvironment(): string {
   return (
@@ -154,46 +116,6 @@ function createWebLogger(): WebLogger {
 }
 
 const webLogger = createWebLogger();
-
-export function serializeErrorForLog(error: unknown): LogContext {
-  if (!(error instanceof Error)) {
-    return {
-      errorType: typeof error,
-      errorMessage: String(error),
-    };
-  }
-
-  const errorWithMetadata = error as Error & {
-    cause?: unknown;
-    code?: unknown;
-    digest?: unknown;
-    statusCode?: unknown;
-  };
-
-  const context: LogContext = {
-    errorName: error.name,
-    errorMessage: error.message,
-  };
-
-  if (typeof errorWithMetadata.code === "string") {
-    context.errorCode = errorWithMetadata.code;
-  }
-
-  if (typeof errorWithMetadata.statusCode === "number") {
-    context.statusCode = errorWithMetadata.statusCode;
-  }
-
-  if (typeof errorWithMetadata.digest === "string") {
-    context.digest = errorWithMetadata.digest;
-  }
-
-  if (errorWithMetadata.cause instanceof Error) {
-    context.causeName = errorWithMetadata.cause.name;
-    context.causeMessage = errorWithMetadata.cause.message;
-  }
-
-  return context;
-}
 
 function write(level: WebLogLevel, event: WebLogEvent, context: LogContext = {}): void {
   webLogger.logger[level](

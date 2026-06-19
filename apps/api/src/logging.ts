@@ -1,4 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
+import { redactLogContext, type LogContext } from "@housepoints/contracts";
 import { finished } from "node:stream/promises";
 import pino from "pino";
 import { createStream, type PinoSeqStream } from "pino-seq";
@@ -49,8 +50,6 @@ export type ApiLogEvent =
   | "orgs.join.token_expired"
   | "orgs.join.already_in_org"
   | "orgs.join.success";
-
-type LogContext = Record<string, unknown>;
 
 type ApiLogger = {
   logger: FastifyBaseLogger;
@@ -127,12 +126,16 @@ export function createApiLogger(): ApiLogger {
   };
 }
 
+function createLogContext(event: ApiLogEvent, context: LogContext): LogContext {
+  return redactLogContext({ event, ...context });
+}
+
 export function info(logger: FastifyBaseLogger, event: ApiLogEvent, context: LogContext = {}): void {
-  logger.info({ event, ...context }, event);
+  logger.info(createLogContext(event, context), event);
 }
 
 export function warn(logger: FastifyBaseLogger, event: ApiLogEvent, context: LogContext = {}): void {
-  logger.warn({ event, ...context }, event);
+  logger.warn(createLogContext(event, context), event);
 }
 
 export function error(
@@ -142,9 +145,9 @@ export function error(
   err?: unknown,
 ): void {
   if (err) {
-    logger.error({ event, ...context, err }, event);
+    logger.error({ ...createLogContext(event, context), err }, event);
     return;
   }
 
-  logger.error({ event, ...context }, event);
+  logger.error(createLogContext(event, context), event);
 }

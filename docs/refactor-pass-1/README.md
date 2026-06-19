@@ -21,6 +21,7 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 4. [Execution Plan](./04-execution-plan.md) defines the recommended refactor order and limits the scope of pass one.
 5. [Acceptance Criteria](./05-acceptance-criteria.md) defines what must be true before feature development resumes.
 6. [Observability And Logging Plan](./06-observability-logging-plan.md) defines the target logging architecture, event schema, redaction rules, and chaos-readiness path.
+7. [SEQ Query Runbook](./07-seq-query-runbook.md) gives practical production queries for tracing user-visible failures, auth issues, API errors, and warning noise.
 
 ## Progress Snapshot
 
@@ -54,12 +55,14 @@ Completed units:
 - Threaded one dashboard render request ID through web render logs and dashboard API reads.
 - Added shared Server Action logging context so action logs, current-user bootstrap, and API calls use one request ID.
 - Normalized expected web action and active-season setup failures to warning-level logs.
+- Shared logging redaction and error serialization through contracts and applied shared context redaction in the API logger.
+- Added a SEQ query runbook and marked the server-side logging baseline complete for pass one.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 
 Current unit verification:
 
-- `npm test`: 182 tests passed.
+- `npm test`: 186 tests passed.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.

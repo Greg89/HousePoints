@@ -33,6 +33,30 @@ describe("API logging helpers", () => {
     );
   });
 
+  it("redacts sensitive context before writing logs", () => {
+    const logger = createLoggerMock();
+
+    warn(logger, "request.validation_failed", {
+      inviteToken: "invite-token",
+      headers: {
+        authorization: "Bearer secret",
+        "x-request-id": "request-1",
+      },
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      {
+        event: "request.validation_failed",
+        inviteToken: "[REDACTED]",
+        headers: {
+          authorization: "[REDACTED]",
+          "x-request-id": "request-1",
+        },
+      },
+      "request.validation_failed",
+    );
+  });
+
   it("uses the event name as the error message and preserves the error", () => {
     const logger = createLoggerMock();
     const cause = new Error("database unavailable");

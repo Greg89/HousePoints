@@ -24,14 +24,14 @@ Strengths:
 - Structured event names exist.
 - Fastify request IDs are enabled.
 - `x-request-id` is accepted.
-- Sensitive headers are redacted.
+- Sensitive headers and helper context fields are redacted.
+- API log context uses the shared contracts redaction helper.
 - API logs include domain events such as auth failures, invite handling, point awards, and dashboard summary reads.
 
 Gaps:
 
-- The API logger is not shared with the web app.
-- Event fields are useful but not yet documented as a contract.
-- There is no single query recipe for tracing one user action across web and API.
+- The API logger implementation is still service-local, even though shared redaction/error helpers now live in contracts.
+- Event fields are useful but should continue to be treated as an operator-facing contract.
 - Some events use different field names for similar concepts.
 
 ### Web
@@ -45,11 +45,11 @@ Strengths:
 - Expired Auth0 access-token sessions are logged and treated as re-authentication instead of dashboard 500s.
 - Web calls send `x-request-id` to the API.
 - Sensitive web log fields are redacted before logs are written.
+- Web and API share redaction and error serialization helpers from contracts.
+- Server render logs, Server Action logs, current-user bootstrap, and API calls can share one request ID.
 
 Gaps:
 
-- Web and API redaction rules are not yet shared from one module.
-- Server render logs and action logs do not yet share one request context.
 - Browser/client-side errors are not captured centrally.
 - Railway access logs must still be checked separately from application logs.
 
@@ -227,13 +227,13 @@ The same failure can produce both outputs, but raw operational detail belongs on
 
 Create a shared logging contract for web and API:
 
-- common log levels;
-- common base fields;
-- common error serialization;
-- common redaction helpers;
-- documented event naming rules.
+- [x] common base fields documented;
+- [x] common error serialization;
+- [x] common redaction helpers;
+- [x] documented event naming rules;
+- [ ] common log levels as exported types if another service needs them.
 
-This can live in a small shared package or be duplicated briefly while the shape stabilizes. Prefer a shared package once both services use it.
+The reusable redaction and error serialization helpers live in `@housepoints/contracts`. Service-specific logger setup remains local to each app.
 
 ### Slice 2: Send Web Logs To SEQ
 
@@ -294,22 +294,22 @@ Add lightweight browser-side error reporting when the product needs it:
 - Unhandled browser exceptions can be reported through a small route handler.
 - Reports must redact URLs, tokens, and user-provided content carefully.
 
-This should wait until server-side logging is unified.
+This is intentionally deferred until the product needs browser-side telemetry. Server-side logging is unified enough for pass one.
 
 ### Slice 6: Dashboards And Alerts
 
 Create SEQ queries or dashboards for:
 
-- web render failures;
-- API unhandled errors;
-- auth token failures;
-- API 401/403 rates;
-- validation failures by route;
-- p95 API duration by route;
-- invite claim conflicts;
-- dashboard dependency failures.
+- [x] web render failures query;
+- [x] API unhandled errors query;
+- [x] auth token failures query;
+- [x] API 401/403 query guidance;
+- [x] validation failures query guidance;
+- [x] slow request guidance using `durationMs`;
+- [x] invite claim conflict query guidance;
+- [x] dashboard dependency failure query guidance.
 
-Alert only on signals with clear action. Dashboards can be broader than alerts.
+The starter query set lives in [SEQ Query Runbook](./07-seq-query-runbook.md). Alert only on signals with clear action. Dashboards can be broader than alerts.
 
 ## Chaos Engineering Readiness
 
@@ -345,7 +345,7 @@ Do not run chaos experiments in production until staging has representative obse
 
 ## Open Decisions
 
-- Should web and API use one shared logging package?
+- Should web and API eventually use one shared logger factory, or is shared contract plus local setup enough?
 - Should request ID and trace ID be separate fields?
 - Should SEQ remain the long-term log store, or should the abstraction support another sink later?
 - Which events should become alerts versus dashboard-only signals?
@@ -354,4 +354,4 @@ Do not run chaos experiments in production until staging has representative obse
 
 ## Near-Term Recommendation
 
-Implement request context propagation next so one SEQ query can follow a full dashboard render across web and API.
+Treat the server-side logging baseline as complete for pass one. Keep event names stable, use the SEQ runbook during production debugging, and defer browser-side client error capture until there is a concrete product or support need.
