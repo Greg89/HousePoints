@@ -37,7 +37,7 @@ Keep route behavior otherwise stable in this phase.
 
 1. [x] Move Fastify construction to `app.ts`.
 2. [x] Move listening and shutdown handling to `server.ts`.
-3. [-] Add central error and auth plugins. Shared hooks exist, but they remain in `app.ts`.
+3. [x] Add central error and auth plugins. Authentication, request logging, response logging, and unhandled-error hooks are registered through a shared API hooks module.
 4. [x] Extract actor resolution and authorization helpers. Actor lookup and admin-role checks live in a tested API actor module.
 5. [ ] Split routes into domain modules without redesigning every query.
 6. [x] Update tests to import only the side-effect-free app factory.
