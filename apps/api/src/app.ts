@@ -6,14 +6,11 @@ import rateLimit from "@fastify/rate-limit";
 import {
   actorScopeSchema,
   adjustPointsSchema,
-  bootstrapUserSchema,
   seasonScopedRequestSchema,
   type Trait,
-  updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { getActorBySub } from "./actor.js";
-import { mapAppUser } from "./app-user.js";
 import {
   createAuth0AccessTokenVerifierFromEnv,
   type VerifyAccessToken,
@@ -33,6 +30,7 @@ import { registerAdminRoutes } from "./routes/admin.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
+import { registerUserRoutes } from "./routes/users.js";
 
 function utcDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -125,6 +123,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerSeasonRoutes(app);
   await registerAdminRoutes(app);
   await registerOrgRoutes(app);
+  await registerUserRoutes(app);
 
 app.post("/houses/leaderboard", async (request, reply) => {
   const parsed = actorScopeSchema.safeParse(request.body);
@@ -445,63 +444,6 @@ app.post("/dashboard/summary", async (request, reply) => {
   };
 });
 
-app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
-  const parsed = bootstrapUserSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    warn(request.log, "users.bootstrap.validation_failed", {
-      issues: parsed.error.issues,
-    });
-    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-  }
-
-  const userSelect = {
-    id: true,
-    auth0Sub: true,
-    email: true,
-    displayName: true,
-    role: true,
-    organizationId: true,
-    organization: { select: { slug: true } },
-    houseId: true,
-    house: { select: { name: true, color: true } },
-  } as const;
-
-  const existing = await prisma.user.findUnique({
-    where: { auth0Sub: request.auth.subject },
-    select: userSelect,
-  });
-
-  if (existing) {
-    info(request.log, "users.bootstrap.loaded", {
-      userId: existing.id,
-      auth0Sub: existing.auth0Sub,
-      organizationId: existing.organizationId,
-      hasHouse: Boolean(existing.houseId),
-    });
-    return { ...mapAppUser(existing), created: false };
-  }
-
-  // New user â€” no org yet. Create the User row without an org.
-  // They must then create an org (POST /orgs/create) or join one (POST /orgs/join).
-  const createdUser = await prisma.user.create({
-    data: {
-      auth0Sub: request.auth.subject,
-      email: parsed.data.email ?? null,
-      displayName: parsed.data.displayName,
-    },
-    select: userSelect,
-  });
-
-  info(request.log, "users.bootstrap.created", {
-    userId: createdUser.id,
-    auth0Sub: createdUser.auth0Sub,
-    hasOrg: false,
-  });
-
-  return reply.status(201).send({ ...mapAppUser(createdUser), created: true });
-});
-
 app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
   const parsed = adjustPointsSchema.safeParse(request.body);
 
@@ -611,38 +553,6 @@ app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minu
   return reply.status(201).send(transaction);
 });
 
-// POST /users/profile - update the authenticated user's display name
-app.post("/users/profile", async (request, reply) => {
-  const parsed = updateProfileSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    warn(request.log, "users.profile.validation_failed", {
-      issues: parsed.error.issues,
-    });
-    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-  }
-
-  const actor = await getActorBySub(request.auth.subject);
-
-  if (!actor) {
-    warn(request.log, "points.actor_not_found", {});
-    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-  }
-
-  const updated = await prisma.user.update({
-    where: { id: actor.id },
-    data: { displayName: parsed.data.displayName },
-    select: { id: true, displayName: true },
-  });
-
-  info(request.log, "users.profile.updated", {
-    actorUserId: actor.id,
-    displayName: updated.displayName,
-  });
-
-  return updated;
-});
-
 // POST /users/scores - per-member point totals (sum of delta grouped by targetUserId)
 app.post("/users/scores", async (request, reply) => {
   const parsed = seasonScopedRequestSchema.safeParse(request.body);
@@ -688,44 +598,6 @@ app.post("/users/scores", async (request, reply) => {
   return grouped.map((row) => ({
     memberId: row.targetUserId as string,
     points: row._sum.delta ?? 0,
-  }));
-});
-
-// POST /members - returns org members for the award dialog (any authenticated member)
-app.post("/members", async (request, reply) => {
-  const parsed = actorScopeSchema.safeParse(request.body);
-
-  if (!parsed.success) {
-    warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-    return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-  }
-
-  const actor = await getActorBySub(request.auth.subject);
-
-  if (!actor) {
-    warn(request.log, "points.actor_not_found", {});
-    return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-  }
-
-  const members = await prisma.user.findMany({
-    where: { organizationId: actor.organizationId },
-    orderBy: { displayName: "asc" },
-    select: {
-      id: true,
-      displayName: true,
-      role: true,
-      houseId: true,
-      house: { select: { name: true, color: true } },
-    },
-  });
-
-  return members.map((m) => ({
-    id: m.id,
-    displayName: m.displayName,
-    role: m.role,
-    houseId: m.houseId,
-    houseName: m.house?.name ?? null,
-    houseColor: m.house?.color ?? null,
   }));
 });
 
