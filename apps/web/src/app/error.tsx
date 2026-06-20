@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowCounterClockwise } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, SignOut } from "@phosphor-icons/react";
 
 export default function GlobalError({
   error,
@@ -29,7 +29,14 @@ export default function GlobalError({
           <ArrowCounterClockwise size={16} />
           Try again
         </button>
-        <div>
+        <div className="flex flex-col items-center gap-3">
+          <Link
+            href="/auth/logout"
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <SignOut size={16} />
+            Sign out and start over
+          </Link>
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Go home
           </Link>
