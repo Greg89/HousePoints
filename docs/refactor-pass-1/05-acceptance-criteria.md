@@ -59,10 +59,11 @@ Status markers:
 
 - [x] `npm test` passes without starting a real listener.
 - [x] Every TypeScript workspace has a real lint and type-check command.
+- [x] Coverage reporting enforces thresholds for security-critical API modules and shared contracts.
 - [-] Security-critical services have direct tests. Authentication, actor resolution, and onboarding are covered; more extracted services should receive direct tests as they appear.
 - [ ] At least one database-backed integration suite validates transactions and constraints.
 - [ ] The production build does not depend on unplanned external network access.
-- [ ] CI runs install, generate, lint, type-check, test, and build as distinct visible steps.
+- [x] CI runs install, generate, lint, type-check, test, coverage, and build as distinct visible steps.
 
 ## Documentation
 

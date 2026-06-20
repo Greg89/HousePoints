@@ -72,4 +72,18 @@ describe("API logging helpers", () => {
       "request.unhandled_error",
     );
   });
+
+  it("writes error events without an error object", () => {
+    const logger = createLoggerMock();
+
+    error(logger, "request.unhandled_error", { statusCode: 500 });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      {
+        event: "request.unhandled_error",
+        statusCode: 500,
+      },
+      "request.unhandled_error",
+    );
+  });
 });

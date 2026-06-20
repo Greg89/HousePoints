@@ -9,6 +9,7 @@
     "build:app": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\""

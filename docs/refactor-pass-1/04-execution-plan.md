@@ -69,7 +69,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 1. [x] Aggregate leaderboard totals in PostgreSQL.
 2. [x] Add cursor pagination to activity.
 3. [x] Add real ESLint/type-check scripts for API, contracts, and DB.
-4. [ ] Add coverage reporting with meaningful thresholds for security-critical modules.
+4. [x] Add coverage reporting with meaningful thresholds for security-critical modules. API auth, actor resolution, hooks, config, logging, and shared contracts now have CI-enforced coverage thresholds.
 5. [x] Remove recursive duplicate workspace builds.
 6. [ ] Make font/build assets reproducible without external network access where practical.
 7. [ ] Add database-backed integration tests for transaction and constraint behavior.

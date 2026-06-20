@@ -28,8 +28,14 @@ jobs:
       - name: Lint
         run: npm run lint --workspaces --if-present
 
+      - name: Type-check
+        run: npm run typecheck
+
       - name: Test
         run: npm run test
+
+      - name: Coverage
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
