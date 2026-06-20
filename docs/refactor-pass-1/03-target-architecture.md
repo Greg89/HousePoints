@@ -68,7 +68,7 @@ Target request flow:
 1. Client obtains an Auth0 access token for the HousePoints API audience.
 2. API verifies signature, issuer, audience, expiry, and required claims.
 3. API reads `sub` from the verified token.
-4. API maps `sub` to the internal user.
+4. API maps `sub` to the internal user through `AuthIdentity.providerSubject`, with a legacy `User.auth0Sub` fallback while existing data is backfilled.
 5. Services authorize the internal actor against the requested operation and resource.
 
 Request bodies contain domain input only:
@@ -83,6 +83,8 @@ Request bodies contain domain input only:
 ```
 
 They do not contain actor identity or organization identity.
+
+The migration `packages/db/prisma/migrations/20260620121000_add_auth_identities/` introduced the `AuthIdentity` table and backfilled each existing `User.auth0Sub`. New users create an identity row as part of bootstrap or onboarding. A same-email alternate provider login is linked automatically only when the verified Auth0 token claims include `email` and `email_verified: true`; otherwise the API returns `ACCOUNT_LINK_REQUIRED` rather than trusting caller-supplied body email.
 
 ## Web Shape
 

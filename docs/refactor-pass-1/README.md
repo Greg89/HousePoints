@@ -25,7 +25,7 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 
 ## Progress Snapshot
 
-Last updated: June 19, 2026
+Last updated: June 20, 2026
 
 Completed units:
 
@@ -76,10 +76,13 @@ Completed units:
 - Removed build-time Google font fetching from the web app so production builds use local/system font fallbacks.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 - Expanded the docs index and normalized older markdown files to ASCII status markers and punctuation.
+- Added an `AuthIdentity` table and migration so verified alternate Auth0 provider subjects can map to one HousePoints user.
+- Added safe duplicate-email handling during bootstrap and onboarding so same-email provider conflicts return stable `ACCOUNT_LINK_REQUIRED` errors instead of Prisma unique-constraint 500s.
+- Added a logout recovery action to the web error boundary so a user trapped in a bad auth/session state can sign out and restart login.
 
 Current unit verification:
 
-- `npm test`: 200 fast tests passed.
+- `npm test`: 205 fast tests passed.
 - `npm run test:integration`: passed against local Docker PostgreSQL.
 - Workspace type-check passed.
 - Workspace lint passed.

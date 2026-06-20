@@ -49,9 +49,9 @@ Add characterization tests before moving each route group.
 1. [x] Create a cached `getCurrentSession()`/`getCurrentUser()` server-only module.
 2. [x] Create one authenticated API client with timeout and request ID support.
 3. [x] Split the action file by domain. Web Server Actions are grouped by admin, dashboard, org, profile, point, and season modules with shared admin authorization kept in a server-only helper.
-4. [-] Convert expected action failures to typed results. Current-user bootstrap, dashboard, and admin-context reads use typed response errors; point awards, legacy point-adjustment submissions, onboarding mutations, invite creation, profile updates, house creation, and house assignment preserve typed API errors, while mutation actions still throw rather than return expected failures.
+4. [-] Convert expected action failures to typed results. Current-user bootstrap, dashboard, and admin-context reads use typed response errors; point awards, legacy point-adjustment submissions, onboarding mutations, invite creation, profile updates, house creation, and house assignment preserve typed API errors, while mutation actions still throw rather than return expected failures. Auth account-link conflicts now return stable API codes and no longer surface as unhandled Prisma errors.
 5. [x] Stop converting dashboard read failures to empty arrays.
-6. [-] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary; section-level recovery is not implemented.
+6. [-] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary, which now includes retry, home, and logout recovery actions; section-level recovery is not implemented.
 
 Expected result: one bootstrap/current-user resolution per render, not one per query.
 
@@ -59,9 +59,9 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 
 1. [x] Make org creation atomic.
 2. [x] Make invite consumption atomic and concurrency-safe.
-3. [-] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API responses; future operations should add schemas with their endpoint contracts.
+3. [-] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API success responses and typed error parsing preserves stable error codes; future operations should add schemas with their endpoint contracts.
 4. [x] Parse all API responses in the web client. Web-consumed responses now flow through the shared response parser and contract schemas.
-5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims. Core auth, role, read/write tenant isolation, onboarding, and invite cases exist; coverage is not yet complete.
+5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, concurrent invite claims, and account-link conflicts. Core auth, role, read/write tenant isolation, onboarding, invite, and duplicate-email account-link cases exist; coverage is not yet complete.
 6. [x] Add stable database constraints for settled ledger rules. New point-ledger writes now require positive deltas, non-empty award reasons, and a trait at the database layer, with database-backed integration coverage.
 
 ## Phase 5: Improve Queries And Tooling
@@ -81,7 +81,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 2. [ ] Mark org management as implemented, partial, or deferred by sub-feature.
 3. [ ] Rebuild the roadmap around current priorities.
 4. [x] Repair text encoding. Older roadmap and feature docs now use ASCII status markers and punctuation so markdown renders consistently across editors and terminals.
-5. [ ] Link architecture decisions and migrations to the relevant roadmap items.
+5. [-] Link architecture decisions and migrations to the relevant roadmap items. The auth identity migration is now linked from the architecture notes; remaining future migrations should be linked as they are introduced.
 
 ## Recommended Pull Request Sequence
 

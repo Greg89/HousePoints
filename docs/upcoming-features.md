@@ -11,34 +11,37 @@ These are not scheduled. Treat this as a living document to refine before work s
 Allow any user to create their own organisation, configure houses within it, and invite team members, removing the dependency on a developer to bootstrap an org manually.
 
 ### Current state
-The `Organization` model already exists and every entity is scoped to it. The first user to hit `/users/bootstrap` with a new `organizationSlug` creates the org implicitly. There is no UI for org creation, no invite flow, and no concept of an "org owner" distinct from an admin.
+The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
+
+Still deferred: org settings, org deletion, ownership transfer, admin removal rules, domain allow-list joining, and true multi-org membership.
 
 ### How it should work
 
 **Org creation**
-- A new "Create your organisation" page/flow (unauthenticated or post-login).
-- The user who creates the org becomes the first `ADMIN` and is implicitly the **Org Owner**.
-- They set: org name, slug (URL-safe, unique), and optionally create their first set of houses during onboarding.
+- Implemented as a post-login onboarding flow.
+- The user who creates the org becomes the first `OWNER`.
+- They set org name, slug, first house name, and first house color.
+- Additional org settings and ownership-management screens are deferred.
 
 **Roles**
-- Introduce a third role: `OWNER` (or promote the existing `ADMIN` with an `isOwner` flag).
-- Only an owner can delete the org, transfer ownership, or remove other admins.
-- Regular `ADMIN`s can manage houses and assign members but cannot touch org-level settings.
+- `OWNER` exists.
+- `OWNER` and `ADMIN` can manage houses, assign members, create invites, and manage seasons.
+- Org deletion, ownership transfer, and admin-removal rules are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
-- Option A - **Invite link**: Owner/admin generates a shareable link with a short-lived signed token scoped to the org slug. Any Auth0-authenticated user who follows the link is added to that org as a `MEMBER`.
-- Option B - **Email domain allow-list**: Org owner specifies a trusted domain (e.g. `acme.com`). Any user whose Auth0 email matches is auto-joined on first login.
-- Both options should be supported; option B is lower friction for corporate rollouts.
+- Option A - **Invite link**: Implemented. Owner/admin generates a shareable single-use token. Any Auth0-authenticated user who follows it is added to the org as a `MEMBER`.
+- Option B - **Email domain allow-list**: Deferred. This remains attractive for corporate rollouts but needs explicit product and security design.
 
 **Isolation**
 - All existing endpoints already filter by `organizationId` derived from the actor's mapping; this is already enforced.
-- The key risk is the bootstrap endpoint. It currently creates a user into an org by slug. With self-serve, we need to distinguish: "I am creating this org" vs "I am joining this org via invite". A user without a valid invite or domain match must be rejected, not silently placed into a wrong org.
-- A user can only belong to **one org** in the current schema (single `organizationId` on `User`). Decide early whether multi-org membership is in scope. If not, make the error message clear when a user tries to join a second org.
+- Bootstrap creates an unmapped user only; org creation and invite joining are explicit flows.
+- Same-email alternate Auth0 provider logins link to the existing user only from verified email token claims. Unverified/body-only email conflicts return `ACCOUNT_LINK_REQUIRED`.
+- A user can only belong to **one org** in the current schema (single `organizationId` on `User`). Multi-org membership remains deferred.
 
 **Open questions**
 - Do we allow a user to leave an org and join another? What happens to their transaction history?
-- Should the invite token be single-use or multi-use (i.e. a standing invite link)?
+- Do we need multi-use standing invite links, or is single-use enough for the first production cohort?
 - Do we need an "org discovery" page, or is the invite link the only entry point?
 - What happens to an org if the owner leaves?
 

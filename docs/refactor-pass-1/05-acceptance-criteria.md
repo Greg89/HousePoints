@@ -12,6 +12,7 @@ Status markers:
 
 - [x] Every non-health API route rejects requests without valid credentials.
 - [x] Actor identity comes only from verified credentials.
+- [x] Alternate Auth0 provider subjects can resolve to the same internal user through the `AuthIdentity` mapping.
 - [x] Request schemas no longer accept `actorAuth0Sub`.
 - [x] Admin and owner routes have explicit role tests.
 - [x] Tenant-isolation tests cover reads and mutations.
@@ -25,6 +26,7 @@ Status markers:
 - [x] The first owner is assigned to that house atomically without database intervention.
 - [x] An invited user can join and reaches the correct assigned/unassigned state.
 - [x] Expired, reused, malformed, and concurrently claimed invites behave deterministically.
+- [x] Same-email alternate provider logins link only from verified email token claims or fail with a stable `ACCOUNT_LINK_REQUIRED` response.
 
 ## Architecture
 
@@ -37,9 +39,10 @@ Status markers:
 ## Contracts And Errors
 
 - [x] API inputs and web-consumed outputs are validated with shared schemas.
-- [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, but mutation UI handling remains incomplete.
+- [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, account-link conflicts no longer become generic 500s, but mutation UI handling remains incomplete.
 - [x] A failed dashboard dependency is not rendered as valid empty data.
 - [x] Dashboard error messages shown to users do not expose raw internal responses.
+- [x] The route error boundary includes a logout recovery path for bad auth/session states.
 
 ## Data Integrity
 
@@ -68,7 +71,7 @@ Status markers:
 ## Documentation
 
 - [x] README setup instructions match actual environment variable names, supported Node version, local Docker/Postgres setup, and verification commands.
-- [ ] The roadmap distinguishes implemented, partial, and proposed org-management work.
+- [x] The roadmap distinguishes implemented, partial, and proposed org-management work.
 - [x] Product authorization decisions are documented.
 - [x] The docs index links current state, roadmap, upcoming features, and this refactor record.
 - [x] Markdown files render without corrupted characters.

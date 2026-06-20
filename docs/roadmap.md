@@ -19,8 +19,9 @@ Each tier has its own file with detailed task breakdowns.
 | 1.2 | `revalidatePath` after all mutating server actions | [done] |
 | 1.3 | Toast feedback on server action success / failure | [done] |
 | 1.4 | Rate limiting on API (`@fastify/rate-limit`) | [done] |
-| 1.5 | Error boundary - API failure shows graceful UI, not Next.js crash page | [done] |
+| 1.5 | Error boundary - API failure shows graceful UI with retry, logout, and home recovery | [done] |
 | 1.6 | Confirm `db:deploy` runs on Railway API start so migrations auto-apply | [done] |
+| 1.7 | Auth identity linking for alternate Auth0 social providers sharing one verified email | [done] |
 
 ---
 
@@ -29,10 +30,11 @@ Each tier has its own file with detailed task breakdowns.
 
 | # | Task | Status |
 |---|------|--------|
-| 2.1 | Wire up a log drain (SEQ / Axiom / Logtail) on Railway | [todo] |
-| 2.2 | Configure Railway health check against `GET /health` | [todo] |
+| 2.1 | Wire up structured server logs to SEQ | [done] |
+| 2.2 | Configure Railway health check against `GET /health` | [done] |
 | 2.3 | `error.tsx` global error boundary in Next.js app | [done] |
 | 2.4 | Structured error responses from API (consistent `code` + `message`) | [done] |
+| 2.5 | Browser-side client error reporting | [todo] |
 
 ---
 
@@ -42,10 +44,11 @@ Each tier has its own file with detailed task breakdowns.
 | # | Task | Status |
 |---|------|--------|
 | 3.1 | Per-member points on Leaderboard tab (new API endpoint) | [done] |
-| 3.2 | Optimistic score update after awarding points | [todo] |
-| 3.3 | Activity feed pagination / load-more (currently capped at 50) | [todo] |
-| 3.4 | Admin: edit existing house color / description | [done] |
-| 3.5 | Mobile header - collapse nav into a menu on small screens | [done] |
+| 3.2 | Leaderboard refreshes after awarding points without a full browser refresh | [done] |
+| 3.3 | Activity feed cursor pagination API | [done] |
+| 3.4 | Activity feed load-more UI | [todo] |
+| 3.5 | Admin: edit existing house color / description | [done] |
+| 3.6 | Mobile header - collapse nav into a menu on small screens | [done] |
 
 ---
 
@@ -56,8 +59,9 @@ Each tier has its own file with detailed task breakdowns.
 |---|------|--------|
 | 4.1 | Vitest unit tests - Zod schemas + utility functions | [done] |
 | 4.2 | Fastify integration tests via `app.inject` | [done] |
-| 4.3 | GitHub Actions workflow: lint -> type-check -> build on every PR | [done] |
-| 4.4 | Playwright e2e: login -> award points -> see score update | [todo] |
+| 4.3 | GitHub Actions workflow: install, generate, lint, type-check, test, coverage, build | [done] |
+| 4.4 | Database-backed integration tests in CI | [done] |
+| 4.5 | Playwright e2e: login -> award points -> see score update | [todo] |
 
 ---
 
@@ -69,4 +73,7 @@ Each tier has its own file with detailed task breakdowns.
 | 5.1 | DB backups configured in Railway | [todo] |
 | 5.2 | Staging environment (Railway environments) | [todo] |
 | 5.3 | Connection pooling via PgBouncer or Prisma Accelerate | [todo] |
-| 5.4 | Multi-org onboarding flow (schema already supports it) | [todo] |
+| 5.4 | Self-serve org creation and single-use invite joining | [done] |
+| 5.5 | Org settings, owner transfer, admin removal, and org deletion | [todo] |
+| 5.6 | Multi-org membership model | [todo] |
+| 5.7 | Query count and response-time baselines for empty, typical, and larger orgs | [todo] |
