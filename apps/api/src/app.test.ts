@@ -1589,6 +1589,7 @@ describe("POST /orgs/create", () => {
     });
     mockOrgCreate.mockResolvedValue(ORG);
     mockHouseCreate.mockResolvedValue(HOUSE);
+    mockSeasonCreate.mockResolvedValue({ id: "season-0" });
     mockUserUpdate.mockResolvedValue(
       makeMember({
         role: "OWNER",
@@ -1629,6 +1630,16 @@ describe("POST /orgs/create", () => {
         }),
       }),
     );
+    expect(mockSeasonCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        name: "Season 0",
+        startsAt: expect.any(Date),
+        isActive: true,
+        createdById: "user-1",
+      },
+      select: { id: true },
+    });
     await app.close();
   });
 

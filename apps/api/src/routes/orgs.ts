@@ -71,7 +71,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
     }
 
-    const { org, house, user } = await prisma.$transaction(async (tx) => {
+    const { org, house, user, season } = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
         data: { name: orgName, slug: orgSlug },
         select: { id: true, slug: true, name: true },
@@ -122,7 +122,18 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
             select: userSelect,
           });
 
-      return { org, house, user };
+      const season = await tx.season.create({
+        data: {
+          organizationId: org.id,
+          name: "Season 0",
+          startsAt: new Date(),
+          isActive: true,
+          createdById: user.id,
+        },
+        select: { id: true },
+      });
+
+      return { org, house, user, season };
     });
 
     info(request.log, "orgs.created", {
@@ -130,6 +141,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       orgSlug: org.slug,
       houseId: house.id,
       ownerId: user.id,
+      activeSeasonId: season.id,
     });
     return reply.status(201).send({ ...mapAppUser(user), created: true });
   });
