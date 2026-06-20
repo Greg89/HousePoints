@@ -804,8 +804,26 @@ describe("POST /houses/leaderboard", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
-        _count: { transactions: 1, users: 2 },
-        transactions: [{ delta: 10 }],
+        _count: { users: 2 },
+      },
+      {
+        id: "house-2",
+        name: "Dragon",
+        color: "#dc2626",
+        description: "Fire team",
+        _count: { users: 1 },
+      },
+    ]);
+    mockTxGroupBy.mockResolvedValue([
+      {
+        targetHouseId: "house-1",
+        _sum: { delta: 10 },
+        _count: { _all: 1 },
+      },
+      {
+        targetHouseId: "house-2",
+        _sum: { delta: 15 },
+        _count: { _all: 2 },
       },
     ]);
     const app = await buildTestApp();
@@ -821,13 +839,39 @@ describe("POST /houses/leaderboard", () => {
       expect.objectContaining({
         where: { organizationId: "org-secure" },
         select: expect.objectContaining({
-          transactions: {
-            where: { seasonId: "season-active" },
-            select: { delta: true },
-          },
+          _count: { select: { users: true } },
         }),
       }),
     );
+    expect(mockTxGroupBy).toHaveBeenCalledWith({
+      by: ["targetHouseId"],
+      where: {
+        organizationId: "org-secure",
+        seasonId: "season-active",
+      },
+      _sum: { delta: true },
+      _count: { _all: true },
+    });
+    expect(res.json()).toEqual([
+      {
+        id: "house-2",
+        name: "Dragon",
+        color: "#dc2626",
+        description: "Fire team",
+        score: 15,
+        transactions: 2,
+        memberCount: 1,
+      },
+      {
+        id: "house-1",
+        name: "Phoenix",
+        color: "#7c3aed",
+        description: null,
+        score: 10,
+        transactions: 1,
+        memberCount: 2,
+      },
+    ]);
     await app.close();
   });
 });

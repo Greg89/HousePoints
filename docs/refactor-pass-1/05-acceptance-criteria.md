@@ -51,7 +51,7 @@ Status markers:
 ## Performance
 
 - [x] Dashboard rendering performs one current-user mapping per request.
-- [ ] House totals are aggregated by the database.
+- [x] House totals are aggregated by the database.
 - [ ] Activity history supports bounded cursor pagination.
 - [ ] Query count and response-time baselines are recorded for an empty, typical, and larger organization.
 

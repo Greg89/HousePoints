@@ -58,42 +58,58 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       throw err;
     }
 
-    const houses = await prisma.house.findMany({
-      where: {
-        organizationId: actor.organizationId,
-      },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        description: true,
-        _count: {
-          select: {
-            transactions: true,
-            users: true,
+    const [houses, houseTotals] = await Promise.all([
+      prisma.house.findMany({
+        where: {
+          organizationId: actor.organizationId,
+        },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          description: true,
+          _count: {
+            select: {
+              users: true,
+            },
           },
         },
-        transactions: {
-          where: {
-            seasonId: season.id,
-          },
-          select: {
-            delta: true,
-          },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["targetHouseId"],
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: season.id,
         },
-      },
-    });
+        _sum: { delta: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const totalsByHouseId = new Map(
+      houseTotals.map((row) => [
+        row.targetHouseId,
+        {
+          score: row._sum.delta ?? 0,
+          transactions: row._count._all,
+        },
+      ]),
+    );
 
     const leaderboard = houses
-      .map((house) => ({
-        id: house.id,
-        name: house.name,
-        color: house.color,
-        description: house.description,
-        score: house.transactions.reduce((total, tx) => total + tx.delta, 0),
-        transactions: house.transactions.length,
-        memberCount: house._count.users,
-      }))
+      .map((house) => {
+        const totals = totalsByHouseId.get(house.id);
+
+        return {
+          id: house.id,
+          name: house.name,
+          color: house.color,
+          description: house.description,
+          score: totals?.score ?? 0,
+          transactions: totals?.transactions ?? 0,
+          memberCount: house._count.users,
+        };
+      })
       .sort((a, b) => b.score - a.score);
 
     info(request.log, "leaderboard.fetched", {

@@ -66,7 +66,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 
 ## Phase 5: Improve Queries And Tooling
 
-1. [ ] Aggregate leaderboard totals in PostgreSQL.
+1. [x] Aggregate leaderboard totals in PostgreSQL.
 2. [ ] Add cursor pagination to activity.
 3. [x] Add real ESLint/type-check scripts for API, contracts, and DB.
 4. [ ] Add coverage reporting with meaningful thresholds for security-critical modules.
