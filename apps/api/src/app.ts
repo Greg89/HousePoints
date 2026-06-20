@@ -24,6 +24,7 @@ import { createApiLogger } from "./logging.js";
 type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
   corsAllowedOrigins?: readonly string[];
+  disableRateLimit?: boolean;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -52,15 +53,17 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   registerAuthenticationHook(app, verifyAccessToken);
 
-  await app.register(rateLimit, {
-    global: true,
-    max: 60,
-    timeWindow: "1 minute",
-    errorResponseBuilder: () => ({
-      code: "RATE_LIMITED",
-      message: "Too many requests â€” please slow down.",
-    }),
-  });
+  if (!options.disableRateLimit) {
+    await app.register(rateLimit, {
+      global: true,
+      max: 60,
+      timeWindow: "1 minute",
+      errorResponseBuilder: () => ({
+        code: "RATE_LIMITED",
+        message: "Too many requests â€” please slow down.",
+      }),
+    });
+  }
 
   registerRequestLifecycleHooks(app);
 

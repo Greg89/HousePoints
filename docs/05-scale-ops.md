@@ -60,3 +60,24 @@ For an internal team app the simplest approach is upgrading to Railway Pro and e
 4. **`APP_ORGANIZATION_SLUG` env var** - currently hard-wires all users into one org; multi-org requires this to be dynamic (derived from the invite or subdomain)
 
 This is the largest piece of work in the roadmap and should wait until the app is proven with the initial team.
+
+---
+
+## 5.7 Dashboard performance baselines [done]
+
+The dashboard API bundle now has a repeatable benchmark for empty, typical, and larger organizations:
+
+```powershell
+npm run db:deploy
+npm run benchmark:dashboard
+```
+
+The current owner dashboard bundle has an expected route-level Prisma operation budget of 26 operations. The June 20, 2026 local Docker/PostgreSQL baseline recorded:
+
+| Scenario | Bundle p50 ms | Bundle p95 ms |
+|---|---:|---:|
+| Empty | 44.3 | 47.4 |
+| Typical | 41.9 | 50.2 |
+| Larger | 51.1 | 60.0 |
+
+Full endpoint detail lives in [Dashboard Performance Baselines](./refactor-pass-1/08-performance-baselines.md).

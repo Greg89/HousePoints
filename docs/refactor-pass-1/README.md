@@ -22,6 +22,7 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 5. [Acceptance Criteria](./05-acceptance-criteria.md) defines what must be true before feature development resumes.
 6. [Observability And Logging Plan](./06-observability-logging-plan.md) defines the target logging architecture, event schema, redaction rules, and chaos-readiness path.
 7. [SEQ Query Runbook](./07-seq-query-runbook.md) gives practical production queries for tracing user-visible failures, auth issues, API errors, and warning noise.
+8. [Dashboard Performance Baselines](./08-performance-baselines.md) records repeatable empty, typical, and larger organization query-count and response-time baselines.
 
 ## Progress Snapshot
 
@@ -79,11 +80,13 @@ Completed units:
 - Added an `AuthIdentity` table and migration so verified alternate Auth0 provider subjects can map to one HousePoints user.
 - Added safe duplicate-email handling during bootstrap and onboarding so same-email provider conflicts return stable `ACCOUNT_LINK_REQUIRED` errors instead of Prisma unique-constraint 500s.
 - Added a logout recovery action to the web error boundary so a user trapped in a bad auth/session state can sign out and restart login.
+- Added a repeatable dashboard API benchmark and recorded empty, typical, and larger organization query-count and response-time baselines.
 
 Current unit verification:
 
 - `npm test`: 205 fast tests passed.
 - `npm run test:integration`: passed against local Docker PostgreSQL.
+- `npm run benchmark:dashboard`: recorded dashboard API baseline against local Docker PostgreSQL.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.

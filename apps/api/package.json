@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "benchmark:dashboard": "tsx src/benchmarks/dashboard-baseline.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\""
   },
