@@ -11,57 +11,52 @@ Users can update their display name at `/settings`. The DB is the source of trut
 
 ## 1.2 `revalidatePath` after mutating server actions [done]
 
-**Problem:** After awarding points, creating a house, or assigning a user to a house the page doesn't re-fetch; users see stale data until they manually refresh.
+**Original problem:** After awarding points, creating a house, or assigning a user to a house the page did not re-fetch; users saw stale data until they manually refreshed.
 
-**Fix:** Call `revalidatePath("/")` at the end of every mutating action.
+**Implemented fix:** Mutating Server Actions revalidate the affected dashboard/settings paths after successful writes.
 
-**Actions to audit:**
-- `awardPoints` - [done] already added
-- `submitPointAdjustment` - [todo]
-- `createHouse` - [todo]
-- `assignUserHouse` - [todo]
-- `updateDisplayName` - [done] already added
+Covered actions:
+
+- `awardPoints`
+- `submitPointAdjustment`
+- `createHouse`
+- `assignUserHouse`
+- org create/join actions
+- season start/rename actions
+- `updateDisplayName`
 
 ---
 
 ## 1.3 Toast feedback on success / failure [done]
 
-**Problem:** Mutating actions (award points, admin operations) give no visual confirmation. Users don't know if the action succeeded.
+**Original problem:** Mutating actions (award points, admin operations) gave no visual confirmation. Users did not know if the action succeeded.
 
-**Approach:**
-- `sonner` is already installed in `apps/web`
-- Add a `<Toaster />` to the root layout
-- Client components call `toast.success()` / `toast.error()` based on server action result
-- Server actions need to return a result object `{ ok: true } | { ok: false; message: string }` instead of throwing, so the client can branch
+**Implemented approach:**
 
-**Files to change:**
-- `apps/web/src/app/layout.tsx` - add `<Toaster />`
-- `apps/web/src/components/AwardPointsDialog.tsx` - call toast after `onAward`
-- `apps/web/src/components/DashboardShell.tsx` - call toast after admin form submissions
-- `apps/web/src/app/settings/page.tsx` / `DisplayNameForm.tsx` - already has inline success state; optionally toast instead
+- `apps/web/src/app/layout.tsx` renders the shared Sonner `<Toaster />`.
+- Award points, org onboarding, and admin management flows show success/error toasts.
+- Settings keeps an inline success state for the display-name form.
+
+Expected mutation failures are still being improved toward typed UI results one flow at a time; current client components catch known action failures and show safe user-facing messages.
 
 ---
 
-## 1.4 Rate limiting on API [todo]
+## 1.4 Rate limiting on API [done]
 
-**Problem:** `/points/adjust` and other write endpoints have no rate limit. A misbehaving client could flood the DB.
+**Original problem:** `/points/adjust` and other write endpoints had no rate limit. A misbehaving client could flood the DB.
 
-**Approach:**
-```bash
-npm install @fastify/rate-limit -w @housepoints/api
-```
+**Implemented approach:**
 
-Register per-route limits:
+- `@fastify/rate-limit` is registered globally in the API app factory.
+- `POST /points/adjust` uses a tighter per-route limit.
+- `POST /users/bootstrap` uses a per-route bootstrap limit.
+- Other API routes inherit the global limit.
+
+Current limits:
+
 - `POST /points/adjust` - 20 req / minute per IP
 - `POST /users/bootstrap` - 30 req / minute per IP
 - All other write endpoints - 60 req / minute per IP
-
-```typescript
-// apps/api/src/app.ts
-import rateLimit from "@fastify/rate-limit";
-await app.register(rateLimit, { max: 60, timeWindow: "1 minute" });
-// Then override per-route with { config: { rateLimit: { max: 20 } } }
-```
 
 ---
 
@@ -69,15 +64,7 @@ await app.register(rateLimit, { max: 60, timeWindow: "1 minute" });
 
 **Problem:** If the API is down or returns an unexpected response during a server component render, Next.js shows a generic crash page.
 
-**Fix:** Add `apps/web/src/app/error.tsx`, a client component that catches render errors and shows a friendly retry screen.
-
-```typescript
-// apps/web/src/app/error.tsx
-"use client";
-export default function GlobalError({ reset }: { reset: () => void }) { ... }
-```
-
-Also add `apps/web/src/app/not-found.tsx` for clean 404s.
+**Implemented fix:** `apps/web/src/app/error.tsx` catches render errors and shows safe retry, home, and logout recovery actions. `apps/web/src/app/not-found.tsx` provides a clean 404 page.
 
 ---
 
@@ -91,3 +78,17 @@ npm run db:deploy -w @housepoints/db && npm run start -w @housepoints/api
 ```
 
 If not, update it. This ensures the `20260613190000_house_color_description` migration (and all future ones) apply automatically on every deploy.
+
+---
+
+## 1.7 Auth identity linking for alternate Auth0 social providers [done]
+
+**Original problem:** A user signing in with another Auth0 provider that shared the same email could hit a database unique constraint on `User.email`.
+
+**Implemented approach:**
+
+- Added the `AuthIdentity` table so multiple provider subjects can map to one HousePoints user.
+- Actor resolution checks `AuthIdentity.providerSubject` before the legacy `User.auth0Sub` fallback.
+- Bootstrap, org create, and org join flows link same-email identities only when the Auth0 email claim is verified.
+- Unsafe or unverified same-email conflicts return `ACCOUNT_LINK_REQUIRED` instead of an unhandled Prisma error.
+- The web error boundary includes a logout recovery action so a trapped user can restart login.

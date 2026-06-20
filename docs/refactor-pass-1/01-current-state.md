@@ -73,10 +73,12 @@ At review time, the API test run also started a real listener on port 4000 becau
 
 ## Documentation State
 
-The existing documentation is valuable but no longer a reliable representation of the repository:
+At review time, the existing documentation was valuable but no longer a reliable representation of the repository:
 
 - Org creation, owner roles, and invites are described as upcoming even though they are partly implemented.
 - Some tier files show unchecked work while `roadmap.md` marks the same work done.
 - README content is duplicated and contains conflicting Node and environment-variable instructions.
 - Several documents contain corrupted character encoding.
 - The API security model and onboarding deadlock are not documented.
+
+This was reconciled during pass one. The root README is now canonical, the roadmap tier detail files mirror the current status, and the remaining deferred items are marked explicitly in the roadmap.

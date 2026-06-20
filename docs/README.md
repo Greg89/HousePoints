@@ -17,7 +17,7 @@ The documents in this folder serve three purposes:
 
 ## Roadmap And Planning
 
-- [Roadmap](./roadmap.md): production-readiness tiers and feature work tracked before the refactor pass.
+- [Roadmap](./roadmap.md): current production-readiness tiers and feature work.
 - [Upcoming features](./upcoming-features.md): unscheduled product concepts and open design questions.
 - [Seasons design plan](./seasons-design.md): proposed product and technical plan for season-scoped scoring.
 
@@ -29,4 +29,4 @@ The documents in this folder serve three purposes:
 - [Tier 4: Testing and CI](./04-testing-ci.md)
 - [Tier 5: Scale and Ops](./05-scale-ops.md)
 
-The refactor review should be used as the engineering gate for upcoming feature work. The older tier documents remain useful history, but some statuses and assumptions no longer match the code.
+The refactor review should be used as the engineering gate for upcoming feature work. The tier detail notes now mirror the current roadmap status and call out deferred items explicitly.

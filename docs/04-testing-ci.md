@@ -53,7 +53,28 @@ Key route groups covered include:
 
 ---
 
-## 4.3 Database-Backed Integration Tests
+## 4.3 GitHub Actions CI
+
+**Trigger:** Every push and pull request.
+
+**Status:** Implemented.
+
+The workflow runs visible steps for:
+
+- install;
+- Prisma client generation;
+- lint;
+- type-check;
+- fast tests;
+- coverage;
+- PostgreSQL service startup;
+- migration deployment;
+- database integration tests;
+- production build.
+
+---
+
+## 4.4 Database-Backed Integration Tests
 
 **Scope:** Real PostgreSQL and Prisma behavior - migrations, foreign keys, uniqueness, and stable relational constraints.
 
@@ -80,27 +101,6 @@ npm run test:integration
 ```
 
 The integration suite intentionally asserts that invalid operations fail. Prisma may print expected constraint errors while the command exits successfully.
-
----
-
-## 4.4 GitHub Actions CI
-
-**Trigger:** Every push and pull request.
-
-**Status:** Implemented.
-
-The workflow runs visible steps for:
-
-- install;
-- Prisma client generation;
-- lint;
-- type-check;
-- fast tests;
-- coverage;
-- PostgreSQL service startup;
-- migration deployment;
-- database integration tests;
-- production build.
 
 ---
 

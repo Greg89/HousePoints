@@ -79,10 +79,10 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 ## Phase 6: Reconcile Documentation
 
 1. [x] Update README to one canonical setup guide.
-2. [ ] Mark org management as implemented, partial, or deferred by sub-feature.
-3. [ ] Rebuild the roadmap around current priorities.
+2. [x] Mark org management as implemented, partial, or deferred by sub-feature.
+3. [x] Rebuild the roadmap around current priorities.
 4. [x] Repair text encoding. Older roadmap and feature docs now use ASCII status markers and punctuation so markdown renders consistently across editors and terminals.
-5. [-] Link architecture decisions and migrations to the relevant roadmap items. The auth identity migration is now linked from the architecture notes; remaining future migrations should be linked as they are introduced.
+5. [x] Link architecture decisions, operational runbooks, and migrations to the relevant roadmap items.
 
 ## Recommended Pull Request Sequence
 

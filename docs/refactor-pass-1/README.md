@@ -81,6 +81,7 @@ Completed units:
 - Added safe duplicate-email handling during bootstrap and onboarding so same-email provider conflicts return stable `ACCOUNT_LINK_REQUIRED` errors instead of Prisma unique-constraint 500s.
 - Added a logout recovery action to the web error boundary so a user trapped in a bad auth/session state can sign out and restart login.
 - Added a repeatable dashboard API benchmark and recorded empty, typical, and larger organization query-count and response-time baselines.
+- Reconciled roadmap tier detail docs with implemented reliability, correctness, UX, testing, and org-management status.
 
 Current unit verification:
 

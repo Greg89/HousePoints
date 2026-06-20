@@ -4,29 +4,42 @@ Makes failures visible before users notice them.
 
 ---
 
-## 2.1 Log drain (SEQ / Axiom / Logtail) [todo]
+## 2.1 Structured log drain to SEQ [done]
 
-**Problem:** Both `apps/api` and `apps/web` already emit structured JSON logs to stdout, but nothing is capturing them. Errors disappear into Railway's ephemeral log buffer.
+**Original problem:** API and web errors were split between Railway logs, Next.js production error pages, and ad-hoc local debugging.
 
-**Recommended:** Axiom (free tier, Railway-native integration) or Logtail.
+**Implemented approach:**
 
-**Steps:**
-1. Add Axiom integration in Railway Dashboard -> Integrations
-2. Set `LOG_LEVEL=info` env var on both services (already in `.env.example`)
-3. The existing Fastify JSON logger and `logInfo`/`logError` calls in the web app will flow through automatically
+- API logs are structured through Pino.
+- Web server logs use the shared logging helpers and can write to SEQ when configured.
+- Dashboard renders share one request ID across web logs and API reads.
+- Server Actions use a shared action logging context.
+- Expected failures are warning-level where appropriate.
+- Shared redaction and error serialization helpers live in contracts.
+- Practical SEQ queries are documented in [refactor-pass-1/07-seq-query-runbook.md](./refactor-pass-1/07-seq-query-runbook.md).
+
+Runtime configuration:
+
+- `SEQ_SERVER_URL`
+- `SEQ_API_KEY` when the SEQ instance requires one
+- `LOG_LEVEL=info`
 
 **Key log events to alert on:**
 - `request.unhandled_error` - 500s in the API
+- `web.dashboard.render_failed` - dashboard render failure
 - `web.action.failed` - server action failures
 - `points.cross_organization_target` - potential security probe
 
 ---
 
-## 2.2 Railway health check [todo]
+## 2.2 Railway health check [done]
 
-**Problem:** Railway doesn't know if the API process is up and serving; it only knows if the process is running.
+**Original problem:** Railway did not know if the API process was up and serving; it only knew if the process was running.
 
-**Fix:** In Railway -> API service -> Settings -> Health Check:
+**Implemented fix:** Railway is configured to call the API health endpoint before considering a deploy live.
+
+Railway API service settings:
+
 - Path: `/health`
 - Interval: 30s
 - Timeout: 5s
@@ -35,33 +48,17 @@ The endpoint already exists and returns `{ ok: true }`.
 
 ---
 
-## 2.3 `error.tsx` global error boundary [todo]
+## 2.3 `error.tsx` global error boundary [done]
 
-See [01-correctness.md section 1.5](./01-correctness.md) - listed in Tier 1 as well because it affects correctness.
-
-Additional `not-found.tsx` for 404 pages:
-```typescript
-// apps/web/src/app/not-found.tsx
-export default function NotFound() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <h1 className="font-display text-4xl text-primary">404</h1>
-        <p className="text-muted-foreground">Page not found.</p>
-        <a href="/" className="text-sm text-primary hover:underline">Go home</a>
-      </div>
-    </div>
-  );
-}
-```
+See [01-correctness.md section 1.5](./01-correctness.md). The route error boundary now shows retry, home, and logout recovery actions, and the app has a clean `not-found.tsx` page.
 
 ---
 
-## 2.4 Consistent API error responses [todo]
+## 2.4 Consistent API error responses [done]
 
-**Problem:** Some error responses include a `code` field, others only have `message`. Client code can't reliably branch on error type.
+**Original problem:** Some error responses included a `code` field, others only had `message`. Client code could not reliably branch on error type.
 
-**Target shape:**
+**Implemented target shape:**
 ```typescript
 type ApiError = {
   code: string;       // e.g. "ACTOR_NOT_MAPPED", "VALIDATION_ERROR"
@@ -70,4 +67,16 @@ type ApiError = {
 };
 ```
 
-**Work:** Audit all `reply.status(4xx).send(...)` calls in `apps/api/src/app.ts` and normalise to the above shape. Update `setErrorHandler` to use `code: "INTERNAL_ERROR"`.
+Web-consumed API errors now preserve stable codes through the shared API response parser. The central API error handler returns `code: "INTERNAL_ERROR"` for unhandled failures without leaking internal details.
+
+---
+
+## 2.5 Browser-side client error reporting [todo]
+
+Server-side render and action failures are now visible in structured logs. Browser-only runtime errors are still deferred.
+
+Recommended first step:
+
+- Add a tiny client error reporter for `window.error` and `window.unhandledrejection`.
+- Send sanitized reports to an authenticated or rate-limited API endpoint.
+- Record browser error events with the same service/environment/request context conventions used by the API and web server logs.
