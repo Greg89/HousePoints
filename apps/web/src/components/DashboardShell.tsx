@@ -19,6 +19,7 @@ import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
 import { OverviewReports } from "./OverviewReports";
 import { AwardPointsDialog } from "./AwardPointsDialog";
+import type { AwardPointsResult } from "@/lib/action-results";
 import type {
   DashboardSummary,
   LeaderboardEntry,
@@ -49,7 +50,7 @@ interface DashboardShellProps {
     dashboardSummary: DashboardSummary;
     memberPoints: MemberScore[];
   }>;
-  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<void>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   loginUrl: string;
   logoutUrl: string;
   adminSection?: React.ReactNode;

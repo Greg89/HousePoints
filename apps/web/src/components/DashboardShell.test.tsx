@@ -425,7 +425,7 @@ const baseProps = {
     },
     memberPoints: [{ memberId: "member-3", points: 10 }],
   })),
-  onAward: async () => {},
+  onAward: async () => ({ ok: true as const }),
   loginUrl: "/auth/login",
   logoutUrl: "/auth/logout",
 };

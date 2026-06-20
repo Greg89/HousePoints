@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import type { OrgMember, LeaderboardEntry, Trait } from "@housepoints/contracts";
 import { TRAITS, TRAIT_LABELS } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
+import type { AwardPointsResult } from "@/lib/action-results";
 
 interface AwardPointsDialogProps {
   open: boolean;
@@ -18,7 +19,7 @@ interface AwardPointsDialogProps {
   /** Houses available for display context only */
   houses: LeaderboardEntry[];
   /** Server action to submit the award */
-  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<void>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
 }
 
 const QUICK_AMOUNTS = [5, 10, 25, 50];
@@ -54,7 +55,15 @@ export function AwardPointsDialog({
     if (!targetUserId || !deltaNum || !reason.trim() || !trait) return;
     startTransition(async () => {
       try {
-        await onAward(targetUserId, deltaNum, reason, trait as Trait);
+        const result = await onAward(targetUserId, deltaNum, reason, trait as Trait);
+
+        if (!result.ok) {
+          toast.error("Failed to award points", {
+            description: result.message,
+          });
+          return;
+        }
+
         toast.success("Points awarded!", {
           description: `+${deltaNum} pts to ${selectedMember?.displayName}`,
         });

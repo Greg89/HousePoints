@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { pointAdjustmentResponseSchema, type Trait } from "@housepoints/contracts";
-import { apiFetch, parseApiResponse } from "@/lib/api-client";
-import { runServerAction } from "@/lib/action-context";
+import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
+import type { AwardPointsResult } from "@/lib/action-results";
 import { logInfo, logWarn } from "@/lib/logging";
 
 export async function submitPointAdjustment(formData: FormData): Promise<void> {
@@ -65,18 +66,45 @@ export async function awardPoints(
   delta: number,
   reason: string,
   trait: Trait
-): Promise<void> {
-  await runServerAction("awardPoints", async ({ requestId }) => {
+): Promise<AwardPointsResult> {
+  return runServerAction("awardPoints", async (context) => {
+    const { requestId } = context;
     await getCurrentUserForRequest(requestId);
     const response = await apiFetch("/points/adjust", requestId, {
       method: "POST",
       body: JSON.stringify({ targetUserId, delta, reason, trait }),
     });
-    await parseApiResponse(
-      response,
-      pointAdjustmentResponseSchema,
-      "Points could not be awarded. Please try again.",
-    );
+
+    try {
+      await parseApiResponse(
+        response,
+        pointAdjustmentResponseSchema,
+        "Points could not be awarded. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedAwardFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        targetUserId,
+        delta,
+        trait,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
     revalidatePath("/");
+
+    return { ok: true };
   });
+}
+
+function isExpectedAwardFailure(error: unknown): error is ApiResponseError {
+  return error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500;
 }
