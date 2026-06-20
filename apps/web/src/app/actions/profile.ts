@@ -4,12 +4,14 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { updateProfileResponseSchema, type UserRole } from "@housepoints/contracts";
 import {
+  ApiResponseError,
   apiFetch,
   getOptionalAuthenticatedApiContext,
   parseApiResponse,
 } from "@/lib/api-client";
-import { runServerAction } from "@/lib/action-context";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
+import type { ProfileUpdateResult } from "@/lib/action-results";
 import { logInfo, logWarn } from "@/lib/logging";
 
 export async function readSessionSummary(requestId: string = randomUUID()): Promise<{
@@ -79,11 +81,16 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   };
 }
 
-export async function updateDisplayName(displayName: string): Promise<void> {
-  await runServerAction("updateDisplayName", async ({ requestId }) => {
+export async function updateDisplayName(displayName: string): Promise<ProfileUpdateResult> {
+  return runServerAction("updateDisplayName", async (context) => {
+    const { requestId } = context;
     const trimmed = displayName.trim();
     if (!trimmed || trimmed.length > 120) {
-      throw new Error("Display name must be between 1 and 120 characters");
+      return {
+        ok: false,
+        code: "INVALID_DISPLAY_NAME",
+        message: "Display name must be between 1 and 120 characters.",
+      };
     }
 
     await getCurrentUserForRequest(requestId);
@@ -93,11 +100,25 @@ export async function updateDisplayName(displayName: string): Promise<void> {
       body: JSON.stringify({ displayName: trimmed }),
     });
 
-    const updated = await parseApiResponse(
-      response,
-      updateProfileResponseSchema,
-      "Your display name could not be updated. Please try again.",
-    );
+    let updated: Awaited<ReturnType<typeof parseProfileUpdateResponse>>;
+
+    try {
+      updated = await parseProfileUpdateResponse(response);
+    } catch (error) {
+      if (!isExpectedProfileUpdateFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        displayNameLength: trimmed.length,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     logInfo("web.profile.updated", {
       requestId,
@@ -107,5 +128,19 @@ export async function updateDisplayName(displayName: string): Promise<void> {
 
     revalidatePath("/");
     revalidatePath("/settings");
+
+    return { ok: true };
   });
+}
+
+function parseProfileUpdateResponse(response: Response) {
+  return parseApiResponse(
+    response,
+    updateProfileResponseSchema,
+    "Your display name could not be updated. Please try again.",
+  );
+}
+
+function isExpectedProfileUpdateFailure(error: unknown): error is ApiResponseError {
+  return error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500;
 }

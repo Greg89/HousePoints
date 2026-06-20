@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import { motion } from "framer-motion";
 import { Check, Warning } from "@phosphor-icons/react";
 import { cn } from "@/lib/cn";
+import type { ProfileUpdateResult } from "@/lib/action-results";
 
 interface DisplayNameFormProps {
   currentName: string;
-  onSave: (name: string) => Promise<void>;
+  onSave: (name: string) => Promise<ProfileUpdateResult>;
 }
 
 export function DisplayNameForm({ currentName, onSave }: DisplayNameFormProps) {
@@ -25,7 +26,14 @@ export function DisplayNameForm({ currentName, onSave }: DisplayNameFormProps) {
     setStatus("idle");
     startTransition(async () => {
       try {
-        await onSave(value.trim());
+        const result = await onSave(value.trim());
+
+        if (!result.ok) {
+          setStatus("error");
+          setErrorMsg(result.message);
+          return;
+        }
+
         setStatus("success");
       } catch (err) {
         setStatus("error");

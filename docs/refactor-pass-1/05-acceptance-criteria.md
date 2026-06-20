@@ -39,7 +39,7 @@ Status markers:
 ## Contracts And Errors
 
 - [x] API inputs and web-consumed outputs are validated with shared schemas.
-- [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, account-link conflicts no longer become generic 500s, and point awards now return typed expected-failure results; remaining mutation actions still need the same treatment.
+- [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, account-link conflicts no longer become generic 500s, and point awards plus profile updates now return typed expected-failure results; remaining mutation actions still need the same treatment.
 - [x] A failed dashboard dependency is not rendered as valid empty data.
 - [x] Dashboard error messages shown to users do not expose raw internal responses.
 - [x] The route error boundary includes a logout recovery path for bad auth/session states.

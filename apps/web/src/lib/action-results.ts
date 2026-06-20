@@ -7,3 +7,4 @@ export type MutationResult =
     };
 
 export type AwardPointsResult = MutationResult;
+export type ProfileUpdateResult = MutationResult;
