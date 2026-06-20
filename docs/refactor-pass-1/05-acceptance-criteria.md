@@ -67,7 +67,7 @@ Status markers:
 
 ## Documentation
 
-- [-] README setup instructions match actual environment variable names and supported Node version. Current variables are present, but duplicate and conflicting sections remain.
+- [x] README setup instructions match actual environment variable names, supported Node version, local Docker/Postgres setup, and verification commands.
 - [ ] The roadmap distinguishes implemented, partial, and proposed org-management work.
 - [x] Product authorization decisions are documented.
 - [ ] The docs index links current state, roadmap, upcoming features, and this refactor record.

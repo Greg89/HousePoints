@@ -1,91 +1,126 @@
-# Tier 4 — Testing & CI
+# Tier 4 - Testing & CI
 
 Prevents regressions as the codebase grows.
 
 ---
 
-## 4.1 Vitest unit tests ⬜
+## 4.1 Vitest Unit Tests
 
-**Scope:** Pure logic — Zod schemas, utility functions, data transformations.
+**Scope:** Pure logic, server helpers, component behavior, Zod schemas, and data transformations.
 
-**Setup:**
+**Status:** Implemented for API, web, and contracts.
+
+Test targets:
+
+- `packages/contracts` - shared request, response, logging, and error schemas.
+- `apps/api` - Fastify route behavior, auth helpers, actor resolution, logging helpers, and config parsing.
+- `apps/web` - selected server helpers and client components.
+
+Run:
+
 ```bash
-npm install -D vitest @vitest/coverage-v8 -w @housepoints/contracts
-npm install -D vitest -w @housepoints/api
+npm test
+npm run test:coverage
 ```
-
-**Test targets:**
-- `packages/contracts` — every schema: valid inputs pass, invalid inputs produce the right error paths
-- `apps/api/src/logging.ts` — `info`, `warn`, `error` call logger methods with correct shape
-- Future utility functions (e.g. point total calculations)
 
 ---
 
-## 4.2 Fastify integration tests ⬜
+## 4.2 Fastify Integration Tests
 
-**Scope:** API route behaviour — correct status codes, response shapes, auth guards.
+**Scope:** API route behavior - correct status codes, response shapes, auth guards, and tenant boundaries.
 
-**Approach:** Use `app.inject()` (no real network) with a mocked Prisma client.
+**Approach:** Use `app.inject()` with a mocked Prisma client. These tests do not open a real network listener.
 
 ```typescript
-// apps/api/src/app.test.ts
-import { buildApp } from "./app.js"; // extract app setup into a factory function
+import { buildApp } from "./app.js";
+
 const app = await buildApp();
 const res = await app.inject({ method: "GET", url: "/health" });
 expect(res.statusCode).toBe(200);
 ```
 
-**Prerequisite:** Complete. `apps/api/src/app.ts` exports a side-effect-free `buildApp()` factory, while `apps/api/src/server.ts` owns the network listener.
+**Status:** Implemented. `apps/api/src/app.ts` exports a side-effect-free `buildApp()` factory, while `apps/api/src/server.ts` owns the network listener.
 
-**Key routes to test:**
-- `GET /health`
-- `POST /users/bootstrap` — creates user, returns idempotent on repeat
-- `POST /points/adjust` — rejects unmapped actor, rejects cross-org house, creates transaction
-- `POST /admin/houses` — rejects non-admin, creates house
-- `POST /admin/users/assign-house` — rejects different-org target
+Key route groups covered include:
+
+- health;
+- user bootstrap and profile;
+- point awards and scores;
+- dashboard reads;
+- organization creation, invites, and joins;
+- admin house/user operations;
+- season context, start, and rename flows.
 
 ---
 
-## 4.3 GitHub Actions CI ⬜
+## 4.3 Database-Backed Integration Tests
 
-**Trigger:** Every push and PR to `main`.
+**Scope:** Real PostgreSQL and Prisma behavior - migrations, foreign keys, uniqueness, and stable relational constraints.
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint --workspaces --if-present
-      - run: npm run build --workspaces
+**Status:** Implemented for point-ledger relationships and constraint behavior.
+
+Local setup:
+
+```powershell
+Copy-Item packages/db/.env.example packages/db/.env
+
+docker run --name housepoints-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=housepoints_local `
+  -p 5432:5432 `
+  -d postgres:16
 ```
 
-Add `DATABASE_URL` as a GitHub Actions secret (or use a SQLite adapter for CI if you want to avoid a real DB dependency during type-check-only runs).
+Apply migrations and run the suite:
+
+```bash
+npm run db:deploy
+npm run test:integration
+```
+
+The integration suite intentionally asserts that invalid operations fail. Prisma may print expected constraint errors while the command exits successfully.
 
 ---
 
-## 4.4 Playwright e2e ⬜
+## 4.4 GitHub Actions CI
 
-**Scope:** Critical happy path only — not exhaustive.
+**Trigger:** Every push and pull request.
 
-**Prerequisite:** A seeded test database (or a Railway staging environment, see Tier 5).
+**Status:** Implemented.
 
-**Test plan:**
+The workflow runs visible steps for:
 
-1. **Login flow** — visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard
-2. **Award points** — click Award Points, select a house, enter amount + reason, submit, confirm house score increments
-3. **Activity feed** — switch to Activity tab, confirm the new transaction appears
-4. **Settings** — navigate to `/settings`, update display name, return to dashboard, confirm name updated
+- install;
+- Prisma client generation;
+- lint;
+- type-check;
+- fast tests;
+- coverage;
+- PostgreSQL service startup;
+- migration deployment;
+- database integration tests;
+- production build.
 
-**Setup:**
+---
+
+## 4.5 Playwright E2E
+
+**Scope:** Critical happy path only, not exhaustive.
+
+**Status:** Deferred.
+
+Prerequisite: a seeded test database, test Auth0 tenant, or staging environment.
+
+Initial test plan:
+
+1. Login flow - visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard.
+2. Award points - click Award Points, select a house, enter amount and reason, submit, confirm house score increments.
+3. Activity feed - switch to Activity tab and confirm the new transaction appears.
+4. Settings - navigate to `/settings`, update display name, return to dashboard, confirm name updated.
+
+Setup when this tier is prioritized:
+
 ```bash
 npm install -D @playwright/test -w @housepoints/web
 npx playwright install chromium

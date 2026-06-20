@@ -21,7 +21,7 @@ Structured logs are emitted by both services and can be sent to SEQ with `SEQ_SE
 
 - Node.js 22+
 - npm 10+
-- PostgreSQL
+- Docker Desktop, or another local PostgreSQL 16+ instance
 - Auth0 tenant with:
   - Regular Web Application for the web app
   - API configured with RS256 signing
@@ -40,12 +40,13 @@ Copy the example files:
 ```powershell
 Copy-Item apps/web/.env.example apps/web/.env.local
 Copy-Item apps/api/.env.example apps/api/.env
+Copy-Item packages/db/.env.example packages/db/.env
 ```
 
-Create `packages/db/.env` with:
+The DB package uses `packages/db/.env` for Prisma commands and database-backed tests:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/housepoints"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/housepoints_local"
 ```
 
 API variables:
@@ -85,13 +86,39 @@ Set `CORS_ALLOWED_ORIGINS` to exact web origins only, comma-separated when there
 
 ## Database
 
+For local development with Docker:
+
+```powershell
+docker run --name housepoints-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=housepoints_local `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+Start or stop that container later with:
+
+```powershell
+docker start housepoints-postgres
+docker stop housepoints-postgres
+```
+
+Apply local migrations and optionally seed data:
+
 ```bash
 npm run db:generate
-npm run db:migrate
+npm run db:deploy
 npm run db:seed -w @housepoints/db
 ```
 
-Production deploys should run:
+Use `db:migrate` only when creating a new migration during schema development:
+
+```bash
+npm run db:migrate
+```
+
+Production and CI deploy existing migrations with:
 
 ```bash
 npm run db:deploy
@@ -119,7 +146,14 @@ Run the full local gate before considering a unit of work complete:
 npm run lint
 npm run typecheck
 npm test
+npm run test:coverage
 npm run build
+```
+
+When a local PostgreSQL database is available, also run:
+
+```bash
+npm run test:integration
 ```
 
 Useful focused commands:
@@ -128,11 +162,14 @@ Useful focused commands:
 npm run test -w @housepoints/api
 npm run test -w @housepoints/web
 npm run test -w @housepoints/contracts
+npm run test:integration
 npm run build -w @housepoints/api
 npm run build -w @housepoints/web
 ```
 
-Current full test count: 182 tests.
+Current fast test count: 200 tests.
+
+The database integration suite intentionally verifies failing database constraints. Prisma may print expected foreign-key or unique-constraint errors while the command still exits successfully.
 
 ## Build Scripts
 
