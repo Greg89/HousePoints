@@ -9,12 +9,14 @@ import {
   inviteLinkSchema,
 } from "@housepoints/contracts";
 import {
+  ApiResponseError,
   apiFetch,
   getOptionalAuthenticatedApiContext,
   parseApiResponse,
 } from "@/lib/api-client";
-import { runServerAction } from "@/lib/action-context";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
+import type { CreateInviteResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
@@ -125,20 +127,47 @@ export async function readAdminContext(requestId: string = randomUUID()) {
   return context;
 }
 
-export async function createInviteLink(): Promise<{ token: string; expiresAt: string }> {
-  return runServerAction("createInviteLink", async ({ requestId }) => {
-    await getCurrentUserForRequest(requestId);
+export async function createInviteLink(): Promise<CreateInviteResult> {
+  return runServerAction("createInviteLink", async (context) => {
+    const { requestId } = context;
+    const actor = await getCurrentUserForRequest(requestId);
 
     const response = await apiFetch("/orgs/invite", requestId, {
       method: "POST",
       body: JSON.stringify({}),
     });
 
-    const data = await parseApiResponse(
-      response,
-      inviteLinkSchema,
-      "An invite could not be generated. Please try again.",
-    );
-    return { token: data.token, expiresAt: data.expiresAt };
+    try {
+      const data = await parseApiResponse(
+        response,
+        inviteLinkSchema,
+        "An invite could not be generated. Please try again.",
+      );
+
+      return {
+        ok: true,
+        token: data.token,
+        expiresAt: data.expiresAt,
+      };
+    } catch (error) {
+      if (!isExpectedInviteFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
   });
+}
+
+function isExpectedInviteFailure(error: unknown): error is ApiResponseError {
+  return error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500;
 }

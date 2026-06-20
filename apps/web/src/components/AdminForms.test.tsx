@@ -46,6 +46,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateHouse: vi.fn().mockResolvedValue(undefined),
     onAssignHouse: vi.fn().mockResolvedValue(undefined),
     onCreateInvite: vi.fn().mockResolvedValue({
+      ok: true,
       token: "invite-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     }),
@@ -231,5 +232,29 @@ describe("AdminForms", () => {
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());
     expect(within(inviteCard!).getByText("invite-token")).toBeInTheDocument();
     expect(within(inviteCard!).getByTitle("Copy token")).toBeInTheDocument();
+  });
+
+  it("shows a safe toast when invite generation returns an expected failure", async () => {
+    const { user, props } = setupAdminForms({
+      onCreateInvite: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "INVITE_LIMIT_REACHED",
+        message: "An invite could not be generated. Please try again.",
+      }),
+    });
+
+    const inviteCard = screen.getByText("Invite Member").closest("div");
+    expect(inviteCard).not.toBeNull();
+
+    await user.click(
+      within(inviteCard!).getByRole("button", { name: "Generate invite token" }),
+    );
+
+    await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());
+    expect(screen.queryByText("invite-token")).not.toBeInTheDocument();
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to generate invite", {
+      description: "An invite could not be generated. Please try again.",
+    });
   });
 });

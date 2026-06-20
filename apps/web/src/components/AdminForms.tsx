@@ -14,6 +14,7 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { CreateInviteResult } from "@/lib/action-results";
 
 interface AdminUser {
   id: string;
@@ -35,7 +36,7 @@ interface AdminFormsProps {
   actorRole: UserRole;
   onCreateHouse: (formData: FormData) => Promise<void>;
   onAssignHouse: (formData: FormData) => Promise<void>;
-  onCreateInvite: () => Promise<{ token: string; expiresAt: string }>;
+  onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<SeasonTransition>;
   onRenameSeason: (formData: FormData) => Promise<Season>;
 }
@@ -178,6 +179,14 @@ export function AdminForms({
     startInvite(async () => {
       try {
         const result = await onCreateInvite();
+
+        if (!result.ok) {
+          toast.error("Failed to generate invite", {
+            description: result.message,
+          });
+          return;
+        }
+
         setInviteToken(result.token);
         setInviteExpiry(result.expiresAt);
         setCopied(false);
