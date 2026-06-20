@@ -52,7 +52,7 @@ Status markers:
 
 - [x] Dashboard rendering performs one current-user mapping per request.
 - [x] House totals are aggregated by the database.
-- [ ] Activity history supports bounded cursor pagination.
+- [x] Activity history supports bounded cursor pagination.
 - [ ] Query count and response-time baselines are recorded for an empty, typical, and larger organization.
 
 ## Quality Gates

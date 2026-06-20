@@ -1084,7 +1084,7 @@ describe("POST /transactions/recent", () => {
     await app.close();
   });
 
-  it("returns activity items with trait included", async () => {
+  it("returns a bounded first page of activity items with trait included", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockTxFindMany.mockResolvedValue([
       {
@@ -1098,15 +1098,27 @@ describe("POST /transactions/recent", () => {
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
         season: { id: "season-active", name: "Q3 2026", isActive: true },
       },
+      {
+        id: "tx-2",
+        delta: 5,
+        reason: "Second page",
+        trait: "LEADERSHIP",
+        createdAt: new Date("2026-01-01T11:00:00Z"),
+        actor: { displayName: "Bob" },
+        targetUser: { displayName: "Alice" },
+        targetHouse: { name: "Phoenix", color: "#7c3aed" },
+        season: { id: "season-active", name: "Q3 2026", isActive: true },
+      },
     ]);
     const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
       url: "/transactions/recent",
-      payload: {},
+      payload: { limit: 1 },
     });
     expect(res.statusCode).toBe(200);
-    const items = res.json();
+    const page = res.json();
+    const items = page.items;
     expect(items).toHaveLength(1);
     expect(items[0].trait).toBe("COLLABORATION");
     expect(items[0].season).toEqual({
@@ -1116,9 +1128,37 @@ describe("POST /transactions/recent", () => {
     });
     expect(items[0].actorName).toBe("Bob");
     expect(items[0].delta).toBe(10);
+    expect(page.nextCursor).toBe("tx-1");
+    expect(mockTxFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-1" },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      take: 2,
+      select: expect.any(Object),
+    });
+    await app.close();
+  });
+
+  it("uses the provided activity cursor for the next page", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { cursor: "tx-1", limit: 25 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ items: [], nextCursor: null });
     expect(mockTxFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: "org-1" },
+        cursor: { id: "tx-1" },
+        skip: 1,
+        take: 26,
       }),
     );
     await app.close();
@@ -1146,7 +1186,7 @@ describe("POST /transactions/recent", () => {
       payload: {},
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()[0].trait).toBeNull();
+    expect(res.json().items[0].trait).toBeNull();
     await app.close();
   });
 });

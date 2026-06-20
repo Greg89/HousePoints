@@ -68,6 +68,7 @@ Completed units:
 - Extracted the API dashboard summary and house leaderboard routes into a focused route module, completing the API route-module extraction pass.
 - Split the web Server Actions into focused admin, dashboard, org, profile, point, and season modules without changing action contracts.
 - Aggregated leaderboard score and transaction totals in the database instead of reducing per-house transactions in application code.
+- Added bounded cursor pagination to the activity feed API while preserving the dashboard's first-page render behavior.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 

@@ -133,6 +133,20 @@ export const activityItemSchema = z.object({
 export type ActivityItem = z.infer<typeof activityItemSchema>;
 export const activityFeedSchema = z.array(activityItemSchema);
 
+export const activityFeedRequestSchema = z.object({
+  cursor: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(100).default(50),
+}).strict();
+
+export type ActivityFeedRequest = z.infer<typeof activityFeedRequestSchema>;
+
+export const pagedActivityFeedSchema = z.object({
+  items: z.array(activityItemSchema),
+  nextCursor: z.string().min(1).nullable(),
+});
+
+export type PagedActivityFeed = z.infer<typeof pagedActivityFeedSchema>;
+
 const dashboardStandoutSchema = z.object({
   memberId: z.string(),
   memberName: z.string(),

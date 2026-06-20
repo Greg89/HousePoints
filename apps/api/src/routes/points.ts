@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import {
-  actorScopeSchema,
   adjustPointsSchema,
+  activityFeedRequestSchema,
   seasonScopedRequestSchema,
   type Trait,
 } from "@housepoints/contracts";
@@ -199,7 +199,7 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/transactions/recent", async (request, reply) => {
-    const parsed = actorScopeSchema.safeParse(request.body);
+    const parsed = activityFeedRequestSchema.safeParse(request.body);
 
     if (!parsed.success) {
       warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
@@ -215,8 +215,12 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
 
     const transactions = await prisma.pointTransaction.findMany({
       where: { organizationId: actor.organizationId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      take: parsed.data.limit + 1,
+      ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
       select: {
         id: true,
         delta: true,
@@ -230,6 +234,12 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
-    return transactions.map(mapActivityItem);
+    const items = transactions.slice(0, parsed.data.limit);
+    const nextCursor = transactions.length > parsed.data.limit ? items.at(-1)?.id ?? null : null;
+
+    return {
+      items: items.map(mapActivityItem),
+      nextCursor,
+    };
   });
 }

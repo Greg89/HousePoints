@@ -6,6 +6,7 @@ import {
   dashboardSummarySchema,
   leaderboardSchema,
   orgMembersSchema,
+  pagedActivityFeedSchema,
   type DashboardSummary,
 } from "@housepoints/contracts";
 import { apiFetch, parseApiResponse } from "@/lib/api-client";
@@ -43,11 +44,12 @@ export async function readActivityFeed(requestId: string = randomUUID()) {
     method: "POST",
     body: JSON.stringify({}),
   });
-  return parseApiResponse(
+  const page = await parseApiResponse(
     response,
-    activityFeedSchema,
+    pagedActivityFeedSchema,
     "Dashboard data could not be loaded. Please try again.",
   );
+  return activityFeedSchema.parse(page.items);
 }
 
 export async function readDashboardSummary(

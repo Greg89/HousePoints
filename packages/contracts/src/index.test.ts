@@ -22,10 +22,12 @@ import {
   memberScoresSchema,
   activityItemSchema,
   activityFeedSchema,
+  activityFeedRequestSchema,
   dashboardSummarySchema,
   appUserSchema,
   leaderboardSchema,
   orgMembersSchema,
+  pagedActivityFeedSchema,
   adminContextSchema,
   pointAdjustmentResponseSchema,
   redactLogContext,
@@ -587,7 +589,22 @@ describe("dashboard response schemas", () => {
     expect(leaderboardSchema.parse([])).toEqual([]);
     expect(orgMembersSchema.parse([])).toEqual([]);
     expect(activityFeedSchema.parse([])).toEqual([]);
+    expect(pagedActivityFeedSchema.parse({ items: [], nextCursor: null })).toEqual({
+      items: [],
+      nextCursor: null,
+    });
     expect(memberScoresSchema.parse([])).toEqual([]);
+  });
+
+  it("accepts bounded activity feed requests and defaults limit", () => {
+    expect(activityFeedRequestSchema.parse({})).toEqual({ limit: 50 });
+    expect(activityFeedRequestSchema.parse({ cursor: "tx-1", limit: 25 })).toEqual({
+      cursor: "tx-1",
+      limit: 25,
+    });
+    expect(activityFeedRequestSchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ limit: 101 }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ cursor: "" }).success).toBe(false);
   });
 
   it("rejects malformed items inside dashboard collections", () => {
@@ -600,6 +617,9 @@ describe("dashboard response schemas", () => {
     ).toBe(false);
     expect(
       activityFeedSchema.safeParse([{ id: "tx-1", delta: "10" }]).success,
+    ).toBe(false);
+    expect(
+      pagedActivityFeedSchema.safeParse({ items: [{ id: "tx-1", delta: "10" }], nextCursor: null }).success,
     ).toBe(false);
     expect(
       memberScoresSchema.safeParse([{ memberId: "user-1", points: 1.5 }])
