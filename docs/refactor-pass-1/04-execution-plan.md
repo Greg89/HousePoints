@@ -80,7 +80,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 1. [x] Update README to one canonical setup guide.
 2. [ ] Mark org management as implemented, partial, or deferred by sub-feature.
 3. [ ] Rebuild the roadmap around current priorities.
-4. [ ] Repair text encoding.
+4. [x] Repair text encoding. Older roadmap and feature docs now use ASCII status markers and punctuation so markdown renders consistently across editors and terminals.
 5. [ ] Link architecture decisions and migrations to the relevant roadmap items.
 
 ## Recommended Pull Request Sequence

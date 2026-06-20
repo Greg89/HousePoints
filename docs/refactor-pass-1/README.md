@@ -75,6 +75,7 @@ Completed units:
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Removed build-time Google font fetching from the web app so production builds use local/system font fallbacks.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
+- Expanded the docs index and normalized older markdown files to ASCII status markers and punctuation.
 
 Current unit verification:
 

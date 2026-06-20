@@ -70,5 +70,5 @@ Status markers:
 - [x] README setup instructions match actual environment variable names, supported Node version, local Docker/Postgres setup, and verification commands.
 - [ ] The roadmap distinguishes implemented, partial, and proposed org-management work.
 - [x] Product authorization decisions are documented.
-- [ ] The docs index links current state, roadmap, upcoming features, and this refactor record.
-- [ ] Markdown files render without corrupted characters.
+- [x] The docs index links current state, roadmap, upcoming features, and this refactor record.
+- [x] Markdown files render without corrupted characters.

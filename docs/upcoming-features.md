@@ -1,4 +1,4 @@
-# Upcoming Features — Brainstorm
+# Upcoming Features - Brainstorm
 
 High-level definitions and open design questions for the next wave of features.
 These are not scheduled. Treat this as a living document to refine before work starts.
@@ -8,7 +8,7 @@ These are not scheduled. Treat this as a living document to refine before work s
 ## 1. Org Management & Self-Serve Signup
 
 ### What it is
-Allow any user to create their own organisation, configure houses within it, and invite team members — removing the dependency on a developer to bootstrap an org manually.
+Allow any user to create their own organisation, configure houses within it, and invite team members, removing the dependency on a developer to bootstrap an org manually.
 
 ### Current state
 The `Organization` model already exists and every entity is scoped to it. The first user to hit `/users/bootstrap` with a new `organizationSlug` creates the org implicitly. There is no UI for org creation, no invite flow, and no concept of an "org owner" distinct from an admin.
@@ -24,15 +24,15 @@ The `Organization` model already exists and every entity is scoped to it. The fi
 - Introduce a third role: `OWNER` (or promote the existing `ADMIN` with an `isOwner` flag).
 - Only an owner can delete the org, transfer ownership, or remove other admins.
 - Regular `ADMIN`s can manage houses and assign members but cannot touch org-level settings.
-- `MEMBER`s have no admin capability — award points only.
+- `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
-- Option A — **Invite link**: Owner/admin generates a shareable link with a short-lived signed token scoped to the org slug. Any Auth0-authenticated user who follows the link is added to that org as a `MEMBER`.
-- Option B — **Email domain allow-list**: Org owner specifies a trusted domain (e.g. `acme.com`). Any user whose Auth0 email matches is auto-joined on first login.
+- Option A - **Invite link**: Owner/admin generates a shareable link with a short-lived signed token scoped to the org slug. Any Auth0-authenticated user who follows the link is added to that org as a `MEMBER`.
+- Option B - **Email domain allow-list**: Org owner specifies a trusted domain (e.g. `acme.com`). Any user whose Auth0 email matches is auto-joined on first login.
 - Both options should be supported; option B is lower friction for corporate rollouts.
 
 **Isolation**
-- All existing endpoints already filter by `organizationId` derived from the actor's mapping — this is already enforced.
+- All existing endpoints already filter by `organizationId` derived from the actor's mapping; this is already enforced.
 - The key risk is the bootstrap endpoint. It currently creates a user into an org by slug. With self-serve, we need to distinguish: "I am creating this org" vs "I am joining this org via invite". A user without a valid invite or domain match must be rejected, not silently placed into a wrong org.
 - A user can only belong to **one org** in the current schema (single `organizationId` on `User`). Decide early whether multi-org membership is in scope. If not, make the error message clear when a user tries to join a second org.
 
@@ -57,7 +57,7 @@ A mechanism to periodically reset the active leaderboard while preserving all hi
 **Season model**
 - New `Season` table: `id`, `organizationId`, `name` (e.g. "Q1 2026"), `startsAt`, `endsAt`, `isActive` (bool).
 - Each `PointTransaction` gets a `seasonId` foreign key. Transactions written during an active season are tagged to it automatically.
-- A `null` `seasonId` on old records means "pre-seasons era" — treat as a legacy bucket for historical reporting, not included in any season leaderboard.
+- A `null` `seasonId` on old records means "pre-seasons era"; treat as a legacy bucket for historical reporting, not included in any season leaderboard.
 
 **Starting a new season**
 - Admin-only action: "Start new season".
@@ -77,7 +77,7 @@ A mechanism to periodically reset the active leaderboard while preserving all hi
 
 **Edge cases**
 - What happens to transactions made before seasons were introduced? Need a migration that creates a "Season 0 / All time" record and back-fills existing transactions, or explicitly excludes them from season scoring.
-- Can there be overlapping seasons? No — enforce a single `isActive` season per org at the DB constraint level.
+- Can there be overlapping seasons? No; enforce a single `isActive` season per org at the DB constraint level.
 - What if an admin forgets to close a season? Consider an optional `autoEndAt` that a background job (or Railway cron) can use to close it.
 
 **Open questions**
@@ -90,30 +90,30 @@ A mechanism to periodically reset the active leaderboard while preserving all hi
 ## 3. Dashboard Widgets
 
 ### What it is
-Replace the current single-view dashboard with a richer landing page composed of focused widgets — giving both members and admins an at-a-glance picture of what's happening.
+Replace the current single-view dashboard with a richer landing page composed of focused widgets, giving both members and admins an at-a-glance picture of what's happening.
 
 ### Current state
 The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboard. The overview tab shows house cards but no condensed stats or highlights.
 
 ### Proposed widgets
 
-**This month's standout** — the member with the most points awarded to them in the current calendar month. Shows name, house colour, and total. Refreshes daily.
+**This month's standout** - the member with the most points awarded to them in the current calendar month. Shows name, house colour, and total. Refreshes daily.
 
-**Trait leader per house** — for each house, which trait has been most recognised this month. Visualised as a small bar or icon cluster. Useful for spotting cultural patterns ("Phoenix is leading in Innovation, Ember is leading in Team Support").
+**Trait leader per house** - for each house, which trait has been most recognised this month. Visualised as a small bar or icon cluster. Useful for spotting cultural patterns ("Phoenix is leading in Innovation, Ember is leading in Team Support").
 
-**Recent activity strip** — a compact horizontal scroll of the last 5–10 transactions, showing actor → recipient, delta, and trait pill. Clicking opens the full activity feed.
+**Recent activity strip** - a compact horizontal scroll of the last 5-10 transactions, showing actor -> recipient, delta, and trait pill. Clicking opens the full activity feed.
 
-**Points velocity** — a simple sparkline per house showing points earned per day over the last 14 days. Highlights momentum shifts (a house surging or fading).
+**Points velocity** - a simple sparkline per house showing points earned per day over the last 14 days. Highlights momentum shifts (a house surging or fading).
 
-**Admin-only: unassigned members** — a warning card showing how many members have not been assigned to a house yet. Links directly to the admin panel.
+**Admin-only: unassigned members** - a warning card showing how many members have not been assigned to a house yet. Links directly to the admin panel.
 
-**Season countdown / summary** — if seasons are enabled, show days remaining in the current season or a "Season just ended" summary card with the winner.
+**Season countdown / summary** - if seasons are enabled, show days remaining in the current season or a "Season just ended" summary card with the winner.
 
 ### Implementation notes
 - Most widgets can be computed server-side in parallel on page load using existing `POST` endpoints or new lightweight aggregation endpoints.
 - Consider a `GET /dashboard/summary` endpoint that returns all widget data in one round-trip to avoid waterfall fetching.
 - Widgets should degrade gracefully: if there are no transactions yet, show an empty state, not an error.
-- The layout should be a responsive CSS grid — widgets can be different sizes (some spanning 2 columns) depending on their content density.
+- The layout should be a responsive CSS grid; widgets can be different sizes (some spanning 2 columns) depending on their content density.
 
 **Open questions**
 - Do members and admins see the same widgets, or should the layout be role-aware?
@@ -125,7 +125,7 @@ The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboa
 ## 4. The Hex
 
 ### What it is
-A limited, high-stakes ability for the house currently in **last place** to hex members of rival houses — temporarily reducing their points. Adds strategic tension and a comeback mechanic.
+A limited, high-stakes ability for the house currently in **last place** to hex members of rival houses, temporarily reducing their points. Adds strategic tension and a comeback mechanic.
 
 ### Design intent
 - Last place should feel hard but not hopeless. The Hex is a pressure valve.
@@ -136,13 +136,13 @@ A limited, high-stakes ability for the house currently in **last place** to hex 
 **Eligibility**
 - Only the house ranked **last** on the current leaderboard (at the moment of casting) can initiate a Hex.
 - Any `ADMIN` member of the last-place house can cast a Hex on behalf of their house.
-- Regular `MEMBER`s cannot cast Hexes — admin gate prevents griefing.
+- Regular `MEMBER`s cannot cast Hexes; admin gate prevents griefing.
 
 **The Hex action**
 - Admin selects a target member from a **different** house (not their own).
 - Selects a Hex Trait from a dedicated Hex Trait list (see below).
 - Optionally adds a note.
-- The system creates a `PointTransaction` with a **negative delta** (e.g. −5 to −15) and a `type: HEX` discriminator.
+- The system creates a `PointTransaction` with a **negative delta** (e.g. -5 to -15) and a `type: HEX` discriminator.
 - The target's house score decreases; their personal score decreases.
 
 **Hex Trait list** (distinct from the positive Trait list)
@@ -159,7 +159,7 @@ The Hex Traits name the *failure mode* being hexed, keeping it professional rath
 - Ignored the Process
 - Radio Silence
 
-These are light-hearted work antipatterns, not personal attacks. The list is intentionally short and fixed — no custom Hex reasons.
+These are light-hearted work antipatterns, not personal attacks. The list is intentionally short and fixed; no custom Hex reasons.
 
 **Guards against overuse**
 
@@ -167,9 +167,9 @@ These are light-hearted work antipatterns, not personal attacks. The list is int
 |---|---|
 | Cooldown | A house can cast at most **1 Hex per 24 hours** |
 | Ceiling | A house loses the Hex ability once they are no longer last place |
-| Delta cap | Hex delta is fixed at −10 (not configurable) to prevent stacking abuse |
+| Delta cap | Hex delta is fixed at -10 (not configurable) to prevent stacking abuse |
 | Self-protection | A member cannot be hexed twice in the same 24-hour window |
-| Audit trail | Every Hex is fully visible in the activity feed with a ⚡ badge — no hidden transactions |
+| Audit trail | Every Hex is fully visible in the activity feed with a Hex badge; no hidden transactions |
 | Season reset | Hex counts reset with each season |
 
 **Schema changes**
@@ -182,13 +182,13 @@ These are light-hearted work antipatterns, not personal attacks. The list is int
 - Returns `429` with a meaningful message if the cooldown or eligibility guard fires.
 
 **UI changes**
-- A "⚡ Cast Hex" button appears in the admin panel **only** when the admin's house is in last place.
-- The button is hidden (not just disabled) when the house is not last — keeps the surprise.
-- Activity feed shows Hex transactions with a distinct visual treatment (red delta, ⚡ icon, Hex Trait pill in a different colour).
+- A "Cast Hex" button appears in the admin panel **only** when the admin's house is in last place.
+- The button is hidden (not just disabled) when the house is not last; this keeps the surprise.
+- Activity feed shows Hex transactions with a distinct visual treatment (red delta, Hex icon, Hex Trait pill in a different colour).
 
 **Open questions**
 - Should hexed members be notified in-app?
 - Should the Hex ability be opt-in per org (org owner enables it in settings)?
-- What happens on a tie for last place — do both houses get the Hex?
-- Is a −10 fixed delta the right balance, or should it scale with the points gap?
+- What happens on a tie for last place; do both houses get the Hex?
+- Is a -10 fixed delta the right balance, or should it scale with the points gap?
 - Should there be a "counter-hex" or defensive ability for houses in the lead?
