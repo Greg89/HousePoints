@@ -71,7 +71,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 3. [x] Add real ESLint/type-check scripts for API, contracts, and DB.
 4. [x] Add coverage reporting with meaningful thresholds for security-critical modules. API auth, actor resolution, hooks, config, logging, and shared contracts now have CI-enforced coverage thresholds.
 5. [x] Remove recursive duplicate workspace builds.
-6. [ ] Make font/build assets reproducible without external network access where practical.
+6. [x] Make font/build assets reproducible without external network access where practical. The web root layout no longer uses `next/font/google`, so production builds do not fetch Google font assets.
 7. [x] Add database-backed integration tests for transaction and constraint behavior. CI now runs Prisma migrations against a PostgreSQL service and verifies point-ledger relationships, foreign-key failures, uniqueness, and restrict-delete behavior.
 8. [x] Unify structured web and API logs in SEQ. Web render/auth instrumentation exists, web logs are delivered to SEQ when configured, dashboard renders share one request ID across web logs and API reads, Server Actions use a shared action logging context, common expected failures are warning-level, shared redaction/error serialization helpers live in contracts, and a SEQ query runbook exists. Browser-side client error reporting remains deferred outside pass one.
 

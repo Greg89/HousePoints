@@ -62,7 +62,7 @@ Status markers:
 - [x] Coverage reporting enforces thresholds for security-critical API modules and shared contracts.
 - [-] Security-critical services have direct tests. Authentication, actor resolution, and onboarding are covered; more extracted services should receive direct tests as they appear.
 - [x] At least one database-backed integration suite validates transactions and constraints.
-- [ ] The production build does not depend on unplanned external network access.
+- [x] The production build does not depend on unplanned external network access.
 - [x] CI runs install, generate, lint, type-check, test, coverage, and build as distinct visible steps.
 
 ## Documentation
