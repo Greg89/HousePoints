@@ -19,6 +19,7 @@
     "build": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run build:app -w @housepoints/api && npm run build:app -w @housepoints/web",
     "test": "npm run test --workspaces --if-present",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:integration": "npm run test:integration -w @housepoints/db",
     "typecheck": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces",
     "db:generate": "npm run db:generate -w @housepoints/db",

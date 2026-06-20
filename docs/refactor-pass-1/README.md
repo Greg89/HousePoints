@@ -70,6 +70,7 @@ Completed units:
 - Aggregated leaderboard score and transaction totals in the database instead of reducing per-house transactions in application code.
 - Added bounded cursor pagination to the activity feed API while preserving the dashboard's first-page render behavior.
 - Added CI-enforced coverage thresholds for security-critical API modules and shared contracts, with type-check and coverage as visible workflow steps.
+- Added a PostgreSQL-backed database integration test suite in CI for point-ledger relationships and stable database constraints.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 

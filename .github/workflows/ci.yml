@@ -10,6 +10,20 @@ jobs:
   test:
     name: Lint, Test & Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: housepoints_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d housepoints_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +50,17 @@ jobs:
 
       - name: Coverage
         run: npm run test:coverage
+
+      - name: Deploy test database migrations
+        run: npm run db:deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/housepoints_ci
+
+      - name: Database integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/housepoints_ci
+          NODE_ENV: test
 
       - name: Build
         run: npm run build
