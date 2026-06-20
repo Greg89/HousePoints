@@ -35,6 +35,11 @@ function assertPrismaErrorCode(error: unknown, code: string) {
   assert.equal(error.code, code);
 }
 
+function assertPrismaConstraintFailure(error: unknown) {
+  assert(error instanceof Error);
+  assert.match(error.message, /violates check constraint/i);
+}
+
 async function createLedgerFixture() {
   const organization = await prisma.organization.create({
     data: {
@@ -123,6 +128,66 @@ async function run() {
   assert.equal(transaction.targetHouse.id, house.id);
   assert.equal(transaction.delta, 10);
   assert.equal(transaction.trait, "TEAM_SUPPORT");
+
+  await assert.rejects(
+    () =>
+      prisma.pointTransaction.create({
+        data: {
+          organizationId: organization.id,
+          seasonId: season.id,
+          actorUserId: actor.id,
+          targetUserId: target.id,
+          targetHouseId: house.id,
+          delta: 0,
+          reason: "Zero delta should fail",
+          trait: "TEAM_SUPPORT",
+        },
+      }),
+    (error) => {
+      assertPrismaConstraintFailure(error);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      prisma.pointTransaction.create({
+        data: {
+          organizationId: organization.id,
+          seasonId: season.id,
+          actorUserId: actor.id,
+          targetUserId: target.id,
+          targetHouseId: house.id,
+          delta: 5,
+          reason: "Missing trait should fail",
+          trait: null,
+        },
+      }),
+    (error) => {
+      assertPrismaConstraintFailure(error);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      prisma.pointTransaction.create({
+        data: {
+          organizationId: organization.id,
+          seasonId: season.id,
+          actorUserId: actor.id,
+          targetUserId: target.id,
+          targetHouseId: house.id,
+          delta: 5,
+          reason: "  ",
+          trait: "TEAM_SUPPORT",
+        },
+      }),
+    (error) => {
+      assertPrismaConstraintFailure(error);
+      return true;
+    },
+  );
 
   await assert.rejects(
     () =>

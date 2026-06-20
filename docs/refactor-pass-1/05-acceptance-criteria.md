@@ -45,7 +45,7 @@ Status markers:
 
 - [x] Organization creation and owner assignment are atomic.
 - [x] Invite consumption and user membership update are atomic.
-- [ ] Settled point-ledger invariants are enforced in service logic and, where stable, in the database.
+- [x] Settled point-ledger invariants are enforced in service logic and, where stable, in the database.
 - [x] Score queries derive tenant and house scope from trusted records.
 
 ## Performance

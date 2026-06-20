@@ -62,7 +62,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 3. [-] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API responses; future operations should add schemas with their endpoint contracts.
 4. [x] Parse all API responses in the web client. Web-consumed responses now flow through the shared response parser and contract schemas.
 5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, and concurrent invite claims. Core auth, role, read/write tenant isolation, onboarding, and invite cases exist; coverage is not yet complete.
-6. [ ] Add stable database constraints for settled ledger rules.
+6. [x] Add stable database constraints for settled ledger rules. New point-ledger writes now require positive deltas, non-empty award reasons, and a trait at the database layer, with database-backed integration coverage.
 
 ## Phase 5: Improve Queries And Tooling
 

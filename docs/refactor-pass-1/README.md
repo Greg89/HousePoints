@@ -71,6 +71,7 @@ Completed units:
 - Added bounded cursor pagination to the activity feed API while preserving the dashboard's first-page render behavior.
 - Added CI-enforced coverage thresholds for security-critical API modules and shared contracts, with type-check and coverage as visible workflow steps.
 - Added a PostgreSQL-backed database integration test suite in CI and documented local Docker/Postgres onboarding for DB-backed tests.
+- Added database check constraints for settled point-award ledger rules and covered them with DB-backed integration tests.
 - Removed recursive duplicate workspace builds while keeping app-level builds self-sufficient for Railway.
 - Replaced the duplicated root README with one canonical current setup and deployment guide.
 
