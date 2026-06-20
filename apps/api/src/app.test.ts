@@ -19,6 +19,10 @@ vi.mock("@housepoints/db", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    authIdentity: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
     house: {
       upsert: vi.fn(),
       create: vi.fn(),
@@ -55,6 +59,8 @@ const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
+const mockAuthIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
+const mockAuthIdentityCreate = prisma.authIdentity.create as ReturnType<typeof vi.fn>;
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
 const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>;
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
@@ -136,12 +142,12 @@ beforeEach(() => {
   );
 });
 
-async function buildTestApp(subject = "auth0|member") {
+async function buildTestApp(subject = "auth0|member", claims: Record<string, unknown> = {}) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
-      claims: { sub: subject },
+      claims: { sub: subject, ...claims },
     }),
   });
 
@@ -368,6 +374,59 @@ describe("POST /users/bootstrap", () => {
         data: expect.objectContaining({ auth0Sub: "auth0|new" }),
       }),
     );
+    await app.close();
+  });
+
+  it("links an alternate social login when the email already belongs to a user", async () => {
+    const existingUser = makeMember({ email: "member@acme.com" });
+    mockAuthIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingUser);
+
+    const app = await buildTestApp("github|member", {
+      email: "member@acme.com",
+      email_verified: true,
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/bootstrap",
+      payload: { email: "member@acme.com", displayName: "Alice GitHub" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(expect.objectContaining({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      created: false,
+    }));
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockAuthIdentityCreate).toHaveBeenCalledWith({
+      data: {
+        providerSubject: "github|member",
+        userId: "user-1",
+      },
+    });
+    await app.close();
+  });
+
+  it("returns a conflict instead of linking duplicate body email without a verified token claim", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(makeMember({ email: "member@acme.com" }));
+
+    const app = await buildTestApp("github|member");
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/bootstrap",
+      payload: { email: "member@acme.com", displayName: "Alice GitHub" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACCOUNT_LINK_REQUIRED");
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockAuthIdentityCreate).not.toHaveBeenCalled();
     await app.close();
   });
 

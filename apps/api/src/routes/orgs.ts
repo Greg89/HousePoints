@@ -22,7 +22,8 @@ type InviteJoinErrorCode =
   | "INVITE_NOT_FOUND"
   | "INVITE_USED"
   | "INVITE_EXPIRED"
-  | "ALREADY_IN_ORG";
+  | "ALREADY_IN_ORG"
+  | "ACCOUNT_LINK_REQUIRED";
 
 class InviteJoinError extends Error {
   constructor(
@@ -61,14 +62,32 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(409).send({ code: "SLUG_TAKEN", message: `The slug "${orgSlug}" is already in use. Choose a different one.` });
     }
 
-    // Reject if this Auth0 user is already in an org
-    const existingUser = await prisma.user.findUnique({
+    // Reject if this authenticated identity is already mapped to a user in an org.
+    const existingIdentity = await prisma.authIdentity.findUnique({
+      where: { providerSubject: auth0Sub },
+      select: { user: { select: { id: true, organizationId: true } } },
+    });
+    const existingUser = existingIdentity?.user ?? await prisma.user.findUnique({
       where: { auth0Sub },
       select: { id: true, organizationId: true },
     });
     if (existingUser?.organizationId) {
       warn(request.log, "orgs.create.already_in_org", { auth0Sub, existingOrgId: existingUser.organizationId });
       return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
+    }
+
+    const conflictingEmailUser = !existingUser && email
+      ? await prisma.user.findUnique({
+          where: { email },
+          select: { id: true },
+        })
+      : null;
+    if (conflictingEmailUser) {
+      warn(request.log, "orgs.create.account_link_required", { auth0Sub, email });
+      return reply.status(409).send({
+        code: "ACCOUNT_LINK_REQUIRED",
+        message: "This email is already registered with another login method. Sign in with the original provider or link the accounts in Auth0.",
+      });
     }
 
     const { org, house, user, season } = await prisma.$transaction(async (tx) => {
@@ -107,6 +126,12 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
               role: "OWNER",
               displayName,
               email: email ?? null,
+              authIdentities: {
+                connectOrCreate: {
+                  where: { providerSubject: auth0Sub },
+                  create: { providerSubject: auth0Sub },
+                },
+              },
             },
             select: userSelect,
           })
@@ -118,6 +143,11 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
               organizationId: org.id,
               houseId: house.id,
               role: "OWNER",
+              authIdentities: {
+                create: {
+                  providerSubject: auth0Sub,
+                },
+              },
             },
             select: userSelect,
           });
@@ -235,7 +265,11 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
           );
         }
 
-        const existingUser = await tx.user.findUnique({
+        const existingIdentity = await tx.authIdentity.findUnique({
+          where: { providerSubject: auth0Sub },
+          select: { user: { select: { id: true, organizationId: true } } },
+        });
+        const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
           where: { auth0Sub },
           select: { id: true, organizationId: true },
         });
@@ -252,6 +286,22 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
           );
         }
 
+        const conflictingEmailUser = !existingUser && email
+          ? await tx.user.findUnique({
+              where: { email },
+              select: { id: true },
+            })
+          : null;
+
+        if (conflictingEmailUser) {
+          throw new InviteJoinError(
+            409,
+            "ACCOUNT_LINK_REQUIRED",
+            "This email is already registered with another login method. Sign in with the original provider or link the accounts in Auth0.",
+            invite.id,
+          );
+        }
+
         const user = existingUser
           ? await tx.user.update({
               where: { id: existingUser.id },
@@ -259,6 +309,12 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
                 organizationId: invite.organizationId,
                 displayName,
                 email: email ?? undefined,
+                authIdentities: {
+                  connectOrCreate: {
+                    where: { providerSubject: auth0Sub },
+                    create: { providerSubject: auth0Sub },
+                  },
+                },
               },
               select: userSelect,
             })
@@ -268,6 +324,11 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
                 email: email ?? null,
                 displayName,
                 organizationId: invite.organizationId,
+                authIdentities: {
+                  create: {
+                    providerSubject: auth0Sub,
+                  },
+                },
               },
               select: userSelect,
             });
@@ -322,7 +383,9 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
             ? "orgs.join.token_expired"
             : err.code === "INVITE_USED"
               ? "orgs.join.token_already_used"
-              : "orgs.join.already_in_org";
+              : err.code === "ACCOUNT_LINK_REQUIRED"
+                ? "orgs.join.account_link_required"
+                : "orgs.join.already_in_org";
 
       warn(request.log, event, {
         auth0Sub,

@@ -9,6 +9,12 @@ import { getActorBySub } from "../actor.js";
 import { mapAppUser } from "../app-user.js";
 import { info, warn } from "../logging.js";
 
+function readVerifiedEmailClaim(claims: Record<string, unknown>): string | null {
+  return typeof claims.email === "string" && claims.email_verified === true
+    ? claims.email
+    : null;
+}
+
 export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
   app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = bootstrapUserSchema.safeParse(request.body);
@@ -32,8 +38,17 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       house: { select: { name: true, color: true } },
     } as const;
 
-    const existing = await prisma.user.findUnique({
-      where: { auth0Sub: request.auth.subject },
+    const auth0Sub = request.auth.subject;
+    const existingIdentity = await prisma.authIdentity.findUnique({
+      where: { providerSubject: auth0Sub },
+      select: {
+        user: {
+          select: userSelect,
+        },
+      },
+    });
+    const existing = existingIdentity?.user ?? await prisma.user.findUnique({
+      where: { auth0Sub },
       select: userSelect,
     });
 
@@ -47,12 +62,62 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       return { ...mapAppUser(existing), created: false };
     }
 
+    const verifiedEmail = readVerifiedEmailClaim(request.auth.claims);
+    const emailForStorage = verifiedEmail ?? parsed.data.email ?? null;
+    const existingByEmail = verifiedEmail
+      ? await prisma.user.findUnique({
+          where: { email: verifiedEmail },
+          select: userSelect,
+        })
+      : null;
+
+    if (existingByEmail) {
+      await prisma.authIdentity.create({
+        data: {
+          providerSubject: auth0Sub,
+          userId: existingByEmail.id,
+        },
+      });
+
+      info(request.log, "users.bootstrap.identity_linked", {
+        userId: existingByEmail.id,
+        auth0Sub,
+        email: existingByEmail.email,
+        organizationId: existingByEmail.organizationId,
+      });
+
+      return { ...mapAppUser(existingByEmail), created: false };
+    }
+
+    const conflictingEmailUser = !verifiedEmail && parsed.data.email
+      ? await prisma.user.findUnique({
+          where: { email: parsed.data.email },
+          select: { id: true },
+        })
+      : null;
+
+    if (conflictingEmailUser) {
+      warn(request.log, "users.bootstrap.account_link_required", {
+        auth0Sub,
+        email: parsed.data.email,
+      });
+      return reply.status(409).send({
+        code: "ACCOUNT_LINK_REQUIRED",
+        message: "This email is already registered with another login method. Sign in with the original provider or link the accounts in Auth0.",
+      });
+    }
+
     // New user has no org yet. They must create or join one next.
     const createdUser = await prisma.user.create({
       data: {
-        auth0Sub: request.auth.subject,
-        email: parsed.data.email ?? null,
+        auth0Sub,
+        email: emailForStorage,
         displayName: parsed.data.displayName,
+        authIdentities: {
+          create: {
+            providerSubject: auth0Sub,
+          },
+        },
       },
       select: userSelect,
     });

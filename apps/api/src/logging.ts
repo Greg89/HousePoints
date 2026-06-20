@@ -19,6 +19,8 @@ export type ApiLogEvent =
   | "users.bootstrap.validation_failed"
   | "users.bootstrap.created"
   | "users.bootstrap.loaded"
+  | "users.bootstrap.identity_linked"
+  | "users.bootstrap.account_link_required"
   | "admin.forbidden"
   | "admin.context.loaded"
   | "admin.house.created"
@@ -44,11 +46,13 @@ export type ApiLogEvent =
   | "orgs.created"
   | "orgs.create.slug_taken"
   | "orgs.create.already_in_org"
+  | "orgs.create.account_link_required"
   | "orgs.invite.created"
   | "orgs.join.invalid_token"
   | "orgs.join.token_already_used"
   | "orgs.join.token_expired"
   | "orgs.join.already_in_org"
+  | "orgs.join.account_link_required"
   | "orgs.join.success";
 
 type ApiLogger = {

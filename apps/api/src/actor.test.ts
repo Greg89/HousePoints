@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@housepoints/db", () => ({
   prisma: {
+    authIdentity: {
+      findUnique: vi.fn(),
+    },
     user: {
       findUnique: vi.fn(),
     },
@@ -11,6 +14,7 @@ vi.mock("@housepoints/db", () => ({
 import { prisma } from "@housepoints/db";
 import { getActorBySub, isAdminRole } from "./actor";
 
+const mockIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 
 describe("isAdminRole", () => {
@@ -26,10 +30,53 @@ describe("getActorBySub", () => {
     vi.resetAllMocks();
   });
 
-  it("looks up actors by Auth0 subject with the expected select shape", async () => {
+  it("looks up actors by linked Auth0 identity with the expected select shape", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        role: "MEMBER",
+        houseId: "house-1",
+        organizationId: "org-1",
+        organization: {
+          slug: "acme",
+        },
+      },
+    });
+
+    await expect(getActorBySub("github|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "github|member",
+      role: "MEMBER",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+    });
+
+    expect(mockIdentityFindUnique).toHaveBeenCalledWith({
+      where: { providerSubject: "github|member" },
+      select: {
+        user: {
+          select: {
+            id: true,
+            role: true,
+            houseId: true,
+            organizationId: true,
+            organization: {
+              select: {
+                slug: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the legacy user subject while identities are backfilled", async () => {
+    mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
-      auth0Sub: "auth0|member",
       role: "MEMBER",
       houseId: "house-1",
       organizationId: "org-1",
@@ -51,7 +98,6 @@ describe("getActorBySub", () => {
       where: { auth0Sub: "auth0|member" },
       select: {
         id: true,
-        auth0Sub: true,
         role: true,
         houseId: true,
         organizationId: true,
@@ -65,19 +111,21 @@ describe("getActorBySub", () => {
   });
 
   it("returns null when no user matches the Auth0 subject", async () => {
+    mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue(null);
 
     await expect(getActorBySub("auth0|missing")).resolves.toBeNull();
   });
 
   it("returns null when the user is not mapped to an organization", async () => {
-    mockFindUnique.mockResolvedValue({
-      id: "user-1",
-      auth0Sub: "auth0|member",
-      role: "MEMBER",
-      houseId: null,
-      organizationId: null,
-      organization: null,
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        role: "MEMBER",
+        houseId: null,
+        organizationId: null,
+        organization: null,
+      },
     });
 
     await expect(getActorBySub("auth0|member")).resolves.toBeNull();

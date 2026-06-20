@@ -96,11 +96,23 @@ model User {
   createdInvites       OrgInvite[]        @relation("CreatedInvites")
   usedInvite           OrgInvite[]        @relation("UsedInvites")
   createdSeasons       Season[]           @relation("CreatedSeasons")
+  authIdentities        AuthIdentity[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
   @@index([organizationId])
   @@index([houseId])
+}
+
+model AuthIdentity {
+  id              String   @id @default(cuid())
+  userId          String
+  providerSubject String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Season {
