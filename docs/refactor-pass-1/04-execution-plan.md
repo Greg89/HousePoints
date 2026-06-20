@@ -48,7 +48,7 @@ Add characterization tests before moving each route group.
 
 1. [x] Create a cached `getCurrentSession()`/`getCurrentUser()` server-only module.
 2. [x] Create one authenticated API client with timeout and request ID support.
-3. [ ] Split the action file by domain.
+3. [x] Split the action file by domain. Web Server Actions are grouped by admin, dashboard, org, profile, point, and season modules with shared admin authorization kept in a server-only helper.
 4. [-] Convert expected action failures to typed results. Current-user bootstrap, dashboard, and admin-context reads use typed response errors; point awards, legacy point-adjustment submissions, onboarding mutations, invite creation, profile updates, house creation, and house assignment preserve typed API errors, while mutation actions still throw rather than return expected failures.
 5. [x] Stop converting dashboard read failures to empty arrays.
 6. [-] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary; section-level recovery is not implemented.

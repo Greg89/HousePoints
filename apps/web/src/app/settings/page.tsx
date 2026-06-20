@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
-import { readSessionSummary, updateDisplayName } from "@/app/actions/points";
+import { readSessionSummary, updateDisplayName } from "@/app/actions/profile";
 import { DisplayNameForm } from "@/components/DisplayNameForm";
 
 export const dynamic = "force-dynamic";

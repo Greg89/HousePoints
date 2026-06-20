@@ -1,21 +1,25 @@
 import { randomUUID } from "node:crypto";
 import {
   assignUserHouse,
-  awardPoints,
   createHouse,
   createInviteLink,
-  readActivityFeed,
   readAdminContext,
+} from "./actions/admin";
+import {
+  readActivityFeed,
   readDashboardSummary,
   readLeaderboard,
-  readMemberScores,
   readMembers,
+} from "./actions/dashboard";
+import { awardPoints } from "./actions/points";
+import {
+  readMemberScores,
   readSeasonContext,
   readSeasonReports,
-  readSessionSummary,
   renameSeason,
   startSeason,
-} from "./actions/points";
+} from "./actions/seasons";
+import { readSessionSummary } from "./actions/profile";
 import { DashboardShell } from "@/components/DashboardShell";
 import { AdminForms } from "@/components/AdminForms";
 import { OrgOnboarding } from "@/components/OrgOnboarding";

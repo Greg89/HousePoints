@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Buildings, LinkSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { createOrg, joinOrg } from "@/app/actions/points";
+import { createOrg, joinOrg } from "@/app/actions/orgs";
 import { cn } from "@/lib/cn";
 
 interface OrgOnboardingProps {

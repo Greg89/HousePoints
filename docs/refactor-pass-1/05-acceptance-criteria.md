@@ -29,10 +29,10 @@ Status markers:
 ## Architecture
 
 - [x] Importing the API app factory does not open a network port.
-- [ ] API routes are grouped by domain.
+- [x] API routes are grouped by domain.
 - [x] Authorization and actor resolution are shared and testable.
 - [x] Web session lookup and HTTP transport are centralized in server-only modules.
-- [ ] Server Actions contain minimal orchestration and revalidation logic.
+- [x] Server Actions contain minimal orchestration and revalidation logic.
 
 ## Contracts And Errors
 
