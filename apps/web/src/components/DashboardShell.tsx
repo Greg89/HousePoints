@@ -95,6 +95,10 @@ export function DashboardShell({
   const isHistoricalSeason = !selectedSeason.isActive;
   const hasMultipleSeasons = seasonContext.seasons.length > 1;
   const selectedSeasonLabel = `${selectedSeason.name}${selectedSeason.isActive ? " (current)" : ""}`;
+  const displayedDashboardSummary =
+    selectedSeasonId === dashboardSummary.selectedSeason.id ? dashboardSummary : scopedDashboardSummary;
+  const displayedMemberPoints =
+    selectedSeasonId === dashboardSummary.selectedSeason.id ? memberPoints : scopedMemberPoints;
 
   function handleSeasonChange(nextSeasonId: string) {
     setSelectedSeasonId(nextSeasonId);
@@ -294,7 +298,7 @@ export function DashboardShell({
             </div>
             <div className="mt-8">
               <OverviewReports
-                dashboardSummary={scopedDashboardSummary}
+                dashboardSummary={displayedDashboardSummary}
                 selectedHouse={selectedHouse}
                 onShowActivity={() => setActiveTab("activity")}
               />
@@ -310,9 +314,9 @@ export function DashboardShell({
           <Tabs.Content value="leaderboard" className="focus:outline-none">
             <Leaderboard
               members={members}
-              memberPoints={scopedMemberPoints}
-              seasonName={scopedDashboardSummary.selectedSeason.name}
-              isHistoricalSeason={!scopedDashboardSummary.selectedSeason.isActive}
+              memberPoints={displayedMemberPoints}
+              seasonName={displayedDashboardSummary.selectedSeason.name}
+              isHistoricalSeason={!displayedDashboardSummary.selectedSeason.isActive}
             />
           </Tabs.Content>
 

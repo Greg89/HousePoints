@@ -504,6 +504,19 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("tabpanel")).toHaveTextContent("10");
   });
 
+  it("refreshes leaderboard points when the active season props update", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<DashboardShell {...baseProps} memberPoints={[]} />);
+
+    await user.click(screen.getByRole("tab", { name: /leaderboard/i }));
+
+    expect(screen.getByRole("tabpanel")).not.toHaveTextContent("25");
+
+    rerender(<DashboardShell {...baseProps} />);
+
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("25");
+  });
+
   it("drills into a house report from a house card and can return to all houses", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps} />);
