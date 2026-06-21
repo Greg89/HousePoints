@@ -6,6 +6,7 @@ import {
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import type { AdminAuditAction } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
@@ -18,6 +19,7 @@ interface TeamManagementProps {
   unassignedUsers: AdminUser[];
   assignedUsers: AdminUser[];
   unassignedSummary: string;
+  recentAdminActions: AdminAuditAction[];
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
 }
@@ -28,6 +30,7 @@ export function TeamManagement({
   unassignedUsers,
   assignedUsers,
   unassignedSummary,
+  recentAdminActions,
   onAssignHouse,
   onCreateInvite,
 }: TeamManagementProps) {
@@ -37,6 +40,11 @@ export function TeamManagement({
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const unassignedCount = unassignedUsers.length;
+  const inviteActions = recentAdminActions.filter(
+    (action) => action.type === "INVITE_CREATED" || action.type === "INVITE_USED",
+  );
+  const inviteCreatedCount = inviteActions.filter((action) => action.type === "INVITE_CREATED").length;
+  const inviteUsedCount = inviteActions.filter((action) => action.type === "INVITE_USED").length;
 
   function handleAssign(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,114 +114,173 @@ export function TeamManagement({
         </p>
       </div>
 
-      <form
-        aria-label="Assign user to house"
-        onSubmit={handleAssign}
-        className="grid gap-3 rounded-xl border p-5 bg-card"
-      >
-        <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
-          <span className="flex items-center gap-2">
-            <UserSwitch size={16} />
-            Assign User to House
-          </span>
-          {unassignedCount > 0 ? (
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-              {unassignedSummary}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+        <form
+          aria-label="Assign user to house"
+          onSubmit={handleAssign}
+          className="grid content-start gap-4 rounded-xl border bg-card p-5"
+        >
+          <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
+            <span className="flex items-center gap-2">
+              <UserSwitch size={16} />
+              Assign User to House
             </span>
-          ) : null}
-        </h5>
-        <select
-          name="targetUserId"
-          aria-label="Member to assign"
-          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
-          required
-          defaultValue=""
-        >
-          <option value="" disabled>
-            {unassignedCount > 0 ? `Select member... ${unassignedSummary}` : "Select member..."}
-          </option>
-          {unassignedUsers.length > 0 ? (
-            <optgroup label={`Needs assignment (${unassignedUsers.length})`}>
-              {unassignedUsers.map((user) => (
-                <option key={user.id} value={user.id}>{user.displayName} - Needs assignment</option>
-              ))}
-            </optgroup>
-          ) : null}
-          {assignedUsers.length > 0 ? (
-            <optgroup label="Assigned members">
-              {assignedUsers.map((user) => (
-                <option key={user.id} value={user.id}>{user.displayName}</option>
-              ))}
-            </optgroup>
-          ) : null}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          {unassignedCount > 0
-            ? `${unassignedCount} ${unassignedCount === 1 ? "member needs" : "members need"} a house. They appear first in this list.`
-            : "All members currently have a house. Select anyone to move them."}
-        </p>
-        <select
-          name="targetHouseId"
-          aria-label="House assignment"
-          className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
-          required
-          defaultValue=""
-        >
-          <option value="" disabled>Select house...</option>
-          {houses.map((house) => (
-            <option key={house.id} value={house.id}>{house.name}</option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          disabled={assignPending}
-          className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {assignPending ? "Assigning..." : "Assign"}
-        </button>
-      </form>
-
-      <div className="grid gap-3 rounded-xl border p-5 bg-card">
-        <h5 className="text-sm font-semibold flex items-center gap-2">
-          <LinkSimple size={16} />
-          Invite Member
-        </h5>
-        <p className="text-xs text-muted-foreground">
-          Generate a single-use token valid for 72 hours. Share it with the new member.
-        </p>
-        {inviteToken ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
-              <code className="text-xs font-mono flex-1 truncate">{inviteToken}</code>
-              <button
-                onClick={handleCopy}
-                className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                title="Copy token"
+            {unassignedCount > 0 ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                {unassignedSummary}
+              </span>
+            ) : null}
+          </h5>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)_auto] lg:items-end">
+            <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+              Member
+              <select
+                name="targetUserId"
+                aria-label="Member to assign"
+                className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+                required
+                defaultValue=""
               >
-                {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Expires: {new Date(inviteExpiry!).toLocaleString()}
-            </p>
+                <option value="" disabled>
+                  {unassignedCount > 0 ? `Select member... ${unassignedSummary}` : "Select member..."}
+                </option>
+                {unassignedUsers.length > 0 ? (
+                  <optgroup label={`Needs assignment (${unassignedUsers.length})`}>
+                    {unassignedUsers.map((user) => (
+                      <option key={user.id} value={user.id}>{user.displayName} - Needs assignment</option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {assignedUsers.length > 0 ? (
+                  <optgroup label="Assigned members">
+                    {assignedUsers.map((user) => (
+                      <option key={user.id} value={user.id}>{user.displayName}</option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+              House
+              <select
+                name="targetHouseId"
+                aria-label="House assignment"
+                className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+                required
+                defaultValue=""
+              >
+                <option value="" disabled>Select house...</option>
+                {houses.map((house) => (
+                  <option key={house.id} value={house.id}>{house.name}</option>
+                ))}
+              </select>
+            </label>
             <button
-              onClick={() => { setInviteToken(null); setInviteExpiry(null); }}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
+              type="submit"
+              disabled={assignPending}
+              className="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              Generate another
+              {assignPending ? "Assigning..." : "Assign"}
             </button>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={handleInvite}
-            disabled={invitePending}
-            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {invitePending ? "Generating..." : "Generate invite token"}
-          </button>
-        )}
+          <p className="text-xs text-muted-foreground">
+            {unassignedCount > 0
+              ? `${unassignedCount} ${unassignedCount === 1 ? "member needs" : "members need"} a house. They appear first in this list.`
+              : "All members currently have a house. Select anyone to move them."}
+          </p>
+        </form>
+
+        <section aria-label="Invite member" className="grid content-start gap-4 rounded-xl border bg-card p-5">
+          <div>
+            <h5 className="text-sm font-semibold flex items-center gap-2">
+              <LinkSimple size={16} />
+              Invite Member
+            </h5>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Generate a single-use token valid for 72 hours. Share it with the new member.
+            </p>
+          </div>
+          {inviteToken ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
+                <code className="text-xs font-mono flex-1 truncate">{inviteToken}</code>
+                <button
+                  onClick={handleCopy}
+                  className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Copy token"
+                >
+                  {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Expires: {new Date(inviteExpiry!).toLocaleString()}
+              </p>
+              <button
+                onClick={() => { setInviteToken(null); setInviteExpiry(null); }}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Generate another
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleInvite}
+              disabled={invitePending}
+              className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {invitePending ? "Generating..." : "Generate invite token"}
+            </button>
+          )}
+        </section>
       </div>
+
+      <section className="rounded-xl border bg-card p-5" aria-label="Invite activity">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h5 className="text-sm font-semibold">Invite activity</h5>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Recent token generation and use from the admin audit stream.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:min-w-56">
+            <div className="rounded-lg border bg-background px-3 py-2">
+              <p className="text-xl font-semibold">{inviteCreatedCount}</p>
+              <p className="text-xs text-muted-foreground">Tokens generated</p>
+            </div>
+            <div className="rounded-lg border bg-background px-3 py-2">
+              <p className="text-xl font-semibold">{inviteUsedCount}</p>
+              <p className="text-xs text-muted-foreground">Tokens used</p>
+            </div>
+          </div>
+        </div>
+        {inviteActions.length === 0 ? (
+          <p className="mt-5 rounded-lg border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            No invite activity has been recorded yet.
+          </p>
+        ) : (
+          <div className="mt-5 divide-y overflow-hidden rounded-lg border">
+            {inviteActions.slice(0, 5).map((action) => (
+              <article key={action.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div>
+                  <span className="rounded-full border bg-background px-2 py-1 text-xs font-medium text-muted-foreground">
+                    {action.type === "INVITE_CREATED" ? "Token generated" : "Token used"}
+                  </span>
+                  <p className="mt-2 text-sm font-semibold">{action.summary}</p>
+                  {action.metadata.expiresAt ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Expires {new Date(action.metadata.expiresAt).toLocaleString()}
+                    </p>
+                  ) : null}
+                </div>
+                <time dateTime={action.occurredAt} className="text-xs font-medium text-muted-foreground sm:text-right">
+                  {new Date(action.occurredAt).toLocaleString()}
+                </time>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </section>
   );
 }

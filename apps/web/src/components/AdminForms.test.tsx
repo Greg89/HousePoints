@@ -85,6 +85,17 @@ const recentAdminActions: AdminAuditAction[] = [
     },
   },
   {
+    id: "invite-used:invite-1",
+    type: "INVITE_USED" as const,
+    occurredAt: "2026-06-21T13:15:00.000Z",
+    actorName: "Ben Unassigned",
+    summary: "Ben Unassigned joined with an invite link.",
+    metadata: {
+      inviteId: "invite-1",
+      usedByName: "Ben Unassigned",
+    },
+  },
+  {
     id: "season-started:season-next",
     type: "SEASON_STARTED" as const,
     occurredAt: "2026-06-21T12:30:00.000Z",
@@ -169,9 +180,11 @@ describe("AdminForms", () => {
     switchToManageSection("Audit");
 
     expect(screen.getByText("Alice Admin created an invite link.")).toBeInTheDocument();
+    expect(screen.getByText("Ben Unassigned joined with an invite link.")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin started Q4 2026.")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin assigned Ben Unassigned to Ravenclaw.")).toBeInTheDocument();
     expect(screen.getByText("Invite created")).toBeInTheDocument();
+    expect(screen.getByText("Invite used")).toBeInTheDocument();
     expect(screen.getByText("Season started")).toBeInTheDocument();
     expect(screen.getByText("House assigned")).toBeInTheDocument();
   });
@@ -464,20 +477,44 @@ describe("AdminForms", () => {
     expect(assignForm.getByText("1 member needs a house. They appear first in this list.")).toBeInTheDocument();
   });
 
+  it("shows invite generation and use reporting in the Team section", () => {
+    setupAdminForms();
+    switchToManageSection("Team");
+
+    const inviteActivity = within(screen.getByLabelText("Invite activity"));
+
+    expect(inviteActivity.getByText("Tokens generated")).toBeInTheDocument();
+    expect(inviteActivity.getByText("Tokens used")).toBeInTheDocument();
+    expect(inviteActivity.getByText("Token generated")).toBeInTheDocument();
+    expect(inviteActivity.getByText("Token used")).toBeInTheDocument();
+    expect(inviteActivity.getByText("Alice Admin created an invite link.")).toBeInTheDocument();
+    expect(inviteActivity.getByText("Ben Unassigned joined with an invite link.")).toBeInTheDocument();
+  });
+
+  it("shows an empty invite activity state when no invite events exist", () => {
+    setupAdminForms({
+      recentAdminActions: recentAdminActions.filter(
+        (action) => action.type !== "INVITE_CREATED" && action.type !== "INVITE_USED",
+      ),
+    });
+    switchToManageSection("Team");
+
+    expect(screen.getByText("No invite activity has been recorded yet.")).toBeInTheDocument();
+  });
+
   it("shows generated invite tokens in the invite card", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Team");
 
-    const inviteCard = screen.getByText("Invite Member").closest("div");
-    expect(inviteCard).not.toBeNull();
+    const inviteCard = within(screen.getByLabelText("Invite member"));
 
     await user.click(
-      within(inviteCard!).getByRole("button", { name: "Generate invite token" }),
+      inviteCard.getByRole("button", { name: "Generate invite token" }),
     );
 
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());
-    expect(within(inviteCard!).getByText("invite-token")).toBeInTheDocument();
-    expect(within(inviteCard!).getByTitle("Copy token")).toBeInTheDocument();
+    expect(inviteCard.getByText("invite-token")).toBeInTheDocument();
+    expect(inviteCard.getByTitle("Copy token")).toBeInTheDocument();
   });
 
   it("shows a safe toast when invite generation returns an expected failure", async () => {
@@ -490,11 +527,10 @@ describe("AdminForms", () => {
     });
     switchToManageSection("Team");
 
-    const inviteCard = screen.getByText("Invite Member").closest("div");
-    expect(inviteCard).not.toBeNull();
+    const inviteCard = within(screen.getByLabelText("Invite member"));
 
     await user.click(
-      within(inviteCard!).getByRole("button", { name: "Generate invite token" }),
+      inviteCard.getByRole("button", { name: "Generate invite token" }),
     );
 
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());

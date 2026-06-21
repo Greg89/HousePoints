@@ -160,6 +160,7 @@ export function AdminForms({
             unassignedUsers={unassignedUsers}
             assignedUsers={assignedUsers}
             unassignedSummary={unassignedSummary}
+            recentAdminActions={recentAdminActions}
             onAssignHouse={onAssignHouse}
             onCreateInvite={onCreateInvite}
           />
