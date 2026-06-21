@@ -22,10 +22,17 @@ import {
 import { readSessionSummary } from "./actions/profile";
 import { DashboardShell } from "@/components/DashboardShell";
 import { AdminForms } from "@/components/AdminForms";
+import { AdminUnavailablePanel } from "@/components/AdminUnavailablePanel";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
-import { logError, logInfo, serializeErrorForLog } from "@/lib/logging";
+import { logError, logInfo, logWarn, serializeErrorForLog } from "@/lib/logging";
 
 export const dynamic = "force-dynamic";
+
+const ADMIN_CONTEXT_FAILED = Symbol("ADMIN_CONTEXT_FAILED");
+
+type AdminContextResult =
+  | Awaited<ReturnType<typeof readAdminContext>>
+  | typeof ADMIN_CONTEXT_FAILED;
 
 export default async function Home() {
   try {
@@ -106,7 +113,7 @@ async function renderHome() {
     );
   }
 
-  // Fetch dashboard data in parallel
+  // Fetch dashboard data in parallel. Admin tools are optional for rendering the core dashboard.
   const [leaderboard, members, activity, memberScores, dashboardSummary, seasonContext, adminContext] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
@@ -114,7 +121,7 @@ async function renderHome() {
     readMemberScores(undefined, requestId),
     readDashboardSummary(undefined, requestId),
     readSeasonContext(requestId),
-    (session.role === "ADMIN" || session.role === "OWNER") ? readAdminContext(requestId) : Promise.resolve(null),
+    readAdminContextForDashboard(session.role, requestId),
   ]);
 
   logInfo("web.dashboard.render_completed", {
@@ -124,7 +131,9 @@ async function renderHome() {
     hasAdminContext: Boolean(adminContext),
   });
 
-  const adminSection = adminContext ? (
+  const adminSection = adminContext === ADMIN_CONTEXT_FAILED ? (
+    <AdminUnavailablePanel />
+  ) : adminContext ? (
     <AdminForms
       users={adminContext.users}
       houses={adminContext.houses}
@@ -161,4 +170,25 @@ async function renderHome() {
       adminSection={adminSection}
     />
   );
+}
+
+async function readAdminContextForDashboard(
+  role: string | null | undefined,
+  requestId: string,
+): Promise<AdminContextResult> {
+  if (role !== "ADMIN" && role !== "OWNER") {
+    return null;
+  }
+
+  try {
+    return await readAdminContext(requestId);
+  } catch (error) {
+    logWarn("web.admin.context_failed", {
+      ...serializeErrorForLog(error),
+      requestId,
+      route: "/",
+    });
+
+    return ADMIN_CONTEXT_FAILED;
+  }
 }

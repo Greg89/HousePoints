@@ -51,7 +51,7 @@ Add characterization tests before moving each route group.
 3. [x] Split the action file by domain. Web Server Actions are grouped by admin, dashboard, org, profile, point, and season modules with shared admin authorization kept in a server-only helper.
 4. [x] Convert expected action failures to typed results. Current-user bootstrap, dashboard, and admin-context reads use typed response errors; point awards, profile updates, invite creation, house creation, house assignment, onboarding mutations, and season start/rename mutations now return typed success/failure results for expected API failures while preserving warning logs. The unused legacy point-adjustment Server Action was removed so points now have one typed mutation path. Auth account-link conflicts now return stable API codes and no longer surface as unhandled Prisma errors.
 5. [x] Stop converting dashboard read failures to empty arrays.
-6. [-] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary, which now includes retry, home, and logout recovery actions; section-level recovery is not implemented.
+6. [x] Add route or section-level loading/error states where useful. Dashboard failures use the route error boundary, which includes retry, home, and logout recovery actions. The dashboard route now has an explicit loading shell, and Manage/admin-context failures render a section-level recovery panel while the core dashboard remains available.
 
 Expected result: one bootstrap/current-user resolution per render, not one per query.
 
