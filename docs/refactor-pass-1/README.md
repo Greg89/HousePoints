@@ -87,10 +87,11 @@ Completed units:
 - Converted invite creation to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
 - Converted house creation to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
 - Converted house assignment to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
+- Converted onboarding create/join mutations to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
 
 Current unit verification:
 
-- `npm test`: 232 fast tests passed.
+- `npm test`: 244 fast tests passed.
 - `npm run test:integration`: passed against local Docker PostgreSQL.
 - `npm run benchmark:dashboard`: recorded dashboard API baseline against local Docker PostgreSQL.
 - Workspace type-check passed.

@@ -52,7 +52,15 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
     if (!orgName.trim() || !orgSlug || !firstHouseName.trim()) return;
     startTransition(async () => {
       try {
-        await createOrg(orgName, orgSlug, firstHouseName, firstHouseColor);
+        const result = await createOrg(orgName, orgSlug, firstHouseName, firstHouseColor);
+
+        if (!result.ok) {
+          toast.error("Could not create organisation", {
+            description: result.message,
+          });
+          return;
+        }
+
         toast.success("Organisation created!", { description: `Welcome to ${orgName}` });
       } catch (err) {
         toast.error("Could not create organisation", {
@@ -66,7 +74,15 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
     if (!inviteToken.trim()) return;
     startTransition(async () => {
       try {
-        await joinOrg(inviteToken.trim());
+        const result = await joinOrg(inviteToken.trim());
+
+        if (!result.ok) {
+          toast.error("Could not join organisation", {
+            description: result.message,
+          });
+          return;
+        }
+
         toast.success("You've joined the organisation!");
       } catch (err) {
         toast.error("Could not join organisation", {
