@@ -18,7 +18,6 @@ Users can update their display name at `/settings`. The DB is the source of trut
 Covered actions:
 
 - `awardPoints`
-- `submitPointAdjustment`
 - `createHouse`
 - `assignUserHouse`
 - org create/join actions
