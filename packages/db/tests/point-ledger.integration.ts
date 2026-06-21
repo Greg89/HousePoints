@@ -219,6 +219,26 @@ async function run() {
     usedById: target.id,
   });
 
+  const seasonStartedAuditEvent = await prisma.auditEvent.create({
+    data: {
+      organizationId: organization.id,
+      actorUserId: actor.id,
+      eventType: "SEASON_STARTED",
+      summary: "Integration Actor started Integration Season.",
+      metadata: {
+        seasonId: season.id,
+        seasonName: season.name,
+      },
+    },
+  });
+  created.auditEventIds.push(seasonStartedAuditEvent.id);
+
+  assert.equal(seasonStartedAuditEvent.eventType, "SEASON_STARTED");
+  assert.deepEqual(seasonStartedAuditEvent.metadata, {
+    seasonId: season.id,
+    seasonName: season.name,
+  });
+
   await assert.rejects(
     () =>
       prisma.pointTransaction.create({

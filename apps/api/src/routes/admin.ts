@@ -318,6 +318,7 @@ function buildRecentAdminActions(
   const auditedDeletedTransactionIds = new Set<string>();
   const auditedCreatedInviteIds = new Set<string>();
   const auditedUsedInviteIds = new Set<string>();
+  const auditedStartedSeasonIds = new Set<string>();
 
   for (const event of auditEvents) {
     const metadata = toStringMetadata(event.metadata);
@@ -332,6 +333,10 @@ function buildRecentAdminActions(
 
     if (event.eventType === "INVITE_USED" && metadata.inviteId) {
       auditedUsedInviteIds.add(metadata.inviteId);
+    }
+
+    if (event.eventType === "SEASON_STARTED" && metadata.seasonId) {
+      auditedStartedSeasonIds.add(metadata.seasonId);
     }
 
     actions.push({
@@ -393,6 +398,10 @@ function buildRecentAdminActions(
   }
 
   for (const season of startedSeasons) {
+    if (auditedStartedSeasonIds.has(season.id)) {
+      continue;
+    }
+
     actions.push({
       id: `season-started:${season.id}`,
       type: "SEASON_STARTED",

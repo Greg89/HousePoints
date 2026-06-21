@@ -145,6 +145,21 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
           },
         });
 
+        await tx.auditEvent.create({
+          data: {
+            organizationId: actor.organizationId,
+            actorUserId: actor.id,
+            eventType: "SEASON_STARTED",
+            summary: `${actor.displayName} started ${activeSeason.name}.`,
+            metadata: {
+              seasonId: activeSeason.id,
+              seasonName: activeSeason.name,
+              previousSeasonId: previousSeason.id,
+              previousSeasonName: previousSeason.name,
+            },
+          },
+        });
+
         return {
           previousSeason,
           activeSeason,

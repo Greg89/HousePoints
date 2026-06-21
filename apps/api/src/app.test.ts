@@ -862,6 +862,20 @@ describe("POST /seasons/start", () => {
         }),
       }),
     );
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "SEASON_STARTED",
+        summary: "Olivia started Q4 2026.",
+        metadata: {
+          seasonId: "season-next",
+          seasonName: "Q4 2026",
+          previousSeasonId: "season-active",
+          previousSeasonName: "Q3 2026",
+        },
+      },
+    });
     expect(res.json()).toEqual({
       previousSeason: {
         id: "season-active",
@@ -918,6 +932,20 @@ describe("POST /seasons/start", () => {
         }),
       }),
     );
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-2",
+        eventType: "SEASON_STARTED",
+        summary: "Bob started Q4 2026.",
+        metadata: {
+          seasonId: "season-next-admin",
+          seasonName: "Q4 2026",
+          previousSeasonId: "season-active",
+          previousSeasonName: "Q3 2026",
+        },
+      },
+    });
     await app.close();
   });
 
@@ -1598,6 +1626,19 @@ describe("POST /transactions/recent", () => {
         createdAt: new Date("2026-06-21T11:00:00.000Z"),
         actor: { displayName: "Bob Admin" },
       },
+      {
+        id: "audit-season-started-1",
+        eventType: "SEASON_STARTED",
+        summary: "Olivia started Q4 2026.",
+        metadata: {
+          seasonId: "season-next",
+          seasonName: "Q4 2026",
+          previousSeasonId: "season-active",
+          previousSeasonName: "Q3 2026",
+        },
+        createdAt: new Date("2026-06-21T10:00:00.000Z"),
+        actor: { displayName: "Olivia" },
+      },
     ]);
     const app = await buildTestApp("auth0|admin");
 
@@ -1664,7 +1705,7 @@ describe("POST /transactions/recent", () => {
         },
       },
       {
-        id: "season-started:season-next",
+        id: "audit-event:audit-season-started-1",
         type: "SEASON_STARTED",
         occurredAt: "2026-06-21T10:00:00.000Z",
         actorName: "Olivia",
@@ -1672,6 +1713,8 @@ describe("POST /transactions/recent", () => {
         metadata: {
           seasonId: "season-next",
           seasonName: "Q4 2026",
+          previousSeasonId: "season-active",
+          previousSeasonName: "Q3 2026",
         },
       },
     ]);

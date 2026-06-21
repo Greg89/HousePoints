@@ -1025,6 +1025,34 @@ describe("adminAuditActionSchema", () => {
         usedByName: "Ben",
       },
     });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-5",
+        type: "SEASON_STARTED",
+        occurredAt: "2026-06-21T13:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia started Q4 2026.",
+        metadata: {
+          seasonId: "season-next",
+          seasonName: "Q4 2026",
+          previousSeasonId: "season-active",
+          previousSeasonName: "Q3 2026",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-5",
+      type: "SEASON_STARTED",
+      occurredAt: "2026-06-21T13:00:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia started Q4 2026.",
+      metadata: {
+        seasonId: "season-next",
+        seasonName: "Q4 2026",
+        previousSeasonId: "season-active",
+        previousSeasonName: "Q3 2026",
+      },
+    });
   });
 
   it("rejects unknown audit action types", () => {
