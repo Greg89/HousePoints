@@ -7,6 +7,7 @@ export type MutationResult =
     };
 
 export type AwardPointsResult = MutationResult;
+export type HouseMutationResult = MutationResult;
 export type ProfileUpdateResult = MutationResult;
 export type CreateInviteResult =
   | { ok: true; token: string; expiresAt: string }

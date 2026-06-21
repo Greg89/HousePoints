@@ -16,19 +16,24 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult } from "@/lib/action-results";
+import type { CreateInviteResult, HouseMutationResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
-export async function createHouse(formData: FormData): Promise<void> {
-  await runServerAction("createHouse", async ({ requestId }) => {
+export async function createHouse(formData: FormData): Promise<HouseMutationResult> {
+  return runServerAction("createHouse", async (context) => {
+    const { requestId } = context;
     const actor = await getActorMappingForAdmin("createHouse", requestId);
     const name = String(formData.get("name") ?? "").trim();
     const color = String(formData.get("color") ?? "#7c3aed").trim();
     const description = String(formData.get("description") ?? "").trim() || undefined;
 
     if (!name) {
-      throw new Error("House name is required");
+      return {
+        ok: false,
+        code: "HOUSE_NAME_REQUIRED",
+        message: "House name is required.",
+      };
     }
 
     const response = await apiFetch("/admin/houses", requestId, {
@@ -40,11 +45,27 @@ export async function createHouse(formData: FormData): Promise<void> {
       }),
     });
 
-    const createdHouse = await parseApiResponse(
-      response,
-      adminHouseSchema,
-      "The house could not be created. Please try again.",
-    );
+    let createdHouse: Awaited<ReturnType<typeof parseHouseResponse>>;
+
+    try {
+      createdHouse = await parseHouseResponse(response);
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        houseName: name,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     logInfo("web.admin.house_created", {
       requestId,
@@ -55,6 +76,8 @@ export async function createHouse(formData: FormData): Promise<void> {
     });
 
     revalidatePath("/");
+
+    return { ok: true };
   });
 }
 
@@ -150,7 +173,7 @@ export async function createInviteLink(): Promise<CreateInviteResult> {
         expiresAt: data.expiresAt,
       };
     } catch (error) {
-      if (!isExpectedInviteFailure(error)) {
+      if (!isExpectedAdminMutationFailure(error)) {
         throw error;
       }
 
@@ -168,6 +191,14 @@ export async function createInviteLink(): Promise<CreateInviteResult> {
   });
 }
 
-function isExpectedInviteFailure(error: unknown): error is ApiResponseError {
+function parseHouseResponse(response: Response) {
+  return parseApiResponse(
+    response,
+    adminHouseSchema,
+    "The house could not be created. Please try again.",
+  );
+}
+
+function isExpectedAdminMutationFailure(error: unknown): error is ApiResponseError {
   return error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500;
 }

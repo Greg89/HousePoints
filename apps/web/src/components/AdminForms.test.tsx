@@ -43,7 +43,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     seasons: [activeSeason, historicalSeason],
     activeSeason,
     actorRole: "OWNER" as const,
-    onCreateHouse: vi.fn().mockResolvedValue(undefined),
+    onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue(undefined),
     onCreateInvite: vi.fn().mockResolvedValue({
       ok: true,
@@ -146,7 +146,7 @@ describe("AdminForms", () => {
     expect(screen.getAllByText("Choose a house accent color")).toHaveLength(2);
   });
 
-  it("submits create-house data without changing the action contract", async () => {
+  it("submits create-house data and shows success when the typed result succeeds", async () => {
     const { user, props } = setupAdminForms();
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
@@ -166,6 +166,30 @@ describe("AdminForms", () => {
       color: "#facc15",
       description: "Hard workers",
     });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("House created", {
+      description: "Hufflepuff",
+    });
+  });
+
+  it("shows a safe toast when create-house returns an expected failure", async () => {
+    const { user, props } = setupAdminForms({
+      onCreateHouse: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "HOUSE_ALREADY_EXISTS",
+        message: "The house could not be created. Please try again.",
+      }),
+    });
+    const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
+
+    await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
+    await user.click(createHouseForm.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to create house", {
+      description: "The house could not be created. Please try again.",
+    });
   });
 
   it("sets the edit color to the selected house color", async () => {
@@ -180,6 +204,26 @@ describe("AdminForms", () => {
 
     await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Slytherin");
     expect(colorInput.value).toBe("#22c55e");
+  });
+
+  it("shows a safe toast when edit-house returns an expected failure", async () => {
+    const { user, props } = setupAdminForms({
+      onCreateHouse: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "HOUSE_ALREADY_EXISTS",
+        message: "The house could not be created. Please try again.",
+      }),
+    });
+    const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
+
+    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
+    await user.click(editHouseForm.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to update house", {
+      description: "The house could not be created. Please try again.",
+    });
   });
 
   it("submits assignment data from the team setup card", async () => {

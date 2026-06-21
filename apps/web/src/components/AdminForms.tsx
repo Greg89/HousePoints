@@ -14,7 +14,7 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
-import type { CreateInviteResult } from "@/lib/action-results";
+import type { CreateInviteResult, HouseMutationResult } from "@/lib/action-results";
 
 interface AdminUser {
   id: string;
@@ -34,7 +34,7 @@ interface AdminFormsProps {
   seasons: Season[];
   activeSeason: Season;
   actorRole: UserRole;
-  onCreateHouse: (formData: FormData) => Promise<void>;
+  onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<void>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<SeasonTransition>;
@@ -123,7 +123,15 @@ export function AdminForms({
     const form = e.currentTarget;
     startCreate(async () => {
       try {
-        await onCreateHouse(formData);
+        const result = await onCreateHouse(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to create house", {
+            description: result.message,
+          });
+          return;
+        }
+
         toast.success("House created", { description: name });
         form.reset();
       } catch (err) {
@@ -141,7 +149,15 @@ export function AdminForms({
     const form = e.currentTarget;
     startEdit(async () => {
       try {
-        await onCreateHouse(formData);
+        const result = await onCreateHouse(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to update house", {
+            description: result.message,
+          });
+          return;
+        }
+
         toast.success("House updated", { description: name });
         setEditHouseName("");
         setEditHouseColor(DEFAULT_HOUSE_COLOR);
