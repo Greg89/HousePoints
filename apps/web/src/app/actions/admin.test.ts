@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { createHouse, createInviteLink } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -157,6 +157,96 @@ describe("createHouse", () => {
     parseApiResponseMock.mockRejectedValue(new Error("database vanished"));
 
     await expect(createHouse(formData)).rejects.toThrow("database vanished");
+
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("assignUserHouse", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "target-1",
+      houseId: "house-2",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "target-1",
+      houseId: "house-2",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when assignment succeeds", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("targetHouseId", "house-2");
+
+    await expect(assignUserHouse(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("assignUserHouse", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("assignUserHouse", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/users/assign-house", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: "target-1",
+        targetHouseId: "house-2",
+      }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+
+    await expect(assignUserHouse(formData)).resolves.toEqual({
+      ok: false,
+      code: "HOUSE_ASSIGNMENT_TARGET_REQUIRED",
+      message: "Target user and house are required.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("targetHouseId", "house-2");
+    const error = new ApiResponseError(
+      404,
+      "USER_NOT_FOUND",
+      "The user could not be assigned to that house. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(assignUserHouse(formData)).resolves.toEqual({
+      ok: false,
+      code: "USER_NOT_FOUND",
+      message: "The user could not be assigned to that house. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "assignUserHouse", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        targetUserId: "target-1",
+        targetHouseId: "house-2",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("rethrows unexpected failures for the shared action logger", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("targetHouseId", "house-2");
+    parseApiResponseMock.mockRejectedValue(new Error("database vanished"));
+
+    await expect(assignUserHouse(formData)).rejects.toThrow("database vanished");
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();

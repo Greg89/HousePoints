@@ -16,7 +16,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, HouseMutationResult } from "@/lib/action-results";
+import type { CreateInviteResult, HouseAssignmentResult, HouseMutationResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
@@ -81,14 +81,19 @@ export async function createHouse(formData: FormData): Promise<HouseMutationResu
   });
 }
 
-export async function assignUserHouse(formData: FormData): Promise<void> {
-  await runServerAction("assignUserHouse", async ({ requestId }) => {
+export async function assignUserHouse(formData: FormData): Promise<HouseAssignmentResult> {
+  return runServerAction("assignUserHouse", async (context) => {
+    const { requestId } = context;
     const actor = await getActorMappingForAdmin("assignUserHouse", requestId);
     const targetUserId = String(formData.get("targetUserId") ?? "").trim();
     const targetHouseId = String(formData.get("targetHouseId") ?? "").trim();
 
     if (!targetUserId || !targetHouseId) {
-      throw new Error("Target user and house are required");
+      return {
+        ok: false,
+        code: "HOUSE_ASSIGNMENT_TARGET_REQUIRED",
+        message: "Target user and house are required.",
+      };
     }
 
     const response = await apiFetch("/admin/users/assign-house", requestId, {
@@ -99,11 +104,28 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
       }),
     });
 
-    const updatedUser = await parseApiResponse(
-      response,
-      assignUserHouseResponseSchema,
-      "The user could not be assigned to that house. Please try again.",
-    );
+    let updatedUser: Awaited<ReturnType<typeof parseHouseAssignmentResponse>>;
+
+    try {
+      updatedUser = await parseHouseAssignmentResponse(response);
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId,
+        targetHouseId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     logInfo("web.admin.user_assigned", {
       requestId,
@@ -113,6 +135,8 @@ export async function assignUserHouse(formData: FormData): Promise<void> {
     });
 
     revalidatePath("/");
+
+    return { ok: true };
   });
 }
 
@@ -196,6 +220,14 @@ function parseHouseResponse(response: Response) {
     response,
     adminHouseSchema,
     "The house could not be created. Please try again.",
+  );
+}
+
+function parseHouseAssignmentResponse(response: Response) {
+  return parseApiResponse(
+    response,
+    assignUserHouseResponseSchema,
+    "The user could not be assigned to that house. Please try again.",
   );
 }
 

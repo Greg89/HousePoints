@@ -44,7 +44,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     activeSeason,
     actorRole: "OWNER" as const,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
-    onAssignHouse: vi.fn().mockResolvedValue(undefined),
+    onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onCreateInvite: vi.fn().mockResolvedValue({
       ok: true,
       token: "invite-token",
@@ -241,6 +241,31 @@ describe("AdminForms", () => {
     expect(Object.fromEntries(formData.entries())).toEqual({
       targetUserId: "user-2",
       targetHouseId: "house-2",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("House assigned", {
+      description: "Ben Unassigned -> Ravenclaw",
+    });
+  });
+
+  it("shows a safe toast when assignment returns an expected failure", async () => {
+    const { user, props } = setupAdminForms({
+      onAssignHouse: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "USER_NOT_FOUND",
+        message: "The user could not be assigned to that house. Please try again.",
+      }),
+    });
+    const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
+
+    await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
+    await user.selectOptions(assignForm.getByLabelText("House assignment"), "house-2");
+    await user.click(assignForm.getByRole("button", { name: "Assign" }));
+
+    await waitFor(() => expect(props.onAssignHouse).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to assign house", {
+      description: "The user could not be assigned to that house. Please try again.",
     });
   });
 

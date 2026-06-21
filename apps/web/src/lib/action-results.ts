@@ -7,6 +7,7 @@ export type MutationResult =
     };
 
 export type AwardPointsResult = MutationResult;
+export type HouseAssignmentResult = MutationResult;
 export type HouseMutationResult = MutationResult;
 export type ProfileUpdateResult = MutationResult;
 export type CreateInviteResult =

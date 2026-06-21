@@ -14,7 +14,7 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
-import type { CreateInviteResult, HouseMutationResult } from "@/lib/action-results";
+import type { CreateInviteResult, HouseAssignmentResult, HouseMutationResult } from "@/lib/action-results";
 
 interface AdminUser {
   id: string;
@@ -35,7 +35,7 @@ interface AdminFormsProps {
   activeSeason: Season;
   actorRole: UserRole;
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
-  onAssignHouse: (formData: FormData) => Promise<void>;
+  onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<SeasonTransition>;
   onRenameSeason: (formData: FormData) => Promise<Season>;
@@ -178,7 +178,15 @@ export function AdminForms({
     const houseName = houses.find((h) => h.id === formData.get("targetHouseId"))?.name;
     startAssign(async () => {
       try {
-        await onAssignHouse(formData);
+        const result = await onAssignHouse(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to assign house", {
+            description: result.message,
+          });
+          return;
+        }
+
         toast.success("House assigned", {
           description: `${userName} -> ${houseName}`,
         });
