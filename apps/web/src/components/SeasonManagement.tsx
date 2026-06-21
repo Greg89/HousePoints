@@ -27,11 +27,11 @@ export function SeasonManagement({
   const [seasonList, setSeasonList] = useState(seasons);
   const [currentSeason, setCurrentSeason] = useState(activeSeason);
   const [renameSeasonId, setRenameSeasonId] = useState(activeSeason.id);
-  const canStartSeason = actorRole === "OWNER" || actorRole === "ADMIN";
+  const canManageSeasons = actorRole === "OWNER";
 
   function handleStartSeason(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!canStartSeason) return;
+    if (!canManageSeasons) return;
 
     const formData = new FormData(e.currentTarget);
     const name = String(formData.get("name") ?? "").trim();
@@ -78,6 +78,8 @@ export function SeasonManagement({
 
   function handleRenameSeason(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!canManageSeasons) return;
+
     const formData = new FormData(e.currentTarget);
     const form = e.currentTarget;
 
@@ -138,11 +140,11 @@ export function SeasonManagement({
             required
             minLength={2}
             maxLength={80}
-            disabled={!canStartSeason}
+            disabled={!canManageSeasons}
           />
-          {!canStartSeason ? (
+          {!canManageSeasons ? (
             <p className="text-xs text-muted-foreground">
-              Admins and owners can start a new season.
+              Only owners can start a new season.
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -151,7 +153,7 @@ export function SeasonManagement({
           )}
           <button
             type="submit"
-            disabled={startSeasonPending || !canStartSeason}
+            disabled={startSeasonPending || !canManageSeasons}
             className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {startSeasonPending ? "Starting..." : "Start season"}
@@ -174,6 +176,7 @@ export function SeasonManagement({
             required
             value={renameSeasonId}
             onChange={(event) => setRenameSeasonId(event.target.value)}
+            disabled={!canManageSeasons}
           >
             {seasonList.map((season) => (
               <option key={season.id} value={season.id}>
@@ -188,13 +191,20 @@ export function SeasonManagement({
             required
             minLength={2}
             maxLength={80}
+            disabled={!canManageSeasons}
           />
-          <p className="text-xs text-muted-foreground">
-            Renaming changes display text only. Scores and dates stay the same.
-          </p>
+          {!canManageSeasons ? (
+            <p className="text-xs text-muted-foreground">
+              Only owners can rename seasons.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Renaming changes display text only. Scores and dates stay the same.
+            </p>
+          )}
           <button
             type="submit"
-            disabled={renameSeasonPending}
+            disabled={renameSeasonPending || !canManageSeasons}
             className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {renameSeasonPending ? "Saving..." : "Rename season"}

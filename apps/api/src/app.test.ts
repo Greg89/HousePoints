@@ -895,23 +895,8 @@ describe("POST /seasons/start", () => {
     await app.close();
   });
 
-  it("allows an admin to close the current season and start the next one", async () => {
-    const nextSeason = {
-      id: "season-next-admin",
-      name: "Q4 2026",
-      startsAt: new Date("2026-08-01T12:00:00.000Z"),
-      endsAt: null,
-      isActive: true,
-    };
-    const closedSeason = {
-      ...ACTIVE_SEASON,
-      endsAt: new Date("2026-08-01T12:00:00.000Z"),
-      isActive: false,
-    };
+  it("rejects admins when starting a season", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
-    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
-    mockSeasonUpdate.mockResolvedValue(closedSeason);
-    mockSeasonCreate.mockResolvedValue(nextSeason);
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -920,32 +905,9 @@ describe("POST /seasons/start", () => {
       payload: { name: "Q4 2026" },
     });
 
-    expect(res.statusCode).toBe(200);
-    expect(mockTransaction).toHaveBeenCalledOnce();
-    expect(mockSeasonCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          organizationId: "org-secure",
-          name: "Q4 2026",
-          isActive: true,
-          createdById: "user-2",
-        }),
-      }),
-    );
-    expect(mockAuditEventCreate).toHaveBeenCalledWith({
-      data: {
-        organizationId: "org-secure",
-        actorUserId: "user-2",
-        eventType: "SEASON_STARTED",
-        summary: "Bob started Q4 2026.",
-        metadata: {
-          seasonId: "season-next-admin",
-          seasonName: "Q4 2026",
-          previousSeasonId: "season-active",
-          previousSeasonName: "Q3 2026",
-        },
-      },
-    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockTransaction).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -960,7 +922,7 @@ describe("POST /seasons/start", () => {
     });
 
     expect(res.statusCode).toBe(403);
-    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockTransaction).not.toHaveBeenCalled();
     await app.close();
   });
@@ -984,12 +946,12 @@ describe("POST /seasons/start", () => {
 });
 
 describe("POST /seasons/rename", () => {
-  it("allows an admin to rename a season in their organization", async () => {
+  it("allows an owner to rename a season in their organization", async () => {
     const renamedSeason = { ...ACTIVE_SEASON, name: "Summer 2026" };
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue({ id: "season-active" });
     mockSeasonUpdate.mockResolvedValue(renamedSeason);
-    const app = await buildTestApp("auth0|admin");
+    const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
       method: "POST",
@@ -1023,9 +985,9 @@ describe("POST /seasons/rename", () => {
   });
 
   it("rejects cross-organization or unknown season IDs when renaming", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(null);
-    const app = await buildTestApp("auth0|admin");
+    const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
       method: "POST",
@@ -1038,6 +1000,23 @@ describe("POST /seasons/rename", () => {
     expect(mockSeasonUpdate).not.toHaveBeenCalled();
     await app.close();
   });
+
+  it("rejects admins when renaming a season", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/rename",
+      payload: { seasonId: "season-active", name: "Summer 2026" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
 });
 
 describe("POST /houses/leaderboard", () => {
@@ -1123,10 +1102,11 @@ describe("POST /houses/leaderboard", () => {
     ]);
     await app.close();
   });
+
 });
 
 describe("POST /admin/houses", () => {
-  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+  it("returns 403 OWNER_REQUIRED when actor is not an owner", async () => {
     mockFindUnique.mockResolvedValue(makeMember()); // role = MEMBER
     const app = await buildTestApp();
     const res = await app.inject({
@@ -1135,12 +1115,28 @@ describe("POST /admin/houses", () => {
       payload: { name: "Gryffindor", color: "#ff0000" },
     });
     expect(res.statusCode).toBe(403);
-    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(res.json().code).toBe("OWNER_REQUIRED");
     await app.close();
   });
 
-  it("returns 201 and creates house when actor is admin", async () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/houses",
+      payload: { name: "Phoenix", color: "#7c3aed" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockHouseUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 201 and creates house when actor is owner", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
     mockHouseUpsert.mockResolvedValue(HOUSE);
     const app = await buildTestApp();
     const res = await app.inject({

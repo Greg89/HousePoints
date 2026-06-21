@@ -6,7 +6,7 @@ import {
   createHouseSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole } from "../actor.js";
+import { getActorBySub, isAdminRole, isOwnerRole } from "../actor.js";
 import { info, warn } from "../logging.js";
 import { mapDeletedPoint } from "./points.js";
 
@@ -166,9 +166,9 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
     const actor = await getActorBySub(request.auth.subject);
 
-    if (!actor || !isAdminRole(actor.role)) {
+    if (!actor || !isOwnerRole(actor.role)) {
       warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
     }
 
     const house = await prisma.house.upsert({

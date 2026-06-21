@@ -38,6 +38,7 @@ const MANAGE_SECTIONS: Array<{
   id: ManageSectionId;
   label: string;
   description: string;
+  ownerOnly?: boolean;
 }> = [
   {
     id: "overview",
@@ -53,11 +54,13 @@ const MANAGE_SECTIONS: Array<{
     id: "houses",
     label: "Houses",
     description: "Create and update house details.",
+    ownerOnly: true,
   },
   {
     id: "seasons",
     label: "Seasons",
     description: "Rename seasons or start the next competition window.",
+    ownerOnly: true,
   },
   {
     id: "audit",
@@ -81,6 +84,7 @@ export function AdminForms({
   onRenameSeason,
 }: AdminFormsProps) {
   const [activeSection, setActiveSection] = useState<ManageSectionId>("overview");
+  const isOwner = actorRole === "OWNER";
   const unassignedUsers = users.filter((user) => !user.houseId);
   const assignedUsers = users.filter((user) => user.houseId);
   const unassignedCount = unassignedUsers.length;
@@ -98,6 +102,7 @@ export function AdminForms({
         >
           {MANAGE_SECTIONS.map((section) => {
             const isActive = section.id === activeSection;
+            const isDisabled = section.ownerOnly === true && !isOwner;
 
             return (
               <button
@@ -105,16 +110,28 @@ export function AdminForms({
                 type="button"
                 role="tab"
                 aria-selected={isActive}
+                aria-disabled={isDisabled}
                 aria-controls={`manage-section-${section.id}`}
                 id={`manage-tab-${section.id}`}
+                disabled={isDisabled}
+                title={isDisabled ? `${section.label} is owner-only` : undefined}
                 onClick={() => setActiveSection(section.id)}
                 className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                   isActive
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                    : "bg-background/60 hover:border-primary/40 hover:bg-muted/50"
+                    : isDisabled
+                      ? "bg-muted/40 text-muted-foreground opacity-70 cursor-not-allowed"
+                      : "bg-background/60 hover:border-primary/40 hover:bg-muted/50"
                 }`}
               >
-                <span className="block text-sm font-semibold">{section.label}</span>
+                <span className="flex items-center justify-between gap-2 text-sm font-semibold">
+                  <span>{section.label}</span>
+                  {isDisabled ? (
+                    <span className="rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide">
+                      Owner only
+                    </span>
+                  ) : null}
+                </span>
                 <span
                   className={`mt-1 block text-xs ${
                     isActive ? "text-primary-foreground/80" : "text-muted-foreground"

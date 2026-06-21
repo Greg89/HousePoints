@@ -175,6 +175,29 @@ describe("AdminForms", () => {
     expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
   });
 
+  it("shows owner-only manage sections to admins without making them clickable", async () => {
+    const { user } = setupAdminForms({ actorRole: "ADMIN" });
+
+    const housesTab = screen.getByRole("tab", { name: /Houses/ });
+    const seasonsTab = screen.getByRole("tab", { name: /Seasons/ });
+
+    expect(housesTab).toBeVisible();
+    expect(seasonsTab).toBeVisible();
+    expect(housesTab).toBeDisabled();
+    expect(seasonsTab).toBeDisabled();
+    expect(housesTab).toHaveAttribute("aria-disabled", "true");
+    expect(seasonsTab).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getAllByText("Owner only")).toHaveLength(2);
+
+    await user.click(housesTab);
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("form", { name: "Create house" })).not.toBeInTheDocument();
+
+    await user.click(seasonsTab);
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
+  });
+
   it("shows recent admin actions in the Audit section", () => {
     setupAdminForms();
     switchToManageSection("Audit");
@@ -225,22 +248,6 @@ describe("AdminForms", () => {
     expect(Object.fromEntries(formData.entries())).toEqual({ name: "Q4 2026" });
     await screen.findByText(/Current active season:/);
     expect(startSeasonForm.getByText("Q4 2026")).toBeInTheDocument();
-    confirmSpy.mockRestore();
-  });
-
-  it("confirms and starts a new season for admins", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    const { user, props } = setupAdminForms({ actorRole: "ADMIN" });
-    switchToManageSection("Seasons");
-    const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
-
-    await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
-    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
-
-    await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Start "Q4 2026" now? This will close Q3 2026 and reset current-season scoring.',
-    );
     confirmSpy.mockRestore();
   });
 

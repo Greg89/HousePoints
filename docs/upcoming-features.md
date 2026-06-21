@@ -25,7 +25,9 @@ Still deferred: org settings, org deletion, ownership transfer, admin removal ru
 
 **Roles**
 - `OWNER` exists.
-- `OWNER` and `ADMIN` can manage houses, assign members, create invites, and manage seasons.
+- `OWNER` controls organization-level configuration, including houses and seasons.
+- `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
+- Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
 - Org deletion, ownership transfer, and admin-removal rules are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
@@ -53,7 +55,7 @@ Still deferred: org settings, org deletion, ownership transfer, admin removal ru
 A mechanism to periodically reset the active leaderboard while preserving all historical data for reporting. Prevents a runaway leader from holding first place indefinitely.
 
 ### Current state
-Seasons are implemented for the core product flow. `PointTransaction` remains the append-only ledger, and every transaction belongs to a season. The dashboard defaults to the active season, historical seasons can be selected for Overview reporting and the Leaderboard tab, Activity includes season badges, and owners/admins can start or rename seasons from Manage. Season starts are auditable through durable `AuditEvent` rows.
+Seasons are implemented for the core product flow. `PointTransaction` remains the append-only ledger, and every transaction belongs to a season. The dashboard defaults to the active season, historical seasons can be selected for Overview reporting and the Leaderboard tab, Activity includes season badges, and owners can start or rename seasons from Manage. Season starts are auditable through durable `AuditEvent` rows.
 
 ### How it should work
 
@@ -63,7 +65,7 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 - Legacy records were backfilled into `Season 0`.
 
 **Starting a new season**
-- Owner/admin action: "Start new season".
+- Owner action: "Start new season".
 - Sets the current active season's `endsAt = now()` and `isActive = false`.
 - Creates a new `Season` row with `isActive = true`.
 - Records a durable `SEASON_STARTED` audit event.
@@ -83,7 +85,7 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 **Edge cases**
 - Transactions made before seasons were introduced are backfilled to `Season 0`.
 - Overlapping active seasons are prevented by a partial unique database index.
-- If an admin forgets to close a season, the season stays active until an owner/admin manually starts the next one. Optional scheduled rollover remains future work.
+- If an owner forgets to close a season, the season stays active until an owner manually starts the next one. Optional scheduled rollover remains future work.
 
 **Open questions**
 - Should Activity gain a season filter in addition to badges?
@@ -124,7 +126,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 - The layout should be a responsive CSS grid; widgets can be different sizes (some spanning 2 columns) depending on their content density.
 - Elevated Manage reporting should expand from the current member/house/unassigned/deletion cards into a compact operational view: recent admin actions, invite activity, season changes, unusual point volume, and data cleanup history.
 - The Manage tab has been split into focused overview, deleted-points reporting, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
-- The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets.
+- The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets. Houses and Seasons remain visible to admins, but are owner-only and disabled for non-owner admins.
 - The Team section now uses compact assignment/invite cards and includes audit-backed invite activity reporting for recent token generation and use.
 - The Audit section now includes a recent admin-actions timeline backed by persisted app data. The dedicated `AuditEvent` table now records the current admin timeline event types: house assignment, point deletion, invite creation/use, and season starts. Legacy fallback rows are still merged for older records that predate durable audit events.
 

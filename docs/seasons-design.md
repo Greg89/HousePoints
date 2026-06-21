@@ -18,7 +18,7 @@ The first seasons implementation is complete:
 - House standings and member scores default to the active season.
 - Overview reporting widgets and the Leaderboard tab can be scoped to historical seasons.
 - The Activity tab remains all-activity by default and includes season badges on each item.
-- Owners and admins can start a new season and rename seasons from Manage.
+- Owners can start a new season and rename seasons from Manage. Admins can see the Seasons Manage section, but it is disabled unless they are an owner.
 - Season starts are written to the durable `AuditEvent` table as `SEASON_STARTED`.
 - The Overview tab has a current-season status card with the active season name, start date, and either days remaining or a no-end-date management hint. The card is hidden by default and displays only when the web service sets `SHOW_SEASON_OVERVIEW_CARD="true"`.
 
@@ -26,9 +26,9 @@ The first seasons implementation is complete:
 
 ### Season Cadence
 
-The first version uses owner/admin-managed freeform seasons.
+The first version uses owner-managed freeform seasons.
 
-Owners and admins can name and start a season manually, for example `Q3 2026` or `Summer Sprint`. Calendar presets and scheduled seasons can come later once real usage shows the right cadence.
+Owners can name and start a season manually, for example `Q3 2026` or `Summer Sprint`. Calendar presets and scheduled seasons can come later once real usage shows the right cadence.
 
 ### Legacy Transactions
 
@@ -44,7 +44,7 @@ If an organization somehow has no active season, active-season reads and point a
 
 ### Season Management
 
-`OWNER` and `ADMIN` users can start and rename seasons.
+`OWNER` users can start and rename seasons.
 
 Starting a season is immediate. It closes the previous active season, creates the new active season, and records the rollover in the admin audit timeline. Renaming a season changes display metadata only; it does not change transactions, membership, dates, or scores.
 
@@ -138,7 +138,7 @@ The dashboard implements the first season UX pass:
 - The selected season scopes Overview reporting widgets and the Leaderboard tab.
 - Historical selection shows a subtle historical-view label.
 - Activity items show season badges.
-- Manage includes season start and rename controls for owners/admins.
+- Manage includes season start and rename controls for owners. Admins still see the Seasons tab, but it is disabled and labelled owner-only.
 - Overview includes a feature-flagged current-season status card showing days remaining when `endsAt` exists, or a management hint when no end date is set.
 
 ## Testing Coverage
@@ -158,7 +158,7 @@ Current coverage includes:
 2. [done] API season scope
 3. [done] Reporting scope
 4. [done] Web read path
-5. [done] Owner/admin season management
+5. [done] Owner-only season management
 6. [done] Durable audit event for season starts
 7. [done] Feature-flagged current-season status card on Overview
 

@@ -15,6 +15,10 @@ export function isAdminRole(role: UserRole): boolean {
   return role === "ADMIN" || role === "OWNER";
 }
 
+export function isOwnerRole(role: UserRole): boolean {
+  return role === "OWNER";
+}
+
 export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
   const identity = await prisma.authIdentity.findUnique({
     where: { providerSubject: auth0Sub },

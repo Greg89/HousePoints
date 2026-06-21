@@ -12,7 +12,7 @@ vi.mock("@housepoints/db", () => ({
 }));
 
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole } from "./actor";
+import { getActorBySub, isAdminRole, isOwnerRole } from "./actor";
 
 const mockIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
@@ -22,6 +22,14 @@ describe("isAdminRole", () => {
     expect(isAdminRole("MEMBER")).toBe(false);
     expect(isAdminRole("ADMIN")).toBe(true);
     expect(isAdminRole("OWNER")).toBe(true);
+  });
+});
+
+describe("isOwnerRole", () => {
+  it("allows only owner roles to use owner-level capabilities", () => {
+    expect(isOwnerRole("MEMBER")).toBe(false);
+    expect(isOwnerRole("ADMIN")).toBe(false);
+    expect(isOwnerRole("OWNER")).toBe(true);
   });
 });
 
