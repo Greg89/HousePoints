@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "./DashboardShell";
 
 vi.mock("framer-motion", () => ({
@@ -445,6 +445,10 @@ const baseProps = {
 };
 
 describe("DashboardShell", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("keeps the dashboard tabs focused for members", () => {
     render(<DashboardShell {...baseProps} />);
 
@@ -479,10 +483,39 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Organization report");
     expect(screen.getByText("Season standout")).toBeInTheDocument();
     expect(screen.getByLabelText(/reporting season/i)).toHaveValue("season-active");
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("Current season");
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("Q3 2026");
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("No end date set");
     expect(screen.getByText("Trait leader per house")).toBeInTheDocument();
     expect(screen.getByText("Recent activity strip")).toBeInTheDocument();
     expect(screen.getByText("Points velocity")).toBeInTheDocument();
     expect(screen.getAllByText("Ben Scorer").length).toBeGreaterThan(0);
+  });
+
+  it("shows a countdown when the active season has an end date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-05T12:00:00.000Z"));
+    const activeSeasonWithEnd = {
+      ...activeSeason,
+      endsAt: "2026-07-10T12:00:00.000Z",
+    };
+
+    render(
+      <DashboardShell
+        {...baseProps}
+        dashboardSummary={{
+          ...baseProps.dashboardSummary,
+          selectedSeason: activeSeasonWithEnd,
+        }}
+        seasonContext={{
+          activeSeason: activeSeasonWithEnd,
+          seasons: [activeSeasonWithEnd, historicalSeason],
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("5 days remaining");
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("ends Jul 10, 2026");
   });
 
   it("shows static season context when there is only one season", () => {

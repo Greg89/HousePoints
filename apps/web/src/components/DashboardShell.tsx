@@ -68,6 +68,48 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"] | "manage";
 
+const dateFormatter = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+function formatDate(value: string) {
+  return dateFormatter.format(new Date(value));
+}
+
+function getSeasonTiming(season: SeasonContext["activeSeason"], now = new Date()) {
+  if (!season.endsAt) {
+    return {
+      label: "No end date set",
+      detail: `Started ${formatDate(season.startsAt)}. Admins can start a new season from Manage when this one is ready to close.`,
+    };
+  }
+
+  const endsAt = new Date(season.endsAt);
+  const millisecondsRemaining = endsAt.getTime() - now.getTime();
+  const daysRemaining = Math.ceil(millisecondsRemaining / 86_400_000);
+
+  if (daysRemaining < 0) {
+    return {
+      label: "Season ended",
+      detail: `Ended ${formatDate(season.endsAt)}. Start a new season from Manage to reset current scoring.`,
+    };
+  }
+
+  if (daysRemaining === 0) {
+    return {
+      label: "Ends today",
+      detail: `Started ${formatDate(season.startsAt)} and closes today.`,
+    };
+  }
+
+  return {
+    label: `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`,
+    detail: `Started ${formatDate(season.startsAt)} and ends ${formatDate(season.endsAt)}.`,
+  };
+}
+
 export function DashboardShell({
   session,
   leaderboard,
@@ -108,6 +150,7 @@ export function DashboardShell({
   const displayedMemberPoints =
     selectedSeasonId === dashboardSummary.selectedSeason.id ? memberPoints : scopedMemberPoints;
   const activityFeedKey = `${activityNextCursor ?? "end"}:${activity.map((item) => item.id).join(",")}`;
+  const activeSeasonTiming = getSeasonTiming(seasonContext.activeSeason);
 
   function handleSeasonChange(nextSeasonId: string) {
     setSelectedSeasonId(nextSeasonId);
@@ -305,6 +348,29 @@ export function DashboardShell({
                 />
               ))}
             </div>
+            <section
+              className="mt-6 rounded-2xl border bg-card/80 p-5 shadow-sm"
+              aria-label="Current season status"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Current season
+                  </p>
+                  <h4 className="mt-1 font-display text-xl font-semibold">{seasonContext.activeSeason.name}</h4>
+                  <p className="mt-2 text-sm text-muted-foreground">{activeSeasonTiming.detail}</p>
+                </div>
+                <div className="inline-flex items-center gap-3 rounded-xl border bg-background px-4 py-3 text-sm font-semibold text-foreground">
+                  <CalendarBlank size={20} className="text-primary" aria-hidden="true" />
+                  <span>{activeSeasonTiming.label}</span>
+                </div>
+              </div>
+              {isHistoricalSeason ? (
+                <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  You are viewing historical reports. Current standings still use {seasonContext.activeSeason.name}.
+                </p>
+              ) : null}
+            </section>
             <div className="mt-8">
               <OverviewReports
                 dashboardSummary={displayedDashboardSummary}

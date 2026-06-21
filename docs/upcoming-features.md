@@ -96,7 +96,7 @@ A mechanism to periodically reset the active leaderboard while preserving all hi
 Replace the current single-view dashboard with a richer landing page composed of focused widgets, giving both members and admins an at-a-glance picture of what's happening.
 
 ### Current state
-The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboard. The overview tab shows house cards but no condensed stats or highlights.
+The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview tab shows house standings plus report widgets for season standout, trait leaders, recent activity, points velocity, and house member rankings. It also shows a compact current-season status card with the active season name, start date, and either days remaining or a no-end-date management hint.
 
 ### Proposed widgets
 
@@ -112,7 +112,7 @@ The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboa
 
 **Admin-only: recent deletions** - implemented for point awards. Owners/admins can soft delete an award from the Activity tab, live scoring excludes the deleted transaction, and the Manage tab shows a recent deletion audit.
 
-**Season countdown / summary** - if seasons are enabled, show days remaining in the current season or a "Season just ended" summary card with the winner.
+**Season countdown / summary** - implemented as a current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Winner summary remains future work.
 
 ### Implementation notes
 - Most widgets can be computed server-side in parallel on page load using existing `POST` endpoints or new lightweight aggregation endpoints.
