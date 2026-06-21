@@ -39,7 +39,7 @@ Status markers:
 ## Contracts And Errors
 
 - [x] API inputs and web-consumed outputs are validated with shared schemas.
-- [-] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, account-link conflicts no longer become generic 500s, and point awards, profile updates, invite creation, house creation, house assignment, plus onboarding mutations now return typed expected-failure results. The unused legacy point-adjustment action was removed; season start and rename mutations still need typed expected-failure handling.
+- [x] Expected errors have stable codes and typed UI handling. The web response boundary preserves codes, account-link conflicts no longer become generic 500s, and point awards, profile updates, invite creation, house creation, house assignment, onboarding mutations, plus season start/rename mutations now return typed expected-failure results. The unused legacy point-adjustment action was removed so points now have one typed mutation path.
 - [x] A failed dashboard dependency is not rendered as valid empty data.
 - [x] Dashboard error messages shown to users do not expose raw internal responses.
 - [x] The route error boundary includes a logout recovery path for bad auth/session states.

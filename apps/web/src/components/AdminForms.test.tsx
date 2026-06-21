@@ -51,18 +51,24 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
       expiresAt: "2099-01-01T00:00:00.000Z",
     }),
     onStartSeason: vi.fn().mockResolvedValue({
-      previousSeason: { ...activeSeason, endsAt: "2026-08-01T00:00:00.000Z", isActive: false },
-      activeSeason: {
-        id: "season-next",
-        name: "Q4 2026",
-        startsAt: "2026-08-01T00:00:00.000Z",
-        endsAt: null,
-        isActive: true,
+      ok: true,
+      transition: {
+        previousSeason: { ...activeSeason, endsAt: "2026-08-01T00:00:00.000Z", isActive: false },
+        activeSeason: {
+          id: "season-next",
+          name: "Q4 2026",
+          startsAt: "2026-08-01T00:00:00.000Z",
+          endsAt: null,
+          isActive: true,
+        },
       },
     }),
     onRenameSeason: vi.fn().mockResolvedValue({
-      ...activeSeason,
-      name: "Summer Sprint",
+      ok: true,
+      season: {
+        ...activeSeason,
+        name: "Summer Sprint",
+      },
     }),
     ...overrides,
   };
@@ -121,6 +127,29 @@ describe("AdminForms", () => {
     confirmSpy.mockRestore();
   });
 
+  it("shows a safe toast when start-season returns an expected failure", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms({
+      onStartSeason: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "ACTIVE_SEASON_NOT_FOUND",
+        message: "The season could not be started. Please try again.",
+      }),
+    });
+    const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
+
+    await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+
+    await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to start season", {
+      description: "The season could not be started. Please try again.",
+    });
+    expect(startSeasonForm.getByText("Q3 2026")).toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
+
   it("submits rename-season data", async () => {
     const { user, props } = setupAdminForms();
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
@@ -135,6 +164,27 @@ describe("AdminForms", () => {
     expect(Object.fromEntries(formData.entries())).toEqual({
       seasonId: "season-0",
       name: "Launch Season",
+    });
+  });
+
+  it("shows a safe toast when rename-season returns an expected failure", async () => {
+    const { user, props } = setupAdminForms({
+      onRenameSeason: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "SEASON_NOT_FOUND",
+        message: "The season could not be renamed. Please try again.",
+      }),
+    });
+    const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
+
+    await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
+    await user.type(renameSeasonForm.getByPlaceholderText("Updated season name"), "Launch Season");
+    await user.click(renameSeasonForm.getByRole("button", { name: "Rename season" }));
+
+    await waitFor(() => expect(props.onRenameSeason).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to rename season", {
+      description: "The season could not be renamed. Please try again.",
     });
   });
 

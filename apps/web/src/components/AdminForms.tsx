@@ -14,7 +14,13 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
-import type { CreateInviteResult, HouseAssignmentResult, HouseMutationResult } from "@/lib/action-results";
+import type {
+  CreateInviteResult,
+  HouseAssignmentResult,
+  HouseMutationResult,
+  RenameSeasonResult,
+  StartSeasonResult,
+} from "@/lib/action-results";
 
 interface AdminUser {
   id: string;
@@ -37,8 +43,8 @@ interface AdminFormsProps {
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
-  onStartSeason: (formData: FormData) => Promise<SeasonTransition>;
-  onRenameSeason: (formData: FormData) => Promise<Season>;
+  onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
+  onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
 }
 
 const DEFAULT_HOUSE_COLOR = "#7c3aed";
@@ -245,7 +251,16 @@ export function AdminForms({
 
     startStartSeason(async () => {
       try {
-        const transition = await onStartSeason(formData);
+        const result = await onStartSeason(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to start season", {
+            description: result.message,
+          });
+          return;
+        }
+
+        const { transition } = result;
         setCurrentSeason(transition.activeSeason);
         setRenameSeasonId(transition.activeSeason.id);
         setSeasonList((existing) => [
@@ -274,7 +289,16 @@ export function AdminForms({
 
     startRenameSeason(async () => {
       try {
-        const renamedSeason = await onRenameSeason(formData);
+        const result = await onRenameSeason(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to rename season", {
+            description: result.message,
+          });
+          return;
+        }
+
+        const { season: renamedSeason } = result;
         setSeasonList((existing) =>
           existing.map((season) => (season.id === renamedSeason.id ? renamedSeason : season)),
         );

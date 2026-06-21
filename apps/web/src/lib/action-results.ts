@@ -12,6 +12,12 @@ export type HouseAssignmentResult = MutationResult;
 export type HouseMutationResult = MutationResult;
 export type JoinOrgResult = MutationResult;
 export type ProfileUpdateResult = MutationResult;
+export type RenameSeasonResult<Season> =
+  | { ok: true; season: Season }
+  | Extract<MutationResult, { ok: false }>;
+export type StartSeasonResult<SeasonTransition> =
+  | { ok: true; transition: SeasonTransition }
+  | Extract<MutationResult, { ok: false }>;
 export type CreateInviteResult =
   | { ok: true; token: string; expiresAt: string }
   | Extract<MutationResult, { ok: false }>;

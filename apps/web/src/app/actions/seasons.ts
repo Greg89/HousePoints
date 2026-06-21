@@ -13,9 +13,10 @@ import {
   type SeasonContext,
   type SeasonTransition,
 } from "@housepoints/contracts";
-import { apiFetch, parseApiResponse } from "@/lib/api-client";
-import { runServerAction } from "@/lib/action-context";
+import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
+import type { RenameSeasonResult, StartSeasonResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 import { readDashboardSummary } from "./dashboard";
@@ -63,13 +64,18 @@ export async function readSeasonReports(seasonId?: string): Promise<{
   });
 }
 
-export async function startSeason(formData: FormData): Promise<SeasonTransition> {
-  return runServerAction("startSeason", async ({ requestId }) => {
+export async function startSeason(formData: FormData): Promise<StartSeasonResult<SeasonTransition>> {
+  return runServerAction("startSeason", async (context) => {
+    const { requestId } = context;
     const actor = await getActorMappingForAdmin("startSeason", requestId);
 
     const name = String(formData.get("name") ?? "").trim();
     if (!name) {
-      throw new Error("Season name is required");
+      return {
+        ok: false,
+        code: "SEASON_NAME_REQUIRED",
+        message: "Season name is required.",
+      };
     }
 
     const response = await apiFetch("/seasons/start", requestId, {
@@ -77,11 +83,31 @@ export async function startSeason(formData: FormData): Promise<SeasonTransition>
       body: JSON.stringify({ name }),
     });
 
-    const transition = await parseApiResponse(
-      response,
-      seasonTransitionSchema,
-      "The season could not be started. Please try again.",
-    );
+    let transition: SeasonTransition;
+
+    try {
+      transition = await parseApiResponse(
+        response,
+        seasonTransitionSchema,
+        "The season could not be started. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedSeasonMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        name,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     logInfo("web.seasons.started", {
       requestId,
@@ -91,18 +117,26 @@ export async function startSeason(formData: FormData): Promise<SeasonTransition>
     });
 
     revalidatePath("/");
-    return transition;
+    return {
+      ok: true,
+      transition,
+    };
   });
 }
 
-export async function renameSeason(formData: FormData): Promise<Season> {
-  return runServerAction("renameSeason", async ({ requestId }) => {
+export async function renameSeason(formData: FormData): Promise<RenameSeasonResult<Season>> {
+  return runServerAction("renameSeason", async (context) => {
+    const { requestId } = context;
     const actor = await getActorMappingForAdmin("renameSeason", requestId);
     const seasonId = String(formData.get("seasonId") ?? "").trim();
     const name = String(formData.get("name") ?? "").trim();
 
     if (!seasonId || !name) {
-      throw new Error("Season and name are required");
+      return {
+        ok: false,
+        code: "SEASON_RENAME_TARGET_REQUIRED",
+        message: "Season and name are required.",
+      };
     }
 
     const response = await apiFetch("/seasons/rename", requestId, {
@@ -110,11 +144,31 @@ export async function renameSeason(formData: FormData): Promise<Season> {
       body: JSON.stringify({ seasonId, name }),
     });
 
-    const season = await parseApiResponse(
-      response,
-      seasonSchema,
-      "The season could not be renamed. Please try again.",
-    );
+    let season: Season;
+
+    try {
+      season = await parseApiResponse(
+        response,
+        seasonSchema,
+        "The season could not be renamed. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedSeasonMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        seasonId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     logInfo("web.seasons.renamed", {
       requestId,
@@ -124,6 +178,13 @@ export async function renameSeason(formData: FormData): Promise<Season> {
     });
 
     revalidatePath("/");
-    return season;
+    return {
+      ok: true,
+      season,
+    };
   });
+}
+
+function isExpectedSeasonMutationFailure(error: unknown): error is ApiResponseError {
+  return error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500;
 }
