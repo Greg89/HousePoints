@@ -35,6 +35,10 @@ vi.mock("@housepoints/db", () => ({
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
+    auditEvent: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+    },
     season: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -75,6 +79,8 @@ const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
 const mockInviteFindMany = prisma.orgInvite.findMany as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
+const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
+const mockAuditEventFindMany = prisma.auditEvent.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
@@ -147,6 +153,8 @@ beforeEach(() => {
   mockTxFindMany.mockResolvedValue([]);
   mockInviteFindMany.mockResolvedValue([]);
   mockSeasonFindMany.mockResolvedValue([]);
+  mockAuditEventFindMany.mockResolvedValue([]);
+  mockAuditEventCreate.mockResolvedValue({});
   mockTransaction.mockImplementation(
     async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
   );
@@ -1244,6 +1252,7 @@ describe("POST /admin/users/assign-house", () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin({ organizationId: "org-1" }));
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "user-1",
+      displayName: "Alice",
       organizationId: "org-1",
     });
     mockHouseFindUnique.mockResolvedValue({
@@ -1269,6 +1278,7 @@ describe("POST /admin/users/assign-house", () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "user-1",
+      displayName: "Alice",
       organizationId: "org-1",
     });
     mockHouseFindUnique.mockResolvedValue({
@@ -1302,6 +1312,20 @@ describe("POST /admin/users/assign-house", () => {
         id: true,
         displayName: true,
         houseId: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-2",
+        eventType: "USER_HOUSE_ASSIGNED",
+        summary: "Bob assigned Alice to Phoenix.",
+        metadata: {
+          targetUserId: "user-1",
+          targetUserName: "Alice",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
+        },
       },
     });
     await app.close();
@@ -1495,6 +1519,21 @@ describe("POST /transactions/recent", () => {
         createdBy: { displayName: "Olivia" },
       },
     ]);
+    mockAuditEventFindMany.mockResolvedValue([
+      {
+        id: "audit-1",
+        eventType: "USER_HOUSE_ASSIGNED",
+        summary: "Bob Admin assigned Alice to Phoenix.",
+        metadata: {
+          targetUserId: "user-1",
+          targetUserName: "Alice",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
+        },
+        createdAt: new Date("2026-06-21T13:00:00.000Z"),
+        actor: { displayName: "Bob Admin" },
+      },
+    ]);
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -1505,6 +1544,19 @@ describe("POST /transactions/recent", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().recentAdminActions).toEqual([
+      {
+        id: "audit-event:audit-1",
+        type: "USER_HOUSE_ASSIGNED",
+        occurredAt: "2026-06-21T13:00:00.000Z",
+        actorName: "Bob Admin",
+        summary: "Bob Admin assigned Alice to Phoenix.",
+        metadata: {
+          targetUserId: "user-1",
+          targetUserName: "Alice",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
+        },
+      },
       {
         id: "invite-used:invite-1",
         type: "INVITE_USED",
@@ -1561,6 +1613,11 @@ describe("POST /transactions/recent", () => {
           organizationId: "org-1",
           createdById: { not: null },
         },
+      }),
+    );
+    expect(mockAuditEventFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1" },
       }),
     );
     await app.close();

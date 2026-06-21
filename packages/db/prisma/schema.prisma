@@ -35,6 +35,10 @@ enum Trait {
   UNSUNG_HERO
 }
 
+enum AuditEventType {
+  USER_HOUSE_ASSIGNED
+}
+
 model Organization {
   id           String             @id @default(cuid())
   name         String
@@ -44,6 +48,7 @@ model Organization {
   transactions PointTransaction[]
   invites      OrgInvite[]
   seasons      Season[]
+  auditEvents  AuditEvent[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 }
@@ -97,6 +102,7 @@ model User {
   createdInvites       OrgInvite[]        @relation("CreatedInvites")
   usedInvite           OrgInvite[]        @relation("UsedInvites")
   createdSeasons       Season[]           @relation("CreatedSeasons")
+  auditEvents          AuditEvent[]       @relation("AuditEventActor")
   authIdentities        AuthIdentity[]
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
@@ -167,4 +173,20 @@ model PointTransaction {
   @@index([targetUserId, seasonId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([deletedByUserId])
+}
+
+model AuditEvent {
+  id             String         @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  eventType      AuditEventType
+  summary        String
+  metadata       Json           @default("{}")
+  createdAt      DateTime       @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("AuditEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId])
 }

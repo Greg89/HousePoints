@@ -926,25 +926,29 @@ describe("adminAuditActionSchema", () => {
   it("accepts typed admin audit actions", () => {
     expect(
       adminAuditActionSchema.parse({
-        id: "point-deleted:tx-1",
-        type: "POINT_DELETED",
+        id: "audit-event:audit-1",
+        type: "USER_HOUSE_ASSIGNED",
         occurredAt: "2026-06-21T12:00:00.000Z",
-        actorName: null,
-        summary: "Unknown admin deleted 10 points from Alice.",
+        actorName: "Olivia",
+        summary: "Olivia assigned Alice to Phoenix.",
         metadata: {
-          transactionId: "tx-1",
+          targetUserId: "user-1",
           targetUserName: "Alice",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
         },
       }),
     ).toEqual({
-      id: "point-deleted:tx-1",
-      type: "POINT_DELETED",
+      id: "audit-event:audit-1",
+      type: "USER_HOUSE_ASSIGNED",
       occurredAt: "2026-06-21T12:00:00.000Z",
-      actorName: null,
-      summary: "Unknown admin deleted 10 points from Alice.",
+      actorName: "Olivia",
+      summary: "Olivia assigned Alice to Phoenix.",
       metadata: {
-        transactionId: "tx-1",
+        targetUserId: "user-1",
         targetUserName: "Alice",
+        targetHouseId: "house-1",
+        targetHouseName: "Phoenix",
       },
     });
   });

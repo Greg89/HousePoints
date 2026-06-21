@@ -9,6 +9,7 @@ type CreatedRecords = {
   houseIds: string[];
   userIds: string[];
   seasonIds: string[];
+  auditEventIds: string[];
 };
 
 const created: CreatedRecords = {
@@ -16,9 +17,13 @@ const created: CreatedRecords = {
   houseIds: [],
   userIds: [],
   seasonIds: [],
+  auditEventIds: [],
 };
 
 async function cleanup() {
+  await prisma.auditEvent.deleteMany({
+    where: { id: { in: created.auditEventIds } },
+  });
   await prisma.pointTransaction.deleteMany({
     where: { organizationId: { in: created.organizationIds } },
   });
@@ -128,6 +133,27 @@ async function run() {
   assert.equal(transaction.targetHouse.id, house.id);
   assert.equal(transaction.delta, 10);
   assert.equal(transaction.trait, "TEAM_SUPPORT");
+
+  const auditEvent = await prisma.auditEvent.create({
+    data: {
+      organizationId: organization.id,
+      actorUserId: actor.id,
+      eventType: "USER_HOUSE_ASSIGNED",
+      summary: "Integration Actor assigned Integration Target to Engineering.",
+      metadata: {
+        targetUserId: target.id,
+        targetHouseId: house.id,
+      },
+    },
+  });
+  created.auditEventIds.push(auditEvent.id);
+
+  assert.equal(auditEvent.organizationId, organization.id);
+  assert.equal(auditEvent.actorUserId, actor.id);
+  assert.deepEqual(auditEvent.metadata, {
+    targetUserId: target.id,
+    targetHouseId: house.id,
+  });
 
   await assert.rejects(
     () =>

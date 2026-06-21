@@ -4,6 +4,7 @@ import { prisma } from "@housepoints/db";
 export type ActorRecord = {
   id: string;
   auth0Sub: string;
+  displayName: string;
   role: UserRole;
   houseId: string | null;
   organizationId: string;
@@ -21,6 +22,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
       user: {
         select: {
           id: true,
+          displayName: true,
           role: true,
           houseId: true,
           organizationId: true,
@@ -37,6 +39,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
     where: { auth0Sub },
     select: {
       id: true,
+      displayName: true,
       role: true,
       houseId: true,
       organizationId: true,
@@ -59,6 +62,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
   return {
     id: actor.id,
     auth0Sub,
+    displayName: actor.displayName,
     role: actor.role,
     houseId: actor.houseId,
     organizationId: actor.organizationId,

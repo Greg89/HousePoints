@@ -28,7 +28,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
     }
 
-    const [users, houses, recentDeletedPoints, recentInvites, recentStartedSeasons] = await Promise.all([
+    const [
+      users,
+      houses,
+      recentDeletedPoints,
+      recentInvites,
+      recentStartedSeasons,
+      recentAuditEvents,
+    ] = await Promise.all([
       prisma.user.findMany({
         where: { organizationId: actor.organizationId },
         orderBy: { displayName: "asc" },
@@ -103,11 +110,28 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
           createdBy: { select: { displayName: true } },
         },
       }),
+      prisma.auditEvent.findMany({
+        where: { organizationId: actor.organizationId },
+        orderBy: [
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+        take: 10,
+        select: {
+          id: true,
+          eventType: true,
+          summary: true,
+          metadata: true,
+          createdAt: true,
+          actor: { select: { displayName: true } },
+        },
+      }),
     ]);
     const recentAdminActions = buildRecentAdminActions(
       recentDeletedPoints,
       recentInvites,
       recentStartedSeasons,
+      recentAuditEvents,
     );
 
     info(request.log, "admin.context.loaded", {
@@ -117,6 +141,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       houses: houses.length,
       recentDeletedPoints: recentDeletedPoints.length,
       recentAdminActions: recentAdminActions.length,
+      recentAuditEvents: recentAuditEvents.length,
     });
 
     return {
@@ -201,7 +226,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const [targetUser, targetHouse] = await Promise.all([
       prisma.user.findUnique({
         where: { id: parsed.data.targetUserId },
-        select: { id: true, organizationId: true },
+        select: { id: true, displayName: true, organizationId: true },
       }),
       prisma.house.findUnique({
         where: { id: parsed.data.targetHouseId },
@@ -217,14 +242,33 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ message: "Target house not found", code: "TARGET_HOUSE_NOT_FOUND" });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: targetUser.id },
-      data: { houseId: targetHouse.id },
-      select: {
-        id: true,
-        displayName: true,
-        houseId: true,
-      },
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const assignedUser = await tx.user.update({
+        where: { id: targetUser.id },
+        data: { houseId: targetHouse.id },
+        select: {
+          id: true,
+          displayName: true,
+          houseId: true,
+        },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          eventType: "USER_HOUSE_ASSIGNED",
+          summary: `${actor.displayName} assigned ${assignedUser.displayName} to ${targetHouse.name}.`,
+          metadata: {
+            targetUserId: assignedUser.id,
+            targetUserName: assignedUser.displayName,
+            targetHouseId: targetHouse.id,
+            targetHouseName: targetHouse.name,
+          },
+        },
+      });
+
+      return assignedUser;
     });
 
     info(request.log, "admin.user.house_assigned", {
@@ -261,8 +305,27 @@ function buildRecentAdminActions(
     createdAt: Date;
     createdBy: { displayName: string } | null;
   }>,
+  auditEvents: Array<{
+    id: string;
+    eventType: AdminAuditAction["type"];
+    summary: string;
+    metadata: unknown;
+    createdAt: Date;
+    actor: { displayName: string } | null;
+  }>,
 ): AdminAuditAction[] {
   const actions: AdminAuditAction[] = [];
+
+  for (const event of auditEvents) {
+    actions.push({
+      id: `audit-event:${event.id}`,
+      type: event.eventType,
+      occurredAt: event.createdAt.toISOString(),
+      actorName: event.actor?.displayName ?? null,
+      summary: event.summary,
+      metadata: toStringMetadata(event.metadata),
+    });
+  }
 
   for (const point of deletedPoints) {
     actions.push({
@@ -323,4 +386,17 @@ function buildRecentAdminActions(
   return actions
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id))
     .slice(0, 10);
+}
+
+function toStringMetadata(metadata: unknown): Record<string, string | null> {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(metadata).map(([key, value]) => [
+      key,
+      value === null || value === undefined ? null : String(value),
+    ]),
+  );
 }

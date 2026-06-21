@@ -61,6 +61,19 @@ const recentDeletedPoints = [
 
 const recentAdminActions: AdminAuditAction[] = [
   {
+    id: "audit-event:audit-1",
+    type: "USER_HOUSE_ASSIGNED",
+    occurredAt: "2026-06-21T13:30:00.000Z",
+    actorName: "Alice Admin",
+    summary: "Alice Admin assigned Ben Unassigned to Ravenclaw.",
+    metadata: {
+      targetUserId: "user-2",
+      targetUserName: "Ben Unassigned",
+      targetHouseId: "house-2",
+      targetHouseName: "Ravenclaw",
+    },
+  },
+  {
     id: "invite-created:invite-1",
     type: "INVITE_CREATED" as const,
     occurredAt: "2026-06-21T13:00:00.000Z",
@@ -157,8 +170,10 @@ describe("AdminForms", () => {
 
     expect(screen.getByText("Alice Admin created an invite link.")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin started Q4 2026.")).toBeInTheDocument();
+    expect(screen.getByText("Alice Admin assigned Ben Unassigned to Ravenclaw.")).toBeInTheDocument();
     expect(screen.getByText("Invite created")).toBeInTheDocument();
     expect(screen.getByText("Season started")).toBeInTheDocument();
+    expect(screen.getByText("House assigned")).toBeInTheDocument();
   });
 
   it("shows an empty state when no admin actions have been recorded", () => {

@@ -34,6 +34,7 @@ describe("getActorBySub", () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
+        displayName: "Member User",
         role: "MEMBER",
         houseId: "house-1",
         organizationId: "org-1",
@@ -46,6 +47,7 @@ describe("getActorBySub", () => {
     await expect(getActorBySub("github|member")).resolves.toEqual({
       id: "user-1",
       auth0Sub: "github|member",
+      displayName: "Member User",
       role: "MEMBER",
       houseId: "house-1",
       organizationId: "org-1",
@@ -58,6 +60,7 @@ describe("getActorBySub", () => {
         user: {
           select: {
             id: true,
+            displayName: true,
             role: true,
             houseId: true,
             organizationId: true,
@@ -77,6 +80,7 @@ describe("getActorBySub", () => {
     mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
+      displayName: "Member User",
       role: "MEMBER",
       houseId: "house-1",
       organizationId: "org-1",
@@ -88,6 +92,7 @@ describe("getActorBySub", () => {
     await expect(getActorBySub("auth0|member")).resolves.toEqual({
       id: "user-1",
       auth0Sub: "auth0|member",
+      displayName: "Member User",
       role: "MEMBER",
       houseId: "house-1",
       organizationId: "org-1",
@@ -98,6 +103,7 @@ describe("getActorBySub", () => {
       where: { auth0Sub: "auth0|member" },
       select: {
         id: true,
+        displayName: true,
         role: true,
         houseId: true,
         organizationId: true,
@@ -121,6 +127,7 @@ describe("getActorBySub", () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
+        displayName: "Member User",
         role: "MEMBER",
         houseId: null,
         organizationId: null,

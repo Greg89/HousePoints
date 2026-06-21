@@ -344,7 +344,13 @@ export type AdminHouse = z.infer<typeof adminHouseSchema>;
 
 export const adminAuditActionSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["POINT_DELETED", "INVITE_CREATED", "INVITE_USED", "SEASON_STARTED"]),
+  type: z.enum([
+    "POINT_DELETED",
+    "INVITE_CREATED",
+    "INVITE_USED",
+    "SEASON_STARTED",
+    "USER_HOUSE_ASSIGNED",
+  ]),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),
   summary: z.string().min(1),
