@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DeletedPoint, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, DeletedPoint, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
@@ -13,6 +13,7 @@ import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { DeletedPointsReport } from "./DeletedPointsReport";
 import { HouseManagement } from "./HouseManagement";
 import { ManageOverview } from "./ManageOverview";
+import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
 import { SeasonManagement } from "./SeasonManagement";
 import { TeamManagement } from "./TeamManagement";
 
@@ -23,6 +24,7 @@ interface AdminFormsProps {
   activeSeason: Season;
   actorRole: UserRole;
   recentDeletedPoints: DeletedPoint[];
+  recentAdminActions: AdminAuditAction[];
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
@@ -71,6 +73,7 @@ export function AdminForms({
   activeSeason,
   actorRole,
   recentDeletedPoints,
+  recentAdminActions,
   onCreateHouse,
   onAssignHouse,
   onCreateInvite,
@@ -180,7 +183,10 @@ export function AdminForms({
         ) : null}
 
         {activeSection === "audit" ? (
-          <DeletedPointsReport recentDeletedPoints={recentDeletedPoints} />
+          <>
+            <RecentAdminActionsReport actions={recentAdminActions} />
+            <DeletedPointsReport recentDeletedPoints={recentDeletedPoints} />
+          </>
         ) : null}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import {
+  type AdminAuditAction,
   actorScopeSchema,
   assignUserHouseSchema,
   createHouseSchema,
@@ -27,7 +28,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
     }
 
-    const [users, houses, recentDeletedPoints] = await Promise.all([
+    const [users, houses, recentDeletedPoints, recentInvites, recentStartedSeasons] = await Promise.all([
       prisma.user.findMany({
         where: { organizationId: actor.organizationId },
         orderBy: { displayName: "asc" },
@@ -69,7 +70,45 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
           season: { select: { id: true, name: true, isActive: true } },
         },
       }),
+      prisma.orgInvite.findMany({
+        where: { organizationId: actor.organizationId },
+        orderBy: [
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+        take: 10,
+        select: {
+          id: true,
+          createdAt: true,
+          usedAt: true,
+          expiresAt: true,
+          createdBy: { select: { displayName: true } },
+          usedBy: { select: { displayName: true } },
+        },
+      }),
+      prisma.season.findMany({
+        where: {
+          organizationId: actor.organizationId,
+          createdById: { not: null },
+        },
+        orderBy: [
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+        take: 10,
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          createdBy: { select: { displayName: true } },
+        },
+      }),
     ]);
+    const recentAdminActions = buildRecentAdminActions(
+      recentDeletedPoints,
+      recentInvites,
+      recentStartedSeasons,
+    );
 
     info(request.log, "admin.context.loaded", {
       actorUserId: actor.id,
@@ -77,6 +116,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       users: users.length,
       houses: houses.length,
       recentDeletedPoints: recentDeletedPoints.length,
+      recentAdminActions: recentAdminActions.length,
     });
 
     return {
@@ -85,6 +125,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       users,
       houses,
       recentDeletedPoints: recentDeletedPoints.map(mapDeletedPoint),
+      recentAdminActions,
     };
   });
 
@@ -196,4 +237,90 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
     return updatedUser;
   });
+}
+
+function buildRecentAdminActions(
+  deletedPoints: Array<{
+    id: string;
+    delta: number;
+    deletedAt: Date | null;
+    deletedBy: { displayName: string } | null;
+    targetUser: { displayName: string } | null;
+  }>,
+  invites: Array<{
+    id: string;
+    createdAt: Date;
+    usedAt: Date | null;
+    expiresAt: Date;
+    createdBy: { displayName: string } | null;
+    usedBy: { displayName: string } | null;
+  }>,
+  startedSeasons: Array<{
+    id: string;
+    name: string;
+    createdAt: Date;
+    createdBy: { displayName: string } | null;
+  }>,
+): AdminAuditAction[] {
+  const actions: AdminAuditAction[] = [];
+
+  for (const point of deletedPoints) {
+    actions.push({
+      id: `point-deleted:${point.id}`,
+      type: "POINT_DELETED",
+      occurredAt: (point.deletedAt ?? new Date(0)).toISOString(),
+      actorName: point.deletedBy?.displayName ?? null,
+      summary: `${point.deletedBy?.displayName ?? "Unknown admin"} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
+      metadata: {
+        transactionId: point.id,
+        targetUserName: point.targetUser?.displayName ?? null,
+      },
+    });
+  }
+
+  for (const invite of invites) {
+    actions.push({
+      id: `invite-created:${invite.id}`,
+      type: "INVITE_CREATED",
+      occurredAt: invite.createdAt.toISOString(),
+      actorName: invite.createdBy?.displayName ?? null,
+      summary: `${invite.createdBy?.displayName ?? "Unknown admin"} created an invite link.`,
+      metadata: {
+        inviteId: invite.id,
+        expiresAt: invite.expiresAt.toISOString(),
+      },
+    });
+
+    if (invite.usedAt) {
+      actions.push({
+        id: `invite-used:${invite.id}`,
+        type: "INVITE_USED",
+        occurredAt: invite.usedAt.toISOString(),
+        actorName: invite.usedBy?.displayName ?? null,
+        summary: `${invite.usedBy?.displayName ?? "Unknown member"} joined with an invite link.`,
+        metadata: {
+          inviteId: invite.id,
+          usedByName: invite.usedBy?.displayName ?? null,
+        },
+      });
+    }
+  }
+
+  for (const season of startedSeasons) {
+    actions.push({
+      id: `season-started:${season.id}`,
+      type: "SEASON_STARTED",
+      occurredAt: season.createdAt.toISOString(),
+      actorName: season.createdBy?.displayName ?? null,
+      summary: `${season.createdBy?.displayName ?? "Unknown admin"} started ${season.name}.`,
+      metadata: {
+        seasonId: season.id,
+        seasonName: season.name,
+      },
+    });
+  }
+
+  return actions
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id))
+    .slice(0, 10);
 }

@@ -31,6 +31,7 @@ vi.mock("@housepoints/db", () => ({
     },
     orgInvite: {
       create: vi.fn(),
+      findMany: vi.fn(),
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
@@ -71,6 +72,7 @@ const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
+const mockInviteFindMany = prisma.orgInvite.findMany as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
@@ -143,6 +145,8 @@ const makeOwner = (overrides = {}) => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mockTxFindMany.mockResolvedValue([]);
+  mockInviteFindMany.mockResolvedValue([]);
+  mockSeasonFindMany.mockResolvedValue([]);
   mockTransaction.mockImplementation(
     async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
   );
@@ -1127,6 +1131,7 @@ describe("POST /admin/context", () => {
       users: [],
       houses: [],
       recentDeletedPoints: [],
+      recentAdminActions: [],
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1190,6 +1195,7 @@ describe("POST /admin/context", () => {
         },
       ],
       recentDeletedPoints: [],
+      recentAdminActions: [],
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1448,6 +1454,115 @@ describe("POST /transactions/recent", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().items[0].trait).toBeNull();
+    await app.close();
+  });
+
+  it("returns a merged recent admin action timeline from persisted org data", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockUserFindMany.mockResolvedValue([]);
+    mockHouseFindMany.mockResolvedValue([]);
+    mockTxFindMany.mockResolvedValue([
+      {
+        id: "tx-1",
+        delta: 12,
+        reason: "Duplicate award",
+        trait: "COLLABORATION",
+        createdAt: new Date("2026-06-20T12:00:00.000Z"),
+        deletedAt: new Date("2026-06-21T12:00:00.000Z"),
+        deletionReason: "Entered twice",
+        actor: { displayName: "Olivia" },
+        targetUser: { displayName: "Ben" },
+        targetHouse: { name: "Phoenix", color: "#7c3aed" },
+        deletedBy: { displayName: "Bob Admin" },
+        season: { id: "season-active", name: "Q3 2026", isActive: true },
+      },
+    ]);
+    mockInviteFindMany.mockResolvedValue([
+      {
+        id: "invite-1",
+        createdAt: new Date("2026-06-21T11:00:00.000Z"),
+        usedAt: new Date("2026-06-21T12:30:00.000Z"),
+        expiresAt: new Date("2026-06-24T11:00:00.000Z"),
+        createdBy: { displayName: "Bob Admin" },
+        usedBy: { displayName: "Casey" },
+      },
+    ]);
+    mockSeasonFindMany.mockResolvedValue([
+      {
+        id: "season-next",
+        name: "Q4 2026",
+        createdAt: new Date("2026-06-21T10:00:00.000Z"),
+        createdBy: { displayName: "Olivia" },
+      },
+    ]);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().recentAdminActions).toEqual([
+      {
+        id: "invite-used:invite-1",
+        type: "INVITE_USED",
+        occurredAt: "2026-06-21T12:30:00.000Z",
+        actorName: "Casey",
+        summary: "Casey joined with an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          usedByName: "Casey",
+        },
+      },
+      {
+        id: "point-deleted:tx-1",
+        type: "POINT_DELETED",
+        occurredAt: "2026-06-21T12:00:00.000Z",
+        actorName: "Bob Admin",
+        summary: "Bob Admin deleted 12 points from Ben.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserName: "Ben",
+        },
+      },
+      {
+        id: "invite-created:invite-1",
+        type: "INVITE_CREATED",
+        occurredAt: "2026-06-21T11:00:00.000Z",
+        actorName: "Bob Admin",
+        summary: "Bob Admin created an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          expiresAt: "2026-06-24T11:00:00.000Z",
+        },
+      },
+      {
+        id: "season-started:season-next",
+        type: "SEASON_STARTED",
+        occurredAt: "2026-06-21T10:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia started Q4 2026.",
+        metadata: {
+          seasonId: "season-next",
+          seasonName: "Q4 2026",
+        },
+      },
+    ]);
+    expect(mockInviteFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-1" },
+      }),
+    );
+    expect(mockSeasonFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-1",
+          createdById: { not: null },
+        },
+      }),
+    );
     await app.close();
   });
 });

@@ -32,6 +32,7 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  adminAuditActionSchema,
   adminContextSchema,
   pointAdjustmentResponseSchema,
   redactLogContext,
@@ -887,6 +888,18 @@ describe("adminContextSchema", () => {
       },
     ],
     recentDeletedPoints: [],
+    recentAdminActions: [
+      {
+        id: "invite-created:invite-1",
+        type: "INVITE_CREATED",
+        occurredAt: "2026-06-21T12:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia created an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+        },
+      },
+    ],
   };
 
   it("accepts the complete admin context response", () => {
@@ -904,6 +917,47 @@ describe("adminContextSchema", () => {
       adminContextSchema.safeParse({
         ...valid,
         houses: [{ ...valid.houses[0], color: null }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("adminAuditActionSchema", () => {
+  it("accepts typed admin audit actions", () => {
+    expect(
+      adminAuditActionSchema.parse({
+        id: "point-deleted:tx-1",
+        type: "POINT_DELETED",
+        occurredAt: "2026-06-21T12:00:00.000Z",
+        actorName: null,
+        summary: "Unknown admin deleted 10 points from Alice.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserName: "Alice",
+        },
+      }),
+    ).toEqual({
+      id: "point-deleted:tx-1",
+      type: "POINT_DELETED",
+      occurredAt: "2026-06-21T12:00:00.000Z",
+      actorName: null,
+      summary: "Unknown admin deleted 10 points from Alice.",
+      metadata: {
+        transactionId: "tx-1",
+        targetUserName: "Alice",
+      },
+    });
+  });
+
+  it("rejects unknown audit action types", () => {
+    expect(
+      adminAuditActionSchema.safeParse({
+        id: "unknown:1",
+        type: "HOUSE_RENAMED",
+        occurredAt: "2026-06-21T12:00:00.000Z",
+        actorName: "Olivia",
+        summary: "House renamed.",
+        metadata: {},
       }).success,
     ).toBe(false);
   });

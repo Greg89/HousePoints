@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { AdminAuditAction } from "@housepoints/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { AdminForms } from "./AdminForms";
 
@@ -58,6 +59,31 @@ const recentDeletedPoints = [
   },
 ];
 
+const recentAdminActions: AdminAuditAction[] = [
+  {
+    id: "invite-created:invite-1",
+    type: "INVITE_CREATED" as const,
+    occurredAt: "2026-06-21T13:00:00.000Z",
+    actorName: "Alice Admin",
+    summary: "Alice Admin created an invite link.",
+    metadata: {
+      inviteId: "invite-1",
+      expiresAt: "2026-06-24T13:00:00.000Z",
+    },
+  },
+  {
+    id: "season-started:season-next",
+    type: "SEASON_STARTED" as const,
+    occurredAt: "2026-06-21T12:30:00.000Z",
+    actorName: "Alice Admin",
+    summary: "Alice Admin started Q4 2026.",
+    metadata: {
+      seasonId: "season-next",
+      seasonName: "Q4 2026",
+    },
+  },
+];
+
 function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminForms>> = {}) {
   const props = {
     users,
@@ -66,6 +92,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     activeSeason,
     actorRole: "OWNER" as const,
     recentDeletedPoints,
+    recentAdminActions,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onCreateInvite: vi.fn().mockResolvedValue({
@@ -120,7 +147,25 @@ describe("AdminForms", () => {
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Recent admin actions")).toBeInTheDocument();
     expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
+  });
+
+  it("shows recent admin actions in the Audit section", () => {
+    setupAdminForms();
+    switchToManageSection("Audit");
+
+    expect(screen.getByText("Alice Admin created an invite link.")).toBeInTheDocument();
+    expect(screen.getByText("Alice Admin started Q4 2026.")).toBeInTheDocument();
+    expect(screen.getByText("Invite created")).toBeInTheDocument();
+    expect(screen.getByText("Season started")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when no admin actions have been recorded", () => {
+    setupAdminForms({ recentAdminActions: [] });
+    switchToManageSection("Audit");
+
+    expect(screen.getByText("No recent admin actions have been recorded yet.")).toBeInTheDocument();
   });
 
   it("shows season management controls with the current active season", () => {

@@ -342,12 +342,25 @@ export const adminHouseSchema = z.object({
 
 export type AdminHouse = z.infer<typeof adminHouseSchema>;
 
+export const adminAuditActionSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(["POINT_DELETED", "INVITE_CREATED", "INVITE_USED", "SEASON_STARTED"]),
+  occurredAt: z.string().datetime(),
+  actorName: z.string().nullable(),
+  summary: z.string().min(1),
+  metadata: z.record(z.string(), z.string().nullable()).default({}),
+});
+
+export type AdminAuditAction = z.infer<typeof adminAuditActionSchema>;
+export const adminAuditActionsSchema = z.array(adminAuditActionSchema);
+
 export const adminContextSchema = z.object({
   organizationId: z.string(),
   organizationSlug: z.string(),
   users: z.array(adminUserSchema),
   houses: z.array(adminHouseSchema),
   recentDeletedPoints: deletedPointsSchema,
+  recentAdminActions: adminAuditActionsSchema,
 });
 
 export type AdminContext = z.infer<typeof adminContextSchema>;
