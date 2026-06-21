@@ -71,12 +71,14 @@ Web-consumed API errors now preserve stable codes through the shared API respons
 
 ---
 
-## 2.5 Browser-side client error reporting [todo]
+## 2.5 Browser-side client error reporting [done]
 
-Server-side render and action failures are now visible in structured logs. Browser-only runtime errors are still deferred.
+Server-side render, Server Action, and browser-only runtime failures are now visible in structured logs.
 
-Recommended first step:
+Implemented approach:
 
-- Add a tiny client error reporter for `window.error` and `window.unhandledrejection`.
-- Send sanitized reports to an authenticated or rate-limited API endpoint.
-- Record browser error events with the same service/environment/request context conventions used by the API and web server logs.
+- `ClientErrorReporter` listens for `window.error` and `window.unhandledrejection`.
+- Reports are sent to the same-origin `POST /api/client-errors` route.
+- The route validates and truncates payloads before writing `web.client.error_reported`.
+- Invalid or malformed reports write `web.client.error_report_rejected` without leaking raw browser payloads.
+- SEQ credentials stay server-side; browsers never write directly to SEQ.

@@ -108,20 +108,25 @@ The integration suite intentionally asserts that invalid operations fail. Prisma
 
 **Scope:** Critical happy path only, not exhaustive.
 
-**Status:** Deferred.
+**Status:** Implemented as an opt-in staging/local harness.
 
-Prerequisite: a seeded test database, test Auth0 tenant, or staging environment.
+Prerequisite: a seeded test database, test Auth0 tenant or staging environment, and a test user that belongs to an organization with at least one assignable target member.
 
-Initial test plan:
+Implemented test path:
 
 1. Login flow - visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard.
-2. Award points - click Award Points, select a house, enter amount and reason, submit, confirm house score increments.
+2. Award points - click Award Points, select a target member, enter amount and reason, submit, and confirm the award succeeds.
 3. Activity feed - switch to Activity tab and confirm the new transaction appears.
-4. Settings - navigate to `/settings`, update display name, return to dashboard, confirm name updated.
+4. Leaderboard - switch to Leaderboard tab and confirm the target member appears.
 
-Setup when this tier is prioritized:
+Run locally or against staging:
 
-```bash
-npm install -D @playwright/test -w @housepoints/web
-npx playwright install chromium
+```powershell
+$env:E2E_BASE_URL = "https://your-staging-web-url"
+$env:E2E_USER_EMAIL = "test-user@example.com"
+$env:E2E_USER_PASSWORD = "test-user-password"
+$env:E2E_TARGET_MEMBER = "Target Member Name"
+npm run test:e2e
 ```
+
+The test is skipped when required environment variables are missing so normal unit-test and build gates remain stable without Auth0 credentials.

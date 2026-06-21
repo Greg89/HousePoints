@@ -34,7 +34,7 @@ Each tier has its own file with detailed task breakdowns.
 | 2.2 | Configure Railway health check against `GET /health` | [done] |
 | 2.3 | `error.tsx` global error boundary in Next.js app | [done] |
 | 2.4 | Structured error responses from API (consistent `code` + `message`) | [done] |
-| 2.5 | Browser-side client error reporting | [todo] |
+| 2.5 | Browser-side client error reporting | [done] |
 
 ---
 
@@ -46,7 +46,7 @@ Each tier has its own file with detailed task breakdowns.
 | 3.1 | Per-member points on Leaderboard tab (new API endpoint) | [done] |
 | 3.2 | Leaderboard refreshes after awarding points without a full browser refresh | [done] |
 | 3.3 | Activity feed cursor pagination API | [done] |
-| 3.4 | Activity feed load-more UI | [todo] |
+| 3.4 | Activity feed load-more UI | [done] |
 | 3.5 | Admin: edit existing house color / description | [done] |
 | 3.6 | Mobile header - collapse nav into a menu on small screens | [done] |
 
@@ -61,7 +61,7 @@ Each tier has its own file with detailed task breakdowns.
 | 4.2 | Fastify integration tests via `app.inject` | [done] |
 | 4.3 | GitHub Actions workflow: install, generate, lint, type-check, test, coverage, build | [done] |
 | 4.4 | Database-backed integration tests in CI | [done] |
-| 4.5 | Playwright e2e: login -> award points -> see score update | [todo] |
+| 4.5 | Playwright e2e: login -> award points -> see score update | [done] |
 
 ---
 
