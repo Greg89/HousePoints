@@ -6,6 +6,7 @@ import {
   adminContextSchema,
   adminHouseSchema,
   assignUserHouseResponseSchema,
+  deletedPointSchema,
   inviteLinkSchema,
 } from "@housepoints/contracts";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, HouseAssignmentResult, HouseMutationResult } from "@/lib/action-results";
+import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
@@ -204,6 +205,69 @@ export async function createInviteLink(): Promise<CreateInviteResult> {
       logServerActionFailed(context, error, {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
+}
+
+export async function deletePointTransaction(
+  transactionId: string,
+  reason?: string,
+): Promise<DeletePointResult> {
+  return runServerAction("deletePointTransaction", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("deletePointTransaction", requestId);
+    const trimmedTransactionId = transactionId.trim();
+    const trimmedReason = reason?.trim() || undefined;
+
+    if (!trimmedTransactionId) {
+      return {
+        ok: false,
+        code: "POINT_TRANSACTION_REQUIRED",
+        message: "A point transaction is required.",
+      };
+    }
+
+    const response = await apiFetch("/points/delete", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        transactionId: trimmedTransactionId,
+        ...(trimmedReason ? { reason: trimmedReason } : {}),
+      }),
+    });
+
+    try {
+      const deletedPoint = await parseApiResponse(
+        response,
+        deletedPointSchema,
+        "The point award could not be deleted. Please try again.",
+      );
+
+      logInfo("web.points.deleted", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        transactionId: deletedPoint.id,
+      });
+
+      revalidatePath("/");
+
+      return { ok: true };
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        transactionId: trimmedTransactionId,
       });
 
       return {

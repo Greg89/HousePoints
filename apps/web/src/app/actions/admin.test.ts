@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -310,5 +310,91 @@ describe("createInviteLink", () => {
     await expect(createInviteLink()).rejects.toThrow("database vanished");
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("deletePointTransaction", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "tx-1",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "tx-1",
+      actorName: "Bob",
+      targetUserName: "Alice",
+      targetHouseName: "Phoenix",
+      targetHouseColor: "#7c3aed",
+      delta: 10,
+      reason: "Great work",
+      trait: "LEADERSHIP",
+      createdAt: "2026-06-01T12:00:00.000Z",
+      deletedAt: "2026-06-02T12:00:00.000Z",
+      deletedByName: "User One",
+      deletionReason: null,
+      season: null,
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when point deletion succeeds", async () => {
+    await expect(deletePointTransaction(" tx-1 ", " Duplicate award ")).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("deletePointTransaction", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("deletePointTransaction", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/points/delete", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        transactionId: "tx-1",
+        reason: "Duplicate award",
+      }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    await expect(deletePointTransaction("   ")).resolves.toEqual({
+      ok: false,
+      code: "POINT_TRANSACTION_REQUIRED",
+      message: "A point transaction is required.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const error = new ApiResponseError(
+      404,
+      "POINT_TRANSACTION_NOT_FOUND",
+      "The point award could not be deleted. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(deletePointTransaction("tx-1")).resolves.toEqual({
+      ok: false,
+      code: "POINT_TRANSACTION_NOT_FOUND",
+      message: "The point award could not be deleted. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "deletePointTransaction", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        transactionId: "tx-1",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("rethrows unexpected failures for the shared action logger", async () => {
+    parseApiResponseMock.mockRejectedValue(new Error("database vanished"));
+
+    await expect(deletePointTransaction("tx-1")).rejects.toThrow("database vanished");
+
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

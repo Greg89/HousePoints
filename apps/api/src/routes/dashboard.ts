@@ -80,6 +80,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         where: {
           organizationId: actor.organizationId,
           seasonId: season.id,
+          deletedAt: null,
         },
         _sum: { delta: true },
         _count: { _all: true },
@@ -176,6 +177,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         where: {
           organizationId: actor.organizationId,
           seasonId: season.id,
+          deletedAt: null,
           targetUserId: { not: null },
         },
         _sum: { delta: true },
@@ -185,6 +187,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         where: {
           organizationId: actor.organizationId,
           seasonId: season.id,
+          deletedAt: null,
           trait: { not: null },
         },
         _count: { trait: true },
@@ -193,6 +196,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         where: {
           organizationId: actor.organizationId,
           seasonId: season.id,
+          deletedAt: null,
         },
         orderBy: { createdAt: "desc" },
         take: 10,
@@ -212,6 +216,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         where: {
           organizationId: actor.organizationId,
           seasonId: season.id,
+          deletedAt: null,
           createdAt: { gte: velocityStartsAt },
         },
         select: {
@@ -225,6 +230,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         where: {
           organizationId: actor.organizationId,
           seasonId: season.id,
+          deletedAt: null,
           targetUserId: { not: null },
         },
         _sum: { delta: true },

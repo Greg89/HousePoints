@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, ArrowRight } from "@phosphor-icons/react";
+import { Clock, ArrowRight, X } from "@phosphor-icons/react";
 import type { ActivityItem, PagedActivityFeed } from "@housepoints/contracts";
 import { TRAIT_LABELS } from "@housepoints/contracts";
+import type { DeletePointResult } from "@/lib/action-results";
 
 interface ActivityFeedProps {
   items: ActivityItem[];
   nextCursor: string | null;
   onLoadMore: (cursor: string) => Promise<PagedActivityFeed>;
+  canDelete?: boolean;
+  onDelete?: (transactionId: string) => Promise<DeletePointResult>;
 }
 
 function relativeTime(isoString: string) {
@@ -23,11 +26,19 @@ function relativeTime(isoString: string) {
   return `${day}d ago`;
 }
 
-export function ActivityFeed({ items, nextCursor, onLoadMore }: ActivityFeedProps) {
+export function ActivityFeed({
+  items,
+  nextCursor,
+  onLoadMore,
+  canDelete = false,
+  onDelete,
+}: ActivityFeedProps) {
   const [visibleItems, setVisibleItems] = useState(items);
   const [cursor, setCursor] = useState(nextCursor);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleLoadMore() {
     if (!cursor || isLoadingMore) {
@@ -45,6 +56,42 @@ export function ActivityFeed({ items, nextCursor, onLoadMore }: ActivityFeedProp
       setLoadMoreError("More activity could not be loaded. Please try again.");
     } finally {
       setIsLoadingMore(false);
+    }
+  }
+
+  async function handleDelete(item: ActivityItem) {
+    if (!canDelete || !onDelete || deletingIds.has(item.id)) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete this ${item.delta}-point award to ${item.targetUserName}? Scores will be recalculated without it.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleteError(null);
+    setDeletingIds((current) => new Set(current).add(item.id));
+
+    try {
+      const result = await onDelete(item.id);
+
+      if (!result.ok) {
+        setDeleteError(result.message);
+        return;
+      }
+
+      setVisibleItems((current) => current.filter((visibleItem) => visibleItem.id !== item.id));
+    } catch {
+      setDeleteError("The point award could not be deleted. Please try again.");
+    } finally {
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
     }
   }
 
@@ -81,6 +128,18 @@ export function ActivityFeed({ items, nextCursor, onLoadMore }: ActivityFeedProp
                 >
                   {item.season.name}
                 </span>
+              ) : null}
+              {canDelete && onDelete ? (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(item)}
+                  disabled={deletingIds.has(item.id)}
+                  aria-label={`Delete point award to ${item.targetUserName}`}
+                  title="Delete point award"
+                  className="absolute right-3 bottom-3 inline-flex h-7 w-7 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:cursor-wait disabled:opacity-50"
+                >
+                  <X size={14} />
+                </button>
               ) : null}
               {/* Actor initial avatar */}
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
@@ -127,6 +186,11 @@ export function ActivityFeed({ items, nextCursor, onLoadMore }: ActivityFeedProp
         {loadMoreError ? (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {loadMoreError}
+          </p>
+        ) : null}
+        {deleteError ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {deleteError}
           </p>
         ) : null}
         {cursor ? (

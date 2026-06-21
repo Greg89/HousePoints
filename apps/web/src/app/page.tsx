@@ -3,6 +3,7 @@ import {
   assignUserHouse,
   createHouse,
   createInviteLink,
+  deletePointTransaction,
   readAdminContext,
 } from "./actions/admin";
 import {
@@ -137,6 +138,7 @@ async function renderHome() {
     <AdminForms
       users={adminContext.users}
       houses={adminContext.houses}
+      recentDeletedPoints={adminContext.recentDeletedPoints}
       seasons={seasonContext.seasons}
       activeSeason={seasonContext.activeSeason}
       actorRole={session.role ?? "MEMBER"}
@@ -167,6 +169,7 @@ async function renderHome() {
       seasonContext={seasonContext}
       onSeasonChange={readSeasonReports}
       onAward={awardPoints}
+      onDeletePoint={deletePointTransaction}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
       adminSection={adminSection}

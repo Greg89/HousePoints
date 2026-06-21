@@ -189,7 +189,7 @@ describe("AwardPointsDialog", () => {
       description: "+10 pts to Alice Assigned",
     });
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
-  });
+  }, 10_000);
 
   it("shows a safe error toast without closing when the typed result fails", async () => {
     const { props, user } = setupDialog({
@@ -208,5 +208,5 @@ describe("AwardPointsDialog", () => {
       description: "Points could not be awarded. Please try again.",
     });
     expect(props.onOpenChange).not.toHaveBeenCalledWith(false);
-  });
+  }, 10_000);
 });

@@ -106,4 +106,55 @@ describe("ActivityFeed", () => {
       expect(screen.getByRole("button", { name: /load more/i })).toBeEnabled();
     });
   });
+
+  it("lets admins delete an activity item after confirmation", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    const onDelete = vi.fn(async () => ({ ok: true as const }));
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        canDelete
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /delete point award to ben/i }));
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("activity-1"));
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Delete this 10-point award to Ben? Scores will be recalculated without it.",
+    );
+    expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
+
+  it("shows a safe error when deletion returns an expected failure", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    const onDelete = vi.fn(async () => ({
+      ok: false as const,
+      code: "POINT_TRANSACTION_ALREADY_DELETED",
+      message: "Point transaction is already deleted",
+    }));
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        canDelete
+        onDelete={onDelete}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /delete point award to ben/i }));
+
+    expect(await screen.findByText("Point transaction is already deleted")).toBeInTheDocument();
+    expect(screen.getByText("Great collaboration")).toBeInTheDocument();
+    confirmSpy.mockRestore();
+  });
 });

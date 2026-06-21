@@ -2,11 +2,12 @@ import type { FastifyInstance } from "fastify";
 import {
   adjustPointsSchema,
   activityFeedRequestSchema,
+  deletePointTransactionSchema,
   seasonScopedRequestSchema,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub } from "../actor.js";
+import { getActorBySub, isAdminRole } from "../actor.js";
 import { info, warn } from "../logging.js";
 import { resolveSeasonScope, SeasonScopeError } from "../season-scope.js";
 
@@ -38,6 +39,28 @@ export function mapActivityItem(tx: {
           isActive: tx.season.isActive,
         }
       : null,
+  };
+}
+
+export function mapDeletedPoint(tx: {
+  id: string;
+  actor: { displayName: string };
+  targetUser: { displayName: string } | null;
+  targetHouse: { name: string; color: string };
+  delta: number;
+  reason: string;
+  trait: Trait | null;
+  createdAt: Date;
+  deletedAt: Date | null;
+  deletedBy: { displayName: string } | null;
+  deletionReason: string | null;
+  season?: { id: string; name: string; isActive: boolean } | null;
+}) {
+  return {
+    ...mapActivityItem(tx),
+    deletedAt: (tx.deletedAt ?? tx.createdAt).toISOString(),
+    deletedByName: tx.deletedBy?.displayName ?? null,
+    deletionReason: tx.deletionReason,
   };
 }
 
@@ -186,6 +209,7 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
       where: {
         organizationId: actor.organizationId,
         seasonId: season.id,
+        deletedAt: null,
         targetUserId: { not: null },
       },
       _sum: { delta: true },
@@ -214,7 +238,7 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const transactions = await prisma.pointTransaction.findMany({
-      where: { organizationId: actor.organizationId },
+      where: { organizationId: actor.organizationId, deletedAt: null },
       orderBy: [
         { createdAt: "desc" },
         { id: "desc" },
@@ -241,5 +265,80 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
       items: items.map(mapActivityItem),
       nextCursor,
     };
+  });
+
+  app.post("/points/delete", async (request, reply) => {
+    const parsed = deletePointTransactionSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor || !isAdminRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {});
+      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+    }
+
+    const existing = await prisma.pointTransaction.findUnique({
+      where: { id: parsed.data.transactionId },
+      select: {
+        id: true,
+        organizationId: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!existing || existing.organizationId !== actor.organizationId) {
+      warn(request.log, "points.delete.not_found", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        transactionId: parsed.data.transactionId,
+      });
+      return reply.status(404).send({ message: "Point transaction not found", code: "POINT_TRANSACTION_NOT_FOUND" });
+    }
+
+    if (existing.deletedAt) {
+      warn(request.log, "points.delete.already_deleted", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        transactionId: existing.id,
+      });
+      return reply.status(409).send({ message: "Point transaction is already deleted", code: "POINT_TRANSACTION_ALREADY_DELETED" });
+    }
+
+    const deletedPoint = await prisma.pointTransaction.update({
+      where: { id: existing.id },
+      data: {
+        deletedAt: new Date(),
+        deletedByUserId: actor.id,
+        deletionReason: parsed.data.reason?.trim() || null,
+      },
+      select: {
+        id: true,
+        delta: true,
+        reason: true,
+        trait: true,
+        createdAt: true,
+        deletedAt: true,
+        deletionReason: true,
+        actor: { select: { displayName: true } },
+        targetUser: { select: { displayName: true } },
+        targetHouse: { select: { name: true, color: true } },
+        deletedBy: { select: { displayName: true } },
+        season: { select: { id: true, name: true, isActive: true } },
+      },
+    });
+
+    info(request.log, "points.deleted", {
+      transactionId: deletedPoint.id,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      delta: deletedPoint.delta,
+    });
+
+    return mapDeletedPoint(deletedPoint);
   });
 }

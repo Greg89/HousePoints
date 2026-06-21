@@ -93,6 +93,7 @@ model User {
   house                House?             @relation(fields: [houseId], references: [id], onDelete: Restrict)
   pointTransactions    PointTransaction[] @relation("ActorTransactions")
   receivedTransactions PointTransaction[] @relation("PointsReceived")
+  deletedPointTransactions PointTransaction[] @relation("DeletedPointTransactions")
   createdInvites       OrgInvite[]        @relation("CreatedInvites")
   usedInvite           OrgInvite[]        @relation("UsedInvites")
   createdSeasons       Season[]           @relation("CreatedSeasons")
@@ -145,19 +146,25 @@ model PointTransaction {
   delta          Int
   reason         String
   trait          Trait?
+  deletedAt      DateTime?
+  deletedByUserId String?
+  deletionReason String?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   season       Season       @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   actor        User         @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
   targetUser   User?        @relation("PointsReceived", fields: [targetUserId], references: [id], onDelete: SetNull)
+  deletedBy    User?        @relation("DeletedPointTransactions", fields: [deletedByUserId], references: [id], onDelete: SetNull)
   targetHouse  House        @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
   @@index([organizationId, seasonId, createdAt])
+  @@index([organizationId, deletedAt])
   @@index([targetHouseId, createdAt])
   @@index([targetHouseId, seasonId, createdAt])
   @@index([targetUserId, createdAt])
   @@index([targetUserId, seasonId, createdAt])
   @@index([actorUserId, createdAt])
+  @@index([deletedByUserId])
 }

@@ -13,6 +13,8 @@ import {
   createSeasonSchema,
   createOrgSchema,
   createInviteSchema,
+  deletedPointSchema,
+  deletePointTransactionSchema,
   inviteLinkSchema,
   joinOrgSchema,
   promoteUserSchema,
@@ -50,6 +52,7 @@ const webConsumedApiEndpoints = [
   "/orgs/invite",
   "/orgs/join",
   "/points/adjust",
+  "/points/delete",
   "/seasons/context",
   "/seasons/rename",
   "/seasons/start",
@@ -421,6 +424,10 @@ describe("authenticated request schemas", () => {
       trait: "LEADERSHIP",
       actorAuth0Sub: "auth0|attacker",
     }],
+    [deletePointTransactionSchema, {
+      transactionId: "tx-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
     [bootstrapUserSchema, {
       displayName: "Alice",
       auth0Sub: "auth0|attacker",
@@ -655,6 +662,22 @@ describe("dashboard response schemas", () => {
     expect(activityFeedRequestSchema.safeParse({ cursor: "" }).success).toBe(false);
   });
 
+  it("accepts soft-deleted point audit records", () => {
+    expect(
+      deletedPointSchema.parse({
+        ...activityItem,
+        deletedAt: "2026-06-17T12:00:00.000Z",
+        deletedByName: "Olivia",
+        deletionReason: "Duplicate award",
+      }),
+    ).toEqual({
+      ...activityItem,
+      deletedAt: "2026-06-17T12:00:00.000Z",
+      deletedByName: "Olivia",
+      deletionReason: "Duplicate award",
+    });
+  });
+
   it("rejects malformed items inside dashboard collections", () => {
     expect(
       leaderboardSchema.safeParse([{ id: "house-1", score: "10" }]).success,
@@ -863,6 +886,7 @@ describe("adminContextSchema", () => {
         description: null,
       },
     ],
+    recentDeletedPoints: [],
   };
 
   it("accepts the complete admin context response", () => {

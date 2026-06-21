@@ -36,6 +36,28 @@ const historicalSeason = {
   isActive: false,
 };
 
+const recentDeletedPoints = [
+  {
+    id: "tx-1",
+    actorName: "Olivia",
+    targetUserName: "Ben Unassigned",
+    targetHouseName: "Ravenclaw",
+    targetHouseColor: "#1d4ed8",
+    delta: 12,
+    reason: "Duplicate award",
+    trait: "COLLABORATION" as const,
+    createdAt: "2026-06-20T12:00:00.000Z",
+    deletedAt: "2026-06-21T12:00:00.000Z",
+    deletedByName: "Alice Admin",
+    deletionReason: "Entered twice",
+    season: {
+      id: "season-active",
+      name: "Q3 2026",
+      isActive: true,
+    },
+  },
+];
+
 function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminForms>> = {}) {
   const props = {
     users,
@@ -43,6 +65,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     seasons: [activeSeason, historicalSeason],
     activeSeason,
     actorRole: "OWNER" as const,
+    recentDeletedPoints,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onCreateInvite: vi.fn().mockResolvedValue({
@@ -125,6 +148,16 @@ describe("AdminForms", () => {
       'Start "Q4 2026" now? This will close Q3 2026 and reset current-season scoring.',
     );
     confirmSpy.mockRestore();
+  });
+
+  it("shows recently deleted point awards as an admin reporting widget", () => {
+    setupAdminForms();
+
+    expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
+    expect(screen.getByText("Awards deleted")).toBeInTheDocument();
+    expect(screen.getByText("Points removed")).toBeInTheDocument();
+    expect(screen.getByText(/Alice Admin deleted 12 points to Ben Unassigned/)).toBeInTheDocument();
+    expect(screen.getByText("Entered twice")).toBeInTheDocument();
   });
 
   it("shows a safe toast when start-season returns an expected failure", async () => {

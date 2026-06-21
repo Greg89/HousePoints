@@ -67,6 +67,36 @@ export type PointAdjustmentResponse = z.infer<
   typeof pointAdjustmentResponseSchema
 >;
 
+export const deletePointTransactionSchema = z.object({
+  transactionId: z.string().min(1),
+  reason: z.string().trim().max(240).optional(),
+}).strict();
+
+export type DeletePointTransactionInput = z.infer<typeof deletePointTransactionSchema>;
+
+export const deletedPointSchema = z.object({
+  id: z.string().min(1),
+  actorName: z.string().min(1),
+  targetUserName: z.string().min(1),
+  targetHouseName: z.string().min(1),
+  targetHouseColor: z.string().min(1),
+  delta: z.number().int(),
+  reason: z.string(),
+  trait: traitSchema.nullable(),
+  createdAt: z.string().datetime(),
+  deletedAt: z.string().datetime(),
+  deletedByName: z.string().nullable(),
+  deletionReason: z.string().nullable(),
+  season: z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    isActive: z.boolean(),
+  }).nullable(),
+});
+
+export type DeletedPoint = z.infer<typeof deletedPointSchema>;
+export const deletedPointsSchema = z.array(deletedPointSchema);
+
 export const bootstrapUserSchema = z.object({
   email: z.string().email().optional(),
   displayName: z.string().min(1).max(120),
@@ -317,6 +347,7 @@ export const adminContextSchema = z.object({
   organizationSlug: z.string(),
   users: z.array(adminUserSchema),
   houses: z.array(adminHouseSchema),
+  recentDeletedPoints: deletedPointsSchema,
 });
 
 export type AdminContext = z.infer<typeof adminContextSchema>;
@@ -516,6 +547,10 @@ export const apiContracts = {
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,
+  ),
+  "/points/delete": defineContract(
+    deletePointTransactionSchema,
+    deletedPointSchema,
   ),
   "/seasons/context": defineContract(actorScopeSchema, seasonContextSchema),
   "/seasons/rename": defineContract(renameSeasonSchema, seasonSchema),

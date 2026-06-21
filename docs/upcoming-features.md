@@ -110,6 +110,8 @@ The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboa
 
 **Admin-only: unassigned members** - a warning card showing how many members have not been assigned to a house yet. Links directly to the admin panel.
 
+**Admin-only: recent deletions** - implemented for point awards. Owners/admins can soft delete an award from the Activity tab, live scoring excludes the deleted transaction, and the Manage tab shows a recent deletion audit.
+
 **Season countdown / summary** - if seasons are enabled, show days remaining in the current season or a "Season just ended" summary card with the winner.
 
 ### Implementation notes
@@ -117,6 +119,7 @@ The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboa
 - Consider a `GET /dashboard/summary` endpoint that returns all widget data in one round-trip to avoid waterfall fetching.
 - Widgets should degrade gracefully: if there are no transactions yet, show an empty state, not an error.
 - The layout should be a responsive CSS grid; widgets can be different sizes (some spanning 2 columns) depending on their content density.
+- Elevated Manage reporting should expand from the current member/house/unassigned/deletion cards into a compact operational view: recent admin actions, invite activity, season changes, unusual point volume, and data cleanup history.
 
 **Open questions**
 - Do members and admins see the same widgets, or should the layout be role-aware?

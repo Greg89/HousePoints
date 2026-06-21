@@ -7,6 +7,7 @@ import {
 import { prisma } from "@housepoints/db";
 import { getActorBySub, isAdminRole } from "../actor.js";
 import { info, warn } from "../logging.js";
+import { mapDeletedPoint } from "./points.js";
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
@@ -26,7 +27,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
     }
 
-    const [users, houses] = await Promise.all([
+    const [users, houses, recentDeletedPoints] = await Promise.all([
       prisma.user.findMany({
         where: { organizationId: actor.organizationId },
         orderBy: { displayName: "asc" },
@@ -43,6 +44,31 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         orderBy: { name: "asc" },
         select: { id: true, name: true, color: true, description: true },
       }),
+      prisma.pointTransaction.findMany({
+        where: {
+          organizationId: actor.organizationId,
+          deletedAt: { not: null },
+        },
+        orderBy: [
+          { deletedAt: "desc" },
+          { id: "desc" },
+        ],
+        take: 10,
+        select: {
+          id: true,
+          delta: true,
+          reason: true,
+          trait: true,
+          createdAt: true,
+          deletedAt: true,
+          deletionReason: true,
+          actor: { select: { displayName: true } },
+          targetUser: { select: { displayName: true } },
+          targetHouse: { select: { name: true, color: true } },
+          deletedBy: { select: { displayName: true } },
+          season: { select: { id: true, name: true, isActive: true } },
+        },
+      }),
     ]);
 
     info(request.log, "admin.context.loaded", {
@@ -50,6 +76,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       users: users.length,
       houses: houses.length,
+      recentDeletedPoints: recentDeletedPoints.length,
     });
 
     return {
@@ -57,6 +84,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationSlug: actor.organizationSlug,
       users,
       houses,
+      recentDeletedPoints: recentDeletedPoints.map(mapDeletedPoint),
     };
   });
 

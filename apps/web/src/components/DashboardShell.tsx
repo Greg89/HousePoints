@@ -19,7 +19,7 @@ import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
 import { OverviewReports } from "./OverviewReports";
 import { AwardPointsDialog } from "./AwardPointsDialog";
-import type { AwardPointsResult } from "@/lib/action-results";
+import type { AwardPointsResult, DeletePointResult } from "@/lib/action-results";
 import type {
   DashboardSummary,
   LeaderboardEntry,
@@ -54,6 +54,7 @@ interface DashboardShellProps {
     memberPoints: MemberScore[];
   }>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
+  onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
   loginUrl: string;
   logoutUrl: string;
   adminSection?: React.ReactNode;
@@ -79,6 +80,7 @@ export function DashboardShell({
   seasonContext,
   onSeasonChange,
   onAward,
+  onDeletePoint,
   logoutUrl,
   adminSection,
 }: DashboardShellProps) {
@@ -319,6 +321,8 @@ export function DashboardShell({
               items={activity}
               nextCursor={activityNextCursor}
               onLoadMore={onLoadMoreActivity}
+              canDelete={session.role === "ADMIN" || session.role === "OWNER"}
+              onDelete={onDeletePoint}
             />
           </Tabs.Content>
 

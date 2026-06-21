@@ -42,8 +42,10 @@ vi.mock("@housepoints/db", () => ({
     },
     pointTransaction: {
       create: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       groupBy: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -76,8 +78,10 @@ const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
 const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
+const mockTxFindUnique = prisma.pointTransaction.findUnique as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
+const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -138,6 +142,7 @@ const makeOwner = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
+  mockTxFindMany.mockResolvedValue([]);
   mockTransaction.mockImplementation(
     async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
   );
@@ -583,6 +588,125 @@ describe("POST /points/adjust", () => {
   });
 });
 
+describe("POST /points/delete", () => {
+  const deletedPoint = {
+    id: "tx-1",
+    delta: 15,
+    reason: "Crushed the demo",
+    trait: "TECHNICAL_EXCELLENCE" as const,
+    createdAt: new Date("2026-06-01T12:00:00.000Z"),
+    deletedAt: new Date("2026-06-02T12:00:00.000Z"),
+    deletionReason: "Duplicate award",
+    actor: { displayName: "Bob" },
+    targetUser: { displayName: "Alice" },
+    targetHouse: { name: "Phoenix", color: "#7c3aed" },
+    deletedBy: { displayName: "Olivia" },
+    season: { id: "season-active", name: "Q3 2026", isActive: true },
+  };
+
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockTxFindUnique).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("soft deletes a point transaction for admins in the same organization", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-1",
+      deletedAt: null,
+    });
+    mockTxUpdate.mockResolvedValue(deletedPoint);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1", reason: " Duplicate award " },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "tx-1",
+      actorName: "Bob",
+      targetUserName: "Alice",
+      targetHouseName: "Phoenix",
+      targetHouseColor: "#7c3aed",
+      delta: 15,
+      reason: "Crushed the demo",
+      trait: "TECHNICAL_EXCELLENCE",
+      createdAt: "2026-06-01T12:00:00.000Z",
+      deletedAt: "2026-06-02T12:00:00.000Z",
+      deletedByName: "Olivia",
+      deletionReason: "Duplicate award",
+      season: { id: "season-active", name: "Q3 2026", isActive: true },
+    });
+    expect(mockTxUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "tx-1" },
+        data: expect.objectContaining({
+          deletedByUserId: "user-2",
+          deletionReason: "Duplicate award",
+        }),
+      }),
+    );
+    await app.close();
+  });
+
+  it("does not reveal transactions from another organization", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-other",
+      deletedAt: null,
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("POINT_TRANSACTION_NOT_FOUND");
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 when the point transaction is already deleted", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-1",
+      deletedAt: new Date("2026-06-02T12:00:00.000Z"),
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("POINT_TRANSACTION_ALREADY_DELETED");
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /seasons/context", () => {
   it("returns active season and historical seasons for the actor's organization", async () => {
     mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
@@ -908,6 +1032,7 @@ describe("POST /houses/leaderboard", () => {
       where: {
         organizationId: "org-secure",
         seasonId: "season-active",
+        deletedAt: null,
       },
       _sum: { delta: true },
       _count: { _all: true },
@@ -1001,6 +1126,7 @@ describe("POST /admin/context", () => {
       organizationSlug: "acme",
       users: [],
       houses: [],
+      recentDeletedPoints: [],
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1063,6 +1189,7 @@ describe("POST /admin/context", () => {
           description: null,
         },
       ],
+      recentDeletedPoints: [],
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1264,7 +1391,7 @@ describe("POST /transactions/recent", () => {
     expect(items[0].delta).toBe(10);
     expect(page.nextCursor).toBe("tx-1");
     expect(mockTxFindMany).toHaveBeenCalledWith({
-      where: { organizationId: "org-1" },
+      where: { organizationId: "org-1", deletedAt: null },
       orderBy: [
         { createdAt: "desc" },
         { id: "desc" },
@@ -1348,6 +1475,7 @@ describe("POST /users/scores", () => {
         where: {
           organizationId: "org-secure",
           seasonId: "season-active",
+          deletedAt: null,
           targetUserId: { not: null },
         },
       }),
