@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
+import { ClientErrorReporter } from "@/components/ClientErrorReporter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         {children}
+        <ClientErrorReporter />
         <Toaster position="bottom-right" richColors />
       </body>
     </html>

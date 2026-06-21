@@ -22,6 +22,8 @@ export type WebLogEvent =
   | "web.dashboard.render_started"
   | "web.dashboard.render_completed"
   | "web.dashboard.render_failed"
+  | "web.client.error_reported"
+  | "web.client.error_report_rejected"
   | "web.request.failed"
   | "web.auth.not_configured"
   | "web.auth.session_missing"
