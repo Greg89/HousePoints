@@ -4,6 +4,7 @@ import {
   actorScopeSchema,
   assignUserHouseSchema,
   createHouseSchema,
+  promoteUserSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { getActorBySub, isAdminRole, isOwnerRole } from "../actor.js";
@@ -277,6 +278,88 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       targetUserId: updatedUser.id,
       targetHouseId: targetHouse.id,
       targetHouseName: targetHouse.name,
+    });
+
+    return updatedUser;
+  });
+
+  app.post("/admin/users/role", async (request, reply) => {
+    const parsed = promoteUserSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor || !isOwnerRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {});
+      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: parsed.data.targetUserId },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        role: true,
+        houseId: true,
+        organizationId: true,
+      },
+    });
+
+    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+      return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
+    }
+
+    if (targetUser.role === "OWNER") {
+      return reply.status(409).send({
+        message: "Owner roles cannot be changed here",
+        code: "OWNER_ROLE_IMMUTABLE",
+      });
+    }
+
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const changedUser = await tx.user.update({
+        where: { id: targetUser.id },
+        data: { role: parsed.data.role },
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          role: true,
+          houseId: true,
+        },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          eventType: "USER_ROLE_CHANGED",
+          summary: `${actor.displayName} changed ${changedUser.displayName} from ${targetUser.role} to ${changedUser.role}.`,
+          metadata: {
+            targetUserId: changedUser.id,
+            targetUserName: changedUser.displayName,
+            previousRole: targetUser.role,
+            newRole: changedUser.role,
+          },
+        },
+      });
+
+      return changedUser;
+    });
+
+    info(request.log, "admin.user.role_changed", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      targetUserId: updatedUser.id,
+      previousRole: targetUser.role,
+      newRole: updatedUser.role,
     });
 
     return updatedUser;

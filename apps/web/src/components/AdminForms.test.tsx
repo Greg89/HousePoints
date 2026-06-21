@@ -12,8 +12,8 @@ vi.mock("sonner", () => ({
 }));
 
 const users = [
-  { id: "user-1", displayName: "Alice Assigned", houseId: "house-1" },
-  { id: "user-2", displayName: "Ben Unassigned", houseId: null },
+  { id: "user-1", displayName: "Alice Assigned", email: "alice@example.com", role: "ADMIN" as const, houseId: "house-1" },
+  { id: "user-2", displayName: "Ben Unassigned", email: "ben@example.com", role: "MEMBER" as const, houseId: null },
 ];
 
 const houses = [
@@ -119,6 +119,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     recentAdminActions,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
+    onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
     onCreateInvite: vi.fn().mockResolvedValue({
       ok: true,
       token: "invite-token",
@@ -465,6 +466,62 @@ describe("AdminForms", () => {
     expect(toast.success).toHaveBeenCalledWith("House assigned", {
       description: "Ben Unassigned -> Ravenclaw",
     });
+  });
+
+  it("lets owners promote members to admins from the Team section", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Team");
+    const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
+
+    await user.selectOptions(promoteForm.getByLabelText("Member to promote"), "user-2");
+    await user.click(promoteForm.getByRole("button", { name: "Promote to admin" }));
+
+    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Promote Ben Unassigned to admin? They will be able to invite members, assign houses, award points, and delete point awards.",
+    );
+
+    const promoteMock = props.onPromoteUser as ReturnType<typeof vi.fn>;
+    const formData = promoteMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-2",
+      role: "ADMIN",
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it("shows role promotion to admins but keeps it owner-only", () => {
+    setupAdminForms({ actorRole: "ADMIN" });
+    switchToManageSection("Team");
+    const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
+
+    expect(promoteForm.getByText("Owner only")).toBeInTheDocument();
+    expect(promoteForm.getByLabelText("Member to promote")).toBeDisabled();
+    expect(promoteForm.getByRole("button", { name: "Promote to admin" })).toBeDisabled();
+  });
+
+  it("shows a safe toast when role promotion returns an expected failure", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms({
+      onPromoteUser: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "OWNER_REQUIRED",
+        message: "The member role could not be updated. Please try again.",
+      }),
+    });
+    switchToManageSection("Team");
+    const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
+
+    await user.selectOptions(promoteForm.getByLabelText("Member to promote"), "user-2");
+    await user.click(promoteForm.getByRole("button", { name: "Promote to admin" }));
+
+    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to update role", {
+      description: "The member role could not be updated. Please try again.",
+    });
+    confirmSpy.mockRestore();
   });
 
   it("shows a safe toast when assignment returns an expected failure", async () => {

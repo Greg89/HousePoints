@@ -46,6 +46,7 @@ const webConsumedApiEndpoints = [
   "/admin/context",
   "/admin/houses",
   "/admin/users/assign-house",
+  "/admin/users/role",
   "/dashboard/summary",
   "/houses/leaderboard",
   "/members",
@@ -1051,6 +1052,34 @@ describe("adminAuditActionSchema", () => {
         seasonName: "Q4 2026",
         previousSeasonId: "season-active",
         previousSeasonName: "Q3 2026",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-6",
+        type: "USER_ROLE_CHANGED",
+        occurredAt: "2026-06-21T13:30:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia changed Ben from MEMBER to ADMIN.",
+        metadata: {
+          targetUserId: "user-2",
+          targetUserName: "Ben",
+          previousRole: "MEMBER",
+          newRole: "ADMIN",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-6",
+      type: "USER_ROLE_CHANGED",
+      occurredAt: "2026-06-21T13:30:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia changed Ben from MEMBER to ADMIN.",
+      metadata: {
+        targetUserId: "user-2",
+        targetUserName: "Ben",
+        previousRole: "MEMBER",
+        newRole: "ADMIN",
       },
     });
   });

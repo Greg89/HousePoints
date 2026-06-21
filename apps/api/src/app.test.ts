@@ -1409,6 +1409,128 @@ describe("POST /users/profile", () => {
   });
 });
 
+describe("POST /admin/users/role", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/role",
+      payload: { targetUserId: "user-1", role: "ADMIN" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when the target user is outside the owner's organization", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/role",
+      payload: { targetUserId: "user-other", role: "ADMIN" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects attempts to change an owner role", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({
+        id: "user-owner-2",
+        displayName: "Second Owner",
+        organizationId: "org-secure",
+      }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/role",
+      payload: { targetUserId: "user-owner-2", role: "ADMIN" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OWNER_ROLE_IMMUTABLE");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to promote a member to admin and writes an audit event", async () => {
+    const targetUser = makeMember({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "MEMBER" as const,
+      organizationId: "org-secure",
+      houseId: "house-1",
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(targetUser);
+    mockUserUpdate.mockResolvedValue({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "ADMIN",
+      houseId: "house-1",
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/role",
+      payload: { targetUserId: "user-target", role: "ADMIN" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-target" },
+      data: { role: "ADMIN" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        role: true,
+        houseId: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "USER_ROLE_CHANGED",
+        summary: "Olivia changed Taylor from MEMBER to ADMIN.",
+        metadata: {
+          targetUserId: "user-target",
+          targetUserName: "Taylor",
+          previousRole: "MEMBER",
+          newRole: "ADMIN",
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "ADMIN",
+      houseId: "house-1",
+    });
+    await app.close();
+  });
+});
+
 describe("POST /transactions/recent", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);

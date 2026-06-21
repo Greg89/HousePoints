@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
   adminContextSchema,
+  adminUserSchema,
   adminHouseSchema,
   assignUserHouseResponseSchema,
   deletedPointSchema,
@@ -17,7 +18,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult } from "@/lib/action-results";
+import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
@@ -133,6 +134,76 @@ export async function assignUserHouse(formData: FormData): Promise<HouseAssignme
       actorUserId: actor.id,
       targetUserId: updatedUser.id,
       targetHouseId: updatedUser.houseId,
+    });
+
+    revalidatePath("/");
+
+    return { ok: true };
+  });
+}
+
+export async function promoteUserRole(formData: FormData): Promise<RoleChangeResult> {
+  return runServerAction("promoteUserRole", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("promoteUserRole", requestId);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+    const role = String(formData.get("role") ?? "ADMIN").trim();
+
+    if (!targetUserId) {
+      return {
+        ok: false,
+        code: "ROLE_TARGET_REQUIRED",
+        message: "A member is required.",
+      };
+    }
+
+    if (role !== "ADMIN" && role !== "MEMBER") {
+      return {
+        ok: false,
+        code: "ROLE_INVALID",
+        message: "Role must be member or admin.",
+      };
+    }
+
+    const response = await apiFetch("/admin/users/role", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId,
+        role,
+      }),
+    });
+
+    try {
+      await parseApiResponse(
+        response,
+        adminUserSchema,
+        "The member role could not be updated. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId,
+        role,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    logInfo("web.admin.user_role_changed", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      targetUserId,
+      role,
     });
 
     revalidatePath("/");

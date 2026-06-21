@@ -13,6 +13,7 @@ export type HouseAssignmentResult = MutationResult;
 export type HouseMutationResult = MutationResult;
 export type JoinOrgResult = MutationResult;
 export type ProfileUpdateResult = MutationResult;
+export type RoleChangeResult = MutationResult;
 export type RenameSeasonResult<Season> =
   | { ok: true; season: Season }
   | Extract<MutationResult, { ok: false }>;

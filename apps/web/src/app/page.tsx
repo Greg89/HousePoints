@@ -4,6 +4,7 @@ import {
   createHouse,
   createInviteLink,
   deletePointTransaction,
+  promoteUserRole,
   readAdminContext,
 } from "./actions/admin";
 import {
@@ -146,6 +147,7 @@ async function renderHome() {
       actorRole={session.role ?? "MEMBER"}
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
+      onPromoteUser={promoteUserRole}
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
       onRenameSeason={renameSeason}

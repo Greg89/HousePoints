@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -249,6 +249,89 @@ describe("assignUserHouse", () => {
     await expect(assignUserHouse(formData)).rejects.toThrow("database vanished");
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("promoteUserRole", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "target-1",
+      displayName: "Target User",
+      email: "target@example.com",
+      role: "ADMIN",
+      houseId: "house-1",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "target-1",
+      displayName: "Target User",
+      email: "target@example.com",
+      role: "ADMIN",
+      houseId: "house-1",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when promotion succeeds", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("role", "ADMIN");
+
+    await expect(promoteUserRole(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("promoteUserRole", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("promoteUserRole", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/users/role", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: "target-1",
+        role: "ADMIN",
+      }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const formData = new FormData();
+
+    await expect(promoteUserRole(formData)).resolves.toEqual({
+      ok: false,
+      code: "ROLE_TARGET_REQUIRED",
+      message: "A member is required.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("role", "ADMIN");
+    const error = new ApiResponseError(
+      403,
+      "OWNER_REQUIRED",
+      "The member role could not be updated. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(promoteUserRole(formData)).resolves.toEqual({
+      ok: false,
+      code: "OWNER_REQUIRED",
+      message: "The member role could not be updated. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "promoteUserRole", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        targetUserId: "target-1",
+        role: "ADMIN",
+      },
+    );
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

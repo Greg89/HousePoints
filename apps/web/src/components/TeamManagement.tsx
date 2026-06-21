@@ -3,13 +3,15 @@ import {
   Check,
   Copy,
   LinkSimple,
+  ShieldCheck,
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import type { AdminAuditAction } from "@housepoints/contracts";
+import type { AdminAuditAction, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
+  RoleChangeResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 
@@ -20,7 +22,9 @@ interface TeamManagementProps {
   assignedUsers: AdminUser[];
   unassignedSummary: string;
   recentAdminActions: AdminAuditAction[];
+  actorRole: UserRole;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
+  onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
 }
 
@@ -31,11 +35,14 @@ export function TeamManagement({
   assignedUsers,
   unassignedSummary,
   recentAdminActions,
+  actorRole,
   onAssignHouse,
+  onPromoteUser,
   onCreateInvite,
 }: TeamManagementProps) {
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
+  const [promotePending, startPromote] = useTransition();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -45,6 +52,8 @@ export function TeamManagement({
   );
   const inviteCreatedCount = inviteActions.filter((action) => action.type === "INVITE_CREATED").length;
   const inviteUsedCount = inviteActions.filter((action) => action.type === "INVITE_USED").length;
+  const isOwner = actorRole === "OWNER";
+  const promotionCandidates = users.filter((user) => user.role === "MEMBER");
 
   function handleAssign(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -98,6 +107,43 @@ export function TeamManagement({
     });
   }
 
+  function handlePromote(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isOwner) return;
+
+    const formData = new FormData(e.currentTarget);
+    const targetUserId = String(formData.get("targetUserId") ?? "");
+    const userName = users.find((user) => user.id === targetUserId)?.displayName ?? "this member";
+    const form = e.currentTarget;
+    const confirmed = window.confirm(
+      `Promote ${userName} to admin? They will be able to invite members, assign houses, award points, and delete point awards.`,
+    );
+
+    if (!confirmed) return;
+
+    startPromote(async () => {
+      try {
+        const result = await onPromoteUser(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to update role", {
+            description: result.message,
+          });
+          return;
+        }
+
+        toast.success("Member promoted", {
+          description: `${userName} is now an admin.`,
+        });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to update role", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
   async function handleCopy() {
     if (!inviteToken) return;
     await navigator.clipboard.writeText(inviteToken);
@@ -114,7 +160,7 @@ export function TeamManagement({
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.8fr)_minmax(18rem,0.8fr)]">
         <form
           aria-label="Assign user to house"
           onSubmit={handleAssign}
@@ -233,6 +279,58 @@ export function TeamManagement({
             </button>
           )}
         </section>
+
+        <form
+          aria-label="Promote member"
+          onSubmit={handlePromote}
+          className="grid content-start gap-4 rounded-xl border bg-card p-5"
+        >
+          <div>
+            <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
+              <span className="flex items-center gap-2">
+                <ShieldCheck size={16} />
+                Role Management
+              </span>
+              {!isOwner ? (
+                <span className="rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Owner only
+                </span>
+              ) : null}
+            </h5>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Promote trusted members to admin so they can help with team operations.
+            </p>
+          </div>
+          <input type="hidden" name="role" value="ADMIN" />
+          <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+            Member
+            <select
+              name="targetUserId"
+              aria-label="Member to promote"
+              className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
+              required
+              defaultValue=""
+              disabled={!isOwner || promotionCandidates.length === 0}
+            >
+              <option value="" disabled>
+                {promotionCandidates.length > 0 ? "Select member..." : "No members eligible"}
+              </option>
+              {promotionCandidates.map((user) => (
+                <option key={user.id} value={user.id}>{user.displayName}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={!isOwner || promotePending || promotionCandidates.length === 0}
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            {promotePending ? "Promoting..." : "Promote to admin"}
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Admins can manage member and points workflows. Owners keep org-level configuration.
+          </p>
+        </form>
       </div>
 
       <section className="rounded-xl border bg-card p-5" aria-label="Invite activity">

@@ -38,6 +38,7 @@ export type WebLogEvent =
   | "web.admin.house_created"
   | "web.admin.house_create_failed"
   | "web.admin.user_assigned"
+  | "web.admin.user_role_changed"
   | "web.admin.assignment_failed"
   | "web.points.deleted"
   | "web.seasons.renamed"

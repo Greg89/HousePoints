@@ -73,7 +73,7 @@ Deferred sub-features:
 - Rename organization.
 - Change organization slug safely.
 - Transfer owner role.
-- Promote/demote admins beyond the existing owner/admin policy checks.
+- Demote admins and define admin-removal rules. Owner-only member promotion is implemented in Manage Team.
 - Remove users from an organization.
 - Delete or archive an organization.
 

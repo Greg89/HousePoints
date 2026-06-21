@@ -1,4 +1,4 @@
-import { Calendar, LinkSimple, Trash, UserPlus, UserSwitch } from "@phosphor-icons/react";
+import { Calendar, LinkSimple, ShieldCheck, Trash, UserPlus, UserSwitch } from "@phosphor-icons/react";
 import type { AdminAuditAction } from "@housepoints/contracts";
 
 interface RecentAdminActionsReportProps {
@@ -11,6 +11,7 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   INVITE_USED: "Invite used",
   SEASON_STARTED: "Season started",
   USER_HOUSE_ASSIGNED: "House assigned",
+  USER_ROLE_CHANGED: "Role changed",
 };
 
 const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
@@ -19,6 +20,7 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   INVITE_USED: UserPlus,
   SEASON_STARTED: Calendar,
   USER_HOUSE_ASSIGNED: UserSwitch,
+  USER_ROLE_CHANGED: ShieldCheck,
 };
 
 export function RecentAdminActionsReport({ actions }: RecentAdminActionsReportProps) {

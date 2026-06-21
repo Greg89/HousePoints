@@ -350,6 +350,7 @@ export const adminAuditActionSchema = z.object({
     "INVITE_USED",
     "SEASON_STARTED",
     "USER_HOUSE_ASSIGNED",
+    "USER_ROLE_CHANGED",
   ]),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),
@@ -554,6 +555,7 @@ export const apiContracts = {
     assignUserHouseSchema,
     assignUserHouseResponseSchema,
   ),
+  "/admin/users/role": defineContract(promoteUserSchema, adminUserSchema),
   "/dashboard/summary": defineContract(
     seasonScopedRequestSchema,
     dashboardSummarySchema,

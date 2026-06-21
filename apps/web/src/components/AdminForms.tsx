@@ -7,6 +7,7 @@ import type {
   HouseAssignmentResult,
   HouseMutationResult,
   RenameSeasonResult,
+  RoleChangeResult,
   StartSeasonResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
@@ -27,6 +28,7 @@ interface AdminFormsProps {
   recentAdminActions: AdminAuditAction[];
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
+  onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
@@ -79,6 +81,7 @@ export function AdminForms({
   recentAdminActions,
   onCreateHouse,
   onAssignHouse,
+  onPromoteUser,
   onCreateInvite,
   onStartSeason,
   onRenameSeason,
@@ -178,7 +181,9 @@ export function AdminForms({
             assignedUsers={assignedUsers}
             unassignedSummary={unassignedSummary}
             recentAdminActions={recentAdminActions}
+            actorRole={actorRole}
             onAssignHouse={onAssignHouse}
+            onPromoteUser={onPromoteUser}
             onCreateInvite={onCreateInvite}
           />
         ) : null}

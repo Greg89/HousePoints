@@ -25,6 +25,7 @@ export type ApiLogEvent =
   | "admin.context.loaded"
   | "admin.house.created"
   | "admin.user.house_assigned"
+  | "admin.user.role_changed"
   | "leaderboard.fetched"
   | "dashboard.summary.loaded"
   | "seasons.active_missing"

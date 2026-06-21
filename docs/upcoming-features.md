@@ -27,6 +27,7 @@ Still deferred: org settings, org deletion, ownership transfer, admin removal ru
 - `OWNER` exists.
 - `OWNER` controls organization-level configuration, including houses and seasons.
 - `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
+- `OWNER` can promote members to `ADMIN` from Manage Team. Role changes are audited.
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
 - Org deletion, ownership transfer, and admin-removal rules are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
@@ -127,7 +128,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 - Elevated Manage reporting should expand from the current member/house/unassigned/deletion cards into a compact operational view: recent admin actions, invite activity, season changes, unusual point volume, and data cleanup history.
 - The Manage tab has been split into focused overview, deleted-points reporting, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
 - The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets. Houses and Seasons remain visible to admins, but are owner-only and disabled for non-owner admins.
-- The Team section now uses compact assignment/invite cards and includes audit-backed invite activity reporting for recent token generation and use.
+- The Team section now uses compact assignment, invite, and owner-only role-management cards. It includes audit-backed invite activity reporting for recent token generation and use.
 - The Audit section now includes a recent admin-actions timeline backed by persisted app data. The dedicated `AuditEvent` table now records the current admin timeline event types: house assignment, point deletion, invite creation/use, and season starts. Legacy fallback rows are still merged for older records that predate durable audit events.
 
 **Open questions**
