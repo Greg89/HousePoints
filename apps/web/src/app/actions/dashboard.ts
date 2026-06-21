@@ -8,6 +8,7 @@ import {
   orgMembersSchema,
   pagedActivityFeedSchema,
   type DashboardSummary,
+  type PagedActivityFeed,
 } from "@housepoints/contracts";
 import { apiFetch, parseApiResponse } from "@/lib/api-client";
 import { getCurrentUserForRequest } from "@/lib/current-user";
@@ -38,17 +39,24 @@ export async function readMembers(requestId: string = randomUUID()) {
   );
 }
 
-export async function readActivityFeed(requestId: string = randomUUID()) {
+export async function readActivityPage(
+  cursor?: string,
+  requestId: string = randomUUID(),
+): Promise<PagedActivityFeed> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify(cursor ? { cursor } : {}),
   });
-  const page = await parseApiResponse(
+  return parseApiResponse(
     response,
     pagedActivityFeedSchema,
     "Dashboard data could not be loaded. Please try again.",
   );
+}
+
+export async function readActivityFeed(requestId: string = randomUUID()) {
+  const page = await readActivityPage(undefined, requestId);
   return activityFeedSchema.parse(page.items);
 }
 

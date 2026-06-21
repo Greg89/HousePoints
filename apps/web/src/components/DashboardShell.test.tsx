@@ -56,7 +56,16 @@ vi.mock("./Leaderboard", () => ({
 }));
 
 vi.mock("./ActivityFeed", () => ({
-  ActivityFeed: () => <section>Activity content</section>,
+  ActivityFeed: ({
+    nextCursor,
+  }: {
+    nextCursor: string | null;
+  }) => (
+    <section>
+      Activity content
+      {nextCursor ? <span>Next cursor: {nextCursor}</span> : null}
+    </section>
+  ),
 }));
 
 vi.mock("./AwardPointsDialog", () => ({
@@ -171,6 +180,11 @@ const baseProps = {
       season: activitySeason,
     },
   ],
+  activityNextCursor: "activity-2",
+  onLoadMoreActivity: vi.fn(async () => ({
+    items: [],
+    nextCursor: null,
+  })),
   memberPoints: [
     { memberId: "member-2", points: 25 },
     { memberId: "member-1", points: 5 },
@@ -556,5 +570,6 @@ describe("DashboardShell", () => {
 
     expect(screen.getByRole("tab", { name: /activity/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Activity content")).toBeVisible();
+    expect(screen.getByText("Next cursor: activity-2")).toBeVisible();
   });
 });

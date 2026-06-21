@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, ArrowRight } from "@phosphor-icons/react";
-import type { ActivityItem } from "@housepoints/contracts";
+import type { ActivityItem, PagedActivityFeed } from "@housepoints/contracts";
 import { TRAIT_LABELS } from "@housepoints/contracts";
 
 interface ActivityFeedProps {
   items: ActivityItem[];
+  nextCursor: string | null;
+  onLoadMore: (cursor: string) => Promise<PagedActivityFeed>;
 }
 
 function relativeTime(isoString: string) {
@@ -20,7 +23,31 @@ function relativeTime(isoString: string) {
   return `${day}d ago`;
 }
 
-export function ActivityFeed({ items }: ActivityFeedProps) {
+export function ActivityFeed({ items, nextCursor, onLoadMore }: ActivityFeedProps) {
+  const [visibleItems, setVisibleItems] = useState(items);
+  const [cursor, setCursor] = useState(nextCursor);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+  async function handleLoadMore() {
+    if (!cursor || isLoadingMore) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+
+    try {
+      const page = await onLoadMore(cursor);
+      setVisibleItems((current) => [...current, ...page.items]);
+      setCursor(page.nextCursor);
+    } catch {
+      setLoadMoreError("More activity could not be loaded. Please try again.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
   return (
     <div className="rounded-xl border bg-card">
       <div className="p-6 border-b">
@@ -30,12 +57,12 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
         </h2>
       </div>
       <div className="overflow-y-auto max-h-[500px] p-4 space-y-3">
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <p className="text-center text-muted-foreground py-8 text-sm">
             No activity yet. Award some points!
           </p>
         ) : (
-          items.map((item, index) => (
+          visibleItems.map((item, index) => (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, x: -16 }}
@@ -97,6 +124,23 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
             </motion.div>
           ))
         )}
+        {loadMoreError ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {loadMoreError}
+          </p>
+        ) : null}
+        {cursor ? (
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              className="rounded-lg border px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
+            >
+              {isLoadingMore ? "Loading..." : "Load more"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -26,6 +26,7 @@ import type {
   OrgMember,
   ActivityItem,
   MemberScore,
+  PagedActivityFeed,
   SeasonContext,
   Trait,
 } from "@housepoints/contracts";
@@ -42,6 +43,8 @@ interface DashboardShellProps {
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];
   activity: ActivityItem[];
+  activityNextCursor: string | null;
+  onLoadMoreActivity: (cursor: string) => Promise<PagedActivityFeed>;
   /** Computed per-member point totals from activity */
   memberPoints: MemberScore[];
   dashboardSummary: DashboardSummary;
@@ -69,6 +72,8 @@ export function DashboardShell({
   leaderboard,
   members,
   activity,
+  activityNextCursor,
+  onLoadMoreActivity,
   memberPoints,
   dashboardSummary,
   seasonContext,
@@ -100,6 +105,7 @@ export function DashboardShell({
     selectedSeasonId === dashboardSummary.selectedSeason.id ? dashboardSummary : scopedDashboardSummary;
   const displayedMemberPoints =
     selectedSeasonId === dashboardSummary.selectedSeason.id ? memberPoints : scopedMemberPoints;
+  const activityFeedKey = `${activityNextCursor ?? "end"}:${activity.map((item) => item.id).join(",")}`;
 
   function handleSeasonChange(nextSeasonId: string) {
     setSelectedSeasonId(nextSeasonId);
@@ -308,7 +314,12 @@ export function DashboardShell({
 
           {/* Activity tab */}
           <Tabs.Content value="activity" className="focus:outline-none">
-            <ActivityFeed items={activity} />
+            <ActivityFeed
+              key={activityFeedKey}
+              items={activity}
+              nextCursor={activityNextCursor}
+              onLoadMore={onLoadMoreActivity}
+            />
           </Tabs.Content>
 
           {/* Leaderboard tab */}

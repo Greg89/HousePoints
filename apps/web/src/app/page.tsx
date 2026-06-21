@@ -6,7 +6,7 @@ import {
   readAdminContext,
 } from "./actions/admin";
 import {
-  readActivityFeed,
+  readActivityPage,
   readDashboardSummary,
   readLeaderboard,
   readMembers,
@@ -114,10 +114,10 @@ async function renderHome() {
   }
 
   // Fetch dashboard data in parallel. Admin tools are optional for rendering the core dashboard.
-  const [leaderboard, members, activity, memberScores, dashboardSummary, seasonContext, adminContext] = await Promise.all([
+  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, adminContext] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
-    readActivityFeed(requestId),
+    readActivityPage(undefined, requestId),
     readMemberScores(undefined, requestId),
     readDashboardSummary(undefined, requestId),
     readSeasonContext(requestId),
@@ -159,7 +159,9 @@ async function renderHome() {
       }}
       leaderboard={leaderboard}
       members={members}
-      activity={activity}
+      activity={activityPage.items}
+      activityNextCursor={activityPage.nextCursor}
+      onLoadMoreActivity={readActivityPage}
       memberPoints={memberScores}
       dashboardSummary={dashboardSummary}
       seasonContext={seasonContext}
