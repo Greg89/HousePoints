@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { DeletedPoint, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
@@ -29,6 +30,40 @@ interface AdminFormsProps {
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
 }
 
+type ManageSectionId = "overview" | "team" | "houses" | "seasons" | "audit";
+
+const MANAGE_SECTIONS: Array<{
+  id: ManageSectionId;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "overview",
+    label: "Overview",
+    description: "Operational totals and quick health signals.",
+  },
+  {
+    id: "team",
+    label: "Team",
+    description: "Invite members and assign houses.",
+  },
+  {
+    id: "houses",
+    label: "Houses",
+    description: "Create and update house details.",
+  },
+  {
+    id: "seasons",
+    label: "Seasons",
+    description: "Rename seasons or start the next competition window.",
+  },
+  {
+    id: "audit",
+    label: "Audit",
+    description: "Review recent administrative cleanup.",
+  },
+];
+
 export function AdminForms({
   users,
   houses,
@@ -42,25 +77,99 @@ export function AdminForms({
   onStartSeason,
   onRenameSeason,
 }: AdminFormsProps) {
+  const [activeSection, setActiveSection] = useState<ManageSectionId>("overview");
   const unassignedUsers = users.filter((user) => !user.houseId);
   const assignedUsers = users.filter((user) => user.houseId);
   const unassignedCount = unassignedUsers.length;
   const unassignedSummary =
     unassignedCount === 1 ? "1 needs assignment" : `${unassignedCount} need assignment`;
+  const activeSectionDefinition = MANAGE_SECTIONS.find((section) => section.id === activeSection);
 
   return (
     <div className="space-y-6">
-      <ManageOverview
-        memberCount={users.length}
-        houseCount={houses.length}
-        unassignedCount={unassignedCount}
-        deletedPointCount={recentDeletedPoints.length}
-      />
+      <div className="rounded-2xl border bg-card p-3">
+        <div
+          role="tablist"
+          aria-label="Manage sections"
+          className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5"
+        >
+          {MANAGE_SECTIONS.map((section) => {
+            const isActive = section.id === activeSection;
 
-      <DeletedPointsReport recentDeletedPoints={recentDeletedPoints} />
+            return (
+              <button
+                key={section.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`manage-section-${section.id}`}
+                id={`manage-tab-${section.id}`}
+                onClick={() => setActiveSection(section.id)}
+                className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                  isActive
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "bg-background/60 hover:border-primary/40 hover:bg-muted/50"
+                }`}
+              >
+                <span className="block text-sm font-semibold">{section.label}</span>
+                <span
+                  className={`mt-1 block text-xs ${
+                    isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+                  }`}
+                >
+                  {section.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
-        <div className="space-y-6">
+      <div
+        role="tabpanel"
+        id={`manage-section-${activeSection}`}
+        aria-labelledby={`manage-tab-${activeSection}`}
+        className="space-y-6"
+      >
+        <div>
+          <p className="text-sm font-medium text-primary">Manage</p>
+          <h3 className="font-display text-2xl font-semibold mt-1">
+            {activeSectionDefinition?.label}
+          </h3>
+          <p className="text-sm text-muted-foreground mt-2">
+            {activeSectionDefinition?.description}
+          </p>
+        </div>
+
+        {activeSection === "overview" ? (
+          <ManageOverview
+            memberCount={users.length}
+            houseCount={houses.length}
+            unassignedCount={unassignedCount}
+            deletedPointCount={recentDeletedPoints.length}
+          />
+        ) : null}
+
+        {activeSection === "team" ? (
+          <TeamManagement
+            users={users}
+            houses={houses}
+            unassignedUsers={unassignedUsers}
+            assignedUsers={assignedUsers}
+            unassignedSummary={unassignedSummary}
+            onAssignHouse={onAssignHouse}
+            onCreateInvite={onCreateInvite}
+          />
+        ) : null}
+
+        {activeSection === "houses" ? (
+          <HouseManagement
+            houses={houses}
+            onCreateHouse={onCreateHouse}
+          />
+        ) : null}
+
+        {activeSection === "seasons" ? (
           <SeasonManagement
             seasons={seasons}
             activeSeason={activeSeason}
@@ -68,21 +177,11 @@ export function AdminForms({
             onStartSeason={onStartSeason}
             onRenameSeason={onRenameSeason}
           />
-          <HouseManagement
-            houses={houses}
-            onCreateHouse={onCreateHouse}
-          />
-        </div>
+        ) : null}
 
-        <TeamManagement
-          users={users}
-          houses={houses}
-          unassignedUsers={unassignedUsers}
-          assignedUsers={assignedUsers}
-          unassignedSummary={unassignedSummary}
-          onAssignHouse={onAssignHouse}
-          onCreateInvite={onCreateInvite}
-        />
+        {activeSection === "audit" ? (
+          <DeletedPointsReport recentDeletedPoints={recentDeletedPoints} />
+        ) : null}
       </div>
     </div>
   );

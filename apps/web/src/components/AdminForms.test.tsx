@@ -104,9 +104,28 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
   };
 }
 
+function switchToManageSection(sectionName: string) {
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(sectionName) }));
+}
+
 describe("AdminForms", () => {
+  it("defaults to the Manage overview and exposes focused section navigation", () => {
+    setupAdminForms();
+
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Team/ })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByText("Manage your team")).toBeInTheDocument();
+
+    switchToManageSection("Audit");
+
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
+  });
+
   it("shows season management controls with the current active season", () => {
     setupAdminForms();
+    switchToManageSection("Seasons");
 
     expect(screen.getByRole("form", { name: "Start season" })).toHaveTextContent(
       "Current active season: Q3 2026",
@@ -117,6 +136,7 @@ describe("AdminForms", () => {
   it("confirms and starts a new season for owners", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, props } = setupAdminForms();
+    switchToManageSection("Seasons");
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
@@ -138,6 +158,7 @@ describe("AdminForms", () => {
   it("confirms and starts a new season for admins", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, props } = setupAdminForms({ actorRole: "ADMIN" });
+    switchToManageSection("Seasons");
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
@@ -152,6 +173,7 @@ describe("AdminForms", () => {
 
   it("shows recently deleted point awards as an admin reporting widget", () => {
     setupAdminForms();
+    switchToManageSection("Audit");
 
     expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
     expect(screen.getByText("Awards deleted")).toBeInTheDocument();
@@ -169,6 +191,7 @@ describe("AdminForms", () => {
         message: "The season could not be started. Please try again.",
       }),
     });
+    switchToManageSection("Seasons");
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
@@ -185,6 +208,7 @@ describe("AdminForms", () => {
 
   it("submits rename-season data", async () => {
     const { user, props } = setupAdminForms();
+    switchToManageSection("Seasons");
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
 
     await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
@@ -208,6 +232,7 @@ describe("AdminForms", () => {
         message: "The season could not be renamed. Please try again.",
       }),
     });
+    switchToManageSection("Seasons");
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
 
     await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
@@ -223,6 +248,7 @@ describe("AdminForms", () => {
 
   it("uses compact, labelled color controls for house forms", () => {
     setupAdminForms();
+    switchToManageSection("Houses");
 
     expect(screen.getByLabelText(/House color/)).toHaveAttribute("type", "color");
     expect(screen.getByLabelText(/New color/)).toHaveAttribute("type", "color");
@@ -231,6 +257,7 @@ describe("AdminForms", () => {
 
   it("submits create-house data and shows success when the typed result succeeds", async () => {
     const { user, props } = setupAdminForms();
+    switchToManageSection("Houses");
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
@@ -263,6 +290,7 @@ describe("AdminForms", () => {
         message: "The house could not be created. Please try again.",
       }),
     });
+    switchToManageSection("Houses");
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
@@ -277,6 +305,7 @@ describe("AdminForms", () => {
 
   it("sets the edit color to the selected house color", async () => {
     const { user } = setupAdminForms();
+    switchToManageSection("Houses");
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
     const colorInput = editHouseForm.getByLabelText(/New color/) as HTMLInputElement;
 
@@ -297,6 +326,7 @@ describe("AdminForms", () => {
         message: "The house could not be created. Please try again.",
       }),
     });
+    switchToManageSection("Houses");
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
 
     await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
@@ -311,6 +341,7 @@ describe("AdminForms", () => {
 
   it("submits assignment data from the team setup card", async () => {
     const { user, props } = setupAdminForms();
+    switchToManageSection("Team");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
 
     await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
@@ -339,6 +370,7 @@ describe("AdminForms", () => {
         message: "The user could not be assigned to that house. Please try again.",
       }),
     });
+    switchToManageSection("Team");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
 
     await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
@@ -354,6 +386,7 @@ describe("AdminForms", () => {
 
   it("keeps unassigned members visible first in the assignment dropdown", () => {
     setupAdminForms();
+    switchToManageSection("Team");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
     const memberSelect = assignForm.getByLabelText("Member to assign") as HTMLSelectElement;
     const groups = Array.from(memberSelect.querySelectorAll("optgroup"));
@@ -373,6 +406,7 @@ describe("AdminForms", () => {
 
   it("shows generated invite tokens in the invite card", async () => {
     const { user, props } = setupAdminForms();
+    switchToManageSection("Team");
 
     const inviteCard = screen.getByText("Invite Member").closest("div");
     expect(inviteCard).not.toBeNull();
@@ -394,6 +428,7 @@ describe("AdminForms", () => {
         message: "An invite could not be generated. Please try again.",
       }),
     });
+    switchToManageSection("Team");
 
     const inviteCard = screen.getByText("Invite Member").closest("div");
     expect(inviteCard).not.toBeNull();

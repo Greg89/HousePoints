@@ -121,6 +121,7 @@ The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboa
 - The layout should be a responsive CSS grid; widgets can be different sizes (some spanning 2 columns) depending on their content density.
 - Elevated Manage reporting should expand from the current member/house/unassigned/deletion cards into a compact operational view: recent admin actions, invite activity, season changes, unusual point volume, and data cleanup history.
 - The Manage tab has been split into focused overview, deleted-points reporting, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
+- The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets.
 
 **Open questions**
 - Do members and admins see the same widgets, or should the layout be role-aware?
