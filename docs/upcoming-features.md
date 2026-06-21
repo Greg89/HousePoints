@@ -53,40 +53,43 @@ Still deferred: org settings, org deletion, ownership transfer, admin removal ru
 A mechanism to periodically reset the active leaderboard while preserving all historical data for reporting. Prevents a runaway leader from holding first place indefinitely.
 
 ### Current state
-`PointTransaction` is an append-only log with no time-bounding. All scores are computed by summing all transactions of all time.
+Seasons are implemented for the core product flow. `PointTransaction` remains the append-only ledger, and every transaction belongs to a season. The dashboard defaults to the active season, historical seasons can be selected for Overview reporting and the Leaderboard tab, Activity includes season badges, and owners/admins can start or rename seasons from Manage. Season starts are auditable through durable `AuditEvent` rows.
 
 ### How it should work
 
 **Season model**
-- New `Season` table: `id`, `organizationId`, `name` (e.g. "Q1 2026"), `startsAt`, `endsAt`, `isActive` (bool).
-- Each `PointTransaction` gets a `seasonId` foreign key. Transactions written during an active season are tagged to it automatically.
-- A `null` `seasonId` on old records means "pre-seasons era"; treat as a legacy bucket for historical reporting, not included in any season leaderboard.
+- Implemented `Season` table: `id`, `organizationId`, `name`, `startsAt`, `endsAt`, `isActive`, and creator metadata.
+- Each `PointTransaction` has a required `seasonId` foreign key. Transactions written during an active season are tagged automatically.
+- Legacy records were backfilled into `Season 0`.
 
 **Starting a new season**
-- Admin-only action: "Start new season".
+- Owner/admin action: "Start new season".
 - Sets the current active season's `endsAt = now()` and `isActive = false`.
 - Creates a new `Season` row with `isActive = true`.
+- Records a durable `SEASON_STARTED` audit event.
 - No points are deleted. The leaderboard simply recomputes from zero because new transactions reference the new season.
 
 **Leaderboard and scoring**
-- All score queries (leaderboard, member scores, activity feed) gain an optional `seasonId` parameter.
-- Default (no `seasonId` supplied): use the current active season.
-- Clients can pass a specific season ID to view historical season standings.
+- House standings default to the active season.
+- Member scores and dashboard summary accept an optional `seasonId` and default to the current active season.
+- The UI can pass a specific season ID to view historical Overview reports and Leaderboard standings.
 
 **Reporting**
-- New "Seasons" tab or dropdown in the UI to browse past seasons.
-- Stats per season: winning house, top point-scorer, most-used trait, most active admin.
-- Season comparison view: how did each house rank across seasons?
+- Implemented season dropdown in Overview.
+- Implemented active-season status card in Overview.
+- Implemented Manage season controls.
+- Future reporting: winner summary, season detail view, stats per season, and season comparison across houses.
 
 **Edge cases**
-- What happens to transactions made before seasons were introduced? Need a migration that creates a "Season 0 / All time" record and back-fills existing transactions, or explicitly excludes them from season scoring.
-- Can there be overlapping seasons? No; enforce a single `isActive` season per org at the DB constraint level.
-- What if an admin forgets to close a season? Consider an optional `autoEndAt` that a background job (or Railway cron) can use to close it.
+- Transactions made before seasons were introduced are backfilled to `Season 0`.
+- Overlapping active seasons are prevented by a partial unique database index.
+- If an admin forgets to close a season, the season stays active until an owner/admin manually starts the next one. Optional scheduled rollover remains future work.
 
 **Open questions**
-- Should season boundaries be calendar-based (quarter, month) or freeform?
-- Do we want a "season preview" period where the next season is configured before it goes live?
-- Should members be notified (email / in-app) when a new season starts?
+- Should Activity gain a season filter in addition to badges?
+- Should season starts create user-visible announcements beyond the admin audit timeline?
+- Do we need a "season preview" period where the next season is configured before it goes live?
+- Should future season boundaries support scheduled calendar cadence?
 
 ---
 

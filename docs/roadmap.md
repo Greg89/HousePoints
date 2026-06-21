@@ -50,6 +50,7 @@ Each tier has its own file with detailed task breakdowns.
 | 3.5 | Admin: edit existing house color / description | [done] |
 | 3.6 | Mobile header - collapse nav into a menu on small screens | [done] |
 | 3.7 | Admin/owner soft delete for point awards plus recent-deletions Manage report | [done] |
+| 3.8 | Seasons UX pass: selector, historical reports, Manage controls, and current-season status | [done] |
 
 ---
 
