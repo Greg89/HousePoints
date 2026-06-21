@@ -61,7 +61,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 2. [x] Make invite consumption atomic and concurrency-safe.
 3. [-] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API success responses and typed error parsing preserves stable error codes; future operations should add schemas with their endpoint contracts.
 4. [x] Parse all API responses in the web client. Web-consumed responses now flow through the shared response parser and contract schemas.
-5. [-] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, concurrent invite claims, and account-link conflicts. Core auth, role, read/write tenant isolation, onboarding, invite, and duplicate-email account-link cases exist; coverage is not yet complete.
+5. [x] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, concurrent invite claims, and account-link conflicts. API coverage now exercises owner/admin/member authorization, read/write tenant isolation, duplicate organization slugs, expired/reused/concurrent invite paths, and duplicate-email account-link conflicts.
 6. [x] Add stable database constraints for settled ledger rules. New point-ledger writes now require positive deltas, non-empty award reasons, and a trait at the database layer, with database-backed integration coverage.
 
 ## Phase 5: Improve Queries And Tooling

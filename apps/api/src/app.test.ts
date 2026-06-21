@@ -68,6 +68,7 @@ const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
+const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
@@ -965,6 +966,55 @@ describe("POST /admin/houses", () => {
 });
 
 describe("POST /admin/context", () => {
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockUserFindMany).not.toHaveBeenCalled();
+    expect(mockHouseFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an admin and scopes organization context to the actor's organization", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockUserFindMany.mockResolvedValue([]);
+    mockHouseFindMany.mockResolvedValue([]);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      organizationId: "org-secure",
+      organizationSlug: "acme",
+      users: [],
+      houses: [],
+    });
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-secure" },
+      }),
+    );
+    expect(mockHouseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-secure" },
+      }),
+    );
+    await app.close();
+  });
+
   it("allows an owner and returns the complete organization context", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
     mockUserFindMany.mockResolvedValue([
@@ -1054,6 +1104,31 @@ describe("POST /admin/users/assign-house", () => {
       payload: { targetUserId: "user-999", targetHouseId: "house-1" },
     });
     expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("returns 404 when target house belongs to another organization", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ organizationId: "org-1" }));
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "user-1",
+      organizationId: "org-1",
+    });
+    mockHouseFindUnique.mockResolvedValue({
+      id: "house-other",
+      organizationId: "org-other",
+      name: "Other House",
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/assign-house",
+      payload: { targetUserId: "user-1", targetHouseId: "house-other" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_HOUSE_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1640,6 +1715,48 @@ describe("POST /orgs/create", () => {
     firstHouseColor: "#7c3aed",
   };
 
+  it("returns SLUG_TAKEN before starting setup when organization slug already exists", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-existing" });
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/create",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("SLUG_TAKEN");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockOrgCreate).not.toHaveBeenCalled();
+    expect(mockHouseCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns ALREADY_IN_ORG before starting setup when identity already belongs to an organization", async () => {
+    mockOrgFindUnique.mockResolvedValue(null);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        organizationId: "org-existing",
+      },
+    });
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/create",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ALREADY_IN_ORG");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockOrgCreate).not.toHaveBeenCalled();
+    expect(mockHouseCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("atomically creates the organization, first house, and assigned owner", async () => {
     mockOrgFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
@@ -1723,6 +1840,58 @@ describe("POST /orgs/create", () => {
       message: "Internal server error",
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
+    await app.close();
+  });
+});
+
+describe("POST /orgs/invite", () => {
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/invite",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockInviteCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an admin to create a single-use invite for their organization", async () => {
+    const expiresAt = new Date("2099-01-01T00:00:00.000Z");
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockInviteCreate.mockResolvedValue({
+      id: "invite-1",
+      expiresAt,
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/invite",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({
+      id: "invite-1",
+      token: expect.stringMatching(/^[a-f0-9]{64}$/),
+      expiresAt: expiresAt.toISOString(),
+      usedAt: null,
+    });
+    expect(mockInviteCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        createdById: "user-2",
+        expiresAt: expect.any(Date),
+      },
+      select: { id: true, expiresAt: true },
+    });
     await app.close();
   });
 });
