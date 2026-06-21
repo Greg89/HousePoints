@@ -122,7 +122,7 @@ The dashboard has three tabs: Overview (house cards), Activity (feed), Leaderboa
 - Elevated Manage reporting should expand from the current member/house/unassigned/deletion cards into a compact operational view: recent admin actions, invite activity, season changes, unusual point volume, and data cleanup history.
 - The Manage tab has been split into focused overview, deleted-points reporting, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
 - The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets.
-- The Audit section now includes a recent admin-actions timeline backed by persisted app data. The first version merges point deletions, invite creation/use, season starts, and durable audit events. The dedicated `AuditEvent` table now records house-assignment and point-deletion events; future admin mutations can write to the same table when they need full before/after history.
+- The Audit section now includes a recent admin-actions timeline backed by persisted app data. The first version merges point deletions, invite creation/use, season starts, and durable audit events. The dedicated `AuditEvent` table now records house-assignment, point-deletion, invite-created, and invite-used events; future admin mutations can write to the same table when they need full before/after history.
 
 **Open questions**
 - Do members and admins see the same widgets, or should the layout be role-aware?

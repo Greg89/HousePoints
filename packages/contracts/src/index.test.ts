@@ -977,6 +977,54 @@ describe("adminAuditActionSchema", () => {
         delta: "12",
       },
     });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-3",
+        type: "INVITE_CREATED",
+        occurredAt: "2026-06-21T12:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia created an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          expiresAt: "2026-06-24T12:00:00.000Z",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-3",
+      type: "INVITE_CREATED",
+      occurredAt: "2026-06-21T12:00:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia created an invite link.",
+      metadata: {
+        inviteId: "invite-1",
+        expiresAt: "2026-06-24T12:00:00.000Z",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-4",
+        type: "INVITE_USED",
+        occurredAt: "2026-06-21T12:30:00.000Z",
+        actorName: "Ben",
+        summary: "Ben joined with an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          usedByName: "Ben",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-4",
+      type: "INVITE_USED",
+      occurredAt: "2026-06-21T12:30:00.000Z",
+      actorName: "Ben",
+      summary: "Ben joined with an invite link.",
+      metadata: {
+        inviteId: "invite-1",
+        usedByName: "Ben",
+      },
+    });
   });
 
   it("rejects unknown audit action types", () => {

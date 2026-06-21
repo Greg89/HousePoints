@@ -1575,6 +1575,29 @@ describe("POST /transactions/recent", () => {
         createdAt: new Date("2026-06-21T12:15:00.000Z"),
         actor: { displayName: "Bob Admin" },
       },
+      {
+        id: "audit-invite-used-1",
+        eventType: "INVITE_USED",
+        summary: "Casey joined with an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          usedById: "user-casey",
+          usedByName: "Casey",
+        },
+        createdAt: new Date("2026-06-21T12:30:00.000Z"),
+        actor: { displayName: "Casey" },
+      },
+      {
+        id: "audit-invite-created-1",
+        eventType: "INVITE_CREATED",
+        summary: "Bob Admin created an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          expiresAt: "2026-06-24T11:00:00.000Z",
+        },
+        createdAt: new Date("2026-06-21T11:00:00.000Z"),
+        actor: { displayName: "Bob Admin" },
+      },
     ]);
     const app = await buildTestApp("auth0|admin");
 
@@ -1600,13 +1623,14 @@ describe("POST /transactions/recent", () => {
         },
       },
       {
-        id: "invite-used:invite-1",
+        id: "audit-event:audit-invite-used-1",
         type: "INVITE_USED",
         occurredAt: "2026-06-21T12:30:00.000Z",
         actorName: "Casey",
         summary: "Casey joined with an invite link.",
         metadata: {
           inviteId: "invite-1",
+          usedById: "user-casey",
           usedByName: "Casey",
         },
       },
@@ -1629,7 +1653,7 @@ describe("POST /transactions/recent", () => {
         },
       },
       {
-        id: "invite-created:invite-1",
+        id: "audit-event:audit-invite-created-1",
         type: "INVITE_CREATED",
         occurredAt: "2026-06-21T11:00:00.000Z",
         actorName: "Bob Admin",
@@ -2207,6 +2231,7 @@ describe("POST /orgs/invite", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
     expect(mockInviteCreate).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2240,6 +2265,19 @@ describe("POST /orgs/invite", () => {
         expiresAt: expect.any(Date),
       },
       select: { id: true, expiresAt: true },
+    });
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-2",
+        eventType: "INVITE_CREATED",
+        summary: "Bob created an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          expiresAt: expiresAt.toISOString(),
+        },
+      },
     });
     await app.close();
   });
@@ -2358,6 +2396,19 @@ describe("POST /orgs/join", () => {
       data: {
         usedAt: expect.any(Date),
         usedById: "user-1",
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-1",
+        eventType: "INVITE_USED",
+        summary: "Alice joined with an invite link.",
+        metadata: {
+          inviteId: "invite-1",
+          usedById: "user-1",
+          usedByName: "Alice",
+        },
       },
     });
     await app.close();

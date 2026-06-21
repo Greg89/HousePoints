@@ -36,6 +36,8 @@ enum Trait {
 }
 
 enum AuditEventType {
+  INVITE_CREATED
+  INVITE_USED
   POINT_DELETED
   USER_HOUSE_ASSIGNED
 }

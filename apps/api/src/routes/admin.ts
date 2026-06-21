@@ -316,12 +316,22 @@ function buildRecentAdminActions(
 ): AdminAuditAction[] {
   const actions: AdminAuditAction[] = [];
   const auditedDeletedTransactionIds = new Set<string>();
+  const auditedCreatedInviteIds = new Set<string>();
+  const auditedUsedInviteIds = new Set<string>();
 
   for (const event of auditEvents) {
     const metadata = toStringMetadata(event.metadata);
 
     if (event.eventType === "POINT_DELETED" && metadata.transactionId) {
       auditedDeletedTransactionIds.add(metadata.transactionId);
+    }
+
+    if (event.eventType === "INVITE_CREATED" && metadata.inviteId) {
+      auditedCreatedInviteIds.add(metadata.inviteId);
+    }
+
+    if (event.eventType === "INVITE_USED" && metadata.inviteId) {
+      auditedUsedInviteIds.add(metadata.inviteId);
     }
 
     actions.push({
@@ -353,19 +363,21 @@ function buildRecentAdminActions(
   }
 
   for (const invite of invites) {
-    actions.push({
-      id: `invite-created:${invite.id}`,
-      type: "INVITE_CREATED",
-      occurredAt: invite.createdAt.toISOString(),
-      actorName: invite.createdBy?.displayName ?? null,
-      summary: `${invite.createdBy?.displayName ?? "Unknown admin"} created an invite link.`,
-      metadata: {
-        inviteId: invite.id,
-        expiresAt: invite.expiresAt.toISOString(),
-      },
-    });
+    if (!auditedCreatedInviteIds.has(invite.id)) {
+      actions.push({
+        id: `invite-created:${invite.id}`,
+        type: "INVITE_CREATED",
+        occurredAt: invite.createdAt.toISOString(),
+        actorName: invite.createdBy?.displayName ?? null,
+        summary: `${invite.createdBy?.displayName ?? "Unknown admin"} created an invite link.`,
+        metadata: {
+          inviteId: invite.id,
+          expiresAt: invite.expiresAt.toISOString(),
+        },
+      });
+    }
 
-    if (invite.usedAt) {
+    if (invite.usedAt && !auditedUsedInviteIds.has(invite.id)) {
       actions.push({
         id: `invite-used:${invite.id}`,
         type: "INVITE_USED",

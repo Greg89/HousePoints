@@ -181,6 +181,44 @@ async function run() {
     trait: transaction.trait,
   });
 
+  const inviteCreatedAuditEvent = await prisma.auditEvent.create({
+    data: {
+      organizationId: organization.id,
+      actorUserId: actor.id,
+      eventType: "INVITE_CREATED",
+      summary: "Integration Actor created an invite link.",
+      metadata: {
+        inviteId: "invite-integration",
+      },
+    },
+  });
+  created.auditEventIds.push(inviteCreatedAuditEvent.id);
+
+  assert.equal(inviteCreatedAuditEvent.eventType, "INVITE_CREATED");
+  assert.deepEqual(inviteCreatedAuditEvent.metadata, {
+    inviteId: "invite-integration",
+  });
+
+  const inviteUsedAuditEvent = await prisma.auditEvent.create({
+    data: {
+      organizationId: organization.id,
+      actorUserId: target.id,
+      eventType: "INVITE_USED",
+      summary: "Integration Target joined with an invite link.",
+      metadata: {
+        inviteId: "invite-integration",
+        usedById: target.id,
+      },
+    },
+  });
+  created.auditEventIds.push(inviteUsedAuditEvent.id);
+
+  assert.equal(inviteUsedAuditEvent.eventType, "INVITE_USED");
+  assert.deepEqual(inviteUsedAuditEvent.metadata, {
+    inviteId: "invite-integration",
+    usedById: target.id,
+  });
+
   await assert.rejects(
     () =>
       prisma.pointTransaction.create({

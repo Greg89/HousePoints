@@ -193,14 +193,31 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     const tokenHash = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + parsed.data.expiresInHours * 60 * 60 * 1000);
 
-    const invite = await prisma.orgInvite.create({
-      data: {
-        organizationId: actor.organizationId,
-        tokenHash,
-        createdById: actor.id,
-        expiresAt,
-      },
-      select: { id: true, expiresAt: true },
+    const invite = await prisma.$transaction(async (tx) => {
+      const invite = await tx.orgInvite.create({
+        data: {
+          organizationId: actor.organizationId,
+          tokenHash,
+          createdById: actor.id,
+          expiresAt,
+        },
+        select: { id: true, expiresAt: true },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          eventType: "INVITE_CREATED",
+          summary: `${actor.displayName} created an invite link.`,
+          metadata: {
+            inviteId: invite.id,
+            expiresAt: invite.expiresAt.toISOString(),
+          },
+        },
+      });
+
+      return invite;
     });
 
     info(request.log, "orgs.invite.created", { inviteId: invite.id, actorId: actor.id, orgId: actor.organizationId, expiresAt });
@@ -353,6 +370,20 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
             invite.id,
           );
         }
+
+        await tx.auditEvent.create({
+          data: {
+            organizationId: invite.organizationId,
+            actorUserId: user.id,
+            eventType: "INVITE_USED",
+            summary: `${user.displayName} joined with an invite link.`,
+            metadata: {
+              inviteId: invite.id,
+              usedById: user.id,
+              usedByName: user.displayName,
+            },
+          },
+        });
 
         return {
           user,
