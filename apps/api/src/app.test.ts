@@ -606,6 +606,8 @@ describe("POST /points/delete", () => {
     delta: 15,
     reason: "Crushed the demo",
     trait: "TECHNICAL_EXCELLENCE" as const,
+    targetUserId: "user-1",
+    targetHouseId: "house-1",
     createdAt: new Date("2026-06-01T12:00:00.000Z"),
     deletedAt: new Date("2026-06-02T12:00:00.000Z"),
     deletionReason: "Duplicate award",
@@ -668,11 +670,31 @@ describe("POST /points/delete", () => {
       expect.objectContaining({
         where: { id: "tx-1" },
         data: expect.objectContaining({
+          deletedAt: expect.any(Date),
           deletedByUserId: "user-2",
           deletionReason: "Duplicate award",
         }),
       }),
     );
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-2",
+        eventType: "POINT_DELETED",
+        summary: "Bob deleted 15 points from Alice.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserId: "user-1",
+          targetUserName: "Alice",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
+          delta: 15,
+          trait: "TECHNICAL_EXCELLENCE",
+          awardReason: "Crushed the demo",
+          deletionReason: "Duplicate award",
+        },
+      },
+    });
     await app.close();
   });
 
@@ -694,6 +716,7 @@ describe("POST /points/delete", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("POINT_TRANSACTION_NOT_FOUND");
     expect(mockTxUpdate).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -715,6 +738,7 @@ describe("POST /points/delete", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("POINT_TRANSACTION_ALREADY_DELETED");
     expect(mockTxUpdate).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
     await app.close();
   });
 });
@@ -1533,6 +1557,24 @@ describe("POST /transactions/recent", () => {
         createdAt: new Date("2026-06-21T13:00:00.000Z"),
         actor: { displayName: "Bob Admin" },
       },
+      {
+        id: "audit-delete-1",
+        eventType: "POINT_DELETED",
+        summary: "Bob Admin deleted 12 points from Ben.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserId: "user-ben",
+          targetUserName: "Ben",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
+          delta: 12,
+          trait: "COLLABORATION",
+          awardReason: "Duplicate award",
+          deletionReason: "Entered twice",
+        },
+        createdAt: new Date("2026-06-21T12:15:00.000Z"),
+        actor: { displayName: "Bob Admin" },
+      },
     ]);
     const app = await buildTestApp("auth0|admin");
 
@@ -1569,14 +1611,21 @@ describe("POST /transactions/recent", () => {
         },
       },
       {
-        id: "point-deleted:tx-1",
+        id: "audit-event:audit-delete-1",
         type: "POINT_DELETED",
-        occurredAt: "2026-06-21T12:00:00.000Z",
+        occurredAt: "2026-06-21T12:15:00.000Z",
         actorName: "Bob Admin",
         summary: "Bob Admin deleted 12 points from Ben.",
         metadata: {
           transactionId: "tx-1",
+          targetUserId: "user-ben",
           targetUserName: "Ben",
+          targetHouseId: "house-1",
+          targetHouseName: "Phoenix",
+          delta: "12",
+          trait: "COLLABORATION",
+          awardReason: "Duplicate award",
+          deletionReason: "Entered twice",
         },
       },
       {

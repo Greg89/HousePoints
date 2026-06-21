@@ -315,19 +315,30 @@ function buildRecentAdminActions(
   }>,
 ): AdminAuditAction[] {
   const actions: AdminAuditAction[] = [];
+  const auditedDeletedTransactionIds = new Set<string>();
 
   for (const event of auditEvents) {
+    const metadata = toStringMetadata(event.metadata);
+
+    if (event.eventType === "POINT_DELETED" && metadata.transactionId) {
+      auditedDeletedTransactionIds.add(metadata.transactionId);
+    }
+
     actions.push({
       id: `audit-event:${event.id}`,
       type: event.eventType,
       occurredAt: event.createdAt.toISOString(),
       actorName: event.actor?.displayName ?? null,
       summary: event.summary,
-      metadata: toStringMetadata(event.metadata),
+      metadata,
     });
   }
 
   for (const point of deletedPoints) {
+    if (auditedDeletedTransactionIds.has(point.id)) {
+      continue;
+    }
+
     actions.push({
       id: `point-deleted:${point.id}`,
       type: "POINT_DELETED",

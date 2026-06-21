@@ -155,6 +155,32 @@ async function run() {
     targetHouseId: house.id,
   });
 
+  const pointDeletedAuditEvent = await prisma.auditEvent.create({
+    data: {
+      organizationId: organization.id,
+      actorUserId: actor.id,
+      eventType: "POINT_DELETED",
+      summary: "Integration Actor deleted 10 points from Integration Target.",
+      metadata: {
+        transactionId: transaction.id,
+        targetUserId: target.id,
+        targetHouseId: house.id,
+        delta: transaction.delta,
+        trait: transaction.trait,
+      },
+    },
+  });
+  created.auditEventIds.push(pointDeletedAuditEvent.id);
+
+  assert.equal(pointDeletedAuditEvent.eventType, "POINT_DELETED");
+  assert.deepEqual(pointDeletedAuditEvent.metadata, {
+    transactionId: transaction.id,
+    targetUserId: target.id,
+    targetHouseId: house.id,
+    delta: transaction.delta,
+    trait: transaction.trait,
+  });
+
   await assert.rejects(
     () =>
       prisma.pointTransaction.create({

@@ -309,27 +309,54 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(409).send({ message: "Point transaction is already deleted", code: "POINT_TRANSACTION_ALREADY_DELETED" });
     }
 
-    const deletedPoint = await prisma.pointTransaction.update({
-      where: { id: existing.id },
-      data: {
-        deletedAt: new Date(),
-        deletedByUserId: actor.id,
-        deletionReason: parsed.data.reason?.trim() || null,
-      },
-      select: {
-        id: true,
-        delta: true,
-        reason: true,
-        trait: true,
-        createdAt: true,
-        deletedAt: true,
-        deletionReason: true,
-        actor: { select: { displayName: true } },
-        targetUser: { select: { displayName: true } },
-        targetHouse: { select: { name: true, color: true } },
-        deletedBy: { select: { displayName: true } },
-        season: { select: { id: true, name: true, isActive: true } },
-      },
+    const deletionReason = parsed.data.reason?.trim() || null;
+    const deletedPoint = await prisma.$transaction(async (tx) => {
+      const point = await tx.pointTransaction.update({
+        where: { id: existing.id },
+        data: {
+          deletedAt: new Date(),
+          deletedByUserId: actor.id,
+          deletionReason,
+        },
+        select: {
+          id: true,
+          delta: true,
+          reason: true,
+          trait: true,
+          targetUserId: true,
+          targetHouseId: true,
+          createdAt: true,
+          deletedAt: true,
+          deletionReason: true,
+          actor: { select: { displayName: true } },
+          targetUser: { select: { displayName: true } },
+          targetHouse: { select: { name: true, color: true } },
+          deletedBy: { select: { displayName: true } },
+          season: { select: { id: true, name: true, isActive: true } },
+        },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          eventType: "POINT_DELETED",
+          summary: `${actor.displayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
+          metadata: {
+            transactionId: point.id,
+            targetUserId: point.targetUserId,
+            targetUserName: point.targetUser?.displayName ?? null,
+            targetHouseId: point.targetHouseId,
+            targetHouseName: point.targetHouse.name,
+            delta: point.delta,
+            trait: point.trait,
+            awardReason: point.reason,
+            deletionReason,
+          },
+        },
+      });
+
+      return point;
     });
 
     info(request.log, "points.deleted", {

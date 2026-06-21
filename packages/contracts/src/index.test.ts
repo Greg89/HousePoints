@@ -951,6 +951,32 @@ describe("adminAuditActionSchema", () => {
         targetHouseName: "Phoenix",
       },
     });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-2",
+        type: "POINT_DELETED",
+        occurredAt: "2026-06-21T12:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia deleted 12 points from Ben.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserName: "Ben",
+          delta: "12",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-2",
+      type: "POINT_DELETED",
+      occurredAt: "2026-06-21T12:00:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia deleted 12 points from Ben.",
+      metadata: {
+        transactionId: "tx-1",
+        targetUserName: "Ben",
+        delta: "12",
+      },
+    });
   });
 
   it("rejects unknown audit action types", () => {

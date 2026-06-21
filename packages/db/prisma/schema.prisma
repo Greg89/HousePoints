@@ -36,6 +36,7 @@ enum Trait {
 }
 
 enum AuditEventType {
+  POINT_DELETED
   USER_HOUSE_ASSIGNED
 }
 
