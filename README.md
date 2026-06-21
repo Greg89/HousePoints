@@ -78,6 +78,7 @@ APP_BASE_URL="http://localhost:3000"
 APP_API_BASE_URL="http://localhost:4000"
 SERVICE_NAME="housepoints-web"
 APP_ORGANIZATION_SLUG="default"
+SHOW_SEASON_OVERVIEW_CARD="false"
 SEQ_SERVER_URL=""
 SEQ_API_KEY=""
 ```
@@ -211,6 +212,7 @@ Web service variables:
 - `AUTH0_AUDIENCE`
 - `APP_BASE_URL`
 - `APP_API_BASE_URL`
+- optional `SHOW_SEASON_OVERVIEW_CARD` (`"true"` displays the Overview current-season status card)
 - optional `SEQ_SERVER_URL`, `SEQ_API_KEY`, `LOG_LEVEL`, `SERVICE_NAME`
 
 Use the same Auth0 API Identifier for `AUTH0_AUDIENCE` in both services. Set `APP_API_BASE_URL` to the deployed API URL and include the deployed web URL in `CORS_ALLOWED_ORIGINS`.

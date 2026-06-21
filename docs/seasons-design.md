@@ -20,7 +20,7 @@ The first seasons implementation is complete:
 - The Activity tab remains all-activity by default and includes season badges on each item.
 - Owners and admins can start a new season and rename seasons from Manage.
 - Season starts are written to the durable `AuditEvent` table as `SEASON_STARTED`.
-- The Overview tab shows a current-season status card with the active season name, start date, and either days remaining or a no-end-date management hint.
+- The Overview tab has a current-season status card with the active season name, start date, and either days remaining or a no-end-date management hint. The card is hidden by default and displays only when the web service sets `SHOW_SEASON_OVERVIEW_CARD="true"`.
 
 ## Product Decisions
 
@@ -139,7 +139,7 @@ The dashboard implements the first season UX pass:
 - Historical selection shows a subtle historical-view label.
 - Activity items show season badges.
 - Manage includes season start and rename controls for owners/admins.
-- Overview includes a current-season status card showing days remaining when `endsAt` exists, or a management hint when no end date is set.
+- Overview includes a feature-flagged current-season status card showing days remaining when `endsAt` exists, or a management hint when no end date is set.
 
 ## Testing Coverage
 
@@ -149,7 +149,7 @@ Current coverage includes:
 - `resolveSeasonScope` unit tests.
 - Fastify route tests for season context, start, rename, season-scoped scores, dashboard summary, activity badges, and cross-org season rejection.
 - Web action tests for season actions.
-- Dashboard component tests for active selection, historical selection, leaderboard refresh, activity navigation, and current-season status.
+- Dashboard component tests for active selection, historical selection, leaderboard refresh, activity navigation, and hidden/enabled current-season status.
 - Database-backed integration tests covering season foreign-key behavior and audit-event storage.
 
 ## Completed Implementation Slices
@@ -160,7 +160,7 @@ Current coverage includes:
 4. [done] Web read path
 5. [done] Owner/admin season management
 6. [done] Durable audit event for season starts
-7. [done] Current-season status card on Overview
+7. [done] Feature-flagged current-season status card on Overview
 
 ## Future Season UX
 

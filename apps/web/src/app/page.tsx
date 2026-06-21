@@ -30,6 +30,7 @@ import { logError, logInfo, logWarn, serializeErrorForLog } from "@/lib/logging"
 export const dynamic = "force-dynamic";
 
 const ADMIN_CONTEXT_FAILED = Symbol("ADMIN_CONTEXT_FAILED");
+const showSeasonOverviewCard = process.env.SHOW_SEASON_OVERVIEW_CARD === "true";
 
 type AdminContextResult =
   | Awaited<ReturnType<typeof readAdminContext>>
@@ -173,6 +174,7 @@ async function renderHome() {
       onDeletePoint={deletePointTransaction}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
+      showSeasonOverviewCard={showSeasonOverviewCard}
       adminSection={adminSection}
     />
   );

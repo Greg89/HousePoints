@@ -76,7 +76,7 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 
 **Reporting**
 - Implemented season dropdown in Overview.
-- Implemented active-season status card in Overview.
+- Implemented active-season status card in Overview behind `SHOW_SEASON_OVERVIEW_CARD`.
 - Implemented Manage season controls.
 - Future reporting: winner summary, season detail view, stats per season, and season comparison across houses.
 
@@ -99,7 +99,7 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 Replace the current single-view dashboard with a richer landing page composed of focused widgets, giving both members and admins an at-a-glance picture of what's happening.
 
 ### Current state
-The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview tab shows house standings plus report widgets for season standout, trait leaders, recent activity, points velocity, and house member rankings. It also shows a compact current-season status card with the active season name, start date, and either days remaining or a no-end-date management hint.
+The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview tab shows house standings plus report widgets for season standout, trait leaders, recent activity, points velocity, and house member rankings. A compact current-season status card also exists, but it is hidden by default and displays only when `SHOW_SEASON_OVERVIEW_CARD="true"` is set on the web service.
 
 ### Proposed widgets
 
@@ -115,7 +115,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 
 **Admin-only: recent deletions** - implemented for point awards. Owners/admins can soft delete an award from the Activity tab, live scoring excludes the deleted transaction, and the Manage tab shows a recent deletion audit.
 
-**Season countdown / summary** - implemented as a current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Winner summary remains future work.
+**Season countdown / summary** - implemented as a feature-flagged current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Winner summary remains future work.
 
 ### Implementation notes
 - Most widgets can be computed server-side in parallel on page load using existing `POST` endpoints or new lightweight aggregation endpoints.

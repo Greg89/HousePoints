@@ -483,13 +483,19 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Organization report");
     expect(screen.getByText("Season standout")).toBeInTheDocument();
     expect(screen.getByLabelText(/reporting season/i)).toHaveValue("season-active");
-    expect(screen.getByLabelText("Current season status")).toHaveTextContent("Current season");
-    expect(screen.getByLabelText("Current season status")).toHaveTextContent("Q3 2026");
-    expect(screen.getByLabelText("Current season status")).toHaveTextContent("No end date set");
+    expect(screen.queryByLabelText("Current season status")).not.toBeInTheDocument();
     expect(screen.getByText("Trait leader per house")).toBeInTheDocument();
     expect(screen.getByText("Recent activity strip")).toBeInTheDocument();
     expect(screen.getByText("Points velocity")).toBeInTheDocument();
     expect(screen.getAllByText("Ben Scorer").length).toBeGreaterThan(0);
+  });
+
+  it("shows current season status on the overview tab when enabled", () => {
+    render(<DashboardShell {...baseProps} showSeasonOverviewCard />);
+
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("Current season");
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("Q3 2026");
+    expect(screen.getByLabelText("Current season status")).toHaveTextContent("No end date set");
   });
 
   it("shows a countdown when the active season has an end date", () => {
@@ -511,6 +517,7 @@ describe("DashboardShell", () => {
           activeSeason: activeSeasonWithEnd,
           seasons: [activeSeasonWithEnd, historicalSeason],
         }}
+        showSeasonOverviewCard
       />,
     );
 
