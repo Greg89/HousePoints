@@ -23,10 +23,11 @@ Those issues should be resolved before implementing Seasons, Dashboard Widgets, 
 6. [Observability And Logging Plan](./06-observability-logging-plan.md) defines the target logging architecture, event schema, redaction rules, and chaos-readiness path.
 7. [SEQ Query Runbook](./07-seq-query-runbook.md) gives practical production queries for tracing user-visible failures, auth issues, API errors, and warning noise.
 8. [Dashboard Performance Baselines](./08-performance-baselines.md) records repeatable empty, typical, and larger organization query-count and response-time baselines.
+9. [Pass One Closeout](./09-closeout.md) summarizes completion evidence, the pass-one done definition, deferred work, and recommended next tracks.
 
 ## Progress Snapshot
 
-Last updated: June 20, 2026
+Last updated: June 21, 2026
 
 Completed units:
 
@@ -88,19 +89,23 @@ Completed units:
 - Converted house creation to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
 - Converted house assignment to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
 - Converted onboarding create/join mutations to typed expected-failure results while preserving warning-level SEQ logging for known API failures.
+- Added an endpoint contract registry that maps every web-consumed API endpoint to request, response, and error schemas.
+- Added focused direct tests for app-user mapping and tenant-scoped season resolution.
+- Marked the execution plan and acceptance criteria complete.
 
-Current unit verification:
+Closeout verification:
 
-- `npm test`: 244 fast tests passed.
+- `npm test`: 273 fast tests passed.
 - `npm run test:integration`: passed against local Docker PostgreSQL.
 - `npm run benchmark:dashboard`: recorded dashboard API baseline against local Docker PostgreSQL.
 - Workspace type-check passed.
 - Workspace lint passed.
 - Full production build passed.
 
-The detailed status of remaining work is tracked in
-[Execution Plan](./04-execution-plan.md) and
-[Acceptance Criteria](./05-acceptance-criteria.md).
+The detailed completed scope is tracked in
+[Execution Plan](./04-execution-plan.md),
+[Acceptance Criteria](./05-acceptance-criteria.md), and
+[Pass One Closeout](./09-closeout.md).
 
 ## Pass-One Principle
 

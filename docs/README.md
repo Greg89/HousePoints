@@ -14,6 +14,7 @@ The documents in this folder serve three purposes:
 - [Target architecture](./refactor-pass-1/03-target-architecture.md): intended API, web, contracts, database, and logging boundaries.
 - [Execution plan](./refactor-pass-1/04-execution-plan.md): recommended order for the first refactor pass.
 - [Acceptance criteria](./refactor-pass-1/05-acceptance-criteria.md): release-blocker and pass-one criteria.
+- [Pass one closeout](./refactor-pass-1/09-closeout.md): completion evidence, done definition, deferred work, and recommended next tracks.
 
 ## Roadmap And Planning
 
