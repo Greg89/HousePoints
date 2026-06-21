@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   adjustPointsSchema,
+  apiContracts,
+  apiErrorSchema,
   bootstrapUserSchema,
   createHouseSchema,
   assignUserHouseSchema,
@@ -36,6 +38,52 @@ import {
   TRAITS,
   TRAIT_LABELS,
 } from "./index";
+
+const webConsumedApiEndpoints = [
+  "/admin/context",
+  "/admin/houses",
+  "/admin/users/assign-house",
+  "/dashboard/summary",
+  "/houses/leaderboard",
+  "/members",
+  "/orgs/create",
+  "/orgs/invite",
+  "/orgs/join",
+  "/points/adjust",
+  "/seasons/context",
+  "/seasons/rename",
+  "/seasons/start",
+  "/transactions/recent",
+  "/users/bootstrap",
+  "/users/profile",
+  "/users/scores",
+] as const;
+
+describe("apiContracts", () => {
+  it("exports request, response, and error schemas for every web-consumed endpoint", () => {
+    expect(Object.keys(apiContracts).sort()).toEqual(
+      [...webConsumedApiEndpoints].sort(),
+    );
+
+    for (const endpoint of webConsumedApiEndpoints) {
+      expect(apiContracts[endpoint].request).toHaveProperty("safeParse");
+      expect(apiContracts[endpoint].response).toHaveProperty("safeParse");
+      expect(apiContracts[endpoint].error).toBe(apiErrorSchema);
+    }
+  });
+
+  it("preserves the stable API error contract", () => {
+    expect(
+      apiContracts["/points/adjust"].error.parse({
+        code: "TARGET_USER_NOT_FOUND",
+        message: "Target user was not found.",
+      }),
+    ).toEqual({
+      code: "TARGET_USER_NOT_FOUND",
+      message: "Target user was not found.",
+    });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // adjustPointsSchema

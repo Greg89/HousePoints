@@ -59,7 +59,7 @@ Expected result: one bootstrap/current-user resolution per render, not one per q
 
 1. [x] Make org creation atomic.
 2. [x] Make invite consumption atomic and concurrency-safe.
-3. [-] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API success responses and typed error parsing preserves stable error codes; future operations should add schemas with their endpoint contracts.
+3. [x] Export response and error schemas from contracts. Shared schemas cover all currently web-consumed API success responses, typed error parsing preserves stable error codes, and `apiContracts` now maps every web-consumed endpoint to request, response, and error schemas.
 4. [x] Parse all API responses in the web client. Web-consumed responses now flow through the shared response parser and contract schemas.
 5. [x] Add tests for owner/admin/member policy, tenant isolation, duplicate slug, expired invite, reused invite, concurrent invite claims, and account-link conflicts. API coverage now exercises owner/admin/member authorization, read/write tenant isolation, duplicate organization slugs, expired/reused/concurrent invite paths, and duplicate-email account-link conflicts.
 6. [x] Add stable database constraints for settled ledger rules. New point-ledger writes now require positive deltas, non-empty award reasons, and a trait at the database layer, with database-backed integration coverage.

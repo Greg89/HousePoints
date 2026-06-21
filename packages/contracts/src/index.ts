@@ -482,3 +482,54 @@ export const inviteLinkSchema = z.object({
 });
 
 export type InviteLink = z.infer<typeof inviteLinkSchema>;
+
+type ApiContract = {
+  request: z.ZodType;
+  response: z.ZodType;
+  error: typeof apiErrorSchema;
+};
+
+function defineContract(request: z.ZodType, response: z.ZodType): ApiContract {
+  return {
+    request,
+    response,
+    error: apiErrorSchema,
+  };
+}
+
+export const apiContracts = {
+  "/admin/context": defineContract(actorScopeSchema, adminContextSchema),
+  "/admin/houses": defineContract(createHouseSchema, adminHouseSchema),
+  "/admin/users/assign-house": defineContract(
+    assignUserHouseSchema,
+    assignUserHouseResponseSchema,
+  ),
+  "/dashboard/summary": defineContract(
+    seasonScopedRequestSchema,
+    dashboardSummarySchema,
+  ),
+  "/houses/leaderboard": defineContract(actorScopeSchema, leaderboardSchema),
+  "/members": defineContract(actorScopeSchema, orgMembersSchema),
+  "/orgs/create": defineContract(createOrgSchema, appUserSchema),
+  "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),
+  "/orgs/join": defineContract(joinOrgSchema, appUserSchema),
+  "/points/adjust": defineContract(
+    adjustPointsSchema,
+    pointAdjustmentResponseSchema,
+  ),
+  "/seasons/context": defineContract(actorScopeSchema, seasonContextSchema),
+  "/seasons/rename": defineContract(renameSeasonSchema, seasonSchema),
+  "/seasons/start": defineContract(createSeasonSchema, seasonTransitionSchema),
+  "/transactions/recent": defineContract(
+    activityFeedRequestSchema,
+    pagedActivityFeedSchema,
+  ),
+  "/users/bootstrap": defineContract(bootstrapUserSchema, appUserSchema),
+  "/users/profile": defineContract(
+    updateProfileSchema,
+    updateProfileResponseSchema,
+  ),
+  "/users/scores": defineContract(seasonScopedRequestSchema, memberScoresSchema),
+} as const;
+
+export type ApiEndpoint = keyof typeof apiContracts;
