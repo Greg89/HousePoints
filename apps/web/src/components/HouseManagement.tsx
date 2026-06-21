@@ -56,6 +56,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
   const [editPending, startEdit] = useTransition();
   const [editHouseName, setEditHouseName] = useState("");
   const [editHouseColor, setEditHouseColor] = useState(DEFAULT_HOUSE_COLOR);
+  const [editHouseDescription, setEditHouseDescription] = useState("");
 
   function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -102,6 +103,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         toast.success("House updated", { description: name });
         setEditHouseName("");
         setEditHouseColor(DEFAULT_HOUSE_COLOR);
+        setEditHouseDescription("");
         form.reset();
       } catch (err) {
         toast.error("Failed to update house", {
@@ -167,10 +169,11 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             value={editHouseName}
             onChange={(event) => {
               const selectedHouseName = event.target.value;
+              const selectedHouse = houses.find((house) => house.name === selectedHouseName);
+
               setEditHouseName(selectedHouseName);
-              setEditHouseColor(
-                getHouseColor(houses.find((house) => house.name === selectedHouseName)),
-              );
+              setEditHouseColor(getHouseColor(selectedHouse));
+              setEditHouseDescription(selectedHouse?.description ?? "");
             }}
           >
             <option value="" disabled>Select house...</option>
@@ -186,6 +189,8 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
           />
           <input
             name="description"
+            value={editHouseDescription}
+            onChange={(event) => setEditHouseDescription(event.target.value)}
             className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="Description (optional)"
           />

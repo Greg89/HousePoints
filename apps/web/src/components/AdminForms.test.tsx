@@ -17,8 +17,8 @@ const users = [
 ];
 
 const houses = [
-  { id: "house-1", name: "Slytherin", color: "#22c55e" },
-  { id: "house-2", name: "Ravenclaw", color: "#1d4ed8" },
+  { id: "house-1", name: "Slytherin", color: "#22c55e", description: "Ambitious builders" },
+  { id: "house-2", name: "Ravenclaw", color: "#1d4ed8", description: "Curious problem solvers" },
 ];
 
 const activeSeason = {
@@ -383,19 +383,44 @@ describe("AdminForms", () => {
     });
   });
 
-  it("sets the edit color to the selected house color", async () => {
+  it("sets edit fields to the selected house values", async () => {
     const { user } = setupAdminForms();
     switchToManageSection("Houses");
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
     const colorInput = editHouseForm.getByLabelText(/New color/) as HTMLInputElement;
+    const descriptionInput = editHouseForm.getByPlaceholderText("Description (optional)") as HTMLInputElement;
 
     expect(colorInput.value).toBe("#7c3aed");
+    expect(descriptionInput.value).toBe("");
 
     await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     expect(colorInput.value).toBe("#1d4ed8");
+    expect(descriptionInput.value).toBe("Curious problem solvers");
 
     await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Slytherin");
     expect(colorInput.value).toBe("#22c55e");
+    expect(descriptionInput.value).toBe("Ambitious builders");
+  });
+
+  it("preserves the selected house description when only changing the edit color", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Houses");
+    const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
+
+    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
+    fireEvent.change(editHouseForm.getByLabelText(/New color/), {
+      target: { value: "#9333ea" },
+    });
+    await user.click(editHouseForm.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());
+    const createHouseMock = props.onCreateHouse as ReturnType<typeof vi.fn>;
+    const formData = createHouseMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      name: "Ravenclaw",
+      color: "#9333ea",
+      description: "Curious problem solvers",
+    });
   });
 
   it("shows a safe toast when edit-house returns an expected failure", async () => {
