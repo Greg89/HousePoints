@@ -3,12 +3,14 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
+  type AdminAuditAction,
   adminContextSchema,
   adminUserSchema,
   adminHouseSchema,
   assignUserHouseResponseSchema,
   deletedPointSchema,
   inviteLinkSchema,
+  pagedAdminAuditActionsSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -244,6 +246,39 @@ export async function readAdminContext(requestId: string = randomUUID()) {
   });
 
   return context;
+}
+
+export async function readAdminAuditPage(
+  type?: AdminAuditAction["type"],
+  cursor?: string,
+  requestId: string = randomUUID(),
+) {
+  const actor = await getActorMappingForAdmin("readAdminAuditPage", requestId);
+  const response = await apiFetch("/admin/audit", requestId, {
+    method: "POST",
+    body: JSON.stringify({
+      ...(type ? { type } : {}),
+      ...(cursor ? { cursor } : {}),
+    }),
+  });
+
+  const page = await parseApiResponse(
+    response,
+    pagedAdminAuditActionsSchema,
+    "Audit history could not be loaded. Please try again.",
+  );
+
+  logInfo("web.admin.audit_loaded", {
+    requestId,
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    filterType: type ?? null,
+    cursor: cursor ?? null,
+    actions: page.items.length,
+    hasNextPage: Boolean(page.nextCursor),
+  });
+
+  return page;
 }
 
 export async function createInviteLink(): Promise<CreateInviteResult> {

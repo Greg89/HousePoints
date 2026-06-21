@@ -5,6 +5,7 @@ import {
   createInviteLink,
   deletePointTransaction,
   promoteUserRole,
+  readAdminAuditPage,
   readAdminContext,
 } from "./actions/admin";
 import {
@@ -142,12 +143,14 @@ async function renderHome() {
       houses={adminContext.houses}
       recentDeletedPoints={adminContext.recentDeletedPoints}
       recentAdminActions={adminContext.recentAdminActions}
+      adminAuditNextCursor={adminContext.adminAuditNextCursor}
       seasons={seasonContext.seasons}
       activeSeason={seasonContext.activeSeason}
       actorRole={session.role ?? "MEMBER"}
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
       onPromoteUser={promoteUserRole}
+      onLoadAdminAudit={readAdminAuditPage}
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
       onRenameSeason={renameSeason}

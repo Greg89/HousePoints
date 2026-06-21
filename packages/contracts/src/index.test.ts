@@ -33,7 +33,9 @@ import {
   orgMembersSchema,
   pagedActivityFeedSchema,
   adminAuditActionSchema,
+  adminAuditRequestSchema,
   adminContextSchema,
+  pagedAdminAuditActionsSchema,
   pointAdjustmentResponseSchema,
   redactLogContext,
   serializeErrorForLog,
@@ -43,6 +45,7 @@ import {
 } from "./index";
 
 const webConsumedApiEndpoints = [
+  "/admin/audit",
   "/admin/context",
   "/admin/houses",
   "/admin/users/assign-house",
@@ -467,6 +470,10 @@ describe("authenticated request schemas", () => {
     [promoteUserSchema, {
       targetUserId: "user-1",
       role: "ADMIN",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [adminAuditRequestSchema, {
+      type: "POINT_DELETED",
       actorAuth0Sub: "auth0|attacker",
     }],
     [seasonScopedRequestSchema, {
@@ -901,6 +908,7 @@ describe("adminContextSchema", () => {
         },
       },
     ],
+    adminAuditNextCursor: "audit-2",
   };
 
   it("accepts the complete admin context response", () => {
@@ -1095,6 +1103,63 @@ describe("adminAuditActionSchema", () => {
         metadata: {},
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("adminAuditRequestSchema", () => {
+  it("accepts bounded audit history pagination and filtering", () => {
+    expect(adminAuditRequestSchema.parse({})).toEqual({ limit: 10 });
+    expect(
+      adminAuditRequestSchema.parse({
+        type: "POINT_DELETED",
+        cursor: "audit-1",
+        limit: 25,
+      }),
+    ).toEqual({
+      type: "POINT_DELETED",
+      cursor: "audit-1",
+      limit: 25,
+    });
+  });
+
+  it("rejects invalid audit filters and unbounded limits", () => {
+    expect(adminAuditRequestSchema.safeParse({ type: "HOUSE_CREATED" }).success).toBe(false);
+    expect(adminAuditRequestSchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(adminAuditRequestSchema.safeParse({ limit: 51 }).success).toBe(false);
+  });
+
+  it("accepts paged audit action responses", () => {
+    expect(
+      pagedAdminAuditActionsSchema.parse({
+        items: [
+          {
+            id: "audit-event:audit-1",
+            type: "POINT_DELETED",
+            occurredAt: "2026-06-21T12:00:00.000Z",
+            actorName: "Olivia",
+            summary: "Olivia deleted 12 points from Ben.",
+            metadata: {
+              transactionId: "tx-1",
+            },
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).toEqual({
+      items: [
+        {
+          id: "audit-event:audit-1",
+          type: "POINT_DELETED",
+          occurredAt: "2026-06-21T12:00:00.000Z",
+          actorName: "Olivia",
+          summary: "Olivia deleted 12 points from Ben.",
+          metadata: {
+            transactionId: "tx-1",
+          },
+        },
+      ],
+      nextCursor: null,
+    });
   });
 });
 

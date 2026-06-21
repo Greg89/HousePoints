@@ -61,6 +61,19 @@ const recentDeletedPoints = [
 
 const recentAdminActions: AdminAuditAction[] = [
   {
+    id: "audit-event:point-delete-1",
+    type: "POINT_DELETED",
+    occurredAt: "2026-06-21T13:45:00.000Z",
+    actorName: "Alice Admin",
+    summary: "Alice Admin deleted 12 points from Ben Unassigned.",
+    metadata: {
+      transactionId: "tx-1",
+      targetUserName: "Ben Unassigned",
+      delta: "12",
+      deletionReason: "Entered twice",
+    },
+  },
+  {
     id: "audit-event:audit-1",
     type: "USER_HOUSE_ASSIGNED",
     occurredAt: "2026-06-21T13:30:00.000Z",
@@ -117,9 +130,14 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     actorRole: "OWNER" as const,
     recentDeletedPoints,
     recentAdminActions,
+    adminAuditNextCursor: null,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
+    onLoadAdminAudit: vi.fn().mockResolvedValue({
+      items: recentAdminActions,
+      nextCursor: null,
+    }),
     onCreateInvite: vi.fn().mockResolvedValue({
       ok: true,
       token: "invite-token",
@@ -172,8 +190,8 @@ describe("AdminForms", () => {
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Recent admin actions")).toBeInTheDocument();
-    expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
+    expect(screen.getByText("Audit history")).toBeInTheDocument();
+    expect(screen.queryByText("Recently deleted point awards")).not.toBeInTheDocument();
   });
 
   it("shows owner-only manage sections to admins without making them clickable", async () => {
@@ -199,14 +217,16 @@ describe("AdminForms", () => {
     expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
   });
 
-  it("shows recent admin actions in the Audit section", () => {
+  it("shows audit history including deleted point awards in the Audit section", () => {
     setupAdminForms();
     switchToManageSection("Audit");
 
+    expect(screen.getByText("Alice Admin deleted 12 points from Ben Unassigned.")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin created an invite link.")).toBeInTheDocument();
     expect(screen.getByText("Ben Unassigned joined with an invite link.")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin started Q4 2026.")).toBeInTheDocument();
     expect(screen.getByText("Alice Admin assigned Ben Unassigned to Ravenclaw.")).toBeInTheDocument();
+    expect(screen.getByText("Point deleted")).toBeInTheDocument();
     expect(screen.getByText("Invite created")).toBeInTheDocument();
     expect(screen.getByText("Invite used")).toBeInTheDocument();
     expect(screen.getByText("Season started")).toBeInTheDocument();
@@ -217,7 +237,54 @@ describe("AdminForms", () => {
     setupAdminForms({ recentAdminActions: [] });
     switchToManageSection("Audit");
 
-    expect(screen.getByText("No recent admin actions have been recorded yet.")).toBeInTheDocument();
+    expect(screen.getByText("No audit history matches this filter yet.")).toBeInTheDocument();
+  });
+
+  it("filters audit history by event type", async () => {
+    const filteredActions = recentAdminActions.filter((action) => action.type === "POINT_DELETED");
+    const { user, props } = setupAdminForms({
+      onLoadAdminAudit: vi.fn().mockResolvedValue({
+        items: filteredActions,
+        nextCursor: null,
+      }),
+    });
+    switchToManageSection("Audit");
+
+    await user.selectOptions(screen.getByLabelText("Filter history"), "POINT_DELETED");
+
+    await waitFor(() => expect(props.onLoadAdminAudit).toHaveBeenCalledWith("POINT_DELETED"));
+    expect(screen.getByText("Alice Admin deleted 12 points from Ben Unassigned.")).toBeInTheDocument();
+    expect(screen.queryByText("Alice Admin created an invite link.")).not.toBeInTheDocument();
+  });
+
+  it("loads additional audit history pages", async () => {
+    const nextAction: AdminAuditAction = {
+      id: "audit-event:older-role-change",
+      type: "USER_ROLE_CHANGED",
+      occurredAt: "2026-06-20T12:00:00.000Z",
+      actorName: "Olivia Owner",
+      summary: "Olivia Owner changed Casey from MEMBER to ADMIN.",
+      metadata: {
+        targetUserId: "user-casey",
+        targetUserName: "Casey",
+        previousRole: "MEMBER",
+        newRole: "ADMIN",
+      },
+    };
+    const { user, props } = setupAdminForms({
+      adminAuditNextCursor: "audit-older-cursor",
+      onLoadAdminAudit: vi.fn().mockResolvedValue({
+        items: [nextAction],
+        nextCursor: null,
+      }),
+    });
+    switchToManageSection("Audit");
+
+    await user.click(screen.getByRole("button", { name: "Load more audit history" }));
+
+    await waitFor(() => expect(props.onLoadAdminAudit).toHaveBeenCalledWith(undefined, "audit-older-cursor"));
+    expect(screen.getByText("Olivia Owner changed Casey from MEMBER to ADMIN.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more audit history" })).not.toBeInTheDocument();
   });
 
   it("shows season management controls with the current active season", () => {
@@ -250,17 +317,6 @@ describe("AdminForms", () => {
     await screen.findByText(/Current active season:/);
     expect(startSeasonForm.getByText("Q4 2026")).toBeInTheDocument();
     confirmSpy.mockRestore();
-  });
-
-  it("shows recently deleted point awards as an admin reporting widget", () => {
-    setupAdminForms();
-    switchToManageSection("Audit");
-
-    expect(screen.getByText("Recently deleted point awards")).toBeInTheDocument();
-    expect(screen.getByText("Awards deleted")).toBeInTheDocument();
-    expect(screen.getByText("Points removed")).toBeInTheDocument();
-    expect(screen.getByText(/Alice Admin deleted 12 points to Ben Unassigned/)).toBeInTheDocument();
-    expect(screen.getByText("Entered twice")).toBeInTheDocument();
   });
 
   it("shows a safe toast when start-season returns an expected failure", async () => {

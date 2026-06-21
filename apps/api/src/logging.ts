@@ -22,6 +22,7 @@ export type ApiLogEvent =
   | "users.bootstrap.identity_linked"
   | "users.bootstrap.account_link_required"
   | "admin.forbidden"
+  | "admin.audit.loaded"
   | "admin.context.loaded"
   | "admin.house.created"
   | "admin.user.house_assigned"

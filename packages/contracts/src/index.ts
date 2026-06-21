@@ -361,6 +361,21 @@ export const adminAuditActionSchema = z.object({
 export type AdminAuditAction = z.infer<typeof adminAuditActionSchema>;
 export const adminAuditActionsSchema = z.array(adminAuditActionSchema);
 
+export const adminAuditRequestSchema = z.object({
+  cursor: z.string().min(1).optional(),
+  type: adminAuditActionSchema.shape.type.optional(),
+  limit: z.number().int().min(1).max(50).default(10),
+}).strict();
+
+export type AdminAuditRequest = z.infer<typeof adminAuditRequestSchema>;
+
+export const pagedAdminAuditActionsSchema = z.object({
+  items: adminAuditActionsSchema,
+  nextCursor: z.string().min(1).nullable(),
+});
+
+export type PagedAdminAuditActions = z.infer<typeof pagedAdminAuditActionsSchema>;
+
 export const adminContextSchema = z.object({
   organizationId: z.string(),
   organizationSlug: z.string(),
@@ -368,6 +383,7 @@ export const adminContextSchema = z.object({
   houses: z.array(adminHouseSchema),
   recentDeletedPoints: deletedPointsSchema,
   recentAdminActions: adminAuditActionsSchema,
+  adminAuditNextCursor: z.string().min(1).nullable(),
 });
 
 export type AdminContext = z.infer<typeof adminContextSchema>;
@@ -549,6 +565,7 @@ function defineContract(request: z.ZodType, response: z.ZodType): ApiContract {
 }
 
 export const apiContracts = {
+  "/admin/audit": defineContract(adminAuditRequestSchema, pagedAdminAuditActionsSchema),
   "/admin/context": defineContract(actorScopeSchema, adminContextSchema),
   "/admin/houses": defineContract(createHouseSchema, adminHouseSchema),
   "/admin/users/assign-house": defineContract(

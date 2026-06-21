@@ -33,6 +33,7 @@ export type WebLogEvent =
   | "web.user.mapping_failed"
   | "web.user.house_unassigned"
   | "web.admin.forbidden"
+  | "web.admin.audit_loaded"
   | "web.admin.context_loaded"
   | "web.admin.context_failed"
   | "web.admin.house_created"

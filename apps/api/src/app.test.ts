@@ -1188,6 +1188,7 @@ describe("POST /admin/context", () => {
       houses: [],
       recentDeletedPoints: [],
       recentAdminActions: [],
+      adminAuditNextCursor: null,
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1252,6 +1253,7 @@ describe("POST /admin/context", () => {
       ],
       recentDeletedPoints: [],
       recentAdminActions: [],
+      adminAuditNextCursor: null,
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1263,6 +1265,102 @@ describe("POST /admin/context", () => {
         where: { organizationId: "org-1" },
       }),
     );
+    await app.close();
+  });
+});
+
+describe("POST /admin/audit", () => {
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/audit",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockAuditEventFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns filtered paged audit history scoped to the actor's organization", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockAuditEventFindMany.mockResolvedValue([
+      {
+        id: "audit-delete-1",
+        eventType: "POINT_DELETED",
+        summary: "Bob Admin deleted 12 points from Ben.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserName: "Ben",
+          delta: 12,
+        },
+        createdAt: new Date("2026-06-21T12:15:00.000Z"),
+        actor: { displayName: "Bob Admin" },
+      },
+      {
+        id: "audit-delete-2",
+        eventType: "POINT_DELETED",
+        summary: "Bob Admin deleted 3 points from Casey.",
+        metadata: {
+          transactionId: "tx-2",
+          targetUserName: "Casey",
+          delta: 3,
+        },
+        createdAt: new Date("2026-06-21T11:15:00.000Z"),
+        actor: { displayName: "Bob Admin" },
+      },
+    ]);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/audit",
+      payload: { type: "POINT_DELETED", cursor: "audit-delete-0", limit: 1 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      items: [
+        {
+          id: "audit-event:audit-delete-1",
+          type: "POINT_DELETED",
+          occurredAt: "2026-06-21T12:15:00.000Z",
+          actorName: "Bob Admin",
+          summary: "Bob Admin deleted 12 points from Ben.",
+          metadata: {
+            transactionId: "tx-1",
+            targetUserName: "Ben",
+            delta: "12",
+          },
+        },
+      ],
+      nextCursor: "audit-delete-1",
+    });
+    expect(mockAuditEventFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        eventType: "POINT_DELETED",
+      },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      take: 2,
+      cursor: { id: "audit-delete-0" },
+      skip: 1,
+      select: {
+        id: true,
+        eventType: true,
+        summary: true,
+        metadata: true,
+        createdAt: true,
+        actor: { select: { displayName: true } },
+      },
+    });
     await app.close();
   });
 });

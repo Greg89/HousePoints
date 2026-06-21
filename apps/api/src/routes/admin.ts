@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import {
   type AdminAuditAction,
+  adminAuditRequestSchema,
   actorScopeSchema,
   assignUserHouseSchema,
   createHouseSchema,
@@ -35,7 +36,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       recentDeletedPoints,
       recentInvites,
       recentStartedSeasons,
-      recentAuditEvents,
+      auditEvents,
     ] = await Promise.all([
       prisma.user.findMany({
         where: { organizationId: actor.organizationId },
@@ -117,7 +118,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
           { createdAt: "desc" },
           { id: "desc" },
         ],
-        take: 10,
+        take: 11,
         select: {
           id: true,
           eventType: true,
@@ -128,6 +129,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         },
       }),
     ]);
+    const recentAuditEvents = auditEvents.slice(0, 10);
+    const adminAuditNextCursor = auditEvents.length > 10
+      ? recentAuditEvents.at(-1)?.id ?? null
+      : null;
     const recentAdminActions = buildRecentAdminActions(
       recentDeletedPoints,
       recentInvites,
@@ -152,6 +157,65 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       houses,
       recentDeletedPoints: recentDeletedPoints.map(mapDeletedPoint),
       recentAdminActions,
+      adminAuditNextCursor,
+    };
+  });
+
+  app.post("/admin/audit", async (request, reply) => {
+    const parsed = adminAuditRequestSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor || !isAdminRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {});
+      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+    }
+
+    const limit = parsed.data.limit;
+    const auditEvents = await prisma.auditEvent.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        ...(parsed.data.type ? { eventType: parsed.data.type } : {}),
+      },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      take: limit + 1,
+      ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        eventType: true,
+        summary: true,
+        metadata: true,
+        createdAt: true,
+        actor: { select: { displayName: true } },
+      },
+    });
+    const pageEvents = auditEvents.slice(0, limit);
+
+    info(request.log, "admin.audit.loaded", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      filterType: parsed.data.type ?? null,
+      cursor: parsed.data.cursor ?? null,
+      actions: pageEvents.length,
+      hasNextPage: auditEvents.length > limit,
+    });
+
+    return {
+      items: pageEvents.map((event) => mapAuditEventToAction({
+        ...event,
+        eventType: event.eventType as AdminAuditAction["type"],
+      })),
+      nextCursor: auditEvents.length > limit ? pageEvents.at(-1)?.id ?? null : null,
     };
   });
 
@@ -422,14 +486,7 @@ function buildRecentAdminActions(
       auditedStartedSeasonIds.add(metadata.seasonId);
     }
 
-    actions.push({
-      id: `audit-event:${event.id}`,
-      type: event.eventType,
-      occurredAt: event.createdAt.toISOString(),
-      actorName: event.actor?.displayName ?? null,
-      summary: event.summary,
-      metadata,
-    });
+    actions.push(mapAuditEventToAction(event, metadata));
   }
 
   for (const point of deletedPoints) {
@@ -501,6 +558,27 @@ function buildRecentAdminActions(
   return actions
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id))
     .slice(0, 10);
+}
+
+function mapAuditEventToAction(
+  event: {
+    id: string;
+    eventType: AdminAuditAction["type"];
+    summary: string;
+    metadata: unknown;
+    createdAt: Date;
+    actor: { displayName: string } | null;
+  },
+  preparedMetadata: Record<string, string | null> = toStringMetadata(event.metadata),
+): AdminAuditAction {
+  return {
+    id: `audit-event:${event.id}`,
+    type: event.eventType,
+    occurredAt: event.createdAt.toISOString(),
+    actorName: event.actor?.displayName ?? null,
+    summary: event.summary,
+    metadata: preparedMetadata,
+  };
 }
 
 function toStringMetadata(metadata: unknown): Record<string, string | null> {

@@ -116,7 +116,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 
 **Admin-only: unassigned members** - a warning card showing how many members have not been assigned to a house yet. Links directly to the admin panel.
 
-**Admin-only: recent deletions** - implemented for point awards. Owners/admins can soft delete an award from the Activity tab, live scoring excludes the deleted transaction, and the Manage tab shows a recent deletion audit.
+**Admin-only: audit history** - implemented for point awards and other admin actions. Owners/admins can soft delete an award from the Activity tab, live scoring excludes the deleted transaction, and the Manage Audit tab shows the deletion in the shared audit history.
 
 **Season countdown / summary** - implemented as a feature-flagged current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Winner summary remains future work.
 
@@ -125,11 +125,11 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 - Consider a `GET /dashboard/summary` endpoint that returns all widget data in one round-trip to avoid waterfall fetching.
 - Widgets should degrade gracefully: if there are no transactions yet, show an empty state, not an error.
 - The layout should be a responsive CSS grid; widgets can be different sizes (some spanning 2 columns) depending on their content density.
-- Elevated Manage reporting should expand from the current member/house/unassigned/deletion cards into a compact operational view: recent admin actions, invite activity, season changes, unusual point volume, and data cleanup history.
-- The Manage tab has been split into focused overview, deleted-points reporting, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
+- Elevated Manage reporting should expand from the current member/house/unassigned cards into a compact operational view: audit history, invite activity, season changes, unusual point volume, and data cleanup history.
+- The Manage tab has been split into focused overview, audit-history, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
 - The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets. Houses and Seasons remain visible to admins, but are owner-only and disabled for non-owner admins.
 - The Team section now uses compact assignment, invite, and owner-only role-management cards. It includes audit-backed invite activity reporting for recent token generation and use.
-- The Audit section now includes a recent admin-actions timeline backed by persisted app data. The dedicated `AuditEvent` table now records the current admin timeline event types: house assignment, point deletion, invite creation/use, and season starts. Legacy fallback rows are still merged for older records that predate durable audit events.
+- The Audit section now uses the persisted `AuditEvent` table as the single source of truth for administrative history. It supports event-type filtering, cursor pagination, and includes point deletion, invite creation/use, season starts, house assignment, and role changes. Legacy fallback rows are still merged into the initial context for older records that predate durable audit events.
 
 **Open questions**
 - Do members and admins see the same widgets, or should the layout be role-aware?

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { AdminAuditAction, DeletedPoint, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, DeletedPoint, PagedAdminAuditActions, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
@@ -11,7 +11,6 @@ import type {
   StartSeasonResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
-import { DeletedPointsReport } from "./DeletedPointsReport";
 import { HouseManagement } from "./HouseManagement";
 import { ManageOverview } from "./ManageOverview";
 import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
@@ -26,9 +25,14 @@ interface AdminFormsProps {
   actorRole: UserRole;
   recentDeletedPoints: DeletedPoint[];
   recentAdminActions: AdminAuditAction[];
+  adminAuditNextCursor: string | null;
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
+  onLoadAdminAudit: (
+    type?: AdminAuditAction["type"],
+    cursor?: string,
+  ) => Promise<PagedAdminAuditActions>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
@@ -67,7 +71,7 @@ const MANAGE_SECTIONS: Array<{
   {
     id: "audit",
     label: "Audit",
-    description: "Review recent administrative cleanup.",
+    description: "Review the full administrative history.",
   },
 ];
 
@@ -79,9 +83,11 @@ export function AdminForms({
   actorRole,
   recentDeletedPoints,
   recentAdminActions,
+  adminAuditNextCursor,
   onCreateHouse,
   onAssignHouse,
   onPromoteUser,
+  onLoadAdminAudit,
   onCreateInvite,
   onStartSeason,
   onRenameSeason,
@@ -206,10 +212,11 @@ export function AdminForms({
         ) : null}
 
         {activeSection === "audit" ? (
-          <>
-            <RecentAdminActionsReport actions={recentAdminActions} />
-            <DeletedPointsReport recentDeletedPoints={recentDeletedPoints} />
-          </>
+          <RecentAdminActionsReport
+            actions={recentAdminActions}
+            nextCursor={adminAuditNextCursor}
+            onLoadPage={onLoadAdminAudit}
+          />
         ) : null}
       </div>
     </div>
