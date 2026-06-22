@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Check, Palette, Warning } from "@phosphor-icons/react";
 import type { ProfileUpdateResult } from "@/lib/action-results";
 import { cn } from "@/lib/cn";
+import { assessHouseThemeColor } from "@/lib/house-theme";
 
 interface HouseThemeToggleFormProps {
   enabled: boolean;
@@ -22,7 +23,9 @@ export function HouseThemeToggleForm({
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const canUseHouseTheme = Boolean(houseName && houseColor);
+  const colorAssessment = assessHouseThemeColor(houseColor);
+  const hasValidHouseColor = colorAssessment.status !== "invalid";
+  const canUseHouseTheme = Boolean(houseName && hasValidHouseColor);
 
   function handleToggle() {
     if (!canUseHouseTheme || isPending) {
@@ -64,13 +67,17 @@ export function HouseThemeToggleForm({
           <p className="mt-1 text-xs text-muted-foreground">
             Use your assigned house color for buttons, tabs, focus rings, and app accents.
           </p>
-          {houseName && houseColor ? (
+          {houseName && hasValidHouseColor ? (
             <p className="mt-3 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium">
               <span
                 className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: houseColor }}
+                style={{ backgroundColor: colorAssessment.normalizedColor ?? houseColor ?? undefined }}
               />
               {houseName}
+            </p>
+          ) : houseName ? (
+            <p className="mt-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              This house needs a valid six-digit hex color before members can enable its theme.
             </p>
           ) : (
             <p className="mt-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">

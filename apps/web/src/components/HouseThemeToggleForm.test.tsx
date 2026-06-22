@@ -42,6 +42,17 @@ describe("HouseThemeToggleForm", () => {
     expect(props.onSave).not.toHaveBeenCalled();
   });
 
+  it("disables the toggle when the assigned house color cannot generate a theme", async () => {
+    const { props, user } = setupToggle({ houseColor: "purple" });
+
+    expect(screen.getByRole("switch")).toBeDisabled();
+    expect(screen.getByText(/valid six-digit hex color/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch"));
+
+    expect(props.onSave).not.toHaveBeenCalled();
+  });
+
   it("rolls back the optimistic toggle when saving fails", async () => {
     const { props, user } = setupToggle({
       onSave: vi.fn().mockResolvedValue({

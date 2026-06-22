@@ -61,6 +61,23 @@ This keeps contrast and readability predictable while still changing the identit
 - Flag neutral colors as readable but visually subtle so owners can choose a stronger house identity.
 - Add focused tests for color assessment and owner-facing house color preview states.
 
+## Phase 3 Visual QA
+
+Tested representative house colors against dashboard and settings theme surfaces:
+
+- Purple: `#7c3aed`
+- Green: `#22c55e`
+- Blue: `#1d4ed8`
+- Yellow: `#facc15`
+- Neutral gray: `#777777`
+
+Decisions from this pass:
+
+- Keep success, destructive, historical-season, and medal colors stable instead of house-themed.
+- Continue using direct house colors for house identity chips, member avatars, and house-specific report bars.
+- Use semantic theme tokens for app controls such as buttons, tabs, focus rings, and profile/settings accents.
+- Disable the profile theme toggle if the assigned house color is missing or invalid, even though normal owner workflows already validate house colors before saving.
+
 ## Later Options
 
 - Add preview cards for default vs house theme.
