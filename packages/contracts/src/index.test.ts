@@ -908,6 +908,10 @@ describe("adminContextSchema", () => {
         },
       },
     ],
+    inviteStats: {
+      generatedCount: 3,
+      usedCount: 2,
+    },
     adminAuditNextCursor: "audit-2",
   };
 

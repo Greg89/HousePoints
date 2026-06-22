@@ -35,6 +35,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       houses,
       recentDeletedPoints,
       recentInvites,
+      inviteGeneratedCount,
+      inviteUsedCount,
       recentStartedSeasons,
       auditEvents,
     ] = await Promise.all([
@@ -95,6 +97,15 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
           usedBy: { select: { displayName: true } },
         },
       }),
+      prisma.orgInvite.count({
+        where: { organizationId: actor.organizationId },
+      }),
+      prisma.orgInvite.count({
+        where: {
+          organizationId: actor.organizationId,
+          usedAt: { not: null },
+        },
+      }),
       prisma.season.findMany({
         where: {
           organizationId: actor.organizationId,
@@ -146,6 +157,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       users: users.length,
       houses: houses.length,
       recentDeletedPoints: recentDeletedPoints.length,
+      inviteGeneratedCount,
+      inviteUsedCount,
       recentAdminActions: recentAdminActions.length,
       recentAuditEvents: recentAuditEvents.length,
     });
@@ -157,6 +170,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       houses,
       recentDeletedPoints: recentDeletedPoints.map(mapDeletedPoint),
       recentAdminActions,
+      inviteStats: {
+        generatedCount: inviteGeneratedCount,
+        usedCount: inviteUsedCount,
+      },
       adminAuditNextCursor,
     };
   });

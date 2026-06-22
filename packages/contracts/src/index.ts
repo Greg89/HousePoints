@@ -376,6 +376,13 @@ export const pagedAdminAuditActionsSchema = z.object({
 
 export type PagedAdminAuditActions = z.infer<typeof pagedAdminAuditActionsSchema>;
 
+export const inviteStatsSchema = z.object({
+  generatedCount: z.number().int().nonnegative(),
+  usedCount: z.number().int().nonnegative(),
+});
+
+export type InviteStats = z.infer<typeof inviteStatsSchema>;
+
 export const adminContextSchema = z.object({
   organizationId: z.string(),
   organizationSlug: z.string(),
@@ -383,6 +390,7 @@ export const adminContextSchema = z.object({
   houses: z.array(adminHouseSchema),
   recentDeletedPoints: deletedPointsSchema,
   recentAdminActions: adminAuditActionsSchema,
+  inviteStats: inviteStatsSchema,
   adminAuditNextCursor: z.string().min(1).nullable(),
 });
 

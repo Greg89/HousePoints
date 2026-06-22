@@ -130,6 +130,10 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     actorRole: "OWNER" as const,
     recentDeletedPoints,
     recentAdminActions,
+    inviteStats: {
+      generatedCount: 3,
+      usedCount: 2,
+    },
     adminAuditNextCursor: null,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
@@ -641,7 +645,9 @@ describe("AdminForms", () => {
 
     const inviteActivity = within(screen.getByLabelText("Invite activity"));
 
+    expect(inviteActivity.getByText("3")).toBeInTheDocument();
     expect(inviteActivity.getByText("Tokens generated")).toBeInTheDocument();
+    expect(inviteActivity.getByText("2")).toBeInTheDocument();
     expect(inviteActivity.getByText("Tokens used")).toBeInTheDocument();
     expect(inviteActivity.getByText("Token generated")).toBeInTheDocument();
     expect(inviteActivity.getByText("Token used")).toBeInTheDocument();

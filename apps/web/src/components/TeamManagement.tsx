@@ -7,7 +7,7 @@ import {
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import type { AdminAuditAction, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, InviteStats, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
@@ -22,6 +22,7 @@ interface TeamManagementProps {
   assignedUsers: AdminUser[];
   unassignedSummary: string;
   recentAdminActions: AdminAuditAction[];
+  inviteStats: InviteStats;
   actorRole: UserRole;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
@@ -35,6 +36,7 @@ export function TeamManagement({
   assignedUsers,
   unassignedSummary,
   recentAdminActions,
+  inviteStats,
   actorRole,
   onAssignHouse,
   onPromoteUser,
@@ -50,8 +52,6 @@ export function TeamManagement({
   const inviteActions = recentAdminActions.filter(
     (action) => action.type === "INVITE_CREATED" || action.type === "INVITE_USED",
   );
-  const inviteCreatedCount = inviteActions.filter((action) => action.type === "INVITE_CREATED").length;
-  const inviteUsedCount = inviteActions.filter((action) => action.type === "INVITE_USED").length;
   const isOwner = actorRole === "OWNER";
   const promotionCandidates = users.filter((user) => user.role === "MEMBER");
 
@@ -345,11 +345,11 @@ export function TeamManagement({
           </div>
           <div className="grid grid-cols-2 gap-2 sm:min-w-56">
             <div className="rounded-lg border bg-background px-3 py-2">
-              <p className="text-xl font-semibold">{inviteCreatedCount}</p>
+              <p className="text-xl font-semibold">{inviteStats.generatedCount}</p>
               <p className="text-xs text-muted-foreground">Tokens generated</p>
             </div>
             <div className="rounded-lg border bg-background px-3 py-2">
-              <p className="text-xl font-semibold">{inviteUsedCount}</p>
+              <p className="text-xl font-semibold">{inviteStats.usedCount}</p>
               <p className="text-xs text-muted-foreground">Tokens used</p>
             </div>
           </div>

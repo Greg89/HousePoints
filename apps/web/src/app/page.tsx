@@ -143,6 +143,7 @@ async function renderHome() {
       houses={adminContext.houses}
       recentDeletedPoints={adminContext.recentDeletedPoints}
       recentAdminActions={adminContext.recentAdminActions}
+      inviteStats={adminContext.inviteStats}
       adminAuditNextCursor={adminContext.adminAuditNextCursor}
       seasons={seasonContext.seasons}
       activeSeason={seasonContext.activeSeason}

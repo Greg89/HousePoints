@@ -31,6 +31,7 @@ vi.mock("@housepoints/db", () => ({
     },
     orgInvite: {
       create: vi.fn(),
+      count: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       updateMany: vi.fn(),
@@ -76,6 +77,7 @@ const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
+const mockInviteCount = prisma.orgInvite.count as ReturnType<typeof vi.fn>;
 const mockInviteFindMany = prisma.orgInvite.findMany as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
@@ -151,6 +153,7 @@ const makeOwner = (overrides = {}) => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mockTxFindMany.mockResolvedValue([]);
+  mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockSeasonFindMany.mockResolvedValue([]);
   mockAuditEventFindMany.mockResolvedValue([]);
@@ -1237,6 +1240,10 @@ describe("POST /admin/context", () => {
       houses: [],
       recentDeletedPoints: [],
       recentAdminActions: [],
+      inviteStats: {
+        generatedCount: 0,
+        usedCount: 0,
+      },
       adminAuditNextCursor: null,
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
@@ -1302,6 +1309,10 @@ describe("POST /admin/context", () => {
       ],
       recentDeletedPoints: [],
       recentAdminActions: [],
+      inviteStats: {
+        generatedCount: 0,
+        usedCount: 0,
+      },
       adminAuditNextCursor: null,
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
@@ -1828,6 +1839,9 @@ describe("POST /transactions/recent", () => {
         usedBy: { displayName: "Casey" },
       },
     ]);
+    mockInviteCount
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(2);
     mockSeasonFindMany.mockResolvedValue([
       {
         id: "season-next",
@@ -1914,6 +1928,10 @@ describe("POST /transactions/recent", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    expect(res.json().inviteStats).toEqual({
+      generatedCount: 3,
+      usedCount: 2,
+    });
     expect(res.json().recentAdminActions).toEqual([
       {
         id: "audit-event:audit-1",
@@ -1988,6 +2006,15 @@ describe("POST /transactions/recent", () => {
         where: { organizationId: "org-1" },
       }),
     );
+    expect(mockInviteCount).toHaveBeenNthCalledWith(1, {
+      where: { organizationId: "org-1" },
+    });
+    expect(mockInviteCount).toHaveBeenNthCalledWith(2, {
+      where: {
+        organizationId: "org-1",
+        usedAt: { not: null },
+      },
+    });
     expect(mockSeasonFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
