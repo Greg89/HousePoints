@@ -160,11 +160,11 @@ export function TeamManagement({
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.8fr)_minmax(18rem,0.8fr)]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.8fr)_minmax(18rem,0.8fr)]">
         <form
           aria-label="Assign user to house"
           onSubmit={handleAssign}
-          className="grid content-start gap-4 rounded-xl border bg-card p-5"
+          className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5"
         >
           <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
             <span className="flex items-center gap-2">
@@ -236,7 +236,7 @@ export function TeamManagement({
           </p>
         </form>
 
-        <section aria-label="Invite member" className="grid content-start gap-4 rounded-xl border bg-card p-5">
+        <section aria-label="Invite member" className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5">
           <div>
             <h5 className="text-sm font-semibold flex items-center gap-2">
               <LinkSimple size={16} />
@@ -248,8 +248,10 @@ export function TeamManagement({
           </div>
           {inviteToken ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
-                <code className="text-xs font-mono flex-1 truncate">{inviteToken}</code>
+              <div className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-lg border bg-muted/50 px-3">
+                <code className="block min-w-0 flex-1 truncate font-mono text-xs" title={inviteToken}>
+                  {inviteToken}
+                </code>
                 <button
                   onClick={handleCopy}
                   className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
@@ -283,7 +285,7 @@ export function TeamManagement({
         <form
           aria-label="Promote member"
           onSubmit={handlePromote}
-          className="grid content-start gap-4 rounded-xl border bg-card p-5"
+          className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5"
         >
           <div>
             <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">

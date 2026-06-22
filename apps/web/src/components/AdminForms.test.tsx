@@ -662,6 +662,27 @@ describe("AdminForms", () => {
     expect(inviteCard.getByTitle("Copy token")).toBeInTheDocument();
   });
 
+  it("contains long generated invite tokens inside the invite card", async () => {
+    const longToken = "5dfc1b66d5c131efdfdf0d4c28de4062ebaebd5e6db57e104f0a8f93c2d1";
+    const { user } = setupAdminForms({
+      onCreateInvite: vi.fn().mockResolvedValue({
+        ok: true,
+        token: longToken,
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      }),
+    });
+    switchToManageSection("Team");
+    const inviteCard = within(screen.getByLabelText("Invite member"));
+
+    await user.click(
+      inviteCard.getByRole("button", { name: "Generate invite token" }),
+    );
+
+    const tokenCode = inviteCard.getByText(longToken);
+    expect(tokenCode).toHaveClass("min-w-0", "truncate");
+    expect(tokenCode.parentElement).toHaveClass("min-w-0");
+  });
+
   it("shows a safe toast when invite generation returns an expected failure", async () => {
     const { user, props } = setupAdminForms({
       onCreateInvite: vi.fn().mockResolvedValue({
