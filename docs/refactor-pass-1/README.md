@@ -11,7 +11,7 @@ The review found a promising small application with clear domain concepts, share
 1. The public API trusts `actorAuth0Sub` supplied in request bodies instead of authenticating the caller.
 2. A newly created organization owner is blocked from the admin controls required to create a house and assign themselves.
 
-Those issues should be resolved before implementing Seasons, Dashboard Widgets, The Hex, or expanding org management.
+Those issues should be resolved before implementing Seasons, Dashboard Widgets, Point Adjustments, or expanding org management.
 
 ## Documents
 

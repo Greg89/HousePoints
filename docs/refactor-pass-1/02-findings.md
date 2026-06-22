@@ -103,7 +103,7 @@ Required direction: use typed result states and segment-level error or retry UI.
 
 ### P1-6: Database invariants are mostly application-only
 
-The database does not enforce positive award deltas, required traits for current awards, or cross-field transaction rules. Upcoming Hex and Seasons work will increase the number of invariants.
+The database does not enforce positive award deltas, required traits for current awards, or cross-field transaction rules. Upcoming Point Adjustments and Seasons work will increase the number of invariants.
 
 Required direction: document ledger invariants and enforce stable rules with schema constraints where practical, backed by service validation.
 

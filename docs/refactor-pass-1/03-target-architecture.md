@@ -156,7 +156,7 @@ Pass one should establish:
 - Award policy is explicit and tested.
 - Transaction creation derives organization and house from trusted database records.
 
-Before Seasons or Hex, introduce a deliberate transaction taxonomy and constraint plan. Do not overload the current ledger with nullable fields until valid combinations are written down.
+Before Seasons or Point Adjustments, introduce a deliberate transaction taxonomy and constraint plan. Do not overload the current ledger with nullable fields until valid combinations are written down.
 
 ## Read Model
 

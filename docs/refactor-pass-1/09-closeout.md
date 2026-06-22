@@ -41,7 +41,7 @@ The following work was intentionally left outside pass one:
 - Broad visual redesign.
 - Multi-organization membership.
 - Dashboard Widgets.
-- The Hex.
+- Point Adjustments.
 - Larger Seasons product UX beyond the backend-safe foundation already added.
 - Deeper service extraction where route modules are still the clearest boundary.
 

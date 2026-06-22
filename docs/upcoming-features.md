@@ -138,73 +138,66 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 
 ---
 
-## 4. The Hex
+## 4. Point Adjustments
 
 ### What it is
-A limited, high-stakes ability for the house currently in **last place** to hex members of rival houses, temporarily reducing their points. Adds strategic tension and a comeback mechanic.
+A controlled admin action for deducting points when the product needs a correction or comeback mechanic. This replaces the earlier theme-specific concept with neutral language that works for any house theme.
+
+### Current state
+The product supports positive point awards and soft deletion of mistaken awards. It does not yet support first-class negative point transactions. The detailed design lives in [Point Adjustments Design](./point-adjustments-design.md).
 
 ### Design intent
-- Last place should feel hard but not hopeless. The Hex is a pressure valve.
-- It should be memorable and fun, not punishing or toxic. The guards are as important as the ability itself.
+- Keep the action transparent and auditable.
+- Avoid punitive or theme-specific language.
+- Preserve the append-only point ledger.
+- Add strong guardrails before negative deltas enter the system.
+
+### Proposed MVP language
+- Feature name: `Point adjustments`
+- Admin action: `Deduct points`
+- Transaction type: `DEDUCTION`
+- Audit event: `POINTS_DEDUCTED`
+- Activity badge: `Deducted`
 
 ### How it should work
 
 **Eligibility**
-- Only the house ranked **last** on the current leaderboard (at the moment of casting) can initiate a Hex.
-- Any `ADMIN` member of the last-place house can cast a Hex on behalf of their house.
-- Regular `MEMBER`s cannot cast Hexes; admin gate prevents griefing.
+- Only `ADMIN` and `OWNER` users can deduct points.
+- The actor and target must belong to the same organization.
+- The actor must have a house assignment.
+- The target must have a house assignment.
+- The target must be in a different house than the actor for the comeback-oriented MVP.
+- The deduction applies to the current active season.
 
-**The Hex action**
-- Admin selects a target member from a **different** house (not their own).
-- Selects a Hex Trait from a dedicated Hex Trait list (see below).
-- Optionally adds a note.
-- The system creates a `PointTransaction` with a **negative delta** (e.g. -5 to -15) and a `type: HEX` discriminator.
-- The target's house score decreases; their personal score decreases.
-
-**Hex Trait list** (distinct from the positive Trait list)
-The Hex Traits name the *failure mode* being hexed, keeping it professional rather than personal:
-
-- Missed Deadline
-- Scope Creep
-- Overcommunication
-- Analysis Paralysis
-- Knowledge Hoarding
-- Dropped the Ball
-- Meeting Overrun
-- Reinvented the Wheel
-- Ignored the Process
-- Radio Silence
-
-These are light-hearted work antipatterns, not personal attacks. The list is intentionally short and fixed; no custom Hex reasons.
-
-**Guards against overuse**
+**Guards**
 
 | Guard | Rule |
 |---|---|
-| Cooldown | A house can cast at most **1 Hex per 24 hours** |
-| Ceiling | A house loses the Hex ability once they are no longer last place |
-| Delta cap | Hex delta is fixed at -10 (not configurable) to prevent stacking abuse |
-| Self-protection | A member cannot be hexed twice in the same 24-hour window |
-| Audit trail | Every Hex is fully visible in the activity feed with a Hex badge; no hidden transactions |
-| Season reset | Hex counts reset with each season |
+| Cooldown | A house can deduct points at most once per 24 hours. |
+| Delta cap | MVP deduction amount is fixed at `-10`. |
+| Same-target protection | A member cannot receive more than one deduction in a 24-hour window. |
+| Visibility | Every deduction appears in Activity and Audit. |
+| Season reset | Cooldowns and reporting are scoped by season. |
+| Reason required | The actor must provide a short reason. |
 
 **Schema changes**
-- `PointTransaction` gets a `type` enum: `AWARD` (default, existing) | `HEX`.
-- Hex transactions always have a negative `delta`. Award transactions always have a positive `delta`. Enforce at the DB and API validation layer.
-- Hex cooldown tracked via a query: `COUNT(*) WHERE type = HEX AND actorHouseId = X AND createdAt > now() - 24h`.
+- `PointTransaction` gets a `type` enum: `AWARD` (default, existing) | `DEDUCTION`.
+- Award transactions require positive `delta`.
+- Deduction transactions require negative `delta`.
+- Both transaction types require `seasonId`.
 
 **API changes**
-- New endpoint `POST /hex/cast` (separate from `POST /points/adjust`) to make the distinction explicit and allow different validation logic.
-- Returns `429` with a meaningful message if the cooldown or eligibility guard fires.
+- New endpoint `POST /points/deduct`.
+- Server derives actor, organization, actor house, target house, active season, and fixed deduction amount.
+- Expected failures should return stable typed error codes.
 
 **UI changes**
-- A "Cast Hex" button appears in the admin panel **only** when the admin's house is in last place.
-- The button is hidden (not just disabled) when the house is not last; this keeps the surprise.
-- Activity feed shows Hex transactions with a distinct visual treatment (red delta, Hex icon, Hex Trait pill in a different colour).
+- Add a `Deduct points` admin action with explicit confirmation copy.
+- Activity feed shows deduction rows with a negative delta and `Deducted` badge.
+- Audit shows durable `POINTS_DEDUCTED` events.
 
 **Open questions**
-- Should hexed members be notified in-app?
-- Should the Hex ability be opt-in per org (org owner enables it in settings)?
-- What happens on a tie for last place; do both houses get the Hex?
-- Is a -10 fixed delta the right balance, or should it scale with the points gap?
-- Should there be a "counter-hex" or defensive ability for houses in the lead?
+- Is the MVP an admin correction tool, a last-place comeback mechanic, or both?
+- Should owners enable/disable point adjustments per organization?
+- Should targets be limited to rival houses only, or can admins correct points inside their own house?
+- Should deduction reasons use free text, a fixed list, or both?

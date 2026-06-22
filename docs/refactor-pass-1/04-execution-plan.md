@@ -8,7 +8,7 @@ Status markers:
 
 ## Scope Of Pass One
 
-Pass one is complete when the existing product works through safer, testable boundaries. It should not implement Seasons, Dashboard Widgets, The Hex, multi-org membership, or broad visual redesign.
+Pass one is complete when the existing product works through safer, testable boundaries. It should not implement Seasons, Dashboard Widgets, Point Adjustments, multi-org membership, or broad visual redesign.
 
 ## Phase 0: Product Decisions
 
