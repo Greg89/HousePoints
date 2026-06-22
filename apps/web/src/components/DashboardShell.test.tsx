@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "./DashboardShell";
@@ -482,7 +482,7 @@ describe("DashboardShell", () => {
 
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Organization report");
     expect(screen.getByText("Season standout")).toBeInTheDocument();
-    expect(screen.getByLabelText(/reporting season/i)).toHaveValue("season-active");
+    expect(screen.getByRole("button", { name: /reporting season: q3 2026/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("Current season status")).not.toBeInTheDocument();
     expect(screen.getByText("Trait leader per house")).toBeInTheDocument();
     expect(screen.getByText("Recent activity strip")).toBeInTheDocument();
@@ -540,12 +540,28 @@ describe("DashboardShell", () => {
     expect(screen.getByLabelText("Reporting season: Q3 2026 (current)")).toBeInTheDocument();
   });
 
+  it("uses an app-styled reporting season dropdown", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps} />);
+
+    await user.click(screen.getByRole("button", { name: /reporting season: q3 2026/i }));
+
+    const listbox = screen.getByRole("listbox", { name: "Reporting season" });
+    expect(listbox).toHaveClass("rounded-2xl", "bg-card");
+    expect(within(listbox).getByRole("option", { name: "Q3 2026 (current)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(within(listbox).getByRole("option", { name: "Season 0" })).toBeInTheDocument();
+  });
+
   it("loads overview and leaderboard reports for a selected historical season", async () => {
     const user = userEvent.setup();
     const onSeasonChange = vi.fn(baseProps.onSeasonChange);
     render(<DashboardShell {...baseProps} onSeasonChange={onSeasonChange} />);
 
-    await user.selectOptions(screen.getByLabelText(/reporting season/i), "season-0");
+    await user.click(screen.getByRole("button", { name: /reporting season: q3 2026/i }));
+    await user.click(screen.getByRole("option", { name: "Season 0" }));
 
     expect(onSeasonChange).toHaveBeenCalledWith("season-0");
     expect(await screen.findByText("Historical view")).toBeInTheDocument();

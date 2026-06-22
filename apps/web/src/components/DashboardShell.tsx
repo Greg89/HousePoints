@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import {
   CaretDown,
   CalendarBlank,
+  Check,
   Trophy,
   Clock,
   ChartBar,
@@ -135,7 +136,9 @@ export function DashboardShell({
   const [scopedDashboardSummary, setScopedDashboardSummary] = useState(dashboardSummary);
   const [scopedMemberPoints, setScopedMemberPoints] = useState(memberPoints);
   const [seasonError, setSeasonError] = useState<string | null>(null);
+  const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [isSeasonPending, startSeasonTransition] = useTransition();
+  const seasonMenuRef = useRef<HTMLDivElement>(null);
   const visibleTabs = adminSection
     ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
     : TABS;
@@ -154,7 +157,34 @@ export function DashboardShell({
   const activityFeedKey = `${activityNextCursor ?? "end"}:${activity.map((item) => item.id).join(",")}`;
   const activeSeasonTiming = getSeasonTiming(seasonContext.activeSeason);
 
+  useEffect(() => {
+    if (!seasonMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!seasonMenuRef.current?.contains(event.target as Node)) {
+        setSeasonMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSeasonMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [seasonMenuOpen]);
+
   function handleSeasonChange(nextSeasonId: string) {
+    setSeasonMenuOpen(false);
     setSelectedSeasonId(nextSeasonId);
     setSeasonError(null);
 
@@ -281,26 +311,62 @@ export function DashboardShell({
               </div>
               <div className="flex flex-col items-start gap-2 sm:items-end">
                 {hasMultipleSeasons ? (
-                  <label className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors focus-within:ring-2 focus-within:ring-primary/30">
-                    <span className="sr-only">Reporting season</span>
-                    <CalendarBlank size={15} className="text-primary" aria-hidden="true" />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Viewing
-                    </span>
-                    <select
-                      value={selectedSeasonId}
-                      onChange={(event) => handleSeasonChange(event.target.value)}
+                  <div ref={seasonMenuRef} className="relative">
+                    <button
+                      type="button"
+                      aria-label={`Reporting season: ${selectedSeasonLabel}`}
+                      aria-haspopup="listbox"
+                      aria-expanded={seasonMenuOpen}
+                      onClick={() => setSeasonMenuOpen((open) => !open)}
                       disabled={isSeasonPending}
-                      className="max-w-52 appearance-none bg-transparent pr-5 text-sm font-semibold text-foreground focus:outline-none disabled:cursor-wait disabled:opacity-70"
+                      className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-wait disabled:opacity-70"
                     >
-                      {seasonContext.seasons.map((season) => (
-                        <option key={season.id} value={season.id}>
-                          {season.name}{season.isActive ? " (current)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <CaretDown size={14} className="-ml-5 text-muted-foreground" aria-hidden="true" />
-                  </label>
+                      <CalendarBlank size={15} className="text-primary" aria-hidden="true" />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Viewing
+                      </span>
+                      <span className="max-w-52 truncate font-semibold">{selectedSeasonLabel}</span>
+                      <CaretDown
+                        size={14}
+                        className={cn(
+                          "text-muted-foreground transition-transform",
+                          seasonMenuOpen ? "rotate-180" : "",
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    {seasonMenuOpen ? (
+                      <div
+                        role="listbox"
+                        aria-label="Reporting season"
+                        className="absolute right-0 z-20 mt-2 min-w-full overflow-hidden rounded-2xl border bg-card p-1.5 text-sm shadow-xl shadow-primary/10"
+                      >
+                        {seasonContext.seasons.map((season) => {
+                          const optionLabel = `${season.name}${season.isActive ? " (current)" : ""}`;
+                          const isSelected = season.id === selectedSeasonId;
+
+                          return (
+                            <button
+                              key={season.id}
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              onClick={() => handleSeasonChange(season.id)}
+                              className={cn(
+                                "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left font-semibold transition-colors",
+                                isSelected
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-foreground hover:bg-muted/70",
+                              )}
+                            >
+                              <span className="whitespace-nowrap">{optionLabel}</span>
+                              {isSelected ? <Check size={14} aria-hidden="true" /> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <div
                     className="inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1.5 text-sm font-medium text-foreground shadow-sm"
