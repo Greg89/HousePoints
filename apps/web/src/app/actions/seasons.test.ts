@@ -52,6 +52,7 @@ const actor = {
   auth0Sub: "auth0|user-1",
   email: "user@example.com",
   displayName: "User One",
+  houseThemeEnabled: false,
   role: "OWNER" as const,
   organizationId: "org-1",
   organizationSlug: "acme",

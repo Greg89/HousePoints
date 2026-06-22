@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
-import { readSessionSummary, updateDisplayName } from "@/app/actions/profile";
+import { readSessionSummary, updateDisplayName, updateHouseThemePreference } from "@/app/actions/profile";
 import { DisplayNameForm } from "@/components/DisplayNameForm";
+import { HouseThemeToggleForm } from "@/components/HouseThemeToggleForm";
+import { resolveHouseThemeStyle } from "@/lib/house-theme";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +19,13 @@ export default async function SettingsPage() {
     redirect("/auth/login");
   }
 
+  const houseThemeStyle = resolveHouseThemeStyle({
+    enabled: Boolean(session.houseThemeEnabled),
+    houseColor: session.houseColor,
+  });
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={houseThemeStyle}>
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
@@ -64,6 +71,14 @@ export default async function SettingsPage() {
               onSave={updateDisplayName}
             />
           </div>
+
+          <div className="border-t" />
+          <HouseThemeToggleForm
+            enabled={Boolean(session.houseThemeEnabled)}
+            houseName={session.houseName ?? null}
+            houseColor={session.houseColor ?? null}
+            onSave={updateHouseThemePreference}
+          />
 
           {/* House & org info */}
           {(session.houseName || session.organizationSlug) && (

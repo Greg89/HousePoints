@@ -24,6 +24,7 @@ const appUser = {
   auth0Sub: "auth0|user-1",
   email: "alice@example.com",
   displayName: "Alice",
+  houseThemeEnabled: false,
   role: "MEMBER",
   organizationId: "org-1",
   organizationSlug: "example-org",

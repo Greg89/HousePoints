@@ -107,6 +107,7 @@ const baseProps = {
     houseId: "house-1",
     houseName: "Slytherin",
     houseColor: "#22c55e",
+    houseThemeEnabled: false,
     role: "MEMBER" as const,
   },
   leaderboard: [
@@ -477,6 +478,17 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("tab", { name: /activity/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /leaderboard/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /manage/i })).not.toBeInTheDocument();
+  });
+
+  it("applies house theme variables when the user preference is enabled", () => {
+    const { container } = render(
+      <DashboardShell
+        {...baseProps}
+        session={{ ...baseProps.session, houseThemeEnabled: true }}
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveStyle({ "--primary": "#22c55e" });
   });
 
   it("shows admin tools only after an admin opens the Manage tab", async () => {

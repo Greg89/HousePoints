@@ -119,6 +119,7 @@ const makeMember = (overrides = {}) => ({
   auth0Sub: "auth0|member",
   email: "member@acme.com",
   displayName: "Alice",
+  houseThemeEnabled: false,
   role: "MEMBER" as const,
   houseId: "house-1",
   organizationId: "org-1",
@@ -132,6 +133,7 @@ const makeAdmin = (overrides = {}) => ({
   auth0Sub: "auth0|admin",
   email: "admin@acme.com",
   displayName: "Bob",
+  houseThemeEnabled: false,
   role: "ADMIN" as const,
   houseId: "house-1",
   organizationId: "org-1",
@@ -373,6 +375,7 @@ describe("POST /users/bootstrap", () => {
       auth0Sub: "auth0|new",
       email: null,
       displayName: "Carol",
+      houseThemeEnabled: false,
       role: "MEMBER" as const,
       houseId: null,
       organizationId: "org-1",
@@ -1544,6 +1547,7 @@ describe("POST /users/profile", () => {
     mockUserUpdate.mockResolvedValue({
       id: "user-1",
       displayName: "Alice Updated",
+      houseThemeEnabled: false,
     });
     const app = await buildTestApp();
 
@@ -1557,11 +1561,41 @@ describe("POST /users/profile", () => {
     expect(res.json()).toEqual({
       id: "user-1",
       displayName: "Alice Updated",
+      houseThemeEnabled: false,
     });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { displayName: "Alice Updated" },
-      select: { id: true, displayName: true },
+      select: { id: true, displayName: true, houseThemeEnabled: true },
+    });
+    await app.close();
+  });
+
+  it("updates and returns the authenticated user's house theme preference", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockUserUpdate.mockResolvedValue({
+      id: "user-1",
+      displayName: "Alice",
+      houseThemeEnabled: true,
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/profile",
+      payload: { houseThemeEnabled: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "user-1",
+      displayName: "Alice",
+      houseThemeEnabled: true,
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { houseThemeEnabled: true },
+      select: { id: true, displayName: true, houseThemeEnabled: true },
     });
     await app.close();
   });

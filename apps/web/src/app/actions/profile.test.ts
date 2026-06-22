@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { updateDisplayName } from "./profile";
+import { updateDisplayName, updateHouseThemePreference } from "./profile";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -45,6 +45,7 @@ describe("updateDisplayName", () => {
       auth0Sub: "auth0|user-1",
       email: "user@example.com",
       displayName: "User One",
+      houseThemeEnabled: false,
       role: "MEMBER",
       organizationId: "org-1",
       organizationSlug: "acme",
@@ -53,8 +54,8 @@ describe("updateDisplayName", () => {
       houseColor: "#22c55e",
       created: false,
     });
-    apiFetchMock.mockResolvedValue(Response.json({ id: "user-1", displayName: "Updated User" }));
-    parseApiResponseMock.mockResolvedValue({ id: "user-1", displayName: "Updated User" });
+    apiFetchMock.mockResolvedValue(Response.json({ id: "user-1", displayName: "Updated User", houseThemeEnabled: false }));
+    parseApiResponseMock.mockResolvedValue({ id: "user-1", displayName: "Updated User", houseThemeEnabled: false });
   });
 
   it("returns ok and revalidates profile surfaces when the update succeeds", async () => {
@@ -111,6 +112,62 @@ describe("updateDisplayName", () => {
     await expect(updateDisplayName("Updated User")).rejects.toThrow("database vanished");
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateHouseThemePreference", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserForRequestMock.mockResolvedValue({
+      id: "user-1",
+      auth0Sub: "auth0|user-1",
+      email: "user@example.com",
+      displayName: "User One",
+      houseThemeEnabled: false,
+      role: "MEMBER",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      houseId: "house-1",
+      houseName: "Slytherin",
+      houseColor: "#22c55e",
+      created: false,
+    });
+    apiFetchMock.mockResolvedValue(Response.json({ id: "user-1", displayName: "User One", houseThemeEnabled: true }));
+    parseApiResponseMock.mockResolvedValue({ id: "user-1", displayName: "User One", houseThemeEnabled: true });
+  });
+
+  it("persists the house theme preference and revalidates profile surfaces", async () => {
+    await expect(updateHouseThemePreference(true)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("updateHouseThemePreference", expect.any(Function));
+    expect(apiFetchMock).toHaveBeenCalledWith("/users/profile", "request-1", {
+      method: "POST",
+      body: JSON.stringify({ houseThemeEnabled: true }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/settings");
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const error = new ApiResponseError(
+      409,
+      "HOUSE_THEME_REJECTED",
+      "Your house theme preference could not be updated. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(updateHouseThemePreference(false)).resolves.toEqual({
+      ok: false,
+      code: "HOUSE_THEME_REJECTED",
+      message: "Your house theme preference could not be updated. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "updateHouseThemePreference", requestId: "request-1" },
+      error,
+      { houseThemeEnabled: false },
+    );
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

@@ -47,12 +47,14 @@ const appUser = {
   auth0Sub: "auth0|user-1",
   email: "user@example.com",
   displayName: "User One",
+  houseThemeEnabled: false,
   role: "OWNER" as const,
   organizationId: "org-1",
   organizationSlug: "acme",
   houseId: "house-1",
   houseName: "Phoenix",
   houseColor: "#7c3aed",
+  created: false,
 };
 
 describe("createOrg", () => {

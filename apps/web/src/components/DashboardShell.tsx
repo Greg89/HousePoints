@@ -21,6 +21,7 @@ import { ActivityFeed } from "./ActivityFeed";
 import { OverviewReports } from "./OverviewReports";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import type { AwardPointsResult, DeletePointResult } from "@/lib/action-results";
+import { resolveHouseThemeStyle } from "@/lib/house-theme";
 import type {
   DashboardSummary,
   LeaderboardEntry,
@@ -39,6 +40,7 @@ interface DashboardShellProps {
     houseId: string | null;
     houseName: string | null;
     houseColor: string | null;
+    houseThemeEnabled: boolean;
     role: "MEMBER" | "ADMIN" | "OWNER";
   };
   leaderboard: LeaderboardEntry[];
@@ -160,6 +162,10 @@ export function DashboardShell({
   const selectedHouse = displayedLeaderboard.find((house) => house.id === selectedHouseId) ?? null;
   const activityFeedKey = `${activityNextCursor ?? "end"}:${activity.map((item) => item.id).join(",")}`;
   const activeSeasonTiming = getSeasonTiming(seasonContext.activeSeason);
+  const houseThemeStyle = resolveHouseThemeStyle({
+    enabled: session.houseThemeEnabled,
+    houseColor: session.houseColor,
+  });
 
   useEffect(() => {
     if (!seasonMenuOpen) {
@@ -217,7 +223,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={houseThemeStyle}>
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">

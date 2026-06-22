@@ -110,6 +110,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
         auth0Sub: true,
         email: true,
         displayName: true,
+        houseThemeEnabled: true,
         role: true,
         organizationId: true,
         organization: { select: { slug: true } },
@@ -243,7 +244,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     const tokenHash = hashToken(inviteToken);
 
     const userSelect = {
-      id: true, auth0Sub: true, email: true, displayName: true, role: true,
+      id: true, auth0Sub: true, email: true, displayName: true, houseThemeEnabled: true, role: true,
       organizationId: true, organization: { select: { slug: true } },
       houseId: true, house: { select: { name: true, color: true } },
     } as const;

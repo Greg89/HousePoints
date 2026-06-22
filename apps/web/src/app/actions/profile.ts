@@ -25,6 +25,7 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   houseId?: string | null;
   houseName?: string | null;
   houseColor?: string | null;
+  houseThemeEnabled?: boolean;
   role?: UserRole;
   needsOrg?: boolean;
   needsHouseAssignment?: boolean;
@@ -75,6 +76,7 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     houseId: mapping.houseId,
     houseName: mapping.houseName,
     houseColor: mapping.houseColor,
+    houseThemeEnabled: mapping.houseThemeEnabled,
     role: mapping.role,
     needsOrg: !mapping.organizationId,
     needsHouseAssignment: !!mapping.organizationId && !mapping.houseId,
@@ -124,6 +126,50 @@ export async function updateDisplayName(displayName: string): Promise<ProfileUpd
       requestId,
       actorUserId: updated.id,
       displayName: updated.displayName,
+    });
+
+    revalidatePath("/");
+    revalidatePath("/settings");
+
+    return { ok: true };
+  });
+}
+
+export async function updateHouseThemePreference(enabled: boolean): Promise<ProfileUpdateResult> {
+  return runServerAction("updateHouseThemePreference", async (context) => {
+    const { requestId } = context;
+
+    await getCurrentUserForRequest(requestId);
+
+    const response = await apiFetch("/users/profile", requestId, {
+      method: "POST",
+      body: JSON.stringify({ houseThemeEnabled: enabled }),
+    });
+
+    let updated: Awaited<ReturnType<typeof parseProfileUpdateResponse>>;
+
+    try {
+      updated = await parseProfileUpdateResponse(response);
+    } catch (error) {
+      if (!isExpectedProfileUpdateFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        houseThemeEnabled: enabled,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    logInfo("web.profile.updated", {
+      requestId,
+      actorUserId: updated.id,
+      houseThemeEnabled: updated.houseThemeEnabled,
     });
 
     revalidatePath("/");

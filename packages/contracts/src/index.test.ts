@@ -390,6 +390,7 @@ describe("updateProfileSchema", () => {
 
   it("accepts valid input", () => {
     expect(updateProfileSchema.safeParse(valid).success).toBe(true);
+    expect(updateProfileSchema.safeParse({ houseThemeEnabled: true }).success).toBe(true);
   });
 
   it("trims whitespace from displayName", () => {
@@ -404,6 +405,10 @@ describe("updateProfileSchema", () => {
 
   it("rejects displayName longer than 120 chars", () => {
     expect(updateProfileSchema.safeParse({ ...valid, displayName: "A".repeat(121) }).success).toBe(false);
+  });
+
+  it("rejects empty profile updates", () => {
+    expect(updateProfileSchema.safeParse({}).success).toBe(false);
   });
 });
 
@@ -851,6 +856,7 @@ describe("appUserSchema", () => {
     auth0Sub: "auth0|user-1",
     email: "alice@example.com",
     displayName: "Alice",
+    houseThemeEnabled: false,
     role: "OWNER" as const,
     organizationId: "org-1",
     organizationSlug: "acme",
@@ -1217,6 +1223,7 @@ describe("updateProfileResponseSchema", () => {
     const response = {
       id: "user-1",
       displayName: "Alice Updated",
+      houseThemeEnabled: true,
     };
 
     expect(updateProfileResponseSchema.parse(response)).toEqual(response);
@@ -1227,12 +1234,14 @@ describe("updateProfileResponseSchema", () => {
       updateProfileResponseSchema.safeParse({
         id: "",
         displayName: "Alice",
+        houseThemeEnabled: false,
       }).success,
     ).toBe(false);
     expect(
       updateProfileResponseSchema.safeParse({
         id: "user-1",
         displayName: "",
+        houseThemeEnabled: false,
       }).success,
     ).toBe(false);
   });

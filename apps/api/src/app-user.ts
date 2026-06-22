@@ -3,6 +3,7 @@ export function mapAppUser(user: {
   auth0Sub: string;
   email: string | null;
   displayName: string;
+  houseThemeEnabled: boolean;
   role: "MEMBER" | "ADMIN" | "OWNER";
   houseId: string | null;
   organizationId: string | null;
@@ -14,6 +15,7 @@ export function mapAppUser(user: {
     auth0Sub: user.auth0Sub,
     email: user.email,
     displayName: user.displayName,
+    houseThemeEnabled: user.houseThemeEnabled,
     role: user.role,
     organizationId: user.organizationId,
     organizationSlug: user.organization?.slug ?? null,

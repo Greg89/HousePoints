@@ -31,6 +31,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       auth0Sub: true,
       email: true,
       displayName: true,
+      houseThemeEnabled: true,
       role: true,
       organizationId: true,
       organization: { select: { slug: true } },
@@ -150,13 +151,17 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
 
     const updated = await prisma.user.update({
       where: { id: actor.id },
-      data: { displayName: parsed.data.displayName },
-      select: { id: true, displayName: true },
+      data: {
+        ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
+        ...(parsed.data.houseThemeEnabled !== undefined ? { houseThemeEnabled: parsed.data.houseThemeEnabled } : {}),
+      },
+      select: { id: true, displayName: true, houseThemeEnabled: true },
     });
 
     info(request.log, "users.profile.updated", {
       actorUserId: actor.id,
       displayName: updated.displayName,
+      houseThemeEnabled: updated.houseThemeEnabled,
     });
 
     return updated;

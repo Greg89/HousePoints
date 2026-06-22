@@ -165,6 +165,7 @@ async function renderHome() {
         houseId: session.houseId ?? null,
         houseName: session.houseName ?? null,
         houseColor: session.houseColor ?? null,
+        houseThemeEnabled: Boolean(session.houseThemeEnabled),
         role: session.role ?? "MEMBER",
       }}
       leaderboard={leaderboard}
