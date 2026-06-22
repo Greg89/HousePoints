@@ -27,12 +27,13 @@ vi.mock("./HouseCard", () => ({
     selected,
     onSelect,
   }: {
-    house: { name: string };
+    house: { name: string; score: number };
     selected?: boolean;
     onSelect?: () => void;
   }) => (
     <button type="button" aria-pressed={selected} onClick={onSelect}>
       {house.name}
+      <span>{house.score}</span>
     </button>
   ),
 }));
@@ -342,6 +343,26 @@ const baseProps = {
     seasons: [activeSeason, historicalSeason],
   },
   onSeasonChange: vi.fn(async () => ({
+    leaderboard: [
+      {
+        id: "house-2",
+        name: "Ravenclaw",
+        color: "#1d4ed8",
+        description: "Values intelligence.",
+        score: 10,
+        transactions: 1,
+        memberCount: 1,
+      },
+      {
+        id: "house-1",
+        name: "Slytherin",
+        color: "#22c55e",
+        description: "Values ambition.",
+        score: 0,
+        transactions: 0,
+        memberCount: 2,
+      },
+    ],
     dashboardSummary: {
       generatedAt: new Date().toISOString(),
       selectedSeason: historicalSeason,
@@ -567,6 +588,8 @@ describe("DashboardShell", () => {
     expect(await screen.findByText("Historical view")).toBeInTheDocument();
     expect(screen.getByText("Historical season view")).toBeInTheDocument();
     expect(screen.getAllByText("Cara Clever").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Ravenclaw/i })).toHaveTextContent("10");
+    expect(screen.getByRole("button", { name: /Slytherin/i })).toHaveTextContent("0");
 
     await user.click(screen.getByRole("tab", { name: /leaderboard/i }));
 
@@ -591,7 +614,7 @@ describe("DashboardShell", () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps} />);
 
-    await user.click(screen.getByRole("button", { name: "Slytherin" }));
+    await user.click(screen.getByRole("button", { name: /Slytherin/i }));
 
     expect(screen.getByText("House report")).toBeInTheDocument();
     expect(screen.getByText("Slytherin members by points received")).toBeInTheDocument();
@@ -607,7 +630,7 @@ describe("DashboardShell", () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps} />);
 
-    await user.click(screen.getByRole("button", { name: "Slytherin" }));
+    await user.click(screen.getByRole("button", { name: /Slytherin/i }));
 
     expect(screen.getByText("House report")).toBeInTheDocument();
 

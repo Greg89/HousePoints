@@ -26,6 +26,22 @@ export async function readLeaderboard(requestId: string = randomUUID()) {
   );
 }
 
+export async function readSeasonLeaderboard(
+  seasonId?: string,
+  requestId: string = randomUUID(),
+) {
+  await getCurrentUserForRequest(requestId);
+  const response = await apiFetch("/houses/leaderboard", requestId, {
+    method: "POST",
+    body: JSON.stringify(seasonId ? { seasonId } : {}),
+  });
+  return parseApiResponse(
+    response,
+    leaderboardSchema,
+    "Dashboard data could not be loaded. Please try again.",
+  );
+}
+
 export async function readMembers(requestId: string = randomUUID()) {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/members", requestId, {

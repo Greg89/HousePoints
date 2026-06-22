@@ -8,6 +8,7 @@ import {
   seasonSchema,
   seasonTransitionSchema,
   type DashboardSummary,
+  type LeaderboardEntry,
   type MemberScore,
   type Season,
   type SeasonContext,
@@ -19,7 +20,7 @@ import { getCurrentUserForRequest } from "@/lib/current-user";
 import type { RenameSeasonResult, StartSeasonResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
-import { readDashboardSummary } from "./dashboard";
+import { readDashboardSummary, readSeasonLeaderboard } from "./dashboard";
 
 export async function readMemberScores(
   seasonId?: string,
@@ -52,15 +53,17 @@ export async function readSeasonContext(requestId: string = randomUUID()): Promi
 
 export async function readSeasonReports(seasonId?: string): Promise<{
   dashboardSummary: DashboardSummary;
+  leaderboard: LeaderboardEntry[];
   memberPoints: MemberScore[];
 }> {
   return runServerAction("readSeasonReports", async ({ requestId }) => {
-    const [dashboardSummary, memberPoints] = await Promise.all([
+    const [dashboardSummary, leaderboard, memberPoints] = await Promise.all([
       readDashboardSummary(seasonId, requestId),
+      readSeasonLeaderboard(seasonId, requestId),
       readMemberScores(seasonId, requestId),
     ]);
 
-    return { dashboardSummary, memberPoints };
+    return { dashboardSummary, leaderboard, memberPoints };
   });
 }
 

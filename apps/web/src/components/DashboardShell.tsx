@@ -52,6 +52,7 @@ interface DashboardShellProps {
   seasonContext: SeasonContext;
   onSeasonChange: (seasonId?: string) => Promise<{
     dashboardSummary: DashboardSummary;
+    leaderboard: LeaderboardEntry[];
     memberPoints: MemberScore[];
   }>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
@@ -133,6 +134,7 @@ export function DashboardShell({
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(dashboardSummary.selectedSeason.id);
+  const [scopedLeaderboard, setScopedLeaderboard] = useState(leaderboard);
   const [scopedDashboardSummary, setScopedDashboardSummary] = useState(dashboardSummary);
   const [scopedMemberPoints, setScopedMemberPoints] = useState(memberPoints);
   const [seasonError, setSeasonError] = useState<string | null>(null);
@@ -142,7 +144,6 @@ export function DashboardShell({
   const visibleTabs = adminSection
     ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
     : TABS;
-  const selectedHouse = leaderboard.find((house) => house.id === selectedHouseId) ?? null;
   const selectedSeason = useMemo(
     () => seasonContext.seasons.find((season) => season.id === selectedSeasonId) ?? seasonContext.activeSeason,
     [seasonContext.activeSeason, seasonContext.seasons, selectedSeasonId],
@@ -152,8 +153,11 @@ export function DashboardShell({
   const selectedSeasonLabel = `${selectedSeason.name}${selectedSeason.isActive ? " (current)" : ""}`;
   const displayedDashboardSummary =
     selectedSeasonId === dashboardSummary.selectedSeason.id ? dashboardSummary : scopedDashboardSummary;
+  const displayedLeaderboard =
+    selectedSeasonId === dashboardSummary.selectedSeason.id ? leaderboard : scopedLeaderboard;
   const displayedMemberPoints =
     selectedSeasonId === dashboardSummary.selectedSeason.id ? memberPoints : scopedMemberPoints;
+  const selectedHouse = displayedLeaderboard.find((house) => house.id === selectedHouseId) ?? null;
   const activityFeedKey = `${activityNextCursor ?? "end"}:${activity.map((item) => item.id).join(",")}`;
   const activeSeasonTiming = getSeasonTiming(seasonContext.activeSeason);
 
@@ -192,6 +196,7 @@ export function DashboardShell({
       try {
         const nextReports = await onSeasonChange(nextSeasonId);
         setScopedDashboardSummary(nextReports.dashboardSummary);
+        setScopedLeaderboard(nextReports.leaderboard);
         setScopedMemberPoints(nextReports.memberPoints);
         setSelectedHouseId(null);
       } catch (error) {
@@ -406,7 +411,7 @@ export function DashboardShell({
               </p>
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {leaderboard.map((house, index) => (
+              {displayedLeaderboard.map((house, index) => (
                 <HouseCard
                   key={house.id}
                   house={house}
@@ -436,7 +441,7 @@ export function DashboardShell({
                 </div>
                 {isHistoricalSeason ? (
                   <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                    You are viewing historical reports. Current standings still use {seasonContext.activeSeason.name}.
+                    You are viewing historical reports and house standings for {selectedSeason.name}.
                   </p>
                 ) : null}
               </section>

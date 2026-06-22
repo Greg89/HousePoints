@@ -73,9 +73,9 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 - No points are deleted. The leaderboard simply recomputes from zero because new transactions reference the new season.
 
 **Leaderboard and scoring**
-- House standings default to the active season.
-- Member scores and dashboard summary accept an optional `seasonId` and default to the current active season.
-- The UI can pass a specific season ID to view historical Overview reports and Leaderboard standings.
+- House standings, member scores, and dashboard summary default to the active season.
+- House standings, member scores, and dashboard summary accept an optional `seasonId`.
+- The UI can pass a specific season ID to view historical Overview standings, reports, and Leaderboard standings.
 
 **Reporting**
 - Implemented season dropdown in Overview.

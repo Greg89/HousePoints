@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 import {
-  actorScopeSchema,
   seasonScopedRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -28,7 +27,7 @@ function lastUtcDateKeys(days: number, now: Date) {
 
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
   app.post("/houses/leaderboard", async (request, reply) => {
-    const parsed = actorScopeSchema.safeParse(request.body);
+    const parsed = seasonScopedRequestSchema.safeParse(request.body);
 
     if (!parsed.success) {
       warn(request.log, "request.validation_failed", {
@@ -46,12 +45,13 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     let season;
     try {
-      season = await resolveSeasonScope(actor);
+      season = await resolveSeasonScope(actor, parsed.data.seasonId);
     } catch (err) {
       if (err instanceof SeasonScopeError) {
-        warn(request.log, "seasons.active_missing", {
+        warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
           actorUserId: actor.id,
           organizationId: actor.organizationId,
+          seasonId: parsed.data.seasonId,
         });
         return reply.status(err.statusCode).send({ message: err.message, code: err.code });
       }

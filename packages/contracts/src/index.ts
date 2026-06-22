@@ -577,7 +577,7 @@ export const apiContracts = {
     seasonScopedRequestSchema,
     dashboardSummarySchema,
   ),
-  "/houses/leaderboard": defineContract(actorScopeSchema, leaderboardSchema),
+  "/houses/leaderboard": defineContract(seasonScopedRequestSchema, leaderboardSchema),
   "/members": defineContract(actorScopeSchema, orgMembersSchema),
   "/orgs/create": defineContract(createOrgSchema, appUserSchema),
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),

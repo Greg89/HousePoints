@@ -54,7 +54,7 @@ There is no standalone "end season" action in version one. That avoids confusing
 
 Historical seasons are visible to all authenticated org members.
 
-The dashboard defaults to the active season. The Overview season selector can switch reporting widgets and the Leaderboard tab to a historical season. House cards remain active-season standings so the top-level competitive state stays consistent. Activity remains all-activity and uses season badges for context.
+The dashboard defaults to the active season. The Overview season selector switches house standings, reporting widgets, and the Leaderboard tab to the selected season. Activity remains all-activity and uses season badges for context.
 
 ## Data Model
 
@@ -120,7 +120,7 @@ Implemented season endpoints:
 Season-aware endpoints:
 
 - `POST /points/adjust` writes the active `seasonId`.
-- `POST /houses/leaderboard` reads active-season house standings.
+- `POST /houses/leaderboard` accepts optional `{ seasonId }` and defaults to active-season house standings.
 - `POST /users/scores` accepts optional `{ seasonId }` and defaults to active.
 - `POST /dashboard/summary` accepts optional `{ seasonId }` and defaults to active.
 - `POST /transactions/recent` returns all activity by default and includes season badge metadata.
@@ -135,7 +135,7 @@ The API uses `resolveSeasonScope(actor, requestedSeasonId?)` to centralize activ
 The dashboard implements the first season UX pass:
 
 - Overview shows a season selector.
-- The selected season scopes Overview reporting widgets and the Leaderboard tab.
+- The selected season scopes Overview house standings, reporting widgets, and the Leaderboard tab.
 - Historical selection shows a subtle historical-view label.
 - Activity items show season badges.
 - Manage includes season start and rename controls for owners. Admins still see the Seasons tab, but it is disabled and labelled owner-only.

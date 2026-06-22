@@ -1103,6 +1103,55 @@ describe("POST /houses/leaderboard", () => {
     await app.close();
   });
 
+  it("uses a requested historical season for house standings", async () => {
+    mockFindUnique.mockResolvedValue(
+      makeMember({ organizationId: "org-secure" }),
+    );
+    mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
+    mockHouseFindMany.mockResolvedValue([
+      {
+        id: "house-1",
+        name: "Phoenix",
+        color: "#7c3aed",
+        description: null,
+        _count: { users: 2 },
+      },
+    ]);
+    mockTxGroupBy.mockResolvedValue([
+      {
+        targetHouseId: "house-1",
+        _sum: { delta: 7 },
+        _count: { _all: 1 },
+      },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/houses/leaderboard",
+      payload: { seasonId: "season-0" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "season-0",
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(mockTxGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          seasonId: "season-0",
+        }),
+      }),
+    );
+    expect(res.json()[0].score).toBe(7);
+    await app.close();
+  });
+
 });
 
 describe("POST /admin/houses", () => {
