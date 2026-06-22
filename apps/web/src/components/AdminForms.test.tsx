@@ -693,7 +693,9 @@ describe("AdminForms", () => {
 
     const tokenCode = inviteCard.getByText(longToken);
     expect(tokenCode).toHaveClass("min-w-0", "truncate");
-    expect(tokenCode.parentElement).toHaveClass("min-w-0");
+    expect(tokenCode.parentElement).toHaveClass("min-w-0", "overflow-hidden");
+    expect(tokenCode.parentElement?.parentElement).toHaveClass("min-w-0", "overflow-hidden");
+    expect(screen.getByLabelText("Invite member")).toHaveClass("min-w-0", "overflow-hidden");
   });
 
   it("shows a safe toast when invite generation returns an expected failure", async () => {

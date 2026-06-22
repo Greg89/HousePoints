@@ -236,7 +236,7 @@ export function TeamManagement({
           </p>
         </form>
 
-        <section aria-label="Invite member" className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5">
+        <section aria-label="Invite member" className="grid min-w-0 overflow-hidden content-start gap-4 rounded-xl border bg-card p-5">
           <div>
             <h5 className="text-sm font-semibold flex items-center gap-2">
               <LinkSimple size={16} />
@@ -247,9 +247,9 @@ export function TeamManagement({
             </p>
           </div>
           {inviteToken ? (
-            <div className="space-y-2">
-              <div className="flex h-10 min-w-0 max-w-full items-center gap-2 rounded-lg border bg-muted/50 px-3">
-                <code className="block min-w-0 flex-1 truncate font-mono text-xs" title={inviteToken}>
+            <div className="min-w-0 max-w-full space-y-2 overflow-hidden">
+              <div className="flex h-10 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border bg-muted/50 px-3">
+                <code className="block min-w-0 max-w-full flex-1 truncate font-mono text-xs" title={inviteToken}>
                   {inviteToken}
                 </code>
                 <button
