@@ -177,13 +177,13 @@ export function TeamManagement({
               </span>
             ) : null}
           </h5>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)_auto] lg:items-end">
+          <div className="grid min-w-0 gap-3">
             <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
               Member
               <select
                 name="targetUserId"
                 aria-label="Member to assign"
-                className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
                 required
                 defaultValue=""
               >
@@ -211,7 +211,7 @@ export function TeamManagement({
               <select
                 name="targetHouseId"
                 aria-label="House assignment"
-                className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
                 required
                 defaultValue=""
               >
@@ -224,7 +224,7 @@ export function TeamManagement({
             <button
               type="submit"
               disabled={assignPending}
-              className="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              className="h-10 w-full rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {assignPending ? "Assigning..." : "Assign"}
             </button>

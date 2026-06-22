@@ -524,6 +524,19 @@ describe("AdminForms", () => {
     });
   });
 
+  it("stacks member assignment controls vertically inside the card", () => {
+    setupAdminForms();
+    switchToManageSection("Team");
+    const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
+    const memberSelect = assignForm.getByLabelText("Member to assign");
+    const houseSelect = assignForm.getByLabelText("House assignment");
+    const assignButton = assignForm.getByRole("button", { name: "Assign" });
+
+    expect(memberSelect).toHaveClass("w-full", "min-w-0");
+    expect(houseSelect).toHaveClass("w-full", "min-w-0");
+    expect(assignButton).toHaveClass("w-full");
+  });
+
   it("lets owners promote members to admins from the Team section", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, props } = setupAdminForms();
