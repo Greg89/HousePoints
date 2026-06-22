@@ -37,6 +37,7 @@ import {
   adminContextSchema,
   pagedAdminAuditActionsSchema,
   pointAdjustmentResponseSchema,
+  pointTransactionTypeSchema,
   redactLogContext,
   serializeErrorForLog,
   traitSchema,
@@ -179,12 +180,24 @@ describe("traitSchema", () => {
   });
 });
 
+describe("pointTransactionTypeSchema", () => {
+  it("accepts the supported point transaction types", () => {
+    expect(pointTransactionTypeSchema.safeParse("AWARD").success).toBe(true);
+    expect(pointTransactionTypeSchema.safeParse("DEDUCTION").success).toBe(true);
+  });
+
+  it("rejects unknown point transaction types", () => {
+    expect(pointTransactionTypeSchema.safeParse("BONUS").success).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // activityItemSchema
 // ---------------------------------------------------------------------------
 describe("activityItemSchema", () => {
   const base = {
     id: "tx-1",
+    type: "AWARD" as const,
     actorName: "Bob",
     targetUserName: "Alice",
     targetHouseName: "Phoenix",
@@ -207,6 +220,22 @@ describe("activityItemSchema", () => {
   it("accepts a valid item with trait: null", () => {
     const result = activityItemSchema.safeParse({ ...base, trait: null });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a deduction-shaped activity item without a trait", () => {
+    expect(
+      activityItemSchema.parse({
+        ...base,
+        type: "DEDUCTION",
+        delta: -10,
+        reason: "Duplicate correction",
+        trait: null,
+      }),
+    ).toMatchObject({
+      type: "DEDUCTION",
+      delta: -10,
+      trait: null,
+    });
   });
 
   it("rejects an invalid trait in activity item", () => {
@@ -639,6 +668,7 @@ describe("memberScoreSchema", () => {
 describe("dashboard response schemas", () => {
   const activityItem = {
     id: "tx-1",
+    type: "AWARD" as const,
     actorName: "Bob",
     targetUserName: "Alice",
     targetHouseName: "Phoenix",

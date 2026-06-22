@@ -159,6 +159,7 @@ const baseProps = {
   activity: [
     {
       id: "activity-1",
+      type: "AWARD" as const,
       actorName: "Gregory Dodson",
       targetUserName: "Ben Scorer",
       targetHouseName: "Slytherin",
@@ -171,6 +172,7 @@ const baseProps = {
     },
     {
       id: "activity-2",
+      type: "AWARD" as const,
       actorName: "Gregory Dodson",
       targetUserName: "Cara Clever",
       targetHouseName: "Ravenclaw",
@@ -280,6 +282,7 @@ const baseProps = {
     recentActivity: [
       {
         id: "activity-1",
+        type: "AWARD" as const,
         actorName: "Gregory Dodson",
         targetUserName: "Ben Scorer",
         targetHouseName: "Slytherin",
@@ -292,6 +295,7 @@ const baseProps = {
       },
       {
         id: "activity-2",
+        type: "AWARD" as const,
         actorName: "Gregory Dodson",
         targetUserName: "Cara Clever",
         targetHouseName: "Ravenclaw",
@@ -431,6 +435,7 @@ const baseProps = {
       recentActivity: [
         {
           id: "activity-historical",
+          type: "AWARD" as const,
           actorName: "Gregory Dodson",
           targetUserName: "Cara Clever",
           targetHouseName: "Ravenclaw",

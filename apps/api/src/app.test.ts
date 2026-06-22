@@ -548,6 +548,7 @@ describe("POST /points/adjust", () => {
       actorUserId: "user-2",
       targetUserId: "user-1",
       targetHouseId: "house-1",
+      type: "AWARD",
       delta: 15,
       reason: "Crushed the demo",
       trait: "TECHNICAL_EXCELLENCE",
@@ -576,6 +577,7 @@ describe("POST /points/adjust", () => {
           actorUserId: "user-2",
           targetUserId: "user-1",
           targetHouseId: "house-1",
+          type: "AWARD",
         }),
       }),
     );
@@ -609,6 +611,7 @@ describe("POST /points/adjust", () => {
 describe("POST /points/delete", () => {
   const deletedPoint = {
     id: "tx-1",
+    type: "AWARD" as const,
     delta: 15,
     reason: "Crushed the demo",
     trait: "TECHNICAL_EXCELLENCE" as const,
@@ -659,6 +662,7 @@ describe("POST /points/delete", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       id: "tx-1",
+      type: "AWARD",
       actorName: "Bob",
       targetUserName: "Alice",
       targetHouseName: "Phoenix",
@@ -1742,6 +1746,7 @@ describe("POST /transactions/recent", () => {
     mockTxFindMany.mockResolvedValue([
       {
         id: "tx-1",
+        type: "AWARD",
         delta: 10,
         reason: "Great collaboration",
         trait: "COLLABORATION",
@@ -1753,6 +1758,7 @@ describe("POST /transactions/recent", () => {
       },
       {
         id: "tx-2",
+        type: "AWARD",
         delta: 5,
         reason: "Second page",
         trait: "LEADERSHIP",
@@ -1850,6 +1856,7 @@ describe("POST /transactions/recent", () => {
     mockTxFindMany.mockResolvedValue([
       {
         id: "tx-1",
+        type: "AWARD",
         delta: 12,
         reason: "Duplicate award",
         trait: "COLLABORATION",
@@ -2223,6 +2230,7 @@ describe("POST /dashboard/summary", () => {
       .mockResolvedValueOnce([
         {
           id: "tx-1",
+          type: "AWARD",
           delta: 12,
           reason: "Great collaboration",
           trait: "COLLABORATION",
@@ -2336,6 +2344,7 @@ describe("POST /dashboard/summary", () => {
     expect(body.recentActivity).toEqual([
       {
         id: "tx-1",
+        type: "AWARD",
         actorName: "Bob",
         targetUserName: "Alice",
         targetHouseName: "Phoenix",

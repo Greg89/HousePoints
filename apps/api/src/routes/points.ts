@@ -4,6 +4,7 @@ import {
   activityFeedRequestSchema,
   deletePointTransactionSchema,
   seasonScopedRequestSchema,
+  type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -16,6 +17,7 @@ export function mapActivityItem(tx: {
   actor: { displayName: string };
   targetUser: { displayName: string } | null;
   targetHouse: { name: string; color: string };
+  type: PointTransactionType;
   delta: number;
   reason: string;
   trait: Trait | null;
@@ -28,6 +30,7 @@ export function mapActivityItem(tx: {
     targetUserName: tx.targetUser?.displayName ?? "Unknown",
     targetHouseName: tx.targetHouse.name,
     targetHouseColor: tx.targetHouse.color,
+    type: tx.type,
     delta: tx.delta,
     reason: tx.reason,
     trait: tx.trait ?? null,
@@ -47,6 +50,7 @@ export function mapDeletedPoint(tx: {
   actor: { displayName: string };
   targetUser: { displayName: string } | null;
   targetHouse: { name: string; color: string };
+  type: PointTransactionType;
   delta: number;
   reason: string;
   trait: Trait | null;
@@ -155,6 +159,7 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
         actorUserId: actor.id,
         targetUserId: targetUser.id,
         targetHouseId: targetUser.houseId,
+        type: "AWARD",
         delta: parsed.data.delta,
         reason: parsed.data.reason,
         trait: parsed.data.trait,
@@ -247,6 +252,7 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
       ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
       select: {
         id: true,
+        type: true,
         delta: true,
         reason: true,
         trait: true,
@@ -320,6 +326,7 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
         },
         select: {
           id: true,
+          type: true,
           delta: true,
           reason: true,
           trait: true,

@@ -35,6 +35,11 @@ enum Trait {
   UNSUNG_HERO
 }
 
+enum PointTransactionType {
+  AWARD
+  DEDUCTION
+}
+
 enum AuditEventType {
   INVITE_CREATED
   INVITE_USED
@@ -155,6 +160,7 @@ model PointTransaction {
   actorUserId    String
   targetUserId   String?
   targetHouseId  String
+  type           PointTransactionType @default(AWARD)
   delta          Int
   reason         String
   trait          Trait?

@@ -27,6 +27,7 @@ vi.mock("framer-motion", () => ({
 
 const baseActivity: ActivityItem = {
   id: "activity-1",
+  type: "AWARD",
   actorName: "Alice",
   targetUserName: "Ben",
   targetHouseName: "Phoenix",

@@ -131,8 +131,27 @@ async function run() {
   assert.equal(transaction.actor.id, actor.id);
   assert.equal(transaction.targetUser?.id, target.id);
   assert.equal(transaction.targetHouse.id, house.id);
+  assert.equal(transaction.type, "AWARD");
   assert.equal(transaction.delta, 10);
   assert.equal(transaction.trait, "TEAM_SUPPORT");
+
+  const deduction = await prisma.pointTransaction.create({
+    data: {
+      organizationId: organization.id,
+      seasonId: season.id,
+      actorUserId: actor.id,
+      targetUserId: target.id,
+      targetHouseId: house.id,
+      type: "DEDUCTION",
+      delta: -10,
+      reason: "Database integration test deduction",
+      trait: null,
+    },
+  });
+
+  assert.equal(deduction.type, "DEDUCTION");
+  assert.equal(deduction.delta, -10);
+  assert.equal(deduction.trait, null);
 
   const auditEvent = await prisma.auditEvent.create({
     data: {
@@ -251,6 +270,48 @@ async function run() {
           delta: 0,
           reason: "Zero delta should fail",
           trait: "TEAM_SUPPORT",
+        },
+      }),
+    (error) => {
+      assertPrismaConstraintFailure(error);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      prisma.pointTransaction.create({
+        data: {
+          organizationId: organization.id,
+          seasonId: season.id,
+          actorUserId: actor.id,
+          targetUserId: target.id,
+          targetHouseId: house.id,
+          type: "AWARD",
+          delta: -5,
+          reason: "Negative award should fail",
+          trait: "TEAM_SUPPORT",
+        },
+      }),
+    (error) => {
+      assertPrismaConstraintFailure(error);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      prisma.pointTransaction.create({
+        data: {
+          organizationId: organization.id,
+          seasonId: season.id,
+          actorUserId: actor.id,
+          targetUserId: target.id,
+          targetHouseId: house.id,
+          type: "DEDUCTION",
+          delta: 5,
+          reason: "Positive deduction should fail",
+          trait: null,
         },
       }),
     (error) => {

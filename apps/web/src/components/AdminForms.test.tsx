@@ -40,6 +40,7 @@ const historicalSeason = {
 const recentDeletedPoints = [
   {
     id: "tx-1",
+    type: "AWARD" as const,
     actorName: "Olivia",
     targetUserName: "Ben Unassigned",
     targetHouseName: "Ravenclaw",

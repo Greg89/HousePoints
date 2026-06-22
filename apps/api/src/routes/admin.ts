@@ -68,6 +68,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         take: 10,
         select: {
           id: true,
+          type: true,
           delta: true,
           reason: true,
           trait: true,

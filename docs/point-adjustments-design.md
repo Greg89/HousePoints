@@ -123,6 +123,8 @@ Expected failures should be typed:
 - Update contracts and mappers.
 - Keep all existing award behavior unchanged.
 
+Status: implemented. Existing awards default to `AWARD`, activity/deleted-point read contracts expose the transaction type, and the database now enforces award-positive plus deduction-negative deltas.
+
 ### Phase 2 - API
 
 - Add `POST /points/deduct`.
