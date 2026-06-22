@@ -394,6 +394,22 @@ describe("AdminForms", () => {
     expect(screen.getByLabelText(/House color/)).toHaveAttribute("type", "color");
     expect(screen.getByLabelText(/New color/)).toHaveAttribute("type", "color");
     expect(screen.getAllByText("Choose a house accent color")).toHaveLength(2);
+    expect(screen.getAllByText("House theme preview")).toHaveLength(2);
+    expect(screen.getAllByText("Theme ready")).toHaveLength(2);
+    expect(screen.getAllByText("This color is ready for readable house themes.")).toHaveLength(2);
+  });
+
+  it("shows a warning when a house color would make a muted app theme", () => {
+    setupAdminForms();
+    switchToManageSection("Houses");
+    const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
+
+    fireEvent.change(createHouseForm.getByLabelText(/House color/), {
+      target: { value: "#777777" },
+    });
+
+    expect(createHouseForm.getByText("Theme subtle")).toBeInTheDocument();
+    expect(createHouseForm.getByText("This color is readable, but it may feel muted as an app theme.")).toBeInTheDocument();
   });
 
   it("submits create-house data and shows success when the typed result succeeds", async () => {

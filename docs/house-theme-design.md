@@ -52,6 +52,15 @@ This keeps contrast and readability predictable while still changing the identit
 - Apply generated CSS variables on dashboard and settings surfaces.
 - Add focused tests for contracts, API behavior, settings UI, and theme generation.
 
+## Phase 2 Scope
+
+- Add shared house color assessment next to the theme resolver.
+- Keep strict six-digit hex validation for generated themes.
+- Surface owner feedback in House Management before colors are saved.
+- Show a live preview for badge, outline, and button treatment using the same semantic theme variables as the dashboard.
+- Flag neutral colors as readable but visually subtle so owners can choose a stronger house identity.
+- Add focused tests for color assessment and owner-facing house color preview states.
+
 ## Later Options
 
 - Add preview cards for default vs house theme.

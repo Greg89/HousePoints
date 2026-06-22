@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { resolveHouseThemeStyle } from "./house-theme";
+import { assessHouseThemeColor, resolveHouseThemeStyle } from "./house-theme";
+
+describe("assessHouseThemeColor", () => {
+  it("rejects colors that cannot produce a safe theme", () => {
+    expect(assessHouseThemeColor("purple")).toMatchObject({
+      status: "invalid",
+      normalizedColor: null,
+      foreground: null,
+      contrastRatio: null,
+    });
+  });
+
+  it("marks distinct house colors as theme ready", () => {
+    expect(assessHouseThemeColor("#7c3aed")).toMatchObject({
+      status: "ready",
+      normalizedColor: "#7c3aed",
+      foreground: "#ffffff",
+    });
+  });
+
+  it("marks neutral colors as readable but subtle", () => {
+    expect(assessHouseThemeColor("#777777")).toMatchObject({
+      status: "subtle",
+      normalizedColor: "#777777",
+    });
+  });
+});
 
 describe("resolveHouseThemeStyle", () => {
   it("returns no theme when the preference is disabled", () => {
