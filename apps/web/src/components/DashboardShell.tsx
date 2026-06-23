@@ -10,6 +10,7 @@ import {
   Clock,
   ChartBar,
   Star,
+  MinusCircle,
   SignOut,
   User,
   Wrench,
@@ -20,7 +21,8 @@ import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
 import { OverviewReports } from "./OverviewReports";
 import { AwardPointsDialog } from "./AwardPointsDialog";
-import type { AwardPointsResult, DeletePointResult } from "@/lib/action-results";
+import { DeductPointsDialog } from "./DeductPointsDialog";
+import type { AwardPointsResult, DeductPointsResult, DeletePointResult } from "@/lib/action-results";
 import { resolveHouseThemeStyle } from "@/lib/house-theme";
 import type {
   DashboardSummary,
@@ -58,6 +60,7 @@ interface DashboardShellProps {
     memberPoints: MemberScore[];
   }>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
+  onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
   loginUrl: string;
   logoutUrl: string;
@@ -127,12 +130,14 @@ export function DashboardShell({
   seasonContext,
   onSeasonChange,
   onAward,
+  onDeduct,
   onDeletePoint,
   logoutUrl,
   showSeasonOverviewCard = false,
   adminSection,
 }: DashboardShellProps) {
   const [awardOpen, setAwardOpen] = useState(false);
+  const [deductOpen, setDeductOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(dashboardSummary.selectedSeason.id);
@@ -162,6 +167,7 @@ export function DashboardShell({
   const selectedHouse = displayedLeaderboard.find((house) => house.id === selectedHouseId) ?? null;
   const activityFeedKey = `${activityNextCursor ?? "end"}:${activity.map((item) => item.id).join(",")}`;
   const activeSeasonTiming = getSeasonTiming(seasonContext.activeSeason);
+  const canDeduct = Boolean(onDeduct) && (session.role === "ADMIN" || session.role === "OWNER");
   const houseThemeStyle = resolveHouseThemeStyle({
     enabled: session.houseThemeEnabled,
     houseColor: session.houseColor,
@@ -248,7 +254,7 @@ export function DashboardShell({
                 {session.houseName}
               </span>
             )}
-            {/* Award points button — hidden on mobile (FAB used instead) */}
+            {/* Award points button - hidden on mobile (FAB used instead) */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -258,6 +264,17 @@ export function DashboardShell({
               <Star weight="fill" size={16} />
               Award Points
             </motion.button>
+            {canDeduct ? (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setDeductOpen(true)}
+                className="hidden items-center gap-2 rounded-lg border border-destructive/30 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 sm:flex"
+              >
+                <MinusCircle weight="fill" size={16} />
+                Deduct Points
+              </motion.button>
+            ) : null}
             {/* User / logout */}
             <div className="flex items-center gap-1">
               <a
@@ -491,16 +508,29 @@ export function DashboardShell({
         </Tabs.Root>
       </main>
 
-      {/* Mobile FAB — Award Points (visible only below sm) */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setAwardOpen(true)}
-        className="sm:hidden fixed bottom-6 right-6 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg"
-        aria-label="Award Points"
-      >
-        <Star weight="fill" size={24} />
-      </motion.button>
+      {/* Mobile FABs - Award Points and admin deductions */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3 sm:hidden">
+        {canDeduct ? (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setDeductOpen(true)}
+            className="flex h-14 w-14 items-center justify-center rounded-full border border-destructive/30 bg-card text-destructive shadow-lg"
+            aria-label="Deduct Points"
+          >
+            <MinusCircle weight="fill" size={24} />
+          </motion.button>
+        ) : null}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setAwardOpen(true)}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+          aria-label="Award Points"
+        >
+          <Star weight="fill" size={24} />
+        </motion.button>
+      </div>
 
       {/* Award dialog */}
       <AwardPointsDialog
@@ -510,6 +540,15 @@ export function DashboardShell({
         members={members}
         onAward={onAward}
       />
+      {onDeduct ? (
+        <DeductPointsDialog
+          open={deductOpen}
+          onOpenChange={setDeductOpen}
+          members={members}
+          actorHouseId={session.houseId}
+          onDeduct={onDeduct}
+        />
+      ) : null}
     </div>
   );
 }

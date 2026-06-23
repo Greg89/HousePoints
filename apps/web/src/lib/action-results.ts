@@ -9,6 +9,7 @@ export type MutationResult =
 export type AwardPointsResult = MutationResult;
 export type CreateOrgResult = MutationResult;
 export type DeletePointResult = MutationResult;
+export type DeductPointsResult = MutationResult;
 export type HouseAssignmentResult = MutationResult;
 export type HouseMutationResult = MutationResult;
 export type JoinOrgResult = MutationResult;

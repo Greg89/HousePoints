@@ -64,8 +64,9 @@ export function ActivityFeed({
       return;
     }
 
+    const transactionLabel = item.type === "DEDUCTION" ? "deduction" : "award";
     const confirmed = window.confirm(
-      `Delete this ${item.delta}-point award to ${item.targetUserName}? Scores will be recalculated without it.`,
+      `Delete this ${item.delta}-point ${transactionLabel} to ${item.targetUserName}? Scores will be recalculated without it.`,
     );
 
     if (!confirmed) {
@@ -109,14 +110,18 @@ export function ActivityFeed({
             No activity yet. Award some points!
           </p>
         ) : (
-          visibleItems.map((item, index) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.04, duration: 0.2 }}
-              className="relative flex items-start gap-3 rounded-lg border p-3 pr-28 transition-colors hover:bg-muted/20 sm:pr-36"
-            >
+          visibleItems.map((item, index) => {
+            const isDeduction = item.type === "DEDUCTION";
+            const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
+
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.04, duration: 0.2 }}
+                className="relative flex items-start gap-3 rounded-lg border p-3 pr-28 transition-colors hover:bg-muted/20 sm:pr-36"
+              >
               {item.season ? (
                 <span
                   className={[
@@ -134,8 +139,8 @@ export function ActivityFeed({
                   type="button"
                   onClick={() => handleDelete(item)}
                   disabled={deletingIds.has(item.id)}
-                  aria-label={`Delete point award to ${item.targetUserName}`}
-                  title="Delete point award"
+                  aria-label={`Delete point transaction for ${item.targetUserName}`}
+                  title="Delete point transaction"
                   className="absolute right-3 bottom-3 inline-flex h-7 w-7 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:cursor-wait disabled:opacity-50"
                 >
                   <X size={14} />
@@ -156,15 +161,15 @@ export function ActivityFeed({
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1 text-sm">
                   <span className="font-semibold">{item.actorName}</span>
-                  <span className="text-muted-foreground">awarded</span>
+                  <span className="text-muted-foreground">{isDeduction ? "deducted" : "awarded"}</span>
                   <span
                     className="font-number font-bold px-1.5 py-0.5 rounded text-xs"
                     style={{
-                      backgroundColor: `${item.targetHouseColor}20`,
-                      color: item.targetHouseColor,
+                      backgroundColor: isDeduction ? "rgb(254 226 226)" : `${item.targetHouseColor}20`,
+                      color: isDeduction ? "rgb(185 28 28)" : item.targetHouseColor,
                     }}
                   >
-                    +{item.delta}
+                    {deltaLabel}
                   </span>
                   <span className="text-muted-foreground">to</span>
                   <span className="font-semibold">{item.targetUserName}</span>
@@ -180,8 +185,9 @@ export function ActivityFeed({
                   {relativeTime(item.createdAt)}
                 </span>
               </div>
-            </motion.div>
-          ))
+              </motion.div>
+            );
+          })
         )}
         {loadMoreError ? (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">

@@ -14,7 +14,7 @@ import {
   readLeaderboard,
   readMembers,
 } from "./actions/dashboard";
-import { awardPoints } from "./actions/points";
+import { awardPoints, deductPoints } from "./actions/points";
 import {
   readMemberScores,
   readSeasonContext,
@@ -178,6 +178,7 @@ async function renderHome() {
       seasonContext={seasonContext}
       onSeasonChange={readSeasonReports}
       onAward={awardPoints}
+      onDeduct={deductPoints}
       onDeletePoint={deletePointTransaction}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"

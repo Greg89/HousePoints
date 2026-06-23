@@ -73,6 +73,10 @@ vi.mock("./AwardPointsDialog", () => ({
   AwardPointsDialog: () => null,
 }));
 
+vi.mock("./DeductPointsDialog", () => ({
+  DeductPointsDialog: () => null,
+}));
+
 const activeSeason = {
   id: "season-active",
   name: "Q3 2026",
@@ -467,6 +471,7 @@ const baseProps = {
     memberPoints: [{ memberId: "member-3", points: 10 }],
   })),
   onAward: async () => ({ ok: true as const }),
+  onDeduct: async () => ({ ok: true as const }),
   loginUrl: "/auth/login",
   logoutUrl: "/auth/logout",
 };
@@ -483,6 +488,18 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("tab", { name: /activity/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /leaderboard/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /manage/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /deduct points/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the deduction action for admins", () => {
+    render(
+      <DashboardShell
+        {...baseProps}
+        session={{ ...baseProps.session, role: "ADMIN" }}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /deduct points/i }).length).toBeGreaterThan(0);
   });
 
   it("applies house theme variables when the user preference is enabled", () => {

@@ -123,7 +123,7 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /delete point award to ben/i }));
+    await user.click(screen.getByRole("button", { name: /delete point transaction for ben/i }));
 
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith("activity-1"));
     expect(confirmSpy).toHaveBeenCalledWith(
@@ -152,10 +152,32 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /delete point award to ben/i }));
+    await user.click(screen.getByRole("button", { name: /delete point transaction for ben/i }));
 
     expect(await screen.findByText("Point transaction is already deleted")).toBeInTheDocument();
     expect(screen.getByText("Great collaboration")).toBeInTheDocument();
     confirmSpy.mockRestore();
+  });
+
+  it("labels deductions with a negative point value", () => {
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            type: "DEDUCTION",
+            delta: -10,
+            reason: "Missed the agreed cleanup rotation",
+            trait: null,
+          },
+        ]}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("deducted")).toBeInTheDocument();
+    expect(screen.getByText("-10")).toBeInTheDocument();
+    expect(screen.queryByText("awarded")).not.toBeInTheDocument();
   });
 });

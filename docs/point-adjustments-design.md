@@ -142,6 +142,8 @@ Status: implemented. The backend now exposes `POST /points/deduct`, validates th
 - Display deductions in Activity, Leaderboard, Overview, and Audit.
 - Add component tests.
 
+Status: in progress. Admins and owners now have a dashboard `Deduct Points` action that targets members from another house, requires a reason, calls `POST /points/deduct`, surfaces cooldown and target-protection failures as safe user-facing messages, and refreshes the dashboard after success. Activity rows now label deductions with negative point values instead of award copy.
+
 ### Phase 4 - Product Hardening
 
 - Decide whether deductions are org-owner feature-flagged.
