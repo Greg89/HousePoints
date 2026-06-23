@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCorsAllowedOrigins } from "./config";
+import { parseBooleanFlag, parseCorsAllowedOrigins } from "./config";
 
 describe("parseCorsAllowedOrigins", () => {
   it("normalizes and deduplicates comma-separated HTTP origins", () => {
@@ -21,5 +21,15 @@ describe("parseCorsAllowedOrigins", () => {
     "https://example.com#fragment",
   ])("rejects invalid configuration value %j", (value) => {
     expect(() => parseCorsAllowedOrigins(value)).toThrow();
+  });
+});
+
+describe("parseBooleanFlag", () => {
+  it("only enables flags when the value is true", () => {
+    expect(parseBooleanFlag("true")).toBe(true);
+    expect(parseBooleanFlag(" TRUE ")).toBe(true);
+    expect(parseBooleanFlag("false")).toBe(false);
+    expect(parseBooleanFlag("1")).toBe(false);
+    expect(parseBooleanFlag(undefined)).toBe(false);
   });
 });

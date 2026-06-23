@@ -181,6 +181,32 @@ describe("deductPoints", () => {
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
+  it("maps disabled point adjustments to a friendly typed result", async () => {
+    const error = new ApiResponseError(
+      404,
+      "POINT_ADJUSTMENTS_DISABLED",
+      "Points could not be deducted. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(
+      deductPoints("target-1", "Missed team commitment"),
+    ).resolves.toEqual({
+      ok: false,
+      code: "POINT_ADJUSTMENTS_DISABLED",
+      message: "Point adjustments are not enabled for this environment.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "deductPoints", requestId: "request-1" },
+      error,
+      {
+        targetUserId: "target-1",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
   it("rethrows unexpected deduction failures for the shared action logger", async () => {
     parseApiResponseMock.mockRejectedValue(new Error("database vanished"));
 

@@ -49,6 +49,7 @@ export type ApiLogEvent =
   | "points.deduct.cross_organization_target"
   | "points.deduct.target_user_unassigned"
   | "points.deduct.same_house_target"
+  | "points.deduct.disabled"
   | "points.deduct.active_season_missing"
   | "points.deduct.cooldown_active"
   | "points.deduct.target_limit_active"

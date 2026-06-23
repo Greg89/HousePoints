@@ -177,6 +177,7 @@ describe("ActivityFeed", () => {
     );
 
     expect(screen.getByText("deducted")).toBeInTheDocument();
+    expect(screen.getByText("Deducted")).toBeInTheDocument();
     expect(screen.getByText("-10")).toBeInTheDocument();
     expect(screen.queryByText("awarded")).not.toBeInTheDocument();
   });

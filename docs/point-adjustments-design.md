@@ -142,14 +142,16 @@ Status: implemented. The backend now exposes `POST /points/deduct`, validates th
 - Display deductions in Activity, Leaderboard, Overview, and Audit.
 - Add component tests.
 
-Status: in progress. Admins and owners now have a dashboard `Deduct Points` action that targets members from another house, requires a reason, calls `POST /points/deduct`, surfaces cooldown and target-protection failures as safe user-facing messages, and refreshes the dashboard after success. Activity rows now label deductions with negative point values instead of award copy.
+Status: implemented. Admins and owners have a dashboard `Deduct Points` action that targets members from another house, requires a reason, shows an explicit confirmation step, calls `POST /points/deduct`, surfaces cooldown and target-protection failures as safe user-facing messages, and refreshes the dashboard after success. Activity rows label deductions with negative point values and a visible `Deducted` badge, while the existing leaderboard, overview, and audit views reflect deduction transactions through the shared ledger and audit stream.
 
 ### Phase 4 - Product Hardening
 
-- Decide whether deductions are org-owner feature-flagged.
+- Gate deductions behind the environment-level `POINT_ADJUSTMENTS_ENABLED` rollout flag.
 - Decide whether last-place-only eligibility is part of production behavior.
 - Add reporting for deductions by season and house.
 - Consider notification copy for targeted members.
+
+Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Per-organization owner controls remain a future product decision.
 
 ## Open Questions
 

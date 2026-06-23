@@ -69,7 +69,14 @@ export function mapDeletedPoint(tx: {
   };
 }
 
-export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
+type PointRouteOptions = {
+  pointAdjustmentsEnabled: boolean;
+};
+
+export async function registerPointRoutes(
+  app: FastifyInstance,
+  options: PointRouteOptions,
+): Promise<void> {
   app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = adjustPointsSchema.safeParse(request.body);
 
@@ -181,6 +188,14 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/points/deduct", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    if (!options.pointAdjustmentsEnabled) {
+      warn(request.log, "points.deduct.disabled", {});
+      return reply.status(404).send({
+        message: "Point adjustments are not enabled",
+        code: "POINT_ADJUSTMENTS_DISABLED",
+      });
+    }
+
     const parsed = deductPointsSchema.safeParse(request.body);
 
     if (!parsed.success) {

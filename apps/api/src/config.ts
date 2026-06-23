@@ -40,3 +40,11 @@ export function parseCorsAllowedOrigins(value: string | undefined): string[] {
 export function readCorsAllowedOriginsFromEnv(): string[] {
   return parseCorsAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
 }
+
+export function parseBooleanFlag(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
+export function readPointAdjustmentsEnabledFromEnv(): boolean {
+  return parseBooleanFlag(process.env.POINT_ADJUSTMENTS_ENABLED);
+}

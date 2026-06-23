@@ -33,6 +33,7 @@ export const dynamic = "force-dynamic";
 
 const ADMIN_CONTEXT_FAILED = Symbol("ADMIN_CONTEXT_FAILED");
 const showSeasonOverviewCard = process.env.SHOW_SEASON_OVERVIEW_CARD === "true";
+const pointAdjustmentsEnabled = process.env.POINT_ADJUSTMENTS_ENABLED === "true";
 
 type AdminContextResult =
   | Awaited<ReturnType<typeof readAdminContext>>
@@ -178,7 +179,7 @@ async function renderHome() {
       seasonContext={seasonContext}
       onSeasonChange={readSeasonReports}
       onAward={awardPoints}
-      onDeduct={deductPoints}
+      onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"

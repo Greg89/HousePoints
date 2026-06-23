@@ -162,6 +162,11 @@ export function ActivityFeed({
                 <div className="flex flex-wrap items-center gap-1 text-sm">
                   <span className="font-semibold">{item.actorName}</span>
                   <span className="text-muted-foreground">{isDeduction ? "deducted" : "awarded"}</span>
+                  {isDeduction ? (
+                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
+                      Deducted
+                    </span>
+                  ) : null}
                   <span
                     className="font-number font-bold px-1.5 py-0.5 rounded text-xs"
                     style={{

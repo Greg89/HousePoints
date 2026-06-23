@@ -102,6 +102,10 @@ function isExpectedPointMutationFailure(error: unknown): error is ApiResponseErr
 }
 
 function getDeductPointsMessage(error: ApiResponseError) {
+  if (error.code === "POINT_ADJUSTMENTS_DISABLED") {
+    return "Point adjustments are not enabled for this environment.";
+  }
+
   if (error.code === "DEDUCTION_COOLDOWN_ACTIVE") {
     return "Your house has already deducted points in the last 24 hours.";
   }

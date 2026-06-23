@@ -502,6 +502,18 @@ describe("DashboardShell", () => {
     expect(screen.getAllByRole("button", { name: /deduct points/i }).length).toBeGreaterThan(0);
   });
 
+  it("hides the deduction action for admins when point adjustments are disabled", () => {
+    render(
+      <DashboardShell
+        {...baseProps}
+        session={{ ...baseProps.session, role: "ADMIN" }}
+        onDeduct={undefined}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /deduct points/i })).not.toBeInTheDocument();
+  });
+
   it("applies house theme variables when the user preference is enabled", () => {
     const { container } = render(
       <DashboardShell

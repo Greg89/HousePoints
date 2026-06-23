@@ -177,6 +177,12 @@ describe("DeductPointsDialog", () => {
     await fillDeductForm(user);
     await user.click(screen.getByRole("button", { name: "Deduct 10 Points" }));
 
+    expect(props.onDeduct).not.toHaveBeenCalled();
+    expect(screen.getByText("Confirm deduction")).toBeInTheDocument();
+    expect(screen.getByText(/This will deduct 10 points from Cara Otherhouse/)).toBeInTheDocument();
+    expect(screen.getByText("The deduction will be visible in Activity and Audit.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm Deduction" }));
+
     await waitFor(() => expect(props.onDeduct).toHaveBeenCalledWith(
       "member-2",
       "Missed the agreed cleanup rotation",
@@ -198,6 +204,7 @@ describe("DeductPointsDialog", () => {
 
     await fillDeductForm(user);
     await user.click(screen.getByRole("button", { name: "Deduct 10 Points" }));
+    await user.click(screen.getByRole("button", { name: "Confirm Deduction" }));
 
     await waitFor(() => expect(props.onDeduct).toHaveBeenCalledOnce());
     expect(toast.error).toHaveBeenCalledWith("Failed to deduct points", {

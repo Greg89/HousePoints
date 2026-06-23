@@ -29,6 +29,7 @@ export function DeductPointsDialog({
 }: DeductPointsDialogProps) {
   const [targetUserId, setTargetUserId] = useState("");
   const [reason, setReason] = useState("");
+  const [isConfirming, setIsConfirming] = useState(false);
   const [isPending, startTransition] = useTransition();
   const eligibleMembers = useMemo(
     () => members.filter((member) => member.houseId && member.houseId !== actorHouseId),
@@ -40,6 +41,7 @@ export function DeductPointsDialog({
   function reset() {
     setTargetUserId("");
     setReason("");
+    setIsConfirming(false);
   }
 
   function handleClose(value: boolean) {
@@ -49,6 +51,11 @@ export function DeductPointsDialog({
 
   function handleSubmit() {
     if (!canSubmit) return;
+
+    if (!isConfirming) {
+      setIsConfirming(true);
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -103,7 +110,14 @@ export function DeductPointsDialog({
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Member from another house</label>
-              <Select.Root value={targetUserId} onValueChange={setTargetUserId} disabled={eligibleMembers.length === 0}>
+              <Select.Root
+                value={targetUserId}
+                onValueChange={(value) => {
+                  setTargetUserId(value);
+                  setIsConfirming(false);
+                }}
+                disabled={eligibleMembers.length === 0}
+              >
                 <Select.Trigger
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-sm",
@@ -174,7 +188,10 @@ export function DeductPointsDialog({
                 rows={4}
                 placeholder="Explain why points are being deducted..."
                 value={reason}
-                onChange={(event) => setReason(event.target.value)}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  setIsConfirming(false);
+                }}
                 className={cn(
                   "w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm",
                   "transition-colors focus:outline-none focus:ring-2 focus:ring-ring",
@@ -184,6 +201,19 @@ export function DeductPointsDialog({
                 This reason is shown in Activity and retained in the audit trail.
               </p>
             </div>
+
+            {isConfirming && selectedMember ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">
+                <p className="font-semibold text-destructive">Confirm deduction</p>
+                <p className="mt-1 text-foreground">
+                  This will deduct {DEDUCTION_AMOUNT} points from {selectedMember.displayName}
+                  {selectedMember.houseName ? ` (${selectedMember.houseName})` : ""}.
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  The deduction will be visible in Activity and Audit.
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
@@ -192,6 +222,15 @@ export function DeductPointsDialog({
                 Cancel
               </button>
             </Dialog.Close>
+            {isConfirming ? (
+              <button
+                type="button"
+                onClick={() => setIsConfirming(false)}
+                className="rounded-lg border px-4 py-2 text-sm transition-colors hover:bg-muted"
+              >
+                Back
+              </button>
+            ) : null}
             <motion.button
               whileHover={{ scale: canSubmit ? 1.02 : 1 }}
               whileTap={{ scale: canSubmit ? 0.98 : 1 }}
@@ -205,7 +244,11 @@ export function DeductPointsDialog({
               )}
             >
               <MinusCircle weight="fill" size={16} />
-              {isPending ? "Deducting..." : `Deduct ${DEDUCTION_AMOUNT} Points`}
+              {isPending
+                ? "Deducting..."
+                : isConfirming
+                  ? "Confirm Deduction"
+                  : `Deduct ${DEDUCTION_AMOUNT} Points`}
             </motion.button>
           </div>
         </Dialog.Content>

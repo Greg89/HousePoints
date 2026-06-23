@@ -144,7 +144,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 A controlled admin action for deducting points when the product needs a correction or comeback mechanic. This replaces the earlier theme-specific concept with neutral language that works for any house theme.
 
 ### Current state
-The product supports positive point awards, soft deletion of mistaken awards, first-class deduction transactions, backend deduction guardrails, and an admin/owner dashboard action for deducting points. The detailed design and phase status live in [Point Adjustments Design](./point-adjustments-design.md).
+The product supports positive point awards, soft deletion of mistaken awards, first-class deduction transactions, backend deduction guardrails, and an admin/owner dashboard action for deducting points. The deduction flow is guarded by `POINT_ADJUSTMENTS_ENABLED`; set it to `"true"` on both the API and web services to expose the feature. The detailed design and phase status live in [Point Adjustments Design](./point-adjustments-design.md).
 
 ### Design intent
 - Keep the action transparent and auditable.

@@ -60,6 +60,7 @@ SERVICE_NAME="housepoints-api"
 AUTH0_DOMAIN="your-tenant.us.auth0.com"
 AUTH0_AUDIENCE="https://api.housepoints.example"
 CORS_ALLOWED_ORIGINS="http://localhost:3000"
+POINT_ADJUSTMENTS_ENABLED="false"
 SEQ_SERVER_URL=""
 SEQ_API_KEY=""
 DEFAULT_ORGANIZATION_SLUG="default"
@@ -79,11 +80,13 @@ APP_API_BASE_URL="http://localhost:4000"
 SERVICE_NAME="housepoints-web"
 APP_ORGANIZATION_SLUG="default"
 SHOW_SEASON_OVERVIEW_CARD="false"
+POINT_ADJUSTMENTS_ENABLED="false"
 SEQ_SERVER_URL=""
 SEQ_API_KEY=""
 ```
 
 Set `CORS_ALLOWED_ORIGINS` to exact web origins only, comma-separated when there is more than one origin.
+Set `POINT_ADJUSTMENTS_ENABLED="true"` on both the API and web apps to enable the admin/owner `Deduct points` flow. Leave it unset or `"false"` to hide the web action and block the API endpoint.
 
 ## Database
 
@@ -201,6 +204,7 @@ API service variables:
 - `AUTH0_DOMAIN`
 - `AUTH0_AUDIENCE`
 - `CORS_ALLOWED_ORIGINS`
+- optional `POINT_ADJUSTMENTS_ENABLED` (`"true"` enables `POST /points/deduct`)
 - optional `SEQ_SERVER_URL`, `SEQ_API_KEY`, `LOG_LEVEL`, `SERVICE_NAME`
 
 Web service variables:
@@ -213,6 +217,7 @@ Web service variables:
 - `APP_BASE_URL`
 - `APP_API_BASE_URL`
 - optional `SHOW_SEASON_OVERVIEW_CARD` (`"true"` displays the Overview current-season status card)
+- optional `POINT_ADJUSTMENTS_ENABLED` (`"true"` displays the admin/owner `Deduct points` action)
 - optional `SEQ_SERVER_URL`, `SEQ_API_KEY`, `LOG_LEVEL`, `SERVICE_NAME`
 
 Use the same Auth0 API Identifier for `AUTH0_AUDIENCE` in both services. Set `APP_API_BASE_URL` to the deployed API URL and include the deployed web URL in `CORS_ALLOWED_ORIGINS`.

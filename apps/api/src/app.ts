@@ -11,7 +11,7 @@ import {
   registerAuthenticationHook,
   registerRequestLifecycleHooks,
 } from "./api-hooks.js";
-import { readCorsAllowedOriginsFromEnv } from "./config.js";
+import { readCorsAllowedOriginsFromEnv, readPointAdjustmentsEnabledFromEnv } from "./config.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -25,6 +25,7 @@ type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
   corsAllowedOrigins?: readonly string[];
   disableRateLimit?: boolean;
+  pointAdjustmentsEnabled?: boolean;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -33,6 +34,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.verifyAccessToken ?? createAuth0AccessTokenVerifierFromEnv();
   const corsAllowedOrigins =
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
+  const pointAdjustmentsEnabled =
+    options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
   const app = Fastify({
     loggerInstance: apiLogger.logger,
     requestIdHeader: "x-request-id",
@@ -72,7 +75,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerAdminRoutes(app);
   await registerOrgRoutes(app);
   await registerUserRoutes(app);
-  await registerPointRoutes(app);
+  await registerPointRoutes(app, { pointAdjustmentsEnabled });
   await registerDashboardRoutes(app);
 
   return app;

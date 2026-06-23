@@ -171,6 +171,7 @@ beforeEach(() => {
 async function buildTestApp(subject = "auth0|member", claims: Record<string, unknown> = {}) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
+    pointAdjustmentsEnabled: true,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
       claims: { sub: subject, ...claims },
@@ -616,6 +617,33 @@ describe("POST /points/deduct", () => {
     targetUserId: "user-1",
     reason: "Duplicate award correction",
   };
+
+  it("returns POINT_ADJUSTMENTS_DISABLED when the rollout flag is off", async () => {
+    const app = await buildApp({
+      corsAllowedOrigins: TEST_CORS_ORIGINS,
+      pointAdjustmentsEnabled: false,
+      verifyAccessToken: vi.fn().mockResolvedValue({
+        subject: "auth0|admin",
+        claims: { sub: "auth0|admin" },
+      }),
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      headers: { authorization: "Bearer valid" },
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      code: "POINT_ADJUSTMENTS_DISABLED",
+      message: "Point adjustments are not enabled",
+    });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
 
   it("returns 400 VALIDATION_ERROR for invalid payloads", async () => {
     const app = await buildTestApp("auth0|admin");
