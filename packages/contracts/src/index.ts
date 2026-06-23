@@ -63,6 +63,13 @@ export const adjustPointsSchema = z.object({
 
 export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
 
+export const deductPointsSchema = z.object({
+  targetUserId: z.string().min(1),
+  reason: z.string().trim().min(3).max(240),
+}).strict();
+
+export type DeductPointsInput = z.infer<typeof deductPointsSchema>;
+
 export const pointAdjustmentResponseSchema = z.object({
   id: z.string().min(1),
 });
@@ -361,6 +368,7 @@ export const adminAuditActionSchema = z.object({
     "INVITE_CREATED",
     "INVITE_USED",
     "SEASON_STARTED",
+    "POINTS_DEDUCTED",
     "USER_HOUSE_ASSIGNED",
     "USER_ROLE_CHANGED",
   ]),
@@ -604,6 +612,10 @@ export const apiContracts = {
   "/orgs/join": defineContract(joinOrgSchema, appUserSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
+    pointAdjustmentResponseSchema,
+  ),
+  "/points/deduct": defineContract(
+    deductPointsSchema,
     pointAdjustmentResponseSchema,
   ),
   "/points/delete": defineContract(

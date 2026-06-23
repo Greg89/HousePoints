@@ -3,6 +3,7 @@ import {
   adjustPointsSchema,
   activityFeedRequestSchema,
   deletePointTransactionSchema,
+  deductPointsSchema,
   seasonScopedRequestSchema,
   type PointTransactionType,
   type Trait,
@@ -174,6 +175,228 @@ export async function registerPointRoutes(app: FastifyInstance): Promise<void> {
       targetUserId: targetUser.id,
       targetHouseId: targetUser.houseId,
       delta: transaction.delta,
+    });
+
+    return reply.status(201).send(transaction);
+  });
+
+  app.post("/points/deduct", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const parsed = deductPointsSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor) {
+      warn(request.log, "points.deduct.actor_not_found", {
+        targetUserId: parsed.data.targetUserId,
+      });
+      return reply.status(403).send({
+        message: "Signed-in user is not mapped to an internal account",
+        code: "ACTOR_NOT_MAPPED",
+      });
+    }
+
+    if (!isAdminRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {
+        actorUserId: actor.id,
+        targetUserId: parsed.data.targetUserId,
+      });
+      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+    }
+
+    if (!actor.houseId) {
+      warn(request.log, "points.deduct.actor_house_required", {
+        actorUserId: actor.id,
+        actorAuth0Sub: actor.auth0Sub,
+        targetUserId: parsed.data.targetUserId,
+      });
+      return reply.status(403).send({
+        message: "Signed-in user must be assigned to a house before deducting points",
+        code: "ACTOR_HOUSE_REQUIRED",
+      });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: parsed.data.targetUserId },
+      select: { id: true, organizationId: true, houseId: true, displayName: true },
+    });
+
+    if (!targetUser) {
+      warn(request.log, "points.deduct.target_user_not_found", {
+        actorUserId: actor.id,
+        actorOrganizationId: actor.organizationId,
+        targetUserId: parsed.data.targetUserId,
+      });
+      return reply.status(404).send({
+        message: "Target user was not found",
+        code: "TARGET_USER_NOT_FOUND",
+      });
+    }
+
+    if (targetUser.organizationId !== actor.organizationId) {
+      warn(request.log, "points.deduct.cross_organization_target", {
+        actorUserId: actor.id,
+        actorAuth0Sub: actor.auth0Sub,
+        actorOrganizationId: actor.organizationId,
+        targetUserId: targetUser.id,
+      });
+      return reply.status(403).send({
+        message: "Target user is outside your organization",
+        code: "CROSS_ORGANIZATION_TARGET",
+      });
+    }
+
+    if (!targetUser.houseId) {
+      warn(request.log, "points.deduct.target_user_unassigned", {
+        actorUserId: actor.id,
+        targetUserId: targetUser.id,
+      });
+      return reply.status(422).send({
+        message: "Target user is not assigned to a house",
+        code: "TARGET_USER_UNASSIGNED",
+      });
+    }
+
+    if (targetUser.houseId === actor.houseId) {
+      warn(request.log, "points.deduct.same_house_target", {
+        actorUserId: actor.id,
+        actorHouseId: actor.houseId,
+        targetUserId: targetUser.id,
+      });
+      return reply.status(409).send({
+        message: "Points can only be deducted from members in another house",
+        code: "SAME_HOUSE_TARGET",
+      });
+    }
+
+    const targetHouseId = targetUser.houseId;
+    let activeSeason;
+    try {
+      activeSeason = await resolveSeasonScope(actor);
+    } catch (err) {
+      if (err instanceof SeasonScopeError) {
+        warn(request.log, "points.deduct.active_season_missing", {
+          actorUserId: actor.id,
+          organizationId: actor.organizationId,
+        });
+        return reply.status(err.statusCode).send({
+          message: "An active season is required before points can be deducted",
+          code: err.code,
+        });
+      }
+      throw err;
+    }
+
+    const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [recentHouseDeduction, recentTargetDeduction] = await Promise.all([
+      prisma.pointTransaction.findFirst({
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: activeSeason.id,
+          type: "DEDUCTION",
+          createdAt: { gte: cooldownWindowStartsAt },
+          actor: {
+            houseId: actor.houseId,
+          },
+        },
+        select: { id: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.pointTransaction.findFirst({
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: activeSeason.id,
+          type: "DEDUCTION",
+          targetUserId: targetUser.id,
+          createdAt: { gte: cooldownWindowStartsAt },
+        },
+        select: { id: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    if (recentHouseDeduction) {
+      warn(request.log, "points.deduct.cooldown_active", {
+        actorUserId: actor.id,
+        actorHouseId: actor.houseId,
+        organizationId: actor.organizationId,
+        seasonId: activeSeason.id,
+        previousTransactionId: recentHouseDeduction.id,
+        previousCreatedAt: recentHouseDeduction.createdAt.toISOString(),
+      });
+      return reply.status(409).send({
+        message: "This house has already deducted points in the last 24 hours",
+        code: "DEDUCTION_COOLDOWN_ACTIVE",
+      });
+    }
+
+    if (recentTargetDeduction) {
+      warn(request.log, "points.deduct.target_limit_active", {
+        actorUserId: actor.id,
+        targetUserId: targetUser.id,
+        organizationId: actor.organizationId,
+        seasonId: activeSeason.id,
+        previousTransactionId: recentTargetDeduction.id,
+        previousCreatedAt: recentTargetDeduction.createdAt.toISOString(),
+      });
+      return reply.status(409).send({
+        message: "This member has already received a deduction in the last 24 hours",
+        code: "TARGET_DEDUCTION_LIMIT_ACTIVE",
+      });
+    }
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      const deduction = await tx.pointTransaction.create({
+        data: {
+          organizationId: actor.organizationId,
+          seasonId: activeSeason.id,
+          actorUserId: actor.id,
+          targetUserId: targetUser.id,
+          targetHouseId,
+          type: "DEDUCTION",
+          delta: -10,
+          reason: parsed.data.reason,
+          trait: null,
+        },
+        select: { id: true },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          eventType: "POINTS_DEDUCTED",
+          summary: `${actor.displayName} deducted 10 points from ${targetUser.displayName}.`,
+          metadata: {
+            transactionId: deduction.id,
+            targetUserId: targetUser.id,
+            targetUserName: targetUser.displayName,
+            targetHouseId,
+            seasonId: activeSeason.id,
+            seasonName: activeSeason.name,
+            delta: -10,
+            reason: parsed.data.reason,
+          },
+        },
+      });
+
+      return deduction;
+    });
+
+    info(request.log, "points.deducted", {
+      transactionId: transaction.id,
+      actorUserId: actor.id,
+      actorAuth0Sub: actor.auth0Sub,
+      organizationId: actor.organizationId,
+      targetUserId: targetUser.id,
+      targetHouseId: targetUser.houseId,
+      delta: -10,
     });
 
     return reply.status(201).send(transaction);

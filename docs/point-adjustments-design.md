@@ -133,6 +133,8 @@ Status: implemented. Existing awards default to `AWARD`, activity/deleted-point 
 - Write a `POINTS_DEDUCTED` audit event.
 - Add focused API tests.
 
+Status: implemented. The backend now exposes `POST /points/deduct`, validates the request contract, enforces admin/owner access, actor house assignment, active season, same-organization target, target house assignment, different-house targeting, house-level 24-hour cooldown, and target-member 24-hour protection, then atomically creates a fixed `DEDUCTION` transaction for `-10` points plus a durable `POINTS_DEDUCTED` audit event.
+
 ### Phase 3 - UI
 
 - Add admin deduction action.

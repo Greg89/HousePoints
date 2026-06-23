@@ -5,6 +5,7 @@ import {
   apiErrorSchema,
   bootstrapUserSchema,
   createHouseSchema,
+  deductPointsSchema,
   assignUserHouseSchema,
   assignUserHouseResponseSchema,
   updateProfileSchema,
@@ -58,6 +59,7 @@ const webConsumedApiEndpoints = [
   "/orgs/invite",
   "/orgs/join",
   "/points/adjust",
+  "/points/deduct",
   "/points/delete",
   "/seasons/context",
   "/seasons/rename",
@@ -152,6 +154,53 @@ describe("adjustPointsSchema", () => {
     const result = adjustPointsSchema.safeParse(withoutTrait);
     expect(result.success).toBe(false);
     expect(result.error?.flatten().fieldErrors.trait).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deductPointsSchema
+// ---------------------------------------------------------------------------
+describe("deductPointsSchema", () => {
+  const valid = {
+    targetUserId: "user_1",
+    reason: "Duplicate award correction",
+  };
+
+  it("accepts a valid input", () => {
+    expect(deductPointsSchema.parse(valid)).toEqual(valid);
+  });
+
+  it("trims the reason", () => {
+    expect(
+      deductPointsSchema.parse({
+        ...valid,
+        reason: "  Duplicate award correction  ",
+      }).reason,
+    ).toBe("Duplicate award correction");
+  });
+
+  it("rejects a missing target user", () => {
+    const result = deductPointsSchema.safeParse({ reason: valid.reason });
+    expect(result.success).toBe(false);
+    expect(result.error?.flatten().fieldErrors.targetUserId).toBeDefined();
+  });
+
+  it("rejects reason shorter than 3 chars", () => {
+    const result = deductPointsSchema.safeParse({ ...valid, reason: "no" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects reason longer than 240 chars", () => {
+    const result = deductPointsSchema.safeParse({ ...valid, reason: "x".repeat(241) });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unknown keys", () => {
+    const result = deductPointsSchema.safeParse({
+      ...valid,
+      delta: -50,
+    });
+    expect(result.success).toBe(false);
   });
 });
 
@@ -1130,6 +1179,34 @@ describe("adminAuditActionSchema", () => {
         newRole: "ADMIN",
       },
     });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-7",
+        type: "POINTS_DEDUCTED",
+        occurredAt: "2026-06-21T14:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia deducted 10 points from Ben.",
+        metadata: {
+          transactionId: "tx-1",
+          targetUserId: "user-2",
+          targetUserName: "Ben",
+          delta: "-10",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-7",
+      type: "POINTS_DEDUCTED",
+      occurredAt: "2026-06-21T14:00:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia deducted 10 points from Ben.",
+      metadata: {
+        transactionId: "tx-1",
+        targetUserId: "user-2",
+        targetUserName: "Ben",
+        delta: "-10",
+      },
+    });
   });
 
   it("rejects unknown audit action types", () => {
@@ -1151,12 +1228,12 @@ describe("adminAuditRequestSchema", () => {
     expect(adminAuditRequestSchema.parse({})).toEqual({ limit: 10 });
     expect(
       adminAuditRequestSchema.parse({
-        type: "POINT_DELETED",
+        type: "POINTS_DEDUCTED",
         cursor: "audit-1",
         limit: 25,
       }),
     ).toEqual({
-      type: "POINT_DELETED",
+      type: "POINTS_DEDUCTED",
       cursor: "audit-1",
       limit: 25,
     });

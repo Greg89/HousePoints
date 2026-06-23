@@ -49,6 +49,7 @@ vi.mock("@housepoints/db", () => ({
     pointTransaction: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       groupBy: vi.fn(),
       update: vi.fn(),
@@ -89,6 +90,7 @@ const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
 const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxFindUnique = prisma.pointTransaction.findUnique as ReturnType<typeof vi.fn>;
+const mockTxFindFirst = prisma.pointTransaction.findFirst as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
 const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
@@ -155,6 +157,7 @@ const makeOwner = (overrides = {}) => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mockTxFindMany.mockResolvedValue([]);
+  mockTxFindFirst.mockResolvedValue(null);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockSeasonFindMany.mockResolvedValue([]);
@@ -604,6 +607,315 @@ describe("POST /points/adjust", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /points/deduct", () => {
+  const validPayload = {
+    targetUserId: "user-1",
+    reason: "Duplicate award correction",
+  };
+
+  it("returns 400 VALIDATION_ERROR for invalid payloads", async () => {
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: { targetUserId: "user-1", reason: "no", delta: -10 },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 403 ACTOR_HOUSE_REQUIRED when actor is not assigned to a house", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ houseId: null }));
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ACTOR_HOUSE_REQUIRED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 TARGET_USER_NOT_FOUND when target does not exist", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin())
+      .mockResolvedValueOnce(null);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 403 CROSS_ORGANIZATION_TARGET when target is outside the actor organization", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin())
+      .mockResolvedValueOnce(makeMember({ organizationId: "org-other", houseId: "house-2" }));
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("CROSS_ORGANIZATION_TARGET");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 422 TARGET_USER_UNASSIGNED when target has no house", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin())
+      .mockResolvedValueOnce(makeMember({ houseId: null }));
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().code).toBe("TARGET_USER_UNASSIGNED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 SAME_HOUSE_TARGET when target is in the actor house", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
+      .mockResolvedValueOnce(makeMember({ houseId: "house-1" }));
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("SAME_HOUSE_TARGET");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
+      .mockResolvedValueOnce(makeMember({ houseId: "house-2" }));
+    mockSeasonFindFirst.mockResolvedValue(null);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 DEDUCTION_COOLDOWN_ACTIVE when the actor house already deducted recently", async () => {
+    const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxFindFirst.mockResolvedValueOnce({
+      id: "tx-recent-house-deduction",
+      createdAt: previousCreatedAt,
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("DEDUCTION_COOLDOWN_ACTIVE");
+    expect(mockTxFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-1",
+          seasonId: "season-active",
+          type: "DEDUCTION",
+          actor: { houseId: "house-1" },
+        }),
+      }),
+    );
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 TARGET_DEDUCTION_LIMIT_ACTIVE when the target already received a recent deduction", async () => {
+    const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "tx-recent-target-deduction",
+        createdAt: previousCreatedAt,
+      });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("TARGET_DEDUCTION_LIMIT_ACTIVE");
+    expect(mockTxFindFirst).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-1",
+          seasonId: "season-active",
+          type: "DEDUCTION",
+          targetUserId: "user-1",
+        }),
+      }),
+    );
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("creates a fixed deduction for admins against another house", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxCreate.mockResolvedValue({ id: "tx-deduction" });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: {
+        targetUserId: "user-1",
+        reason: "  Duplicate award correction  ",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ id: "tx-deduction" });
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockTxCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        seasonId: "season-active",
+        actorUserId: "user-2",
+        targetUserId: "user-1",
+        targetHouseId: "house-2",
+        type: "DEDUCTION",
+        delta: -10,
+        reason: "Duplicate award correction",
+        trait: null,
+      },
+      select: { id: true },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-2",
+        eventType: "POINTS_DEDUCTED",
+        summary: "Bob deducted 10 points from Alice.",
+        metadata: {
+          transactionId: "tx-deduction",
+          targetUserId: "user-1",
+          targetUserName: "Alice",
+          targetHouseId: "house-2",
+          seasonId: "season-active",
+          seasonName: "Q3 2026",
+          delta: -10,
+          reason: "Duplicate award correction",
+        },
+      },
+    });
+    await app.close();
+  });
+
+  it("allows owners to create deductions", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ houseId: "house-1" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxCreate.mockResolvedValue({ id: "tx-owner-deduction" });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/deduct",
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ id: "tx-owner-deduction" });
+    expect(mockTxCreate).toHaveBeenCalled();
     await app.close();
   });
 });
