@@ -148,10 +148,11 @@ Status: implemented. Admins and owners have a dashboard `Deduct Points` action t
 
 - Gate deductions behind the environment-level `POINT_ADJUSTMENTS_ENABLED` rollout flag.
 - Decide whether last-place-only eligibility is part of production behavior.
-- Add reporting for deductions by season and house.
+- Add Manage Overview reporting for active-season deductions by house.
+- Add full historical reporting for deductions by season and house.
 - Consider notification copy for targeted members.
 
-Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Per-organization owner controls remain a future product decision.
+Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Manage Overview now includes active-season deduction totals and by-house reporting. Full historical season-by-season deduction analytics and per-organization owner controls remain future product decisions.
 
 ## Open Questions
 

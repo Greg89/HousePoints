@@ -135,6 +135,28 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
       generatedCount: 3,
       usedCount: 2,
     },
+    pointAdjustmentStats: {
+      seasonId: "season-active",
+      seasonName: "Q3 2026",
+      totalDeductionCount: 2,
+      totalDeductedPoints: 20,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Slytherin",
+          houseColor: "#22c55e",
+          deductionCount: 2,
+          deductedPoints: 20,
+        },
+        {
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          deductionCount: 0,
+          deductedPoints: 0,
+        },
+      ],
+    },
     adminAuditNextCursor: null,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
@@ -190,6 +212,13 @@ describe("AdminForms", () => {
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /Team/ })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByText("Manage your team")).toBeInTheDocument();
+    const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
+    expect(adjustmentActivity.getByText("Season: Q3 2026")).toBeInTheDocument();
+    expect(adjustmentActivity.getByText("Points deducted")).toBeInTheDocument();
+    expect(adjustmentActivity.getByText("Deduction events")).toBeInTheDocument();
+    expect(adjustmentActivity.getByText("Slytherin")).toBeInTheDocument();
+    expect(adjustmentActivity.getByText("2 deductions")).toBeInTheDocument();
+    expect(adjustmentActivity.getAllByText("20")[0]).toBeInTheDocument();
 
     switchToManageSection("Audit");
 
@@ -243,6 +272,26 @@ describe("AdminForms", () => {
     switchToManageSection("Audit");
 
     expect(screen.getByText("No audit history matches this filter yet.")).toBeInTheDocument();
+  });
+
+  it("shows an empty point-adjustment state when no deductions exist", () => {
+    setupAdminForms({
+      pointAdjustmentStats: {
+        seasonId: "season-active",
+        seasonName: "Q3 2026",
+        totalDeductionCount: 0,
+        totalDeductedPoints: 0,
+        byHouse: houses.map((house) => ({
+          houseId: house.id,
+          houseName: house.name,
+          houseColor: house.color,
+          deductionCount: 0,
+          deductedPoints: 0,
+        })),
+      },
+    });
+
+    expect(screen.getByText("No point deductions have been recorded for the current season.")).toBeInTheDocument();
   });
 
   it("filters audit history by event type", async () => {

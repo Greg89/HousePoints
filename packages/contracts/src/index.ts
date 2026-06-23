@@ -403,6 +403,22 @@ export const inviteStatsSchema = z.object({
 
 export type InviteStats = z.infer<typeof inviteStatsSchema>;
 
+export const pointAdjustmentStatsSchema = z.object({
+  seasonId: z.string().nullable(),
+  seasonName: z.string().nullable(),
+  totalDeductionCount: z.number().int().nonnegative(),
+  totalDeductedPoints: z.number().int().nonnegative(),
+  byHouse: z.array(z.object({
+    houseId: z.string(),
+    houseName: z.string(),
+    houseColor: z.string(),
+    deductionCount: z.number().int().nonnegative(),
+    deductedPoints: z.number().int().nonnegative(),
+  })),
+});
+
+export type PointAdjustmentStats = z.infer<typeof pointAdjustmentStatsSchema>;
+
 export const adminContextSchema = z.object({
   organizationId: z.string(),
   organizationSlug: z.string(),
@@ -411,6 +427,7 @@ export const adminContextSchema = z.object({
   recentDeletedPoints: deletedPointsSchema,
   recentAdminActions: adminAuditActionsSchema,
   inviteStats: inviteStatsSchema,
+  pointAdjustmentStats: pointAdjustmentStatsSchema,
   adminAuditNextCursor: z.string().min(1).nullable(),
 });
 

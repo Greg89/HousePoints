@@ -158,6 +158,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
+  mockTxGroupBy.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockSeasonFindMany.mockResolvedValue([]);
@@ -1591,6 +1592,13 @@ describe("POST /admin/context", () => {
         generatedCount: 0,
         usedCount: 0,
       },
+      pointAdjustmentStats: {
+        seasonId: null,
+        seasonName: null,
+        totalDeductionCount: 0,
+        totalDeductedPoints: 0,
+        byHouse: [],
+      },
       adminAuditNextCursor: null,
     });
     expect(mockUserFindMany).toHaveBeenCalledWith(
@@ -1659,6 +1667,21 @@ describe("POST /admin/context", () => {
       inviteStats: {
         generatedCount: 0,
         usedCount: 0,
+      },
+      pointAdjustmentStats: {
+        seasonId: null,
+        seasonName: null,
+        totalDeductionCount: 0,
+        totalDeductedPoints: 0,
+        byHouse: [
+          {
+            houseId: "house-1",
+            houseName: "Phoenix",
+            houseColor: "#7c3aed",
+            deductionCount: 0,
+            deductedPoints: 0,
+          },
+        ],
       },
       adminAuditNextCursor: null,
     });
@@ -2409,6 +2432,71 @@ describe("POST /transactions/recent", () => {
         where: { organizationId: "org-1" },
       }),
     );
+    await app.close();
+  });
+
+  it("returns current-season point adjustment reporting by house", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockUserFindMany.mockResolvedValue([]);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
+      { id: "house-2", name: "Ember", color: "#ef4444", description: null },
+    ]);
+    mockSeasonFindFirst.mockResolvedValue({
+      id: "season-active",
+      name: "Q3 2026",
+    });
+    mockTxGroupBy.mockResolvedValue([
+      {
+        targetHouseId: "house-1",
+        _count: { _all: 2 },
+        _sum: { delta: -20 },
+      },
+    ]);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().pointAdjustmentStats).toEqual({
+      seasonId: "season-active",
+      seasonName: "Q3 2026",
+      totalDeductionCount: 2,
+      totalDeductedPoints: 20,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          deductionCount: 2,
+          deductedPoints: 20,
+        },
+        {
+          houseId: "house-2",
+          houseName: "Ember",
+          houseColor: "#ef4444",
+          deductionCount: 0,
+          deductedPoints: 0,
+        },
+      ],
+    });
+    expect(mockTxGroupBy).toHaveBeenCalledWith({
+      by: ["targetHouseId"],
+      where: {
+        organizationId: "org-secure",
+        type: "DEDUCTION",
+        deletedAt: null,
+        season: {
+          isActive: true,
+        },
+      },
+      _count: { _all: true },
+      _sum: { delta: true },
+    });
     await app.close();
   });
 });

@@ -37,6 +37,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       recentInvites,
       inviteGeneratedCount,
       inviteUsedCount,
+      activeSeason,
+      activeSeasonDeductionTotals,
       recentStartedSeasons,
       auditEvents,
     ] = await Promise.all([
@@ -107,6 +109,29 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
           usedAt: { not: null },
         },
       }),
+      prisma.season.findFirst({
+        where: {
+          organizationId: actor.organizationId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["targetHouseId"],
+        where: {
+          organizationId: actor.organizationId,
+          type: "DEDUCTION",
+          deletedAt: null,
+          season: {
+            isActive: true,
+          },
+        },
+        _count: { _all: true },
+        _sum: { delta: true },
+      }),
       prisma.season.findMany({
         where: {
           organizationId: actor.organizationId,
@@ -164,6 +189,39 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       recentAuditEvents: recentAuditEvents.length,
     });
 
+    const deductionTotalsByHouseId = new Map(
+      activeSeasonDeductionTotals.map((row) => [
+        row.targetHouseId,
+        {
+          deductionCount: row._count._all,
+          deductedPoints: Math.abs(row._sum.delta ?? 0),
+        },
+      ]),
+    );
+    const pointAdjustmentStats = {
+      seasonId: activeSeason?.id ?? null,
+      seasonName: activeSeason?.name ?? null,
+      totalDeductionCount: activeSeasonDeductionTotals.reduce(
+        (total, row) => total + row._count._all,
+        0,
+      ),
+      totalDeductedPoints: activeSeasonDeductionTotals.reduce(
+        (total, row) => total + Math.abs(row._sum.delta ?? 0),
+        0,
+      ),
+      byHouse: houses.map((house) => {
+        const totals = deductionTotalsByHouseId.get(house.id);
+
+        return {
+          houseId: house.id,
+          houseName: house.name,
+          houseColor: house.color,
+          deductionCount: totals?.deductionCount ?? 0,
+          deductedPoints: totals?.deductedPoints ?? 0,
+        };
+      }),
+    };
+
     return {
       organizationId: actor.organizationId,
       organizationSlug: actor.organizationSlug,
@@ -175,6 +233,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         generatedCount: inviteGeneratedCount,
         usedCount: inviteUsedCount,
       },
+      pointAdjustmentStats,
       adminAuditNextCursor,
     };
   });

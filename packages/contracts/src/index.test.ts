@@ -997,6 +997,21 @@ describe("adminContextSchema", () => {
       generatedCount: 3,
       usedCount: 2,
     },
+    pointAdjustmentStats: {
+      seasonId: "season-active",
+      seasonName: "Q3 2026",
+      totalDeductionCount: 2,
+      totalDeductedPoints: 20,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          deductionCount: 2,
+          deductedPoints: 20,
+        },
+      ],
+    },
     adminAuditNextCursor: "audit-2",
   };
 

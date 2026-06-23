@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { AdminAuditAction, DeletedPoint, InviteStats, PagedAdminAuditActions, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, DeletedPoint, InviteStats, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
@@ -26,6 +26,7 @@ interface AdminFormsProps {
   recentDeletedPoints: DeletedPoint[];
   recentAdminActions: AdminAuditAction[];
   inviteStats: InviteStats;
+  pointAdjustmentStats: PointAdjustmentStats;
   adminAuditNextCursor: string | null;
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
@@ -85,6 +86,7 @@ export function AdminForms({
   recentDeletedPoints,
   recentAdminActions,
   inviteStats,
+  pointAdjustmentStats,
   adminAuditNextCursor,
   onCreateHouse,
   onAssignHouse,
@@ -178,6 +180,7 @@ export function AdminForms({
             houseCount={houses.length}
             unassignedCount={unassignedCount}
             deletedPointCount={recentDeletedPoints.length}
+            pointAdjustmentStats={pointAdjustmentStats}
           />
         ) : null}
 
