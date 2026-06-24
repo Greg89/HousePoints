@@ -141,10 +141,10 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 ## 4. Point Adjustments
 
 ### What it is
-A controlled admin action for deducting points when the product needs a correction or comeback mechanic. This replaces the earlier theme-specific concept with neutral language that works for any house theme.
+A controlled admin action for deducting points when the product needs a correction. This replaces the earlier theme-specific concept with neutral language that works for any house theme.
 
 ### Current state
-The product supports positive point awards, soft deletion of mistaken awards, first-class deduction transactions, backend deduction guardrails, an admin/owner dashboard action for deducting points, and Manage Overview reporting for active-season deductions by house. The deduction flow is guarded by `POINT_ADJUSTMENTS_ENABLED`; set it to `"true"` on both the API and web services to expose the feature. The detailed design and phase status live in [Point Adjustments Design](./point-adjustments-design.md).
+The product supports positive point awards, soft deletion of mistaken awards, first-class deduction transactions, backend deduction guardrails, an admin/owner dashboard action for deducting points, and Manage Overview reporting for active-season deductions by house. The MVP policy is correction-first: no last-place-only eligibility, no direct targeted-member notifications, and no per-organization owner toggle yet. The deduction flow is guarded by `POINT_ADJUSTMENTS_ENABLED`; set it to `"true"` on both the API and web services to expose the feature. The detailed design and phase status live in [Point Adjustments Design](./point-adjustments-design.md).
 
 ### Design intent
 - Keep the action transparent and auditable.
@@ -166,7 +166,7 @@ The product supports positive point awards, soft deletion of mistaken awards, fi
 - The actor and target must belong to the same organization.
 - The actor must have a house assignment.
 - The target must have a house assignment.
-- The target must be in a different house than the actor for the comeback-oriented MVP.
+- The target must be in a different house than the actor for the correction-first MVP.
 - The deduction applies to the current active season.
 
 **Guards**
@@ -195,9 +195,10 @@ The product supports positive point awards, soft deletion of mistaken awards, fi
 - Add a `Deduct points` admin action with explicit confirmation copy.
 - Activity feed shows deduction rows with a negative delta and `Deducted` badge.
 - Audit shows durable `POINTS_DEDUCTED` events.
+- Direct user notifications are deferred; Activity and Audit are the MVP visibility surfaces.
 
 **Open questions**
-- Is the MVP an admin correction tool, a last-place comeback mechanic, or both?
-- Should owners enable/disable point adjustments per organization?
+- What production usage threshold would justify direct user notifications for deductions?
+- Should owners eventually enable/disable point adjustments per organization?
 - Should targets be limited to rival houses only, or can admins correct points inside their own house?
 - Should deduction reasons use free text, a fixed list, or both?

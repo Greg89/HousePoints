@@ -2,7 +2,7 @@
 
 ## Goal
 
-Give admins a controlled way to deduct points when the product needs a correction or comeback mechanic, without making the app feel punitive or locked into a magic theme. The feature should be transparent, audited, season-scoped, and hard to abuse.
+Give admins a controlled way to deduct points when the product needs a correction, without making the app feel punitive or locked into a magic theme. The feature should be transparent, audited, season-scoped, and hard to abuse.
 
 ## Product Language
 
@@ -16,6 +16,14 @@ Give admins a controlled way to deduct points when the product needs a correctio
 This keeps the app theme-neutral. A company can run House Points with office houses, departments, project squads, or any future house naming system without the deduction feature feeling out of place.
 
 ## MVP Rules
+
+### Product Policy
+
+The MVP is an admin correction tool, not a comeback mechanic. Deductions are available to admins and owners who need to correct or moderate point activity inside a season. The original last-place-only comeback idea remains a possible future game mode, but it should not shape the first production behavior.
+
+Point adjustments are controlled by the environment-level `POINT_ADJUSTMENTS_ENABLED` rollout flag. Per-organization owner controls are deferred until org settings exist and until the feature has enough real usage to justify an in-product toggle.
+
+Activity and Audit are the MVP notification surfaces. A targeted member can see deductions in the shared Activity feed, and elevated users can review them in Audit. Direct user notifications, email, or inbox-style alerts are deferred.
 
 ### Eligibility
 
@@ -37,7 +45,7 @@ This keeps the app theme-neutral. A company can run House Points with office hou
 | Season reset | Cooldowns and reporting are scoped by season. |
 | Reason required | The actor must provide a short reason. |
 
-The original comeback-only concept limited the action to the last-place house. That is still attractive, but it should remain an explicit product decision before implementation. A stricter first version can include last-place eligibility; an operational correction version should not.
+The MVP does not enforce last-place-only eligibility. That rule would turn the feature into a comeback mechanic, which is intentionally deferred.
 
 ## UX
 
@@ -115,6 +123,8 @@ Expected failures should be typed:
 - Rename roadmap references from the earlier concept to point adjustments.
 - Decide whether MVP requires last-place eligibility or starts as admin correction/comeback tooling.
 
+Status: implemented. The MVP product policy is correction-first: no last-place-only requirement, environment-level rollout control, and Activity/Audit visibility as the first notification surface.
+
 ### Phase 1 - Ledger Taxonomy
 
 - Add `PointTransaction.type`.
@@ -147,17 +157,18 @@ Status: implemented. Admins and owners have a dashboard `Deduct Points` action t
 ### Phase 4 - Product Hardening
 
 - Gate deductions behind the environment-level `POINT_ADJUSTMENTS_ENABLED` rollout flag.
-- Decide whether last-place-only eligibility is part of production behavior.
+- Defer last-place-only eligibility unless point adjustments later become a dedicated comeback mechanic.
 - Add Manage Overview reporting for active-season deductions by house.
 - Add full historical reporting for deductions by season and house.
-- Consider notification copy for targeted members.
+- Treat Activity and Audit as the MVP notification surfaces.
+- Consider direct notification copy for targeted members after production usage validates the need.
 
-Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Manage Overview now includes active-season deduction totals and by-house reporting. Full historical season-by-season deduction analytics and per-organization owner controls remain future product decisions.
+Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Manage Overview now includes active-season deduction totals and by-house reporting. The MVP is explicitly correction-first, without last-place-only eligibility or direct notifications. Full historical season-by-season deduction analytics, direct notifications, comeback mechanics, and per-organization owner controls remain future product decisions.
 
 ## Open Questions
 
-- Is the MVP an admin correction tool, a last-place comeback mechanic, or both?
-- Should owners be able to enable/disable deductions per organization?
+- What production usage threshold would justify direct user notifications for deductions?
+- Should owners eventually be able to enable/disable point adjustments per organization?
 - Should deductions require owner approval, or is admin capability enough?
 - Should targets be limited to rival houses only, or can admins correct points inside their own house?
 - Should deduction reasons use free text, a fixed list, or both?
