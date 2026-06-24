@@ -37,6 +37,7 @@ import {
   adminAuditRequestSchema,
   adminContextSchema,
   pagedAdminAuditActionsSchema,
+  pointAdjustmentStatsSchema,
   pointAdjustmentResponseSchema,
   pointTransactionTypeSchema,
   redactLogContext,
@@ -50,6 +51,7 @@ const webConsumedApiEndpoints = [
   "/admin/audit",
   "/admin/context",
   "/admin/houses",
+  "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
   "/admin/users/role",
   "/dashboard/summary",
@@ -1312,6 +1314,54 @@ describe("pointAdjustmentResponseSchema", () => {
     expect(pointAdjustmentResponseSchema.safeParse({ id: "" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("pointAdjustmentStatsSchema", () => {
+  it("accepts selected-season point adjustment reporting", () => {
+    expect(
+      pointAdjustmentStatsSchema.parse({
+        seasonId: "season-0",
+        seasonName: "Season 0",
+        totalDeductionCount: 1,
+        totalDeductedPoints: 10,
+        byHouse: [
+          {
+            houseId: "house-1",
+            houseName: "Phoenix",
+            houseColor: "#7c3aed",
+            deductionCount: 1,
+            deductedPoints: 10,
+          },
+        ],
+      }),
+    ).toEqual({
+      seasonId: "season-0",
+      seasonName: "Season 0",
+      totalDeductionCount: 1,
+      totalDeductedPoints: 10,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          deductionCount: 1,
+          deductedPoints: 10,
+        },
+      ],
+    });
+  });
+
+  it("rejects negative deduction totals", () => {
+    expect(
+      pointAdjustmentStatsSchema.safeParse({
+        seasonId: "season-0",
+        seasonName: "Season 0",
+        totalDeductionCount: -1,
+        totalDeductedPoints: 10,
+        byHouse: [],
+      }).success,
+    ).toBe(false);
   });
 });
 

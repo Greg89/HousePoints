@@ -1699,6 +1699,141 @@ describe("POST /admin/context", () => {
   });
 });
 
+describe("POST /admin/point-adjustments/stats", () => {
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/point-adjustments/stats",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockSeasonFindFirst).not.toHaveBeenCalled();
+    expect(mockTxGroupBy).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns active-season point adjustment reporting by default", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
+      { id: "house-2", name: "Ember", color: "#ef4444", description: null },
+    ]);
+    mockTxGroupBy.mockResolvedValue([
+      {
+        targetHouseId: "house-1",
+        _count: { _all: 2 },
+        _sum: { delta: -20 },
+      },
+    ]);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/point-adjustments/stats",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-secure",
+          isActive: true,
+        },
+      }),
+    );
+    expect(mockTxGroupBy).toHaveBeenCalledWith({
+      by: ["targetHouseId"],
+      where: {
+        organizationId: "org-secure",
+        seasonId: "season-active",
+        type: "DEDUCTION",
+        deletedAt: null,
+      },
+      _count: { _all: true },
+      _sum: { delta: true },
+    });
+    expect(res.json()).toEqual({
+      seasonId: "season-active",
+      seasonName: "Q3 2026",
+      totalDeductionCount: 2,
+      totalDeductedPoints: 20,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          deductionCount: 2,
+          deductedPoints: 20,
+        },
+        {
+          houseId: "house-2",
+          houseName: "Ember",
+          houseColor: "#ef4444",
+          deductionCount: 0,
+          deductedPoints: 0,
+        },
+      ],
+    });
+    await app.close();
+  });
+
+  it("uses a requested historical season for point adjustment reporting", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
+    ]);
+    mockTxGroupBy.mockResolvedValue([
+      {
+        targetHouseId: "house-1",
+        _count: { _all: 1 },
+        _sum: { delta: -10 },
+      },
+    ]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/point-adjustments/stats",
+      payload: { seasonId: "season-0" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "season-0",
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(mockTxGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-secure",
+          seasonId: "season-0",
+          type: "DEDUCTION",
+          deletedAt: null,
+        }),
+      }),
+    );
+    expect(res.json()).toMatchObject({
+      seasonId: "season-0",
+      seasonName: "Season 0",
+      totalDeductionCount: 1,
+      totalDeductedPoints: 10,
+    });
+    await app.close();
+  });
+});
+
 describe("POST /admin/audit", () => {
   it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
     mockFindUnique.mockResolvedValue(makeMember());

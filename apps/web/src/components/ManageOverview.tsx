@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, useTransition, type ReactNode } from "react";
 import {
   House,
   Trash,
@@ -6,7 +8,7 @@ import {
   UserSwitch,
   UsersThree,
 } from "@phosphor-icons/react";
-import type { PointAdjustmentStats } from "@housepoints/contracts";
+import type { PointAdjustmentStats, Season } from "@housepoints/contracts";
 
 interface ManageOverviewProps {
   memberCount: number;
@@ -14,6 +16,8 @@ interface ManageOverviewProps {
   unassignedCount: number;
   deletedPointCount: number;
   pointAdjustmentStats: PointAdjustmentStats;
+  seasons: Season[];
+  onLoadPointAdjustmentStats: (seasonId?: string) => Promise<PointAdjustmentStats>;
 }
 
 export function ManageOverview({
@@ -22,10 +26,29 @@ export function ManageOverview({
   unassignedCount,
   deletedPointCount,
   pointAdjustmentStats,
+  seasons,
+  onLoadPointAdjustmentStats,
 }: ManageOverviewProps) {
-  const housesWithDeductions = pointAdjustmentStats.byHouse.filter(
+  const [selectedStats, setSelectedStats] = useState(pointAdjustmentStats);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const housesWithDeductions = selectedStats.byHouse.filter(
     (house) => house.deductionCount > 0,
   );
+  const selectedSeasonId = selectedStats.seasonId ?? "";
+
+  function handleSeasonChange(nextSeasonId: string) {
+    startTransition(async () => {
+      setErrorMessage(null);
+
+      try {
+        const stats = await onLoadPointAdjustmentStats(nextSeasonId || undefined);
+        setSelectedStats(stats);
+      } catch {
+        setErrorMessage("Point adjustment reporting could not be loaded. Please try again.");
+      }
+    });
+  }
 
   return (
     <div className="rounded-2xl border bg-card p-6 space-y-6">
@@ -45,7 +68,7 @@ export function ManageOverview({
           <MetricCard
             icon={<TrendDown size={14} />}
             label="Deductions"
-            value={pointAdjustmentStats.totalDeductionCount}
+            value={selectedStats.totalDeductionCount}
           />
         </div>
       </div>
@@ -58,32 +81,62 @@ export function ManageOverview({
           <div>
             <p className="text-sm font-semibold">Point adjustment activity</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Current-season deduction activity by target house.
+              Deduction activity by target house for the selected season.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:min-w-[16rem]">
-            <MetricCard
-              icon={<TrendDown size={14} />}
-              label="Points deducted"
-              value={pointAdjustmentStats.totalDeductedPoints}
-            />
-            <MetricCard
-              icon={<TrendDown size={14} />}
-              label="Deduction events"
-              value={pointAdjustmentStats.totalDeductionCount}
-            />
+          <div className="flex flex-col gap-3 sm:min-w-[20rem]">
+            <div>
+              <label
+                htmlFor="point-adjustment-season"
+                className="block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                Reporting season
+              </label>
+              <select
+                id="point-adjustment-season"
+                value={selectedSeasonId}
+                disabled={isPending}
+                onChange={(event) => handleSeasonChange(event.target.value)}
+                className="mt-1 w-full rounded-xl border bg-card px-3 py-2 text-sm"
+              >
+                {seasons.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name}{season.isActive ? " (current)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <MetricCard
+                icon={<TrendDown size={14} />}
+                label="Points deducted"
+                value={selectedStats.totalDeductedPoints}
+              />
+              <MetricCard
+                icon={<TrendDown size={14} />}
+                label="Deduction events"
+                value={selectedStats.totalDeductionCount}
+              />
+            </div>
           </div>
         </div>
 
+        {errorMessage ? (
+          <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {errorMessage}
+          </p>
+        ) : null}
+
         <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {pointAdjustmentStats.seasonName
-            ? `Season: ${pointAdjustmentStats.seasonName}`
+          {selectedStats.seasonName
+            ? `Season: ${selectedStats.seasonName}`
             : "No active season"}
+          {isPending ? " - Loading report..." : ""}
         </p>
 
         {housesWithDeductions.length > 0 ? (
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            {pointAdjustmentStats.byHouse.map((house) => (
+            {selectedStats.byHouse.map((house) => (
               <div
                 key={house.houseId}
                 className="rounded-xl border bg-card p-3"
@@ -112,7 +165,7 @@ export function ManageOverview({
           </div>
         ) : (
           <div className="mt-3 rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground">
-            No point deductions have been recorded for the current season.
+            No point deductions have been recorded for this season.
           </div>
         )}
       </section>

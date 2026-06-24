@@ -6,10 +6,12 @@ import {
   assignUserHouseSchema,
   createHouseSchema,
   promoteUserSchema,
+  seasonScopedRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { getActorBySub, isAdminRole, isOwnerRole } from "../actor.js";
 import { info, warn } from "../logging.js";
+import { resolveSeasonScope, SeasonScopeError } from "../season-scope.js";
 import { mapDeletedPoint } from "./points.js";
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
@@ -189,38 +191,11 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       recentAuditEvents: recentAuditEvents.length,
     });
 
-    const deductionTotalsByHouseId = new Map(
-      activeSeasonDeductionTotals.map((row) => [
-        row.targetHouseId,
-        {
-          deductionCount: row._count._all,
-          deductedPoints: Math.abs(row._sum.delta ?? 0),
-        },
-      ]),
+    const pointAdjustmentStats = buildPointAdjustmentStats(
+      houses,
+      activeSeason,
+      activeSeasonDeductionTotals,
     );
-    const pointAdjustmentStats = {
-      seasonId: activeSeason?.id ?? null,
-      seasonName: activeSeason?.name ?? null,
-      totalDeductionCount: activeSeasonDeductionTotals.reduce(
-        (total, row) => total + row._count._all,
-        0,
-      ),
-      totalDeductedPoints: activeSeasonDeductionTotals.reduce(
-        (total, row) => total + Math.abs(row._sum.delta ?? 0),
-        0,
-      ),
-      byHouse: houses.map((house) => {
-        const totals = deductionTotalsByHouseId.get(house.id);
-
-        return {
-          houseId: house.id,
-          houseName: house.name,
-          houseColor: house.color,
-          deductionCount: totals?.deductionCount ?? 0,
-          deductedPoints: totals?.deductedPoints ?? 0,
-        };
-      }),
-    };
 
     return {
       organizationId: actor.organizationId,
@@ -236,6 +211,70 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       pointAdjustmentStats,
       adminAuditNextCursor,
     };
+  });
+
+  app.post("/admin/point-adjustments/stats", async (request, reply) => {
+    const parsed = seasonScopedRequestSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor || !isAdminRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {});
+      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
+    }
+
+    let season;
+    try {
+      season = await resolveSeasonScope(actor, parsed.data.seasonId);
+    } catch (error) {
+      if (error instanceof SeasonScopeError) {
+        warn(request.log, error.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
+          actorUserId: actor.id,
+          organizationId: actor.organizationId,
+          requestedSeasonId: parsed.data.seasonId ?? null,
+        });
+        return reply.status(error.statusCode).send({ message: error.message, code: error.code });
+      }
+
+      throw error;
+    }
+
+    const [houses, deductionTotals] = await Promise.all([
+      prisma.house.findMany({
+        where: { organizationId: actor.organizationId },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, color: true, description: true },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["targetHouseId"],
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: season.id,
+          type: "DEDUCTION",
+          deletedAt: null,
+        },
+        _count: { _all: true },
+        _sum: { delta: true },
+      }),
+    ]);
+    const stats = buildPointAdjustmentStats(houses, season, deductionTotals);
+
+    info(request.log, "admin.point_adjustments.loaded", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      seasonId: season.id,
+      deductionCount: stats.totalDeductionCount,
+      deductedPoints: stats.totalDeductedPoints,
+    });
+
+    return stats;
   });
 
   app.post("/admin/audit", async (request, reply) => {
@@ -505,6 +544,67 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
     return updatedUser;
   });
+}
+
+type PointAdjustmentTotalRow = {
+  targetHouseId: string | null;
+  _count: { _all: number };
+  _sum: { delta: number | null };
+};
+
+function hasTargetHouseId(
+  row: PointAdjustmentTotalRow,
+): row is PointAdjustmentTotalRow & { targetHouseId: string } {
+  return Boolean(row.targetHouseId);
+}
+
+function buildPointAdjustmentStats(
+  houses: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>,
+  season: {
+    id: string;
+    name: string;
+  } | null,
+  deductionTotals: PointAdjustmentTotalRow[],
+) {
+  const deductionTotalsByHouseId = new Map(
+    deductionTotals
+      .filter(hasTargetHouseId)
+      .map((row) => [
+        row.targetHouseId,
+        {
+          deductionCount: row._count._all,
+          deductedPoints: Math.abs(row._sum.delta ?? 0),
+        },
+      ]),
+  );
+
+  return {
+    seasonId: season?.id ?? null,
+    seasonName: season?.name ?? null,
+    totalDeductionCount: deductionTotals.reduce(
+      (total, row) => total + row._count._all,
+      0,
+    ),
+    totalDeductedPoints: deductionTotals.reduce(
+      (total, row) => total + Math.abs(row._sum.delta ?? 0),
+      0,
+    ),
+    byHouse: houses.map((house) => {
+      const totals = deductionTotalsByHouseId.get(house.id);
+
+      return {
+        houseId: house.id,
+        houseName: house.name,
+        houseColor: house.color,
+        deductionCount: totals?.deductionCount ?? 0,
+        deductedPoints: totals?.deductedPoints ?? 0,
+      };
+    }),
+  };
 }
 
 function buildRecentAdminActions(

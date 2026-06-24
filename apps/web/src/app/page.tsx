@@ -7,6 +7,7 @@ import {
   promoteUserRole,
   readAdminAuditPage,
   readAdminContext,
+  readPointAdjustmentStats,
 } from "./actions/admin";
 import {
   readActivityPage,
@@ -154,6 +155,7 @@ async function renderHome() {
       onAssignHouse={assignUserHouse}
       onPromoteUser={promoteUserRole}
       onLoadAdminAudit={readAdminAuditPage}
+      onLoadPointAdjustmentStats={readPointAdjustmentStats}
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
       onRenameSeason={renameSeason}

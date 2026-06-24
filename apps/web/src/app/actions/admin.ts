@@ -11,6 +11,7 @@ import {
   deletedPointSchema,
   inviteLinkSchema,
   pagedAdminAuditActionsSchema,
+  pointAdjustmentStatsSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -279,6 +280,36 @@ export async function readAdminAuditPage(
   });
 
   return page;
+}
+
+export async function readPointAdjustmentStats(
+  seasonId?: string,
+  requestId: string = randomUUID(),
+) {
+  const actor = await getActorMappingForAdmin("readPointAdjustmentStats", requestId);
+  const response = await apiFetch("/admin/point-adjustments/stats", requestId, {
+    method: "POST",
+    body: JSON.stringify({
+      ...(seasonId ? { seasonId } : {}),
+    }),
+  });
+
+  const stats = await parseApiResponse(
+    response,
+    pointAdjustmentStatsSchema,
+    "Point adjustment reporting could not be loaded. Please try again.",
+  );
+
+  logInfo("web.admin.point_adjustments_loaded", {
+    requestId,
+    actorUserId: actor.id,
+    organizationId: actor.organizationId,
+    seasonId: stats.seasonId,
+    deductionCount: stats.totalDeductionCount,
+    deductedPoints: stats.totalDeductedPoints,
+  });
+
+  return stats;
 }
 
 export async function createInviteLink(): Promise<CreateInviteResult> {

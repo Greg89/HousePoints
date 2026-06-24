@@ -35,6 +35,7 @@ interface AdminFormsProps {
     type?: AdminAuditAction["type"],
     cursor?: string,
   ) => Promise<PagedAdminAuditActions>;
+  onLoadPointAdjustmentStats: (seasonId?: string) => Promise<PointAdjustmentStats>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
@@ -92,6 +93,7 @@ export function AdminForms({
   onAssignHouse,
   onPromoteUser,
   onLoadAdminAudit,
+  onLoadPointAdjustmentStats,
   onCreateInvite,
   onStartSeason,
   onRenameSeason,
@@ -181,6 +183,8 @@ export function AdminForms({
             unassignedCount={unassignedCount}
             deletedPointCount={recentDeletedPoints.length}
             pointAdjustmentStats={pointAdjustmentStats}
+            seasons={seasons}
+            onLoadPointAdjustmentStats={onLoadPointAdjustmentStats}
           />
         ) : null}
 

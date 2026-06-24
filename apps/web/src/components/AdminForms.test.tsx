@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AdminAuditAction } from "@housepoints/contracts";
+import type { AdminAuditAction, PointAdjustmentStats } from "@housepoints/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { AdminForms } from "./AdminForms";
 
@@ -165,6 +165,28 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
       items: recentAdminActions,
       nextCursor: null,
     }),
+    onLoadPointAdjustmentStats: vi.fn().mockResolvedValue({
+      seasonId: "season-active",
+      seasonName: "Q3 2026",
+      totalDeductionCount: 2,
+      totalDeductedPoints: 20,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Slytherin",
+          houseColor: "#22c55e",
+          deductionCount: 2,
+          deductedPoints: 20,
+        },
+        {
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          deductionCount: 0,
+          deductedPoints: 0,
+        },
+      ],
+    } satisfies PointAdjustmentStats),
     onCreateInvite: vi.fn().mockResolvedValue({
       ok: true,
       token: "invite-token",
@@ -291,7 +313,44 @@ describe("AdminForms", () => {
       },
     });
 
-    expect(screen.getByText("No point deductions have been recorded for the current season.")).toBeInTheDocument();
+    expect(screen.getByText("No point deductions have been recorded for this season.")).toBeInTheDocument();
+  });
+
+  it("loads point-adjustment reporting for a selected historical season", async () => {
+    const historicalStats: PointAdjustmentStats = {
+      seasonId: "season-0",
+      seasonName: "Season 0",
+      totalDeductionCount: 1,
+      totalDeductedPoints: 10,
+      byHouse: [
+        {
+          houseId: "house-1",
+          houseName: "Slytherin",
+          houseColor: "#22c55e",
+          deductionCount: 0,
+          deductedPoints: 0,
+        },
+        {
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          deductionCount: 1,
+          deductedPoints: 10,
+        },
+      ],
+    };
+    const { user, props } = setupAdminForms({
+      onLoadPointAdjustmentStats: vi.fn().mockResolvedValue(historicalStats),
+    });
+    const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
+
+    await user.selectOptions(adjustmentActivity.getByLabelText("Reporting season"), "season-0");
+
+    await waitFor(() => expect(props.onLoadPointAdjustmentStats).toHaveBeenCalledWith("season-0"));
+    expect(adjustmentActivity.getByText("Season: Season 0")).toBeInTheDocument();
+    expect(adjustmentActivity.getByText("Ravenclaw")).toBeInTheDocument();
+    expect(adjustmentActivity.getByText("1 deduction")).toBeInTheDocument();
+    expect(adjustmentActivity.getAllByText("10")).toHaveLength(2);
   });
 
   it("filters audit history by event type", async () => {

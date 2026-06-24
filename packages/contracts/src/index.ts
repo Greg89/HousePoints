@@ -613,6 +613,10 @@ export const apiContracts = {
   "/admin/audit": defineContract(adminAuditRequestSchema, pagedAdminAuditActionsSchema),
   "/admin/context": defineContract(actorScopeSchema, adminContextSchema),
   "/admin/houses": defineContract(createHouseSchema, adminHouseSchema),
+  "/admin/point-adjustments/stats": defineContract(
+    seasonScopedRequestSchema,
+    pointAdjustmentStatsSchema,
+  ),
   "/admin/users/assign-house": defineContract(
     assignUserHouseSchema,
     assignUserHouseResponseSchema,

@@ -159,11 +159,11 @@ Status: implemented. Admins and owners have a dashboard `Deduct Points` action t
 - Gate deductions behind the environment-level `POINT_ADJUSTMENTS_ENABLED` rollout flag.
 - Defer last-place-only eligibility unless point adjustments later become a dedicated comeback mechanic.
 - Add Manage Overview reporting for active-season deductions by house.
-- Add full historical reporting for deductions by season and house.
+- Add Manage Overview historical reporting for deductions by season and house.
 - Treat Activity and Audit as the MVP notification surfaces.
 - Consider direct notification copy for targeted members after production usage validates the need.
 
-Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Manage Overview now includes active-season deduction totals and by-house reporting. The MVP is explicitly correction-first, without last-place-only eligibility or direct notifications. Full historical season-by-season deduction analytics, direct notifications, comeback mechanics, and per-organization owner controls remain future product decisions.
+Status: in progress. Point adjustments are now globally gated by `POINT_ADJUSTMENTS_ENABLED` on both the API and web services. When the flag is off, the web app hides the admin/owner `Deduct Points` action and the API returns the typed `POINT_ADJUSTMENTS_DISABLED` response from `POST /points/deduct`. Manage Overview now includes a reporting-season selector for deduction totals and by-house reporting; it defaults to the active season and can load historical seasons through `POST /admin/point-adjustments/stats`. The MVP is explicitly correction-first, without last-place-only eligibility or direct notifications. Direct notifications, comeback mechanics, per-organization owner controls, and deeper season-comparison analytics remain future product decisions.
 
 ## Open Questions
 
