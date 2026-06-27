@@ -18,6 +18,7 @@ import {
 import { awardPoints, deductPoints } from "./actions/points";
 import {
   readMemberScores,
+  readSeasonComparison,
   readSeasonContext,
   readSeasonReports,
   renameSeason,
@@ -29,6 +30,7 @@ import { AdminForms } from "@/components/AdminForms";
 import { AdminUnavailablePanel } from "@/components/AdminUnavailablePanel";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { logError, logInfo, logWarn, serializeErrorForLog } from "@/lib/logging";
+import type { Season, SeasonComparison } from "@housepoints/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +131,7 @@ async function renderHome() {
     readSeasonContext(requestId),
     readAdminContextForDashboard(session.role, requestId),
   ]);
+  const initialSeasonComparison = await readInitialSeasonComparison(seasonContext.seasons, requestId);
 
   logInfo("web.dashboard.render_completed", {
     requestId,
@@ -181,6 +184,8 @@ async function renderHome() {
       dashboardSummary={dashboardSummary}
       seasonContext={seasonContext}
       onSeasonChange={readSeasonReports}
+      initialSeasonComparison={initialSeasonComparison}
+      onCompareSeasons={readSeasonComparison}
       onAward={awardPoints}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
@@ -190,6 +195,38 @@ async function renderHome() {
       adminSection={adminSection}
     />
   );
+}
+
+async function readInitialSeasonComparison(
+  seasons: Season[],
+  requestId: string,
+): Promise<SeasonComparison | null> {
+  if (seasons.length < 2) {
+    return null;
+  }
+
+  const activeSeason = seasons.find((season) => season.isActive) ?? seasons[0];
+  const historicalSeason = seasons
+    .filter((season) => season.id !== activeSeason.id)
+    .sort((left, right) => new Date(right.startsAt).getTime() - new Date(left.startsAt).getTime())[0];
+
+  if (!historicalSeason) {
+    return null;
+  }
+
+  try {
+    return await readSeasonComparison(historicalSeason.id, activeSeason.id, requestId);
+  } catch (error) {
+    logWarn("web.seasons.initial_comparison_failed", {
+      ...serializeErrorForLog(error),
+      requestId,
+      route: "/",
+      fromSeasonId: historicalSeason.id,
+      toSeasonId: activeSeason.id,
+    });
+
+    return null;
+  }
 }
 
 async function readAdminContextForDashboard(

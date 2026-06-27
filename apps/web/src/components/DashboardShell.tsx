@@ -20,6 +20,7 @@ import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
 import { OverviewReports } from "./OverviewReports";
+import { SeasonComparisonReport } from "./SeasonComparisonReport";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import { DeductPointsDialog } from "./DeductPointsDialog";
 import type { AwardPointsResult, DeductPointsResult, DeletePointResult } from "@/lib/action-results";
@@ -31,6 +32,7 @@ import type {
   ActivityItem,
   MemberScore,
   PagedActivityFeed,
+  SeasonComparison,
   SeasonContext,
   Trait,
 } from "@housepoints/contracts";
@@ -59,6 +61,8 @@ interface DashboardShellProps {
     leaderboard: LeaderboardEntry[];
     memberPoints: MemberScore[];
   }>;
+  initialSeasonComparison?: SeasonComparison | null;
+  onCompareSeasons?: (fromSeasonId: string, toSeasonId: string) => Promise<SeasonComparison>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
@@ -129,6 +133,8 @@ export function DashboardShell({
   dashboardSummary,
   seasonContext,
   onSeasonChange,
+  initialSeasonComparison = null,
+  onCompareSeasons,
   onAward,
   onDeduct,
   onDeletePoint,
@@ -476,6 +482,15 @@ export function DashboardShell({
                 onShowActivity={() => setActiveTab("activity")}
               />
             </div>
+            {onCompareSeasons ? (
+              <div className="mt-8">
+                <SeasonComparisonReport
+                  seasons={seasonContext.seasons}
+                  initialComparison={initialSeasonComparison}
+                  onCompare={onCompareSeasons}
+                />
+              </div>
+            ) : null}
           </Tabs.Content>
 
           {/* Activity tab */}

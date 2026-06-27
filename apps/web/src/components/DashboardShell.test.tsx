@@ -69,6 +69,31 @@ vi.mock("./ActivityFeed", () => ({
   ),
 }));
 
+vi.mock("./SeasonComparisonReport", () => ({
+  SeasonComparisonReport: ({
+    seasons,
+    initialComparison,
+    onCompare,
+  }: {
+    seasons: { id: string; name: string }[];
+    initialComparison?: { fromSeason: { name: string }; toSeason: { name: string } } | null;
+    onCompare: (fromSeasonId: string, toSeasonId: string) => Promise<unknown>;
+  }) => (
+    <section aria-label="Season comparison report">
+      <span>Compare seasons</span>
+      <span>{seasons.map((season) => season.name).join(", ")}</span>
+      {initialComparison ? (
+        <span>
+          {initialComparison.fromSeason.name} to {initialComparison.toSeason.name}
+        </span>
+      ) : null}
+      <button type="button" onClick={() => void onCompare("season-0", "season-active")}>
+        Reload comparison
+      </button>
+    </section>
+  ),
+}));
+
 vi.mock("./AwardPointsDialog", () => ({
   AwardPointsDialog: () => null,
 }));
@@ -103,6 +128,41 @@ const historicalActivitySeason = {
   id: historicalSeason.id,
   name: historicalSeason.name,
   isActive: historicalSeason.isActive,
+};
+
+const initialSeasonComparison = {
+  fromSeason: historicalSeason,
+  toSeason: activeSeason,
+  houses: [
+    {
+      houseId: "house-1",
+      houseName: "Slytherin",
+      houseColor: "#22c55e",
+      from: {
+        rank: 2,
+        points: 100,
+        transactions: 4,
+        averagePointsPerDay: 10,
+        topContributor: null,
+      },
+      to: {
+        rank: 1,
+        points: 150,
+        transactions: 6,
+        averagePointsPerDay: 15,
+        topContributor: {
+          userId: "member-2",
+          displayName: "Ben Scorer",
+          points: 80,
+        },
+      },
+      delta: {
+        rankChange: 1,
+        pointChange: 50,
+        averagePointsPerDayChange: 5,
+      },
+    },
+  ],
 };
 
 const baseProps = {
@@ -470,6 +530,8 @@ const baseProps = {
     },
     memberPoints: [{ memberId: "member-3", points: 10 }],
   })),
+  initialSeasonComparison,
+  onCompareSeasons: vi.fn(async () => initialSeasonComparison),
   onAward: async () => ({ ok: true as const }),
   onDeduct: async () => ({ ok: true as const }),
   loginUrl: "/auth/login",
@@ -554,7 +616,19 @@ describe("DashboardShell", () => {
     expect(screen.getByText("Trait leader per house")).toBeInTheDocument();
     expect(screen.getByText("Recent activity strip")).toBeInTheDocument();
     expect(screen.getByText("Points velocity")).toBeInTheDocument();
+    expect(screen.getByLabelText("Season comparison report")).toBeInTheDocument();
+    expect(screen.getByLabelText("Season comparison report")).toHaveTextContent("Season 0 to Q3 2026");
     expect(screen.getAllByText("Ben Scorer").length).toBeGreaterThan(0);
+  });
+
+  it("reloads season comparisons from the overview report", async () => {
+    const user = userEvent.setup();
+    const onCompareSeasons = vi.fn(baseProps.onCompareSeasons);
+    render(<DashboardShell {...baseProps} onCompareSeasons={onCompareSeasons} />);
+
+    await user.click(screen.getByRole("button", { name: /reload comparison/i }));
+
+    expect(onCompareSeasons).toHaveBeenCalledWith("season-0", "season-active");
   });
 
   it("shows current season status on the overview tab when enabled", () => {
