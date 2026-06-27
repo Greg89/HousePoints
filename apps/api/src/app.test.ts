@@ -1538,6 +1538,93 @@ describe("POST /seasons/compare", () => {
     expect(mockTxGroupBy).not.toHaveBeenCalled();
     await app.close();
   });
+
+  it("assembles a larger comparison fixture with set-based aggregate queries", async () => {
+    const houses = Array.from({ length: 12 }, (_, index) => ({
+      id: `house-${index + 1}`,
+      name: `House ${String(index + 1).padStart(2, "0")}`,
+      color: `#${String(index + 1).padStart(6, "0")}`,
+    }));
+    const users = Array.from({ length: 48 }, (_, index) => ({
+      id: `user-${index + 1}`,
+      displayName: `Member ${String(index + 1).padStart(2, "0")}`,
+    }));
+    const houseTotals = houses.flatMap((house, index) => [
+      {
+        seasonId: fromSeason.id,
+        targetHouseId: house.id,
+        _sum: { delta: (index + 1) * 10 },
+        _count: { _all: index + 1 },
+      },
+      {
+        seasonId: toSeason.id,
+        targetHouseId: house.id,
+        _sum: { delta: (houses.length - index) * 12 },
+        _count: { _all: index + 2 },
+      },
+    ]);
+    const contributorTotals = houses.flatMap((house, houseIndex) =>
+      Array.from({ length: 4 }, (_, contributorIndex) => {
+        const user = users[(houseIndex * 4 + contributorIndex) % users.length] ?? users[0];
+
+        return {
+          seasonId: contributorIndex % 2 === 0 ? fromSeason.id : toSeason.id,
+          targetHouseId: house.id,
+          targetUserId: user.id,
+          _sum: { delta: (contributorIndex + 1) * (houseIndex + 1) },
+        };
+      }),
+    );
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindMany.mockResolvedValue([fromSeason, toSeason]);
+    mockHouseFindMany.mockResolvedValue(houses);
+    mockTxGroupBy
+      .mockResolvedValueOnce(houseTotals)
+      .mockResolvedValueOnce(contributorTotals);
+    mockUserFindMany.mockResolvedValue(users);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/compare",
+      payload: {
+        fromSeasonId: fromSeason.id,
+        toSeasonId: toSeason.id,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockHouseFindMany).toHaveBeenCalledTimes(1);
+    expect(mockTxGroupBy).toHaveBeenCalledTimes(2);
+    expect(mockUserFindMany).toHaveBeenCalledTimes(1);
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: { in: users.map((user) => user.id) },
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    const body = res.json();
+    expect(body.houses).toHaveLength(12);
+    expect(body.houses[0]).toEqual(
+      expect.objectContaining({
+        houseId: "house-1",
+        from: expect.objectContaining({
+          points: 10,
+          transactions: 1,
+        }),
+        to: expect.objectContaining({
+          points: 144,
+          transactions: 2,
+        }),
+        delta: expect.objectContaining({
+          pointChange: 134,
+        }),
+      }),
+    );
+    await app.close();
+  });
 });
 
 describe("POST /seasons/start", () => {

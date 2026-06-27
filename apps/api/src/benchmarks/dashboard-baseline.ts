@@ -27,6 +27,18 @@ const warmupIterations = 1;
 const measuredIterations = 5;
 const requestIdPrefix = `dashboard-baseline-${Date.now()}`;
 
+type CreatedScenario = {
+  name: string;
+  actorSubject: string;
+  organizationId: string;
+  previousSeasonId: string;
+  activeSeasonId: string;
+};
+
+type EndpointPayload =
+  | Record<string, unknown>
+  | ((scenario: CreatedScenario) => Record<string, unknown>);
+
 const verifyAccessToken: VerifyAccessToken = async (token) => ({
   subject: token,
   claims: {
@@ -94,6 +106,17 @@ const endpointSpecs = [
     body: {},
   },
   {
+    name: "season comparison",
+    phase: "parallel",
+    method: "POST",
+    url: "/seasons/compare",
+    expectedQueries: 6,
+    body: (scenario: CreatedScenario) => ({
+      fromSeasonId: scenario.previousSeasonId,
+      toSeasonId: scenario.activeSeasonId,
+    }),
+  },
+  {
     name: "admin context",
     phase: "parallel",
     method: "POST",
@@ -126,12 +149,6 @@ const scenarioConfigs = [
 
 type ScenarioConfig = (typeof scenarioConfigs)[number];
 type EndpointName = (typeof endpointSpecs)[number]["name"];
-
-type CreatedScenario = {
-  name: ScenarioConfig["name"];
-  actorSubject: string;
-  organizationId: string;
-};
 
 type EndpointSample = {
   endpoint: EndpointName;
@@ -217,6 +234,16 @@ async function createScenario(
       createdById: owner.id,
     },
   });
+  const previousSeason = await prisma.season.create({
+    data: {
+      organizationId: organization.id,
+      name: "Benchmark Previous Season",
+      startsAt: new Date(Date.UTC(2025, 11, 1)),
+      endsAt: new Date(Date.UTC(2026, 0, 1)),
+      isActive: false,
+      createdById: owner.id,
+    },
+  });
 
   const members = [owner];
   const remainingMembers = Math.max(0, config.memberCount - 1);
@@ -256,7 +283,7 @@ async function createScenario(
 
         return {
           organizationId: organization.id,
-          seasonId: activeSeason.id,
+          seasonId: index % 2 === 0 ? activeSeason.id : previousSeason.id,
           actorUserId: owner.id,
           targetUserId: targetUser.id,
           targetHouseId,
@@ -273,7 +300,13 @@ async function createScenario(
     name: config.name,
     actorSubject,
     organizationId: organization.id,
+    previousSeasonId: previousSeason.id,
+    activeSeasonId: activeSeason.id,
   };
+}
+
+function resolveEndpointBody(endpoint: { body: EndpointPayload }, scenario: CreatedScenario) {
+  return typeof endpoint.body === "function" ? endpoint.body(scenario) : endpoint.body;
 }
 
 async function cleanupScenarios(
@@ -307,7 +340,7 @@ async function cleanupScenarios(
 
 async function injectEndpoint(
   app: FastifyInstance,
-  actorSubject: string,
+  scenario: CreatedScenario,
   endpoint: (typeof endpointSpecs)[number],
 ): Promise<EndpointSample> {
   const startedAt = performance.now();
@@ -315,11 +348,11 @@ async function injectEndpoint(
     method: endpoint.method,
     url: endpoint.url,
     headers: {
-      authorization: `Bearer ${actorSubject}`,
+      authorization: `Bearer ${scenario.actorSubject}`,
       "content-type": "application/json",
       "x-request-id": `${requestIdPrefix}-${randomUUID()}`,
     },
-    payload: endpoint.body,
+    payload: resolveEndpointBody(endpoint, scenario),
   });
   const ms = performance.now() - startedAt;
 
@@ -338,7 +371,7 @@ async function injectEndpoint(
 
 async function runDashboardBundle(
   app: FastifyInstance,
-  actorSubject: string,
+  scenario: CreatedScenario,
 ): Promise<BundleSample> {
   const startedAt = performance.now();
   const serialEndpoints = endpointSpecs.filter((endpoint) => endpoint.phase === "serial");
@@ -346,11 +379,11 @@ async function runDashboardBundle(
   const serialSamples: EndpointSample[] = [];
 
   for (const endpoint of serialEndpoints) {
-    serialSamples.push(await injectEndpoint(app, actorSubject, endpoint));
+    serialSamples.push(await injectEndpoint(app, scenario, endpoint));
   }
 
   const parallelSamples = await Promise.all(
-    parallelEndpoints.map((endpoint) => injectEndpoint(app, actorSubject, endpoint)),
+    parallelEndpoints.map((endpoint) => injectEndpoint(app, scenario, endpoint)),
   );
 
   return {
@@ -406,12 +439,12 @@ async function main() {
 
     for (const scenario of scenarios) {
       for (let index = 0; index < warmupIterations; index += 1) {
-        await runDashboardBundle(app, scenario.actorSubject);
+        await runDashboardBundle(app, scenario);
       }
 
       const samples: BundleSample[] = [];
       for (let index = 0; index < measuredIterations; index += 1) {
-        samples.push(await runDashboardBundle(app, scenario.actorSubject));
+        samples.push(await runDashboardBundle(app, scenario));
       }
 
       const bundleDurations = samples.map((sample) => sample.totalMs);

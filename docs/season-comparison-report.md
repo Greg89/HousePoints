@@ -210,4 +210,4 @@ Web:
 1. [done] Contracts and API endpoint with route tests.
 2. [done] Web Server Action and focused component with unit tests.
 3. [done] Overview integration and responsive polish.
-4. Optional performance check with a larger fixture once real data volume grows.
+4. [done] Optional performance check with a larger fixture once real data volume grows.
