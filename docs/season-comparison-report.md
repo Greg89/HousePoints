@@ -207,7 +207,7 @@ Web:
 
 ## Recommended Slices
 
-1. Contracts and API endpoint with route tests.
+1. [done] Contracts and API endpoint with route tests.
 2. Web Server Action and focused component with unit tests.
 3. Overview integration and responsive polish.
 4. Optional performance check with a larger fixture once real data volume grows.

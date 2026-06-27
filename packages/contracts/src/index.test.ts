@@ -20,6 +20,8 @@ import {
   joinOrgSchema,
   promoteUserSchema,
   renameSeasonSchema,
+  seasonCompareRequestSchema,
+  seasonComparisonSchema,
   seasonContextSchema,
   seasonScopedRequestSchema,
   seasonTransitionSchema,
@@ -64,6 +66,7 @@ const webConsumedApiEndpoints = [
   "/points/deduct",
   "/points/delete",
   "/seasons/context",
+  "/seasons/compare",
   "/seasons/rename",
   "/seasons/start",
   "/transactions/recent",
@@ -574,6 +577,11 @@ describe("authenticated request schemas", () => {
       name: "Q3 2026",
       actorAuth0Sub: "auth0|attacker",
     }],
+    [seasonCompareRequestSchema, {
+      fromSeasonId: "season-0",
+      toSeasonId: "season-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
   ] as const;
 
   it.each(cases)("rejects identity fields from %#", (schema, input) => {
@@ -687,6 +695,66 @@ describe("season schemas", () => {
     });
   });
 
+  it("accepts a comparison request for two distinct seasons", () => {
+    expect(
+      seasonCompareRequestSchema.parse({
+        fromSeasonId: "season-0",
+        toSeasonId: "season-1",
+      }),
+    ).toEqual({
+      fromSeasonId: "season-0",
+      toSeasonId: "season-1",
+    });
+  });
+
+  it("rejects comparison requests for the same season", () => {
+    expect(
+      seasonCompareRequestSchema.safeParse({
+        fromSeasonId: "season-1",
+        toSeasonId: "season-1",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts a season comparison response with null contributors", () => {
+    const response = {
+      fromSeason: previousSeason,
+      toSeason: activeSeason,
+      houses: [
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          from: {
+            rank: 2,
+            points: 20,
+            transactions: 2,
+            averagePointsPerDay: 2.5,
+            topContributor: null,
+          },
+          to: {
+            rank: 1,
+            points: 50,
+            transactions: 4,
+            averagePointsPerDay: 5,
+            topContributor: {
+              userId: "user-1",
+              displayName: "Alice",
+              points: 30,
+            },
+          },
+          delta: {
+            rankChange: 1,
+            pointChange: 30,
+            averagePointsPerDayChange: 2.5,
+          },
+        },
+      ],
+    };
+
+    expect(seasonComparisonSchema.parse(response)).toEqual(response);
+  });
+
   it("rejects malformed season fields", () => {
     expect(
       seasonContextSchema.safeParse({
@@ -696,6 +764,21 @@ describe("season schemas", () => {
     ).toBe(false);
     expect(createSeasonSchema.safeParse({ name: "Q" }).success).toBe(false);
     expect(renameSeasonSchema.safeParse({ seasonId: "", name: "Q4 2026" }).success).toBe(false);
+    expect(
+      seasonComparisonSchema.safeParse({
+        fromSeason: previousSeason,
+        toSeason: activeSeason,
+        houses: [
+          {
+            houseId: "house-1",
+            houseName: "Phoenix",
+            houseColor: "#7c3aed",
+            from: { rank: 1, points: 1, transactions: 1, averagePointsPerDay: 1, topContributor: null },
+            to: { rank: 1, points: 1, transactions: 1, averagePointsPerDay: 1, topContributor: null },
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });
 

@@ -1248,6 +1248,298 @@ describe("POST /seasons/context", () => {
   });
 });
 
+describe("POST /seasons/compare", () => {
+  const fromSeason = {
+    id: "season-0",
+    name: "Season 0",
+    startsAt: new Date("2026-01-01T00:00:00.000Z"),
+    endsAt: new Date("2026-01-11T00:00:00.000Z"),
+    isActive: false,
+  };
+  const toSeason = {
+    id: "season-active",
+    name: "Q3 2026",
+    startsAt: new Date("2026-02-01T00:00:00.000Z"),
+    endsAt: new Date("2026-02-06T00:00:00.000Z"),
+    isActive: true,
+  };
+
+  it("compares house rank, points, velocity, and top contributors across two seasons", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindMany.mockResolvedValue([fromSeason, toSeason]);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-2", name: "Ember", color: "#ef4444" },
+      { id: "house-3", name: "Frost", color: "#0ea5e9" },
+      { id: "house-1", name: "Phoenix", color: "#7c3aed" },
+    ]);
+    mockTxGroupBy
+      .mockResolvedValueOnce([
+        {
+          seasonId: "season-0",
+          targetHouseId: "house-1",
+          _sum: { delta: 100 },
+          _count: { _all: 3 },
+        },
+        {
+          seasonId: "season-0",
+          targetHouseId: "house-2",
+          _sum: { delta: 80 },
+          _count: { _all: 2 },
+        },
+        {
+          seasonId: "season-active",
+          targetHouseId: "house-1",
+          _sum: { delta: 70 },
+          _count: { _all: 3 },
+        },
+        {
+          seasonId: "season-active",
+          targetHouseId: "house-2",
+          _sum: { delta: 120 },
+          _count: { _all: 4 },
+        },
+        {
+          seasonId: "season-active",
+          targetHouseId: "house-3",
+          _sum: { delta: -10 },
+          _count: { _all: 1 },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          seasonId: "season-0",
+          targetHouseId: "house-1",
+          targetUserId: "user-1",
+          _sum: { delta: 75 },
+        },
+        {
+          seasonId: "season-0",
+          targetHouseId: "house-1",
+          targetUserId: "user-2",
+          _sum: { delta: 25 },
+        },
+        {
+          seasonId: "season-active",
+          targetHouseId: "house-2",
+          targetUserId: "user-3",
+          _sum: { delta: 120 },
+        },
+        {
+          seasonId: "season-active",
+          targetHouseId: "house-3",
+          targetUserId: "user-4",
+          _sum: { delta: -10 },
+        },
+      ]);
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-1", displayName: "Alice" },
+      { id: "user-2", displayName: "Bob" },
+      { id: "user-3", displayName: "Cora" },
+      { id: "user-4", displayName: "Drew" },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/compare",
+      payload: {
+        fromSeasonId: "season-0",
+        toSeasonId: "season-active",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: { in: ["season-0", "season-active"] },
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(mockHouseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org-secure" },
+        orderBy: { name: "asc" },
+      }),
+    );
+    expect(mockTxGroupBy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        by: ["seasonId", "targetHouseId"],
+        where: {
+          organizationId: "org-secure",
+          seasonId: { in: ["season-0", "season-active"] },
+          deletedAt: null,
+        },
+      }),
+    );
+    expect(mockTxGroupBy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        by: ["seasonId", "targetHouseId", "targetUserId"],
+        where: {
+          organizationId: "org-secure",
+          seasonId: { in: ["season-0", "season-active"] },
+          deletedAt: null,
+          targetUserId: { not: null },
+        },
+      }),
+    );
+    expect(mockUserFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: { in: ["user-1", "user-2", "user-3", "user-4"] },
+          organizationId: "org-secure",
+        },
+      }),
+    );
+    expect(res.json()).toEqual({
+      fromSeason: {
+        id: "season-0",
+        name: "Season 0",
+        startsAt: "2026-01-01T00:00:00.000Z",
+        endsAt: "2026-01-11T00:00:00.000Z",
+        isActive: false,
+      },
+      toSeason: {
+        id: "season-active",
+        name: "Q3 2026",
+        startsAt: "2026-02-01T00:00:00.000Z",
+        endsAt: "2026-02-06T00:00:00.000Z",
+        isActive: true,
+      },
+      houses: [
+        {
+          houseId: "house-2",
+          houseName: "Ember",
+          houseColor: "#ef4444",
+          from: {
+            rank: 2,
+            points: 80,
+            transactions: 2,
+            averagePointsPerDay: 8,
+            topContributor: null,
+          },
+          to: {
+            rank: 1,
+            points: 120,
+            transactions: 4,
+            averagePointsPerDay: 24,
+            topContributor: {
+              userId: "user-3",
+              displayName: "Cora",
+              points: 120,
+            },
+          },
+          delta: {
+            rankChange: 1,
+            pointChange: 40,
+            averagePointsPerDayChange: 16,
+          },
+        },
+        {
+          houseId: "house-3",
+          houseName: "Frost",
+          houseColor: "#0ea5e9",
+          from: {
+            rank: 3,
+            points: 0,
+            transactions: 0,
+            averagePointsPerDay: 0,
+            topContributor: null,
+          },
+          to: {
+            rank: 3,
+            points: -10,
+            transactions: 1,
+            averagePointsPerDay: -2,
+            topContributor: {
+              userId: "user-4",
+              displayName: "Drew",
+              points: -10,
+            },
+          },
+          delta: {
+            rankChange: 0,
+            pointChange: -10,
+            averagePointsPerDayChange: -2,
+          },
+        },
+        {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          from: {
+            rank: 1,
+            points: 100,
+            transactions: 3,
+            averagePointsPerDay: 10,
+            topContributor: {
+              userId: "user-1",
+              displayName: "Alice",
+              points: 75,
+            },
+          },
+          to: {
+            rank: 2,
+            points: 70,
+            transactions: 3,
+            averagePointsPerDay: 14,
+            topContributor: null,
+          },
+          delta: {
+            rankChange: -1,
+            pointChange: -30,
+            averagePointsPerDayChange: 4,
+          },
+        },
+      ],
+    });
+    await app.close();
+  });
+
+  it("rejects comparison requests for the same season", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/compare",
+      payload: {
+        fromSeasonId: "season-0",
+        toSeasonId: "season-0",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockSeasonFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects cross-organization or unknown season IDs", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockSeasonFindMany.mockResolvedValue([fromSeason]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/compare",
+      payload: {
+        fromSeasonId: "season-0",
+        toSeasonId: "other-season",
+      },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("SEASON_NOT_FOUND");
+    expect(mockHouseFindMany).not.toHaveBeenCalled();
+    expect(mockTxGroupBy).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /seasons/start", () => {
   it("allows an owner to close the current season and start the next one", async () => {
     const nextSeason = {

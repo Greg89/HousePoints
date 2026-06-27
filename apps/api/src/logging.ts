@@ -36,6 +36,7 @@ export type ApiLogEvent =
   | "leaderboard.fetched"
   | "dashboard.summary.loaded"
   | "seasons.active_missing"
+  | "seasons.compare.loaded"
   | "seasons.context.loaded"
   | "seasons.name_conflict"
   | "seasons.not_found"

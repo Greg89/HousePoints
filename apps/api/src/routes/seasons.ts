@@ -3,6 +3,7 @@ import {
   actorScopeSchema,
   createSeasonSchema,
   renameSeasonSchema,
+  seasonCompareRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { getActorBySub, isOwnerRole } from "../actor.js";
@@ -16,6 +17,64 @@ function isUniqueConstraintError(err: unknown): boolean {
     "code" in err &&
     (err as { code?: unknown }).code === "P2002"
   );
+}
+
+type SeasonRecord = {
+  id: string;
+  name: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  isActive: boolean;
+};
+
+type HouseRecord = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+type HouseMetric = {
+  rank: number;
+  points: number;
+  transactions: number;
+  averagePointsPerDay: number;
+  topContributor: {
+    userId: string;
+    displayName: string;
+    points: number;
+  } | null;
+};
+
+const DAY_MS = 86_400_000;
+
+function roundMetric(value: number): number {
+  return Number(value.toFixed(2));
+}
+
+function seasonActiveDays(season: SeasonRecord, now = new Date()): number {
+  const endsAt = season.endsAt ?? now;
+  return Math.max(1, Math.ceil((endsAt.getTime() - season.startsAt.getTime()) / DAY_MS));
+}
+
+function seasonHouseKey(seasonId: string, houseId: string): string {
+  return `${seasonId}:${houseId}`;
+}
+
+function buildRanks(
+  houses: HouseRecord[],
+  pointsByHouseId: Map<string, number>,
+): Map<string, number> {
+  const ranked = [...houses].sort((a, b) => {
+    const pointDelta = (pointsByHouseId.get(b.id) ?? 0) - (pointsByHouseId.get(a.id) ?? 0);
+
+    if (pointDelta !== 0) {
+      return pointDelta;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+
+  return new Map(ranked.map((house, index) => [house.id, index + 1]));
 }
 
 export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> {
@@ -73,6 +132,193 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
     return {
       activeSeason: mapSeason(activeSeason),
       seasons: seasons.map(mapSeason),
+    };
+  });
+
+  app.post("/seasons/compare", async (request, reply) => {
+    const parsed = seasonCompareRequestSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor) {
+      warn(request.log, "points.actor_not_found", {});
+      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
+    }
+
+    const requestedSeasonIds = [parsed.data.fromSeasonId, parsed.data.toSeasonId];
+    const seasons = await prisma.season.findMany({
+      where: {
+        id: { in: requestedSeasonIds },
+        organizationId: actor.organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        isActive: true,
+      },
+    });
+    const seasonsById = new Map(seasons.map((season) => [season.id, season]));
+    const fromSeason = seasonsById.get(parsed.data.fromSeasonId);
+    const toSeason = seasonsById.get(parsed.data.toSeasonId);
+
+    if (!fromSeason || !toSeason) {
+      warn(request.log, "seasons.not_found", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        fromSeasonId: parsed.data.fromSeasonId,
+        toSeasonId: parsed.data.toSeasonId,
+      });
+      return reply.status(404).send({ message: "Season not found", code: "SEASON_NOT_FOUND" });
+    }
+
+    const [houses, houseTotals, contributorTotals] = await Promise.all([
+      prisma.house.findMany({
+        where: { organizationId: actor.organizationId },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, color: true },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["seasonId", "targetHouseId"],
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: { in: requestedSeasonIds },
+          deletedAt: null,
+        },
+        _sum: { delta: true },
+        _count: { _all: true },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["seasonId", "targetHouseId", "targetUserId"],
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: { in: requestedSeasonIds },
+          deletedAt: null,
+          targetUserId: { not: null },
+        },
+        _sum: { delta: true },
+      }),
+    ]);
+
+    const userIds = [
+      ...new Set(
+        contributorTotals
+          .map((row) => row.targetUserId)
+          .filter((userId): userId is string => Boolean(userId)),
+      ),
+    ];
+    const users = userIds.length
+      ? await prisma.user.findMany({
+          where: {
+            id: { in: userIds },
+            organizationId: actor.organizationId,
+          },
+          select: { id: true, displayName: true },
+        })
+      : [];
+    const userNamesById = new Map(users.map((user) => [user.id, user.displayName]));
+
+    const totalsBySeasonHouse = new Map<string, { points: number; transactions: number }>();
+    const pointsBySeason = new Map<string, Map<string, number>>([
+      [fromSeason.id, new Map()],
+      [toSeason.id, new Map()],
+    ]);
+
+    for (const row of houseTotals) {
+      const points = row._sum.delta ?? 0;
+      totalsBySeasonHouse.set(seasonHouseKey(row.seasonId, row.targetHouseId), {
+        points,
+        transactions: row._count._all,
+      });
+      pointsBySeason.get(row.seasonId)?.set(row.targetHouseId, points);
+    }
+
+    const topContributorsBySeasonHouse = new Map<string, HouseMetric["topContributor"]>();
+
+    for (const row of contributorTotals) {
+      if (!row.targetUserId) {
+        continue;
+      }
+
+      const points = row._sum.delta ?? 0;
+      const displayName = userNamesById.get(row.targetUserId);
+
+      if (!displayName) {
+        continue;
+      }
+
+      const key = seasonHouseKey(row.seasonId, row.targetHouseId);
+      const current = topContributorsBySeasonHouse.get(key);
+
+      if (
+        !current ||
+        points > current.points ||
+        (points === current.points && displayName.localeCompare(current.displayName) < 0)
+      ) {
+        topContributorsBySeasonHouse.set(key, {
+          userId: row.targetUserId,
+          displayName,
+          points,
+        });
+      }
+    }
+
+    const fromRanks = buildRanks(houses, pointsBySeason.get(fromSeason.id) ?? new Map());
+    const toRanks = buildRanks(houses, pointsBySeason.get(toSeason.id) ?? new Map());
+    const fromDays = seasonActiveDays(fromSeason);
+    const toDays = seasonActiveDays(toSeason);
+
+    function metricFor(season: SeasonRecord, house: HouseRecord, ranks: Map<string, number>, days: number): HouseMetric {
+      const key = seasonHouseKey(season.id, house.id);
+      const totals = totalsBySeasonHouse.get(key) ?? { points: 0, transactions: 0 };
+
+      return {
+        rank: ranks.get(house.id) ?? houses.length,
+        points: totals.points,
+        transactions: totals.transactions,
+        averagePointsPerDay: roundMetric(totals.points / days),
+        topContributor: topContributorsBySeasonHouse.get(key) ?? null,
+      };
+    }
+
+    const comparisonHouses = houses.map((house) => {
+      const from = metricFor(fromSeason, house, fromRanks, fromDays);
+      const to = metricFor(toSeason, house, toRanks, toDays);
+
+      return {
+        houseId: house.id,
+        houseName: house.name,
+        houseColor: house.color,
+        from,
+        to,
+        delta: {
+          rankChange: from.rank - to.rank,
+          pointChange: to.points - from.points,
+          averagePointsPerDayChange: roundMetric(to.averagePointsPerDay - from.averagePointsPerDay),
+        },
+      };
+    });
+
+    info(request.log, "seasons.compare.loaded", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      fromSeasonId: fromSeason.id,
+      toSeasonId: toSeason.id,
+      houses: comparisonHouses.length,
+    });
+
+    return {
+      fromSeason: mapSeason(fromSeason),
+      toSeason: mapSeason(toSeason),
+      houses: comparisonHouses,
     };
   });
 
