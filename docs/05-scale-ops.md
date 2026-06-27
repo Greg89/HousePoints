@@ -64,7 +64,7 @@ For an internal team app the simplest approach is upgrading to Railway Pro and e
 
 ---
 
-## 5.5 Org settings, owner transfer, admin removal, and org deletion [todo]
+## 5.5 Org settings, owner transfer, deeper admin removal, and org deletion [todo]
 
 The app supports creating and joining organizations, but broader organization administration remains future work.
 
@@ -73,7 +73,7 @@ Deferred sub-features:
 - Rename organization.
 - Change organization slug safely.
 - Transfer owner role.
-- Demote admins and define admin-removal rules. Owner-only member promotion is implemented in Manage Team.
+- Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization.
 - Delete or archive an organization.
 

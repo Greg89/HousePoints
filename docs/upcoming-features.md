@@ -27,9 +27,9 @@ Still deferred: org settings, org deletion, ownership transfer, admin removal ru
 - `OWNER` exists.
 - `OWNER` controls organization-level configuration, including houses and seasons.
 - `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
-- `OWNER` can promote members to `ADMIN` from Manage Team. Role changes are audited.
+- `OWNER` can promote members to `ADMIN` and demote admins back to `MEMBER` from Manage Team. Role changes are audited.
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org deletion, ownership transfer, and admin-removal rules are not implemented yet.
+- Org deletion, ownership transfer, and deeper admin-removal rules are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**

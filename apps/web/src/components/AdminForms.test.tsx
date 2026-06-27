@@ -689,14 +689,45 @@ describe("AdminForms", () => {
     confirmSpy.mockRestore();
   });
 
+  it("lets owners remove admin access from the Team section", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Team");
+    const demoteForm = within(screen.getByRole("form", { name: "Remove admin access" }));
+
+    await user.selectOptions(demoteForm.getByLabelText("Admin to demote"), "user-1");
+    await user.click(demoteForm.getByRole("button", { name: "Remove admin access" }));
+
+    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Remove admin access for Alice Assigned? They will keep their member profile and house assignment.",
+    );
+
+    const roleChangeMock = props.onPromoteUser as ReturnType<typeof vi.fn>;
+    const formData = roleChangeMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-1",
+      role: "MEMBER",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Admin access removed", {
+      description: "Alice Assigned is now a member.",
+    });
+    confirmSpy.mockRestore();
+  });
+
   it("shows role promotion to admins but keeps it owner-only", () => {
     setupAdminForms({ actorRole: "ADMIN" });
     switchToManageSection("Team");
+    const roleSection = within(screen.getByLabelText("Role management"));
     const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
+    const demoteForm = within(screen.getByRole("form", { name: "Remove admin access" }));
 
-    expect(promoteForm.getByText("Owner only")).toBeInTheDocument();
+    expect(roleSection.getByText("Owner only")).toBeInTheDocument();
     expect(promoteForm.getByLabelText("Member to promote")).toBeDisabled();
     expect(promoteForm.getByRole("button", { name: "Promote to admin" })).toBeDisabled();
+    expect(demoteForm.getByLabelText("Admin to demote")).toBeDisabled();
+    expect(demoteForm.getByRole("button", { name: "Remove admin access" })).toBeDisabled();
   });
 
   it("shows a safe toast when role promotion returns an expected failure", async () => {

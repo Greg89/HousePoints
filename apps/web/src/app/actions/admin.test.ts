@@ -292,6 +292,23 @@ describe("promoteUserRole", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/");
   });
 
+  it("submits member role changes for owner admin demotion", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("role", "MEMBER");
+
+    await expect(promoteUserRole(formData)).resolves.toEqual({ ok: true });
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/users/role", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: "target-1",
+        role: "MEMBER",
+      }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
   it("returns validation failures as typed results without calling the API", async () => {
     const formData = new FormData();
 

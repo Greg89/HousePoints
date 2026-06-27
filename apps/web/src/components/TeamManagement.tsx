@@ -44,7 +44,7 @@ export function TeamManagement({
 }: TeamManagementProps) {
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
-  const [promotePending, startPromote] = useTransition();
+  const [rolePending, startRoleChange] = useTransition();
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -54,6 +54,7 @@ export function TeamManagement({
   );
   const isOwner = actorRole === "OWNER";
   const promotionCandidates = users.filter((user) => user.role === "MEMBER");
+  const demotionCandidates = users.filter((user) => user.role === "ADMIN");
 
   function handleAssign(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -121,7 +122,7 @@ export function TeamManagement({
 
     if (!confirmed) return;
 
-    startPromote(async () => {
+    startRoleChange(async () => {
       try {
         const result = await onPromoteUser(formData);
 
@@ -134,6 +135,43 @@ export function TeamManagement({
 
         toast.success("Member promoted", {
           description: `${userName} is now an admin.`,
+        });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to update role", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
+  function handleDemote(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isOwner) return;
+
+    const formData = new FormData(e.currentTarget);
+    const targetUserId = String(formData.get("targetUserId") ?? "");
+    const userName = users.find((user) => user.id === targetUserId)?.displayName ?? "this admin";
+    const form = e.currentTarget;
+    const confirmed = window.confirm(
+      `Remove admin access for ${userName}? They will keep their member profile and house assignment.`,
+    );
+
+    if (!confirmed) return;
+
+    startRoleChange(async () => {
+      try {
+        const result = await onPromoteUser(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to update role", {
+            description: result.message,
+          });
+          return;
+        }
+
+        toast.success("Admin access removed", {
+          description: `${userName} is now a member.`,
         });
         form.reset();
       } catch (err) {
@@ -282,9 +320,8 @@ export function TeamManagement({
           )}
         </section>
 
-        <form
-          aria-label="Promote member"
-          onSubmit={handlePromote}
+        <section
+          aria-label="Role management"
           className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5"
         >
           <div>
@@ -300,39 +337,71 @@ export function TeamManagement({
               ) : null}
             </h5>
             <p className="mt-2 text-xs text-muted-foreground">
-              Promote trusted members to admin so they can help with team operations.
+              Promote trusted members to admin or remove admin access when responsibilities change.
             </p>
           </div>
-          <input type="hidden" name="role" value="ADMIN" />
-          <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-            Member
-            <select
-              name="targetUserId"
-              aria-label="Member to promote"
-              className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
-              required
-              defaultValue=""
-              disabled={!isOwner || promotionCandidates.length === 0}
-            >
-              <option value="" disabled>
-                {promotionCandidates.length > 0 ? "Select member..." : "No members eligible"}
-              </option>
-              {promotionCandidates.map((user) => (
-                <option key={user.id} value={user.id}>{user.displayName}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            disabled={!isOwner || promotePending || promotionCandidates.length === 0}
-            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-          >
-            {promotePending ? "Promoting..." : "Promote to admin"}
-          </button>
+          <div className="grid gap-4">
+            <form aria-label="Promote member" onSubmit={handlePromote} className="grid gap-3">
+              <input type="hidden" name="role" value="ADMIN" />
+              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+                Member
+                <select
+                  name="targetUserId"
+                  aria-label="Member to promote"
+                  className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
+                  required
+                  defaultValue=""
+                  disabled={!isOwner || promotionCandidates.length === 0}
+                >
+                  <option value="" disabled>
+                    {promotionCandidates.length > 0 ? "Select member..." : "No members eligible"}
+                  </option>
+                  {promotionCandidates.map((user) => (
+                    <option key={user.id} value={user.id}>{user.displayName}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                disabled={!isOwner || rolePending || promotionCandidates.length === 0}
+                className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                {rolePending ? "Updating..." : "Promote to admin"}
+              </button>
+            </form>
+            <form aria-label="Remove admin access" onSubmit={handleDemote} className="grid gap-3 border-t pt-4">
+              <input type="hidden" name="role" value="MEMBER" />
+              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+                Admin
+                <select
+                  name="targetUserId"
+                  aria-label="Admin to demote"
+                  className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
+                  required
+                  defaultValue=""
+                  disabled={!isOwner || demotionCandidates.length === 0}
+                >
+                  <option value="" disabled>
+                    {demotionCandidates.length > 0 ? "Select admin..." : "No admins eligible"}
+                  </option>
+                  {demotionCandidates.map((user) => (
+                    <option key={user.id} value={user.id}>{user.displayName}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                disabled={!isOwner || rolePending || demotionCandidates.length === 0}
+                className="h-10 rounded-lg border px-4 text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                {rolePending ? "Updating..." : "Remove admin access"}
+              </button>
+            </form>
+          </div>
           <p className="text-xs text-muted-foreground">
             Admins can manage member and points workflows. Owners keep org-level configuration.
           </p>
-        </form>
+        </section>
       </div>
 
       <section className="rounded-xl border bg-card p-5" aria-label="Invite activity">

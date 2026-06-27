@@ -560,6 +560,11 @@ describe("authenticated request schemas", () => {
       role: "ADMIN",
       actorAuth0Sub: "auth0|attacker",
     }],
+    [promoteUserSchema, {
+      targetUserId: "user-1",
+      role: "MEMBER",
+      actorAuth0Sub: "auth0|attacker",
+    }],
     [adminAuditRequestSchema, {
       type: "POINT_DELETED",
       actorAuth0Sub: "auth0|attacker",

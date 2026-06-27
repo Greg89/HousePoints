@@ -2692,6 +2692,70 @@ describe("POST /admin/users/role", () => {
     });
     await app.close();
   });
+
+  it("allows an owner to demote an admin to member and writes an audit event", async () => {
+    const targetUser = makeAdmin({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "ADMIN" as const,
+      organizationId: "org-secure",
+      houseId: "house-1",
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(targetUser);
+    mockUserUpdate.mockResolvedValue({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "MEMBER",
+      houseId: "house-1",
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/role",
+      payload: { targetUserId: "user-target", role: "MEMBER" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-target" },
+      data: { role: "MEMBER" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        role: true,
+        houseId: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "USER_ROLE_CHANGED",
+        summary: "Olivia changed Taylor from ADMIN to MEMBER.",
+        metadata: {
+          targetUserId: "user-target",
+          targetUserName: "Taylor",
+          previousRole: "ADMIN",
+          newRole: "MEMBER",
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "MEMBER",
+      houseId: "house-1",
+    });
+    await app.close();
+  });
 });
 
 describe("POST /transactions/recent", () => {
