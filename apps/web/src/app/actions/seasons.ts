@@ -5,12 +5,14 @@ import { revalidatePath } from "next/cache";
 import {
   memberScoresSchema,
   seasonContextSchema,
+  seasonComparisonSchema,
   seasonSchema,
   seasonTransitionSchema,
   type DashboardSummary,
   type LeaderboardEntry,
   type MemberScore,
   type Season,
+  type SeasonComparison,
   type SeasonContext,
   type SeasonTransition,
 } from "@housepoints/contracts";
@@ -48,6 +50,23 @@ export async function readSeasonContext(requestId: string = randomUUID()): Promi
     response,
     seasonContextSchema,
     "Season context could not be loaded. Please try again.",
+  );
+}
+
+export async function readSeasonComparison(
+  fromSeasonId: string,
+  toSeasonId: string,
+  requestId: string = randomUUID(),
+): Promise<SeasonComparison> {
+  await getCurrentUserForRequest(requestId);
+  const response = await apiFetch("/seasons/compare", requestId, {
+    method: "POST",
+    body: JSON.stringify({ fromSeasonId, toSeasonId }),
+  });
+  return parseApiResponse(
+    response,
+    seasonComparisonSchema,
+    "Season comparison could not be loaded. Please try again.",
   );
 }
 

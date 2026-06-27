@@ -4,7 +4,7 @@ import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import { getActorMappingForAdmin } from "./admin-auth";
-import { renameSeason, startSeason } from "./seasons";
+import { readSeasonComparison, renameSeason, startSeason } from "./seasons";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -167,6 +167,46 @@ describe("startSeason", () => {
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("readSeasonComparison", () => {
+  const comparison = {
+    fromSeason: previousSeason,
+    toSeason: activeSeason,
+    houses: [],
+  };
+
+  beforeEach(() => {
+    parseApiResponseMock.mockResolvedValue(comparison);
+  });
+
+  it("loads a season comparison for the authenticated user", async () => {
+    await expect(
+      readSeasonComparison("season-current", "season-next", "request-2"),
+    ).resolves.toEqual(comparison);
+
+    expect(getCurrentUserForRequestMock).toHaveBeenCalledWith("request-2");
+    expect(apiFetchMock).toHaveBeenCalledWith("/seasons/compare", "request-2", {
+      method: "POST",
+      body: JSON.stringify({
+        fromSeasonId: "season-current",
+        toSeasonId: "season-next",
+      }),
+    });
+    expect(parseApiResponseMock).toHaveBeenCalledWith(
+      expect.any(Response),
+      expect.any(Object),
+      "Season comparison could not be loaded. Please try again.",
+    );
+  });
+
+  it("rethrows comparison load failures", async () => {
+    parseApiResponseMock.mockRejectedValue(new Error("comparison failed"));
+
+    await expect(
+      readSeasonComparison("season-current", "season-next", "request-2"),
+    ).rejects.toThrow("comparison failed");
   });
 });
 
