@@ -5,7 +5,9 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import {
   createAuth0AccessTokenVerifierFromEnv,
+  createOptionalAuth0IdTokenVerifierFromEnv,
   type VerifyAccessToken,
+  type VerifyIdToken,
 } from "./auth.js";
 import {
   registerAuthenticationHook,
@@ -23,6 +25,7 @@ import { createApiLogger } from "./logging.js";
 
 type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
+  verifyIdToken?: VerifyIdToken | null;
   corsAllowedOrigins?: readonly string[];
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
@@ -32,6 +35,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
   const apiLogger = createApiLogger();
   const verifyAccessToken =
     options.verifyAccessToken ?? createAuth0AccessTokenVerifierFromEnv();
+  const verifyIdToken =
+    options.verifyIdToken ?? createOptionalAuth0IdTokenVerifierFromEnv();
   const corsAllowedOrigins =
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const pointAdjustmentsEnabled =
@@ -50,7 +55,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(cors, {
     origin: [...corsAllowedOrigins],
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["authorization", "content-type", "x-request-id"],
+    allowedHeaders: ["authorization", "content-type", "x-request-id", "x-auth0-id-token"],
     maxAge: 600,
   });
 
@@ -74,7 +79,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerSeasonRoutes(app);
   await registerAdminRoutes(app);
   await registerOrgRoutes(app);
-  await registerUserRoutes(app);
+  await registerUserRoutes(app, { verifyIdToken });
   await registerPointRoutes(app, { pointAdjustmentsEnabled });
   await registerDashboardRoutes(app);
 

@@ -169,7 +169,14 @@ beforeEach(() => {
   );
 });
 
-async function buildTestApp(subject = "auth0|member", claims: Record<string, unknown> = {}) {
+async function buildTestApp(
+  subject = "auth0|member",
+  claims: Record<string, unknown> = {},
+  options: {
+    idTokenSubject?: string;
+    idTokenClaims?: Record<string, unknown>;
+  } = {},
+) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
@@ -177,6 +184,15 @@ async function buildTestApp(subject = "auth0|member", claims: Record<string, unk
       subject,
       claims: { sub: subject, ...claims },
     }),
+    verifyIdToken: options.idTokenClaims
+      ? vi.fn().mockResolvedValue({
+          subject: options.idTokenSubject ?? subject,
+          claims: {
+            sub: options.idTokenSubject ?? subject,
+            ...options.idTokenClaims,
+          },
+        })
+      : null,
   });
 
   app.addHook("onRequest", async (request) => {
@@ -323,7 +339,7 @@ describe("CORS", () => {
     );
     expect(res.headers["access-control-allow-methods"]).toContain("POST");
     expect(res.headers["access-control-allow-headers"]).toBe(
-      "authorization, content-type, x-request-id",
+      "authorization, content-type, x-request-id, x-auth0-id-token",
     );
     await app.close();
   });
@@ -436,6 +452,80 @@ describe("POST /users/bootstrap", () => {
         userId: "user-1",
       },
     });
+    await app.close();
+  });
+
+  it("links an alternate social login from verified ID token email claims", async () => {
+    const existingUser = makeMember({ email: "member@acme.com" });
+    mockAuthIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingUser);
+
+    const app = await buildTestApp(
+      "github|member",
+      {},
+      {
+        idTokenClaims: {
+          email: "member@acme.com",
+          email_verified: true,
+        },
+      },
+    );
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/bootstrap",
+      headers: {
+        "x-auth0-id-token": "id-token",
+      },
+      payload: { email: "member@acme.com", displayName: "Alice GitHub" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(expect.objectContaining({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      created: false,
+    }));
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockAuthIdentityCreate).toHaveBeenCalledWith({
+      data: {
+        providerSubject: "github|member",
+        userId: "user-1",
+      },
+    });
+    await app.close();
+  });
+
+  it("does not link an alternate social login when ID token subject differs", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(makeMember({ email: "member@acme.com" }));
+
+    const app = await buildTestApp(
+      "github|member",
+      {},
+      {
+        idTokenSubject: "github|other-user",
+        idTokenClaims: {
+          email: "member@acme.com",
+          email_verified: true,
+        },
+      },
+    );
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/bootstrap",
+      headers: {
+        "x-auth0-id-token": "id-token",
+      },
+      payload: { email: "member@acme.com", displayName: "Alice GitHub" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACCOUNT_LINK_REQUIRED");
+    expect(mockAuthIdentityCreate).not.toHaveBeenCalled();
     await app.close();
   });
 

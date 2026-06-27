@@ -84,7 +84,7 @@ Request bodies contain domain input only:
 
 They do not contain actor identity or organization identity.
 
-The migration `packages/db/prisma/migrations/20260620121000_add_auth_identities/` introduced the `AuthIdentity` table and backfilled each existing `User.auth0Sub`. New users create an identity row as part of bootstrap or onboarding. A same-email alternate provider login is linked automatically only when the verified Auth0 token claims include `email` and `email_verified: true`; otherwise the API returns `ACCOUNT_LINK_REQUIRED` rather than trusting caller-supplied body email.
+The migration `packages/db/prisma/migrations/20260620121000_add_auth_identities/` introduced the `AuthIdentity` table and backfilled each existing `User.auth0Sub`. New users create an identity row as part of bootstrap or onboarding. A same-email alternate provider login is linked automatically only when verified Auth0 token claims include `email` and `email_verified: true`. The API first checks the access token claims, then verifies the web session ID token against `AUTH0_CLIENT_ID` and requires the ID token subject to match the access token subject. If no verified token claim is available, the API returns `ACCOUNT_LINK_REQUIRED` rather than trusting caller-supplied body email.
 
 ## Web Shape
 

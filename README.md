@@ -58,6 +58,7 @@ API_PORT="4000"
 LOG_LEVEL="info"
 SERVICE_NAME="housepoints-api"
 AUTH0_DOMAIN="your-tenant.us.auth0.com"
+AUTH0_CLIENT_ID="your-web-client-id"
 AUTH0_AUDIENCE="https://api.housepoints.example"
 CORS_ALLOWED_ORIGINS="http://localhost:3000"
 POINT_ADJUSTMENTS_ENABLED="false"
@@ -86,6 +87,7 @@ SEQ_API_KEY=""
 ```
 
 Set `CORS_ALLOWED_ORIGINS` to exact web origins only, comma-separated when there is more than one origin.
+Set API `AUTH0_CLIENT_ID` to the same Auth0 application client ID used by the web service. The API uses it to verify the web session ID token when safely linking same-email Auth0 identities.
 Set `POINT_ADJUSTMENTS_ENABLED="true"` on both the API and web apps to enable the admin/owner `Deduct points` flow. Leave it unset or `"false"` to hide the web action and block the API endpoint.
 
 ## Database
@@ -202,6 +204,7 @@ API service variables:
 
 - `DATABASE_URL`
 - `AUTH0_DOMAIN`
+- `AUTH0_CLIENT_ID` (same value as the web Auth0 application client ID; enables verified same-email account linking)
 - `AUTH0_AUDIENCE`
 - `CORS_ALLOWED_ORIGINS`
 - optional `POINT_ADJUSTMENTS_ENABLED` (`"true"` enables `POST /points/deduct`)

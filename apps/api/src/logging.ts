@@ -21,6 +21,8 @@ export type ApiLogEvent =
   | "users.bootstrap.loaded"
   | "users.bootstrap.identity_linked"
   | "users.bootstrap.account_link_required"
+  | "users.bootstrap.id_token_invalid"
+  | "users.bootstrap.id_token_subject_mismatch"
   | "admin.forbidden"
   | "admin.audit.loaded"
   | "admin.context.loaded"

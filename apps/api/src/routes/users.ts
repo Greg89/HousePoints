@@ -8,6 +8,7 @@ import { prisma } from "@housepoints/db";
 import { getActorBySub } from "../actor.js";
 import { mapAppUser } from "../app-user.js";
 import { info, warn } from "../logging.js";
+import type { VerifyIdToken } from "../auth.js";
 
 function readVerifiedEmailClaim(claims: Record<string, unknown>): string | null {
   return typeof claims.email === "string" && claims.email_verified === true
@@ -15,7 +16,48 @@ function readVerifiedEmailClaim(claims: Record<string, unknown>): string | null 
     : null;
 }
 
-export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
+function readIdTokenHeader(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return value[0]?.trim() || null;
+  }
+
+  return value?.trim() || null;
+}
+
+async function readVerifiedEmailFromIdToken(input: {
+  accessTokenSubject: string;
+  idToken: string | null;
+  verifyIdToken?: VerifyIdToken | null;
+  log: Parameters<typeof warn>[0];
+}): Promise<string | null> {
+  if (!input.idToken || !input.verifyIdToken) {
+    return null;
+  }
+
+  try {
+    const principal = await input.verifyIdToken(input.idToken);
+
+    if (principal.subject !== input.accessTokenSubject) {
+      warn(input.log, "users.bootstrap.id_token_subject_mismatch", {
+        accessTokenSubject: input.accessTokenSubject,
+        idTokenSubject: principal.subject,
+      });
+      return null;
+    }
+
+    return readVerifiedEmailClaim(principal.claims);
+  } catch (err) {
+    warn(input.log, "users.bootstrap.id_token_invalid", {
+      error: err instanceof Error ? err.message : "unknown",
+    });
+    return null;
+  }
+}
+
+export async function registerUserRoutes(
+  app: FastifyInstance,
+  options: { verifyIdToken?: VerifyIdToken | null } = {},
+): Promise<void> {
   app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = bootstrapUserSchema.safeParse(request.body);
 
@@ -63,7 +105,14 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       return { ...mapAppUser(existing), created: false };
     }
 
-    const verifiedEmail = readVerifiedEmailClaim(request.auth.claims);
+    const verifiedEmail =
+      readVerifiedEmailClaim(request.auth.claims) ??
+      await readVerifiedEmailFromIdToken({
+        accessTokenSubject: auth0Sub,
+        idToken: readIdTokenHeader(request.headers["x-auth0-id-token"]),
+        verifyIdToken: options.verifyIdToken,
+        log: request.log,
+      });
     const emailForStorage = verifiedEmail ?? parsed.data.email ?? null;
     const existingByEmail = verifiedEmail
       ? await prisma.user.findUnique({

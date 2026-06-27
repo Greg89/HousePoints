@@ -34,6 +34,7 @@ export class ApiResponseError extends Error {
 export type AuthenticatedApiContext = {
   user: User;
   accessToken: string;
+  idToken?: string;
 };
 
 function isRecoverableAccessTokenError(error: unknown): boolean {
@@ -53,6 +54,7 @@ type ApiRequestDependencies = {
   baseUrl: string;
   fetchImpl: typeof fetch;
   getAccessToken: () => Promise<string>;
+  getIdToken?: () => Promise<string | null | undefined>;
   timeoutMs: number;
 };
 
@@ -63,11 +65,15 @@ export function createApiRequester(dependencies: ApiRequestDependencies) {
     init: RequestInit,
   ): Promise<Response> {
     const accessToken = await dependencies.getAccessToken();
+    const idToken = await dependencies.getIdToken?.();
     const headers = new Headers(init.headers);
 
     headers.set("authorization", `Bearer ${accessToken}`);
     headers.set("content-type", "application/json");
     headers.set("x-request-id", requestId);
+    if (idToken) {
+      headers.set("x-auth0-id-token", idToken);
+    }
 
     return dependencies.fetchImpl(
       new URL(path, `${dependencies.baseUrl.replace(/\/$/, "")}/`),
@@ -145,6 +151,7 @@ export const getOptionalAuthenticatedApiContext = cache(
     return {
       user: session.user,
       accessToken: token,
+      idToken: session.tokenSet?.idToken,
     };
   },
 );
@@ -187,6 +194,7 @@ export async function apiFetch(
     baseUrl: apiBaseUrl,
     fetchImpl: fetch,
     getAccessToken: async () => context.accessToken,
+    getIdToken: async () => context.idToken,
     timeoutMs: DEFAULT_TIMEOUT_MS,
   })(path, requestId, init);
 }

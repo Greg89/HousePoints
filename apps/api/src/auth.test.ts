@@ -10,6 +10,8 @@ vi.mock("jose", () => jose);
 import {
   createAuth0AccessTokenVerifier,
   createAuth0AccessTokenVerifierFromEnv,
+  createAuth0IdTokenVerifier,
+  createOptionalAuth0IdTokenVerifierFromEnv,
   readBearerToken,
 } from "./auth";
 
@@ -103,6 +105,47 @@ describe("createAuth0AccessTokenVerifier", () => {
   });
 });
 
+describe("createAuth0IdTokenVerifier", () => {
+  it("verifies ID tokens for the Auth0 web application audience", async () => {
+    jose.jwtVerify.mockResolvedValue({
+      payload: {
+        sub: "github|user",
+        email: "alice@example.com",
+        email_verified: true,
+      },
+    });
+
+    const verifyIdToken = createAuth0IdTokenVerifier({
+      domain: "example.auth0.com",
+      clientId: "web-client-id",
+    });
+
+    await expect(verifyIdToken("id-token")).resolves.toEqual({
+      subject: "github|user",
+      claims: {
+        sub: "github|user",
+        email: "alice@example.com",
+        email_verified: true,
+      },
+    });
+
+    expect(jose.jwtVerify).toHaveBeenCalledWith("id-token", "jwks", {
+      issuer: "https://example.auth0.com/",
+      audience: "web-client-id",
+      algorithms: ["RS256"],
+    });
+  });
+
+  it("rejects missing Auth0 client ID configuration", () => {
+    expect(() =>
+      createAuth0IdTokenVerifier({
+        domain: "example.auth0.com",
+        clientId: " ",
+      }),
+    ).toThrow("AUTH0_CLIENT_ID must be configured");
+  });
+});
+
 describe("createAuth0AccessTokenVerifierFromEnv", () => {
   it("creates a verifier from environment configuration", async () => {
     process.env.AUTH0_DOMAIN = "example.auth0.com";
@@ -134,6 +177,31 @@ describe("createAuth0AccessTokenVerifierFromEnv", () => {
     expect(() => createAuth0AccessTokenVerifierFromEnv()).toThrow(
       "AUTH0_AUDIENCE must be configured",
     );
+  });
+});
+
+describe("createOptionalAuth0IdTokenVerifierFromEnv", () => {
+  it("returns null when ID token verification is not configured", () => {
+    delete process.env.AUTH0_CLIENT_ID;
+    process.env.AUTH0_DOMAIN = "example.auth0.com";
+
+    expect(createOptionalAuth0IdTokenVerifierFromEnv()).toBeNull();
+  });
+
+  it("creates a verifier when Auth0 domain and client ID are configured", async () => {
+    process.env.AUTH0_DOMAIN = "example.auth0.com";
+    process.env.AUTH0_CLIENT_ID = "web-client-id";
+    jose.jwtVerify.mockResolvedValue({
+      payload: {
+        sub: "auth0|user",
+      },
+    });
+
+    const verifyIdToken = createOptionalAuth0IdTokenVerifierFromEnv();
+
+    await expect(verifyIdToken?.("id-token")).resolves.toMatchObject({
+      subject: "auth0|user",
+    });
   });
 });
 

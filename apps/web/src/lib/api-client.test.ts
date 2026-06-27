@@ -64,6 +64,28 @@ describe("createApiRequester", () => {
     expect(headers.get("x-client-header")).toBe("present");
   });
 
+  it("forwards an Auth0 ID token when one is available", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
+    const request = createApiRequester({
+      baseUrl: "https://api.example.com/",
+      fetchImpl,
+      getAccessToken: async () => "access-token",
+      getIdToken: async () => "id-token",
+      timeoutMs: 5_000,
+    });
+
+    await request("/users/bootstrap", "request-123", {
+      method: "POST",
+      body: "{}",
+    });
+
+    const headers = new Headers(fetchImpl.mock.calls[0][1]?.headers);
+
+    expect(headers.get("x-auth0-id-token")).toBe("id-token");
+  });
+
   it("preserves a caller-provided abort signal", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(null, { status: 204 }),

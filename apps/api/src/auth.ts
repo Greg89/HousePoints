@@ -10,6 +10,7 @@ export type AuthPrincipal = {
 };
 
 export type VerifyAccessToken = (token: string) => Promise<AuthPrincipal>;
+export type VerifyIdToken = (token: string) => Promise<AuthPrincipal>;
 
 function normalizeIssuer(domain: string): string {
   const value = domain.trim().replace(/\/+$/, "");
@@ -47,6 +48,37 @@ export function createAuth0AccessTokenVerifier(input: {
   };
 }
 
+export function createAuth0IdTokenVerifier(input: {
+  domain: string;
+  clientId: string;
+}): VerifyIdToken {
+  const issuer = normalizeIssuer(input.domain);
+  const clientId = input.clientId.trim();
+
+  if (!clientId) {
+    throw new Error("AUTH0_CLIENT_ID must be configured");
+  }
+
+  const jwks = createRemoteJWKSet(new URL(".well-known/jwks.json", issuer));
+
+  return async (token) => {
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer,
+      audience: clientId,
+      algorithms: ["RS256"],
+    });
+
+    if (!payload.sub) {
+      throw new Error('ID token is missing required "sub" claim');
+    }
+
+    return {
+      subject: payload.sub,
+      claims: payload,
+    };
+  };
+}
+
 export function createAuth0AccessTokenVerifierFromEnv(): VerifyAccessToken {
   const domain = process.env.AUTH0_DOMAIN?.trim();
   const audience = process.env.AUTH0_AUDIENCE?.trim();
@@ -60,6 +92,17 @@ export function createAuth0AccessTokenVerifierFromEnv(): VerifyAccessToken {
   }
 
   return createAuth0AccessTokenVerifier({ domain, audience });
+}
+
+export function createOptionalAuth0IdTokenVerifierFromEnv(): VerifyIdToken | null {
+  const domain = process.env.AUTH0_DOMAIN?.trim();
+  const clientId = process.env.AUTH0_CLIENT_ID?.trim();
+
+  if (!domain || !clientId) {
+    return null;
+  }
+
+  return createAuth0IdTokenVerifier({ domain, clientId });
 }
 
 export function readBearerToken(authorization: string | undefined): string | null {
