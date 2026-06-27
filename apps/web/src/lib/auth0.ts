@@ -21,6 +21,7 @@ export function getAuth0Client(): Auth0Client | null {
 		auth0Client = new Auth0Client({
 			authorizationParameters: {
 				audience: process.env.AUTH0_AUDIENCE,
+				scope: "openid profile email",
 			},
 		});
 	}

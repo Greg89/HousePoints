@@ -30,7 +30,11 @@ async function readVerifiedEmailFromIdToken(input: {
   verifyIdToken?: VerifyIdToken | null;
   log: Parameters<typeof warn>[0];
 }): Promise<string | null> {
-  if (!input.idToken || !input.verifyIdToken) {
+  if (!input.idToken) {
+    return null;
+  }
+
+  if (!input.verifyIdToken) {
     return null;
   }
 
@@ -45,7 +49,17 @@ async function readVerifiedEmailFromIdToken(input: {
       return null;
     }
 
-    return readVerifiedEmailClaim(principal.claims);
+    const verifiedEmail = readVerifiedEmailClaim(principal.claims);
+
+    if (!verifiedEmail) {
+      warn(input.log, "users.bootstrap.id_token_email_unverified", {
+        auth0Sub: input.accessTokenSubject,
+        hasEmail: typeof principal.claims.email === "string",
+        emailVerified: principal.claims.email_verified,
+      });
+    }
+
+    return verifiedEmail;
   } catch (err) {
     warn(input.log, "users.bootstrap.id_token_invalid", {
       error: err instanceof Error ? err.message : "unknown",
@@ -105,11 +119,12 @@ export async function registerUserRoutes(
       return { ...mapAppUser(existing), created: false };
     }
 
+    const idToken = readIdTokenHeader(request.headers["x-auth0-id-token"]);
     const verifiedEmail =
       readVerifiedEmailClaim(request.auth.claims) ??
       await readVerifiedEmailFromIdToken({
         accessTokenSubject: auth0Sub,
-        idToken: readIdTokenHeader(request.headers["x-auth0-id-token"]),
+        idToken,
         verifyIdToken: options.verifyIdToken,
         log: request.log,
       });
@@ -147,6 +162,16 @@ export async function registerUserRoutes(
       : null;
 
     if (conflictingEmailUser) {
+      if (!idToken) {
+        warn(request.log, "users.bootstrap.id_token_missing", {
+          auth0Sub,
+        });
+      } else if (!options.verifyIdToken) {
+        warn(request.log, "users.bootstrap.id_token_verifier_missing", {
+          auth0Sub,
+        });
+      }
+
       warn(request.log, "users.bootstrap.account_link_required", {
         auth0Sub,
         email: parsed.data.email,
