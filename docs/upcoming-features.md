@@ -120,6 +120,8 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 
 **Season countdown / summary** - implemented as a feature-flagged current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Winner summary remains future work.
 
+**Season comparison report** - planned as an Overview reporting widget that compares two seasons inside the current organization. It should show house rank changes, point changes, point velocity, and top contributors without changing the selected dashboard reporting season. See [Season Comparison Report](./season-comparison-report.md).
+
 ### Implementation notes
 - Most widgets can be computed server-side in parallel on page load using existing `POST` endpoints or new lightweight aggregation endpoints.
 - Consider a `GET /dashboard/summary` endpoint that returns all widget data in one round-trip to avoid waterfall fetching.
