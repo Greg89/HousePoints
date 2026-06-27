@@ -165,6 +165,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       recentTransactions,
       velocityTransactions,
       memberTotals,
+      houseTotals,
+      transactionTypeTotals,
       members,
     ] = await Promise.all([
       prisma.house.findMany({
@@ -235,6 +237,26 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           targetUserId: { not: null },
         },
         _sum: { delta: true },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["targetHouseId"],
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: season.id,
+          deletedAt: null,
+        },
+        _sum: { delta: true },
+        _count: { _all: true },
+      }),
+      prisma.pointTransaction.groupBy({
+        by: ["type"],
+        where: {
+          organizationId: actor.organizationId,
+          seasonId: season.id,
+          deletedAt: null,
+        },
+        _sum: { delta: true },
+        _count: { _all: true },
       }),
       prisma.user.findMany({
         where: { organizationId: actor.organizationId },
@@ -327,6 +349,21 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         }))
         .sort((a, b) => b.points - a.points || a.displayName.localeCompare(b.displayName)),
     }));
+    const transactionTotalsByType = new Map(transactionTypeTotals.map((row) => [row.type, row]));
+    const awardTotals = transactionTotalsByType.get("AWARD");
+    const deductionTotals = transactionTotalsByType.get("DEDUCTION");
+    const totalTransactions = transactionTypeTotals.reduce((total, row) => total + row._count._all, 0);
+    const housePoints = new Map(houseTotals.map((row) => [row.targetHouseId, row._sum.delta ?? 0]));
+    const winningHouse = totalTransactions === 0
+      ? null
+      : houses
+          .map((house) => ({
+            houseId: house.id,
+            houseName: house.name,
+            houseColor: house.color,
+            points: housePoints.get(house.id) ?? 0,
+          }))
+          .sort((a, b) => b.points - a.points || a.houseName.localeCompare(b.houseName))[0] ?? null;
 
     info(request.log, "dashboard.summary.loaded", {
       organizationId: actor.organizationId,
@@ -344,10 +381,26 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0],
       ),
     }));
+    const seasonWinnerSummary = season.isActive || !season.endsAt
+      ? null
+      : {
+          seasonId: season.id,
+          seasonName: season.name,
+          startsAt: season.startsAt.toISOString(),
+          endsAt: season.endsAt.toISOString(),
+          winningHouse,
+          topContributor: seasonStandout,
+          totalTransactions,
+          awardCount: awardTotals?._count._all ?? 0,
+          deductionCount: deductionTotals?._count._all ?? 0,
+          awardedPoints: Math.max(0, awardTotals?._sum.delta ?? 0),
+          deductedPoints: Math.abs(Math.min(0, deductionTotals?._sum.delta ?? 0)),
+        };
 
     return {
       generatedAt: now.toISOString(),
       selectedSeason: mapSeason(season),
+      seasonWinnerSummary,
       seasonStartsAt: season.startsAt.toISOString(),
       seasonStandout,
       seasonStandoutsByHouse,

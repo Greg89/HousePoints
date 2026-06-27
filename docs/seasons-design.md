@@ -167,7 +167,7 @@ Current coverage includes:
 These are optional next slices, not blockers for the current production-ready season foundation:
 
 1. Activity season filter: decide whether Activity should stay all-activity only or allow filtering by season.
-2. Season winner summary: show winner and key stats for recently ended seasons.
+2. Season winner summary: show winner and key stats for recently ended seasons. The MVP lives in [Season Winner Summary](./season-winner-summary.md).
 3. Season comparison report: compare house ranking, point velocity, and top contributors across seasons. The product and implementation plan live in [Season Comparison Report](./season-comparison-report.md).
 4. Season detail page or modal: provide a focused historical report without overloading the dashboard.
 5. Scheduled seasons: support planned starts or automatic rollovers if real usage needs calendar-based cadence.

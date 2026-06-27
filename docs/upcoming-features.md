@@ -118,9 +118,9 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 
 **Admin-only: audit history** - implemented for point awards and other admin actions. Owners/admins can soft delete an award from the Activity tab, live scoring excludes the deleted transaction, and the Manage Audit tab shows the deletion in the shared audit history.
 
-**Season countdown / summary** - implemented as a feature-flagged current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Winner summary remains future work.
+**Season countdown / summary** - implemented as a feature-flagged current-season status card. It shows days remaining when the active season has an end date, otherwise it explains that admins can close the season from Manage when ready. Historical season winner summaries are implemented on the Overview tab. See [Season Winner Summary](./season-winner-summary.md).
 
-**Season comparison report** - planned as an Overview reporting widget that compares two seasons inside the current organization. It should show house rank changes, point changes, point velocity, and top contributors without changing the selected dashboard reporting season. See [Season Comparison Report](./season-comparison-report.md).
+**Season comparison report** - implemented as an Overview reporting widget that compares two seasons inside the current organization. It shows house rank changes, point changes, point velocity, and top contributors without changing the selected dashboard reporting season. See [Season Comparison Report](./season-comparison-report.md).
 
 ### Implementation notes
 - Most widgets can be computed server-side in parallel on page load using existing `POST` endpoints or new lightweight aggregation endpoints.

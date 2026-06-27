@@ -886,6 +886,7 @@ describe("dashboard response schemas", () => {
         endsAt: null,
         isActive: true,
       },
+      seasonWinnerSummary: null,
       seasonStartsAt: "2026-06-01T00:00:00.000Z",
       seasonStandout: {
         memberId: "user-1",
@@ -964,6 +965,44 @@ describe("dashboard response schemas", () => {
     };
 
     expect(dashboardSummarySchema.parse(summary)).toEqual(summary);
+
+    const historicalSummary = {
+      ...summary,
+      selectedSeason: {
+        id: "season-0",
+        name: "Season 0",
+        startsAt: "2026-06-01T00:00:00.000Z",
+        endsAt: "2026-07-01T00:00:00.000Z",
+        isActive: false,
+      },
+      seasonWinnerSummary: {
+        seasonId: "season-0",
+        seasonName: "Season 0",
+        startsAt: "2026-06-01T00:00:00.000Z",
+        endsAt: "2026-07-01T00:00:00.000Z",
+        winningHouse: {
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          points: 42,
+        },
+        topContributor: {
+          memberId: "user-1",
+          memberName: "Alice",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          points: 42,
+        },
+        totalTransactions: 5,
+        awardCount: 4,
+        deductionCount: 1,
+        awardedPoints: 47,
+        deductedPoints: 5,
+      },
+    };
+
+    expect(dashboardSummarySchema.parse(historicalSummary)).toEqual(historicalSummary);
   });
 
   it("rejects malformed dashboard summary fields", () => {
@@ -977,6 +1016,7 @@ describe("dashboard response schemas", () => {
           endsAt: null,
           isActive: true,
         },
+        seasonWinnerSummary: null,
         seasonStartsAt: "2026-06-01T00:00:00.000Z",
         seasonStandout: null,
         seasonStandoutsByHouse: [],
@@ -999,6 +1039,7 @@ describe("dashboard response schemas", () => {
           endsAt: null,
           isActive: true,
         },
+        seasonWinnerSummary: null,
         seasonStartsAt: "2026-06-01T00:00:00.000Z",
         seasonStandout: null,
         seasonStandoutsByHouse: [],

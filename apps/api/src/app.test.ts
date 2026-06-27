@@ -3257,6 +3257,13 @@ describe("POST /dashboard/summary", () => {
         { targetUserId: "user-1", _sum: { delta: 55 } },
         { targetUserId: "user-2", _sum: { delta: 5 } },
         { targetUserId: "user-3", _sum: { delta: 10 } },
+      ])
+      .mockResolvedValueOnce([
+        { targetHouseId: "house-1", _sum: { delta: 55 }, _count: { _all: 3 } },
+        { targetHouseId: "house-2", _sum: { delta: 10 }, _count: { _all: 1 } },
+      ])
+      .mockResolvedValueOnce([
+        { type: "AWARD", _sum: { delta: 75 }, _count: { _all: 4 } },
       ]);
     mockTxFindMany
       .mockResolvedValueOnce([
@@ -3316,6 +3323,7 @@ describe("POST /dashboard/summary", () => {
       isActive: true,
     });
     expect(body.seasonStartsAt).toBe("2026-07-01T00:00:00.000Z");
+    expect(body.seasonWinnerSummary).toBeNull();
     expect(body.monthStartsAt).toBe("2026-07-01T00:00:00.000Z");
     expect(body.seasonStandout).toEqual({
       memberId: "user-1",
@@ -3448,10 +3456,35 @@ describe("POST /dashboard/summary", () => {
   it("uses a requested historical season for reporting summary", async () => {
     mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
-    mockHouseFindMany.mockResolvedValue([]);
-    mockTxGroupBy.mockResolvedValue([]);
+    mockHouseFindMany.mockResolvedValue([
+      HOUSE,
+      { id: "house-2", name: "Ember", color: "#ef4444", description: null, organizationId: "org-secure" },
+    ]);
+    mockTxGroupBy
+      .mockResolvedValueOnce([
+        { targetUserId: "user-3", targetHouseId: "house-2", _sum: { delta: 30 } },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { targetUserId: "user-3", _sum: { delta: 30 } },
+      ])
+      .mockResolvedValueOnce([
+        { targetHouseId: "house-1", _sum: { delta: 10 }, _count: { _all: 1 } },
+        { targetHouseId: "house-2", _sum: { delta: 30 }, _count: { _all: 3 } },
+      ])
+      .mockResolvedValueOnce([
+        { type: "AWARD", _sum: { delta: 45 }, _count: { _all: 3 } },
+        { type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } },
+      ]);
     mockTxFindMany.mockResolvedValue([]);
-    mockUserFindMany.mockResolvedValue([]);
+    mockUserFindMany.mockResolvedValue([
+      {
+        id: "user-3",
+        displayName: "Cora",
+        role: "MEMBER",
+        houseId: "house-2",
+      },
+    ]);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -3470,6 +3503,31 @@ describe("POST /dashboard/summary", () => {
       }),
     );
     expect(res.json().selectedSeason.id).toBe("season-0");
+    expect(res.json().seasonWinnerSummary).toEqual({
+      seasonId: "season-0",
+      seasonName: "Season 0",
+      startsAt: "2026-06-01T00:00:00.000Z",
+      endsAt: "2026-07-01T00:00:00.000Z",
+      winningHouse: {
+        houseId: "house-2",
+        houseName: "Ember",
+        houseColor: "#ef4444",
+        points: 30,
+      },
+      topContributor: {
+        memberId: "user-3",
+        memberName: "Cora",
+        houseId: "house-2",
+        houseName: "Ember",
+        houseColor: "#ef4444",
+        points: 30,
+      },
+      totalTransactions: 4,
+      awardCount: 3,
+      deductionCount: 1,
+      awardedPoints: 45,
+      deductedPoints: 5,
+    });
     for (const call of mockTxFindMany.mock.calls) {
       expect(call[0]).toEqual(
         expect.objectContaining({

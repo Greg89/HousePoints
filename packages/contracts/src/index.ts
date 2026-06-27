@@ -200,9 +200,31 @@ const dashboardStandoutSchema = z.object({
   points: z.number().int(),
 });
 
+const seasonWinnerSummarySchema = z.object({
+  seasonId: z.string(),
+  seasonName: z.string(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  winningHouse: z.object({
+    houseId: z.string(),
+    houseName: z.string(),
+    houseColor: z.string(),
+    points: z.number().int(),
+  }).nullable(),
+  topContributor: dashboardStandoutSchema.nullable(),
+  totalTransactions: z.number().int().nonnegative(),
+  awardCount: z.number().int().nonnegative(),
+  deductionCount: z.number().int().nonnegative(),
+  awardedPoints: z.number().int().nonnegative(),
+  deductedPoints: z.number().int().nonnegative(),
+});
+
+export type SeasonWinnerSummary = z.infer<typeof seasonWinnerSummarySchema>;
+
 export const dashboardSummarySchema = z.object({
   generatedAt: z.string().datetime(),
   selectedSeason: seasonSchema,
+  seasonWinnerSummary: seasonWinnerSummarySchema.nullable(),
   seasonStartsAt: z.string().datetime(),
   seasonStandout: dashboardStandoutSchema.nullable(),
   seasonStandoutsByHouse: z.array(z.object({

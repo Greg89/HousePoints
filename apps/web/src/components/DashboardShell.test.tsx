@@ -261,6 +261,7 @@ const baseProps = {
   dashboardSummary: {
     generatedAt: new Date().toISOString(),
     selectedSeason: activeSeason,
+    seasonWinnerSummary: null,
     seasonStartsAt: activeSeason.startsAt,
     seasonStandout: {
       memberId: "member-2",
@@ -435,6 +436,31 @@ const baseProps = {
     dashboardSummary: {
       generatedAt: new Date().toISOString(),
       selectedSeason: historicalSeason,
+      seasonWinnerSummary: {
+        seasonId: "season-0",
+        seasonName: "Season 0",
+        startsAt: historicalSeason.startsAt,
+        endsAt: historicalSeason.endsAt,
+        winningHouse: {
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          points: 10,
+        },
+        topContributor: {
+          memberId: "member-3",
+          memberName: "Cara Clever",
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#1d4ed8",
+          points: 10,
+        },
+        totalTransactions: 1,
+        awardCount: 1,
+        deductionCount: 0,
+        awardedPoints: 10,
+        deductedPoints: 0,
+      },
       seasonStartsAt: historicalSeason.startsAt,
       seasonStandout: {
         memberId: "member-3",
@@ -616,6 +642,7 @@ describe("DashboardShell", () => {
     expect(screen.getByText("Trait leader per house")).toBeInTheDocument();
     expect(screen.getByText("Recent activity strip")).toBeInTheDocument();
     expect(screen.getByText("Points velocity")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Season recap")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Season comparison report")).toBeInTheDocument();
     expect(screen.getByLabelText("Season comparison report")).toHaveTextContent("Season 0 to Q3 2026");
     expect(screen.getAllByText("Ben Scorer").length).toBeGreaterThan(0);
@@ -707,6 +734,9 @@ describe("DashboardShell", () => {
     expect(onSeasonChange).toHaveBeenCalledWith("season-0");
     expect(await screen.findByText("Historical view")).toBeInTheDocument();
     expect(screen.getByText("Historical season view")).toBeInTheDocument();
+    expect(screen.getByLabelText("Season recap")).toHaveTextContent("Winning house");
+    expect(screen.getByLabelText("Season recap")).toHaveTextContent("Ravenclaw");
+    expect(screen.getByLabelText("Season recap")).toHaveTextContent("10 points");
     expect(screen.getAllByText("Cara Clever").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Ravenclaw/i })).toHaveTextContent("10");
     expect(screen.getByRole("button", { name: /Slytherin/i })).toHaveTextContent("0");

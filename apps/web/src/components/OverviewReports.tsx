@@ -14,6 +14,10 @@ function formatShortDate(isoString: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(isoString));
 }
 
+function formatDate(isoString: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(isoString));
+}
+
 export function OverviewReports({
   dashboardSummary,
   selectedHouse,
@@ -43,6 +47,7 @@ export function OverviewReports({
   const rankedMembers = selectedHouse
     ? dashboardSummary.houseMemberRankings.find((entry) => entry.houseId === selectedHouse.id)?.members ?? []
     : [];
+  const winnerSummary = !selectedHouse && isHistoricalSeason ? dashboardSummary.seasonWinnerSummary : null;
 
   return (
     <section className="space-y-4" aria-label={`${scopeLabel} reporting widgets`}>
@@ -62,6 +67,78 @@ export function OverviewReports({
           <p className="text-xs font-semibold text-amber-700">Historical season view</p>
         ) : null}
       </div>
+
+      {winnerSummary ? (
+        <article className="rounded-xl border bg-card p-5" aria-label="Season recap">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Trophy size={18} className="text-primary" />
+                Season recap
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {formatDate(winnerSummary.startsAt)} to {formatDate(winnerSummary.endsAt)}
+              </p>
+            </div>
+            {winnerSummary.winningHouse ? (
+              <div className="rounded-xl border bg-background/60 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Winning house
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: winnerSummary.winningHouse.houseColor }}
+                  />
+                  <span className="font-display text-xl font-semibold">
+                    {winnerSummary.winningHouse.houseName}
+                  </span>
+                </div>
+                <p className="mt-1 font-number text-2xl font-bold" style={{ color: winnerSummary.winningHouse.houseColor }}>
+                  {winnerSummary.winningHouse.points.toLocaleString()} points
+                </p>
+              </div>
+            ) : (
+              <p className="rounded-xl border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+                No winning house yet for this season.
+              </p>
+            )}
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top contributor</p>
+              <p className="mt-2 text-sm font-semibold">
+                {winnerSummary.topContributor?.memberName ?? "No contributor yet"}
+              </p>
+              {winnerSummary.topContributor ? (
+                <p className="font-number text-lg font-bold">
+                  {winnerSummary.topContributor.points.toLocaleString()} points
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Transactions</p>
+              <p className="mt-2 font-number text-lg font-bold">
+                {winnerSummary.totalTransactions.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Awarded</p>
+              <p className="mt-2 font-number text-lg font-bold">
+                {winnerSummary.awardedPoints.toLocaleString()} points
+              </p>
+              <p className="text-xs text-muted-foreground">{winnerSummary.awardCount} awards</p>
+            </div>
+            <div className="rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Deductions</p>
+              <p className="mt-2 font-number text-lg font-bold">
+                {winnerSummary.deductedPoints.toLocaleString()} points
+              </p>
+              <p className="text-xs text-muted-foreground">{winnerSummary.deductionCount} deductions</p>
+            </div>
+          </div>
+        </article>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-4">
         <article className="rounded-xl border bg-card p-5 lg:col-span-1">

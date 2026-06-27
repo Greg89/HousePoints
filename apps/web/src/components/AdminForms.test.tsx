@@ -347,7 +347,7 @@ describe("AdminForms", () => {
     await user.selectOptions(adjustmentActivity.getByLabelText("Reporting season"), "season-0");
 
     await waitFor(() => expect(props.onLoadPointAdjustmentStats).toHaveBeenCalledWith("season-0"));
-    expect(adjustmentActivity.getByText("Season: Season 0")).toBeInTheDocument();
+    await waitFor(() => expect(adjustmentActivity.getByText("Season: Season 0")).toBeInTheDocument());
     expect(adjustmentActivity.getByText("Ravenclaw")).toBeInTheDocument();
     expect(adjustmentActivity.getByText("1 deduction")).toBeInTheDocument();
     expect(adjustmentActivity.getAllByText("10")).toHaveLength(2);
