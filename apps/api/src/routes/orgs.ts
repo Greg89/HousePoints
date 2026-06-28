@@ -5,7 +5,11 @@ import {
   createOrgSchema,
   joinOrgSchema,
 } from "@housepoints/contracts";
-import { prisma } from "@housepoints/db";
+import {
+  createPrimaryOrganizationSlugAlias,
+  isOrganizationSlugReserved,
+  prisma,
+} from "@housepoints/db";
 import { getActorBySub, isAdminRole } from "../actor.js";
 import { mapAppUser } from "../app-user.js";
 import { info, warn } from "../logging.js";
@@ -55,8 +59,8 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     } = parsed.data;
     const auth0Sub = request.auth.subject;
 
-    // Reject if slug is already taken
-    const slugTaken = await prisma.organization.findUnique({ where: { slug: orgSlug }, select: { id: true } });
+    // Reject if slug is already taken or reserved by an alias.
+    const slugTaken = await isOrganizationSlugReserved(prisma, orgSlug);
     if (slugTaken) {
       warn(request.log, "orgs.create.slug_taken", { orgSlug });
       return reply.status(409).send({ code: "SLUG_TAKEN", message: `The slug "${orgSlug}" is already in use. Choose a different one.` });
@@ -94,6 +98,11 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       const org = await tx.organization.create({
         data: { name: orgName, slug: orgSlug },
         select: { id: true, slug: true, name: true },
+      });
+
+      await createPrimaryOrganizationSlugAlias(tx, {
+        organizationId: org.id,
+        slug: org.slug,
       });
 
       const house = await tx.house.create({

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { Prisma } from "@prisma/client";
-import { prisma } from "../src/index.js";
+import {
+  createPrimaryOrganizationSlugAlias,
+  isOrganizationSlugReserved,
+  prisma,
+  resolveOrganizationSlug,
+} from "../src/index.js";
 
 const runId = `db-it-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -105,6 +110,71 @@ async function run() {
   }
 
   const { organization, house, actor, target, season } = await createLedgerFixture();
+
+  await createPrimaryOrganizationSlugAlias(prisma, {
+    organizationId: organization.id,
+    slug: organization.slug,
+  });
+
+  assert.equal(await isOrganizationSlugReserved(prisma, organization.slug), true);
+  assert.equal(await isOrganizationSlugReserved(prisma, `${runId}-available`), false);
+
+  const resolvedPrimarySlug = await resolveOrganizationSlug(prisma, organization.slug);
+  assert.deepEqual(resolvedPrimarySlug, {
+    organizationId: organization.id,
+    matchedSlug: organization.slug,
+    currentSlug: organization.slug,
+    isPrimary: true,
+    organization: {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      createPrimaryOrganizationSlugAlias(prisma, {
+        organizationId: organization.id,
+        slug: `${runId}-second-primary`,
+      }),
+    (error) => {
+      assertPrismaErrorCode(error, "P2002");
+      return true;
+    },
+  );
+
+  const oldAlias = await prisma.organizationSlugAlias.create({
+    data: {
+      organizationId: organization.id,
+      slug: `${runId}-old-slug`,
+      isPrimary: false,
+      retiredAt: new Date(),
+    },
+  });
+
+  assert.equal(await isOrganizationSlugReserved(prisma, oldAlias.slug), true);
+
+  const resolvedOldSlug = await resolveOrganizationSlug(prisma, oldAlias.slug);
+  assert.equal(resolvedOldSlug?.organizationId, organization.id);
+  assert.equal(resolvedOldSlug?.matchedSlug, oldAlias.slug);
+  assert.equal(resolvedOldSlug?.currentSlug, organization.slug);
+  assert.equal(resolvedOldSlug?.isPrimary, false);
+
+  await assert.rejects(
+    () =>
+      prisma.organizationSlugAlias.create({
+        data: {
+          organizationId: organization.id,
+          slug: oldAlias.slug,
+          isPrimary: false,
+        },
+      }),
+    (error) => {
+      assertPrismaErrorCode(error, "P2002");
+      return true;
+    },
+  );
 
   const transaction = await prisma.pointTransaction.create({
     data: {

@@ -6,6 +6,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // â”€â”€ Mock @housepoints/db before importing anything that uses it â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 vi.mock("@housepoints/db", () => ({
+  createPrimaryOrganizationSlugAlias: vi.fn(),
+  isOrganizationSlugReserved: vi.fn(),
+  resolveOrganizationSlug: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
     organization: {
@@ -37,6 +40,10 @@ vi.mock("@housepoints/db", () => ({
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
+    organizationSlugAlias: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+    },
     auditEvent: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -62,7 +69,11 @@ vi.mock("@housepoints/db", () => ({
 vi.mock("dotenv/config", () => ({}));
 
 import { buildApp } from "./app";
-import { prisma } from "@housepoints/db";
+import {
+  createPrimaryOrganizationSlugAlias,
+  isOrganizationSlugReserved,
+  prisma,
+} from "@housepoints/db";
 
 // Typed shorthand helpers
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
@@ -72,7 +83,6 @@ const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockAuthIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
 const mockAuthIdentityCreate = prisma.authIdentity.create as ReturnType<typeof vi.fn>;
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
-const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>;
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockOrgUpdate = prisma.organization.update as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
@@ -84,6 +94,8 @@ const mockInviteCount = prisma.orgInvite.count as ReturnType<typeof vi.fn>;
 const mockInviteFindMany = prisma.orgInvite.findMany as ReturnType<typeof vi.fn>;
 const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
+const mockCreatePrimaryOrganizationSlugAlias = createPrimaryOrganizationSlugAlias as ReturnType<typeof vi.fn>;
+const mockIsOrganizationSlugReserved = isOrganizationSlugReserved as ReturnType<typeof vi.fn>;
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
 const mockAuditEventFindMany = prisma.auditEvent.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
@@ -163,6 +175,8 @@ beforeEach(() => {
   mockTxGroupBy.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
+  mockIsOrganizationSlugReserved.mockResolvedValue(false);
+  mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockSeasonFindMany.mockResolvedValue([]);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
@@ -3685,7 +3699,7 @@ describe("POST /orgs/create", () => {
   };
 
   it("returns SLUG_TAKEN before starting setup when organization slug already exists", async () => {
-    mockOrgFindUnique.mockResolvedValue({ id: "org-existing" });
+    mockIsOrganizationSlugReserved.mockResolvedValue(true);
     const app = await buildTestApp("auth0|member");
 
     const res = await app.inject({
@@ -3703,7 +3717,6 @@ describe("POST /orgs/create", () => {
   });
 
   it("returns ALREADY_IN_ORG before starting setup when identity already belongs to an organization", async () => {
-    mockOrgFindUnique.mockResolvedValue(null);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
@@ -3727,7 +3740,6 @@ describe("POST /orgs/create", () => {
   });
 
   it("atomically creates the organization, first house, and assigned owner", async () => {
-    mockOrgFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
       organizationId: null,
@@ -3766,6 +3778,10 @@ describe("POST /orgs/create", () => {
       },
       select: { id: true, name: true, color: true },
     });
+    expect(mockCreatePrimaryOrganizationSlugAlias).toHaveBeenCalledWith(prisma, {
+      organizationId: "org-1",
+      slug: "acme",
+    });
     expect(mockUserUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -3789,7 +3805,6 @@ describe("POST /orgs/create", () => {
   });
 
   it("returns an error when the atomic setup transaction fails", async () => {
-    mockOrgFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
       organizationId: null,
