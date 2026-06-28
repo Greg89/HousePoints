@@ -71,7 +71,7 @@ The app supports creating and joining organizations. The first org settings slic
 Deferred sub-features:
 
 - Rename organization display name. Implemented for owners in Manage Settings.
-- Change organization slug safely. Design guidance lives in [Organization Settings Design](./org-settings-design.md); the recommended path now starts with alias/reservation support because slugs are intended to become visible in URLs and invite links.
+- Change organization slug safely. Alias/reservation support and owner-only slug changes are implemented; slug-bearing invite URLs are the next slice. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
 - Transfer owner role.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization.

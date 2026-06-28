@@ -8,6 +8,7 @@ import {
   readAdminAuditPage,
   readAdminContext,
   readPointAdjustmentStats,
+  updateOrgSlug,
   updateOrgSettings,
 } from "./actions/admin";
 import {
@@ -163,6 +164,7 @@ async function renderHome() {
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
       onPromoteUser={promoteUserRole}
+      onUpdateOrgSlug={updateOrgSlug}
       onUpdateOrgSettings={updateOrgSettings}
       onLoadAdminAudit={readAdminAuditPage}
       onLoadPointAdjustmentStats={readPointAdjustmentStats}

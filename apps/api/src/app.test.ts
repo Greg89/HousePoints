@@ -43,6 +43,7 @@ vi.mock("@housepoints/db", () => ({
     organizationSlugAlias: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      updateMany: vi.fn(),
     },
     auditEvent: {
       create: vi.fn(),
@@ -96,6 +97,8 @@ const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockCreatePrimaryOrganizationSlugAlias = createPrimaryOrganizationSlugAlias as ReturnType<typeof vi.fn>;
 const mockIsOrganizationSlugReserved = isOrganizationSlugReserved as ReturnType<typeof vi.fn>;
+const mockOrgSlugAliasCreate = prisma.organizationSlugAlias.create as ReturnType<typeof vi.fn>;
+const mockOrgSlugAliasUpdateMany = prisma.organizationSlugAlias.updateMany as ReturnType<typeof vi.fn>;
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
 const mockAuditEventFindMany = prisma.auditEvent.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
@@ -2241,6 +2244,119 @@ describe("POST /admin/org/settings", () => {
       id: "org-1",
       name: "Renamed Org",
       slug: "acme",
+    });
+    await app.close();
+  });
+});
+
+describe("POST /admin/org/slug", () => {
+  it("returns 403 OWNER_REQUIRED when actor is not an owner", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/slug",
+      payload: { slug: "acme-corp" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    expect(mockOrgSlugAliasCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns SLUG_UNCHANGED when the submitted slug matches the current slug", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/slug",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("SLUG_UNCHANGED");
+    expect(mockIsOrganizationSlugReserved).not.toHaveBeenCalled();
+    expect(mockTransaction).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns SLUG_TAKEN when the slug is already reserved", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockIsOrganizationSlugReserved.mockResolvedValue(true);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/slug",
+      payload: { slug: "reserved-slug" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("SLUG_TAKEN");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to change the organization slug and writes an audit event", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockOrgUpdate.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme-corp",
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/slug",
+      payload: { slug: "acme-corp" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockOrgSlugAliasUpdateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        isPrimary: true,
+      },
+      data: {
+        isPrimary: false,
+        retiredAt: expect.any(Date),
+      },
+    });
+    expect(mockOrgUpdate).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      data: { slug: "acme-corp" },
+      select: { id: true, name: true, slug: true },
+    });
+    expect(mockOrgSlugAliasCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        slug: "acme-corp",
+        isPrimary: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "ORG_SETTINGS_UPDATED",
+        summary: "Olivia changed the organization slug from acme to acme-corp.",
+        metadata: {
+          field: "slug",
+          previousSlug: "acme",
+          newSlug: "acme-corp",
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme-corp",
     });
     await app.close();
   });

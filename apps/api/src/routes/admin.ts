@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { Prisma } from "@prisma/client";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
@@ -7,9 +8,10 @@ import {
   createHouseSchema,
   promoteUserSchema,
   seasonScopedRequestSchema,
+  updateOrgSlugSchema,
   updateOrgSettingsSchema,
 } from "@housepoints/contracts";
-import { prisma } from "@housepoints/db";
+import { isOrganizationSlugReserved, prisma } from "@housepoints/db";
 import { getActorBySub, isAdminRole, isOwnerRole } from "../actor.js";
 import { info, warn } from "../logging.js";
 import { resolveSeasonScope, SeasonScopeError } from "../season-scope.js";
@@ -263,6 +265,117 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return updatedOrganization;
+  });
+
+  app.post("/admin/org/slug", async (request, reply) => {
+    const parsed = updateOrgSlugSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor || !isOwnerRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {});
+      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
+    }
+
+    const nextSlug = parsed.data.slug;
+    const previousSlug = actor.organizationSlug;
+
+    if (nextSlug === previousSlug) {
+      return reply.status(409).send({
+        code: "SLUG_UNCHANGED",
+        message: "The organization slug is already set to that value.",
+      });
+    }
+
+    if (await isOrganizationSlugReserved(prisma, nextSlug)) {
+      warn(request.log, "admin.org.slug_taken", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        attemptedSlug: nextSlug,
+      });
+      return reply.status(409).send({
+        code: "SLUG_TAKEN",
+        message: "That organization slug is already reserved. Choose a different one.",
+      });
+    }
+
+    try {
+      const updatedOrganization = await prisma.$transaction(async (tx) => {
+        await tx.organizationSlugAlias.updateMany({
+          where: {
+            organizationId: actor.organizationId,
+            isPrimary: true,
+          },
+          data: {
+            isPrimary: false,
+            retiredAt: new Date(),
+          },
+        });
+
+        const organization = await tx.organization.update({
+          where: { id: actor.organizationId },
+          data: { slug: nextSlug },
+          select: { id: true, name: true, slug: true },
+        });
+
+        await tx.organizationSlugAlias.create({
+          data: {
+            organizationId: actor.organizationId,
+            slug: nextSlug,
+            isPrimary: true,
+          },
+        });
+
+        await tx.auditEvent.create({
+          data: {
+            organizationId: actor.organizationId,
+            actorUserId: actor.id,
+            eventType: "ORG_SETTINGS_UPDATED",
+            summary: `${actor.displayName} changed the organization slug from ${previousSlug} to ${organization.slug}.`,
+            metadata: {
+              field: "slug",
+              previousSlug,
+              newSlug: organization.slug,
+            },
+          },
+        });
+
+        return organization;
+      });
+
+      info(request.log, "admin.org.slug_updated", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        previousSlug,
+        newSlug: updatedOrganization.slug,
+      });
+
+      return updatedOrganization;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        warn(request.log, "admin.org.slug_taken", {
+          actorUserId: actor.id,
+          organizationId: actor.organizationId,
+          attemptedSlug: nextSlug,
+        });
+        return reply.status(409).send({
+          code: "SLUG_TAKEN",
+          message: "That organization slug is already reserved. Choose a different one.",
+        });
+      }
+
+      throw error;
+    }
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {

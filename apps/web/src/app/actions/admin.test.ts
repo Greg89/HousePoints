@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, updateOrgSettings } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, updateOrgSettings, updateOrgSlug } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -132,6 +132,79 @@ describe("updateOrgSettings", () => {
         actorUserId: "user-1",
         organizationId: "org-1",
         organizationName: "House Points Guild",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateOrgSlug", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme-corp",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme-corp",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when slug update succeeds", async () => {
+    const formData = new FormData();
+    formData.set("slug", " acme-corp ");
+
+    await expect(updateOrgSlug(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("updateOrgSlug", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("updateOrgSlug", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/org/slug", "request-1", {
+      method: "POST",
+      body: JSON.stringify({ slug: "acme-corp" }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const formData = new FormData();
+
+    await expect(updateOrgSlug(formData)).resolves.toEqual({
+      ok: false,
+      code: "ORG_SLUG_REQUIRED",
+      message: "Organization slug is required.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("slug", "reserved-slug");
+    const error = new ApiResponseError(
+      409,
+      "SLUG_TAKEN",
+      "That organization slug is already reserved. Choose a different one.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(updateOrgSlug(formData)).resolves.toEqual({
+      ok: false,
+      code: "SLUG_TAKEN",
+      message: "That organization slug is already reserved. Choose a different one.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "updateOrgSlug", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        organizationSlug: "reserved-slug",
       },
     );
     expect(revalidatePathMock).not.toHaveBeenCalled();

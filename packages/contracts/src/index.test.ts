@@ -25,6 +25,7 @@ import {
   seasonContextSchema,
   seasonScopedRequestSchema,
   updateOrgSettingsSchema,
+  updateOrgSlugSchema,
   seasonTransitionSchema,
   memberScoreSchema,
   memberScoresSchema,
@@ -55,6 +56,7 @@ const webConsumedApiEndpoints = [
   "/admin/context",
   "/admin/houses",
   "/admin/org/settings",
+  "/admin/org/slug",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
   "/admin/users/role",
@@ -569,6 +571,10 @@ describe("authenticated request schemas", () => {
     }],
     [updateOrgSettingsSchema, {
       name: "Acme Corp",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [updateOrgSlugSchema, {
+      slug: "acme-corp",
       actorAuth0Sub: "auth0|attacker",
     }],
     [adminAuditRequestSchema, {
@@ -1522,6 +1528,20 @@ describe("pointAdjustmentStatsSchema", () => {
         byHouse: [],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("updateOrgSlugSchema", () => {
+  it("accepts URL-safe slugs", () => {
+    expect(updateOrgSlugSchema.parse({ slug: "acme-corp-2" })).toEqual({
+      slug: "acme-corp-2",
+    });
+  });
+
+  it("rejects unsafe slugs", () => {
+    expect(updateOrgSlugSchema.safeParse({ slug: "Acme Corp" }).success).toBe(false);
+    expect(updateOrgSlugSchema.safeParse({ slug: "-acme" }).success).toBe(false);
+    expect(updateOrgSlugSchema.safeParse({ slug: "acme-" }).success).toBe(false);
   });
 });
 

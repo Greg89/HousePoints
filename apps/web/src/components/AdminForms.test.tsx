@@ -166,6 +166,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
+    onUpdateOrgSlug: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
     onLoadAdminAudit: vi.fn().mockResolvedValue({
       items: recentAdminActions,
@@ -313,6 +314,68 @@ describe("AdminForms", () => {
     const { toast } = await import("sonner");
     expect(toast.success).toHaveBeenCalledWith("Organization updated", {
       description: "House Points Guild",
+    });
+  });
+
+  it("lets owners change the organization slug with confirmation", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
+
+    expect(slugForm.getByText("Previous slugs stay reserved so old links cannot be claimed by another organization.")).toBeInTheDocument();
+
+    await user.type(slugForm.getByLabelText("New slug"), "acme-corp");
+    await user.type(slugForm.getByLabelText("Confirm current slug"), "acme");
+    await user.click(slugForm.getByRole("button", { name: "Change organization slug" }));
+
+    await waitFor(() => expect(props.onUpdateOrgSlug).toHaveBeenCalledOnce());
+    const updateMock = props.onUpdateOrgSlug as ReturnType<typeof vi.fn>;
+    const formData = updateMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      slug: "acme-corp",
+      confirmation: "acme",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Organization slug updated", {
+      description: "acme-corp",
+    });
+  });
+
+  it("does not submit slug changes when confirmation does not match", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
+
+    await user.type(slugForm.getByLabelText("New slug"), "acme-corp");
+    await user.type(slugForm.getByLabelText("Confirm current slug"), "wrong");
+    await user.click(slugForm.getByRole("button", { name: "Change organization slug" }));
+
+    expect(props.onUpdateOrgSlug).not.toHaveBeenCalled();
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Slug confirmation does not match", {
+      description: "Type acme to confirm this change.",
+    });
+  });
+
+  it("shows a safe toast when organization slug update fails", async () => {
+    const { user, props } = setupAdminForms({
+      onUpdateOrgSlug: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "SLUG_TAKEN",
+        message: "That organization slug is already reserved. Choose a different one.",
+      }),
+    });
+    switchToManageSection("Settings");
+    const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
+
+    await user.type(slugForm.getByLabelText("New slug"), "reserved-slug");
+    await user.type(slugForm.getByLabelText("Confirm current slug"), "acme");
+    await user.click(slugForm.getByRole("button", { name: "Change organization slug" }));
+
+    await waitFor(() => expect(props.onUpdateOrgSlug).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to update organization slug", {
+      description: "That organization slug is already reserved. Choose a different one.",
     });
   });
 

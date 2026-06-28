@@ -14,9 +14,10 @@ Organizations already have two user-facing identifiers:
 The first settings slice is implemented:
 
 - Owners can rename the organization display name from Manage Settings.
+- Owners can change the organization slug from a separate confirmed Manage Settings form.
 - The API derives the organization from the authenticated actor; the client does not submit an organization id.
-- Display-name changes are audited as `ORG_SETTINGS_UPDATED`.
-- The current slug is read-only in the UI.
+- Display-name and slug changes are audited as `ORG_SETTINGS_UPDATED`.
+- Old slugs stay reserved through `OrganizationSlugAlias`.
 
 Today, the slug is mostly identity metadata. It is stored uniquely, returned in app/user/admin context, shown in Settings, and used during organization creation to prevent duplicates. Current invite joining is based on single-use token hashes and the invite's `organizationId`, not on the slug. The app does not currently route dashboards by `/:orgSlug`.
 
@@ -30,7 +31,7 @@ Owners own organization-level configuration. Admins run day-to-day operations su
 
 That means organization slug changes should stay owner-only. They are more sensitive than changing the display name because slugs can become part of future links, discovery, invite policy, or organization switching.
 
-Recommended product behavior:
+Implemented product behavior:
 
 - Keep the slug visible in Manage Settings so owners understand the organization identifier.
 - Allow slug changes only after an explicit owner action, not inline with the display-name form.
@@ -62,13 +63,13 @@ The design should preserve today's safety while avoiding a future trap where old
 
 ## Recommended MVP
 
-Because slugs are intended to become visible in URLs and invite links, the MVP should include slug alias/reservation before enabling slug change or slug-based links. That keeps the first public slug experience from creating broken links or accidental slug takeovers later.
+Because slugs are intended to become visible in URLs and invite links, the MVP includes slug alias/reservation before enabling slug-based links. That keeps the first public slug experience from creating broken links or accidental slug takeovers later.
 
 Behavior:
 
-- Backfill an alias/reservation row for every existing organization's current slug.
-- Owner opens a dedicated "Change organization slug" control.
-- Form requires the new slug and a confirmation step that clearly says links or future references may change.
+- Backfill an alias/reservation row for every existing organization's current slug. Implemented.
+- Owner opens a dedicated "Change organization slug" control. Implemented.
+- Form requires the new slug and confirmation of the current slug. Implemented.
 - Server validates with the existing shared slug rules: lowercase letters, numbers, hyphens, no leading/trailing hyphen, length limits.
 - Server checks uniqueness against both current organization slugs and reserved slug aliases.
 - Server derives `organizationId` from the actor and updates only that organization.
@@ -197,13 +198,13 @@ Integration/regression checks:
 
 ---
 
-## Recommended Next Slice
+## Phase Status
 
-Start with the alias/reservation foundation because slugs are intended to become visible in URLs and invites.
+Slugs are intended to become visible in URLs and invites, so the work starts with reservation safety before public route changes.
 
 Suggested order:
 
-1. Add `OrganizationSlugAlias`, backfill current slugs, and add a shared slug resolver.
-2. Add owner-only slug change using the existing `Organization.slug` field plus alias reservation checks.
-3. Update invite generation to present slug-bearing invite URLs while keeping token-hash join security.
+1. Add `OrganizationSlugAlias`, backfill current slugs, and add a shared slug resolver. Implemented.
+2. Add owner-only slug change using the existing `Organization.slug` field plus alias reservation checks. Implemented.
+3. Update invite generation to present slug-bearing invite URLs while keeping token-hash join security. Next.
 4. Add slug-based landing/join routes that resolve aliases and redirect old slugs to the current slug.

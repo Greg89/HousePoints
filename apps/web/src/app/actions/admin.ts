@@ -143,6 +143,62 @@ export async function updateOrgSettings(formData: FormData): Promise<OrgSettings
   });
 }
 
+export async function updateOrgSlug(formData: FormData): Promise<OrgSettingsMutationResult> {
+  return runServerAction("updateOrgSlug", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("updateOrgSlug", requestId);
+    const slug = String(formData.get("slug") ?? "").trim();
+
+    if (!slug) {
+      return {
+        ok: false,
+        code: "ORG_SLUG_REQUIRED",
+        message: "Organization slug is required.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/slug", requestId, {
+      method: "POST",
+      body: JSON.stringify({ slug }),
+    });
+
+    try {
+      const organization = await parseApiResponse(
+        response,
+        orgSettingsSchema,
+        "The organization slug could not be updated. Please try again.",
+      );
+
+      logInfo("web.admin.org_slug_updated", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationSlug: organization.slug,
+      });
+
+      revalidatePath("/");
+
+      return { ok: true };
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationSlug: slug,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
+}
+
 export async function assignUserHouse(formData: FormData): Promise<HouseAssignmentResult> {
   return runServerAction("assignUserHouse", async (context) => {
     const { requestId } = context;

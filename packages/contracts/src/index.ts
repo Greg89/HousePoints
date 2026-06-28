@@ -666,6 +666,12 @@ export const updateOrgSettingsSchema = z.object({
 
 export type UpdateOrgSettingsInput = z.infer<typeof updateOrgSettingsSchema>;
 
+export const updateOrgSlugSchema = z.object({
+  slug: slugSchema,
+}).strict();
+
+export type UpdateOrgSlugInput = z.infer<typeof updateOrgSlugSchema>;
+
 export const inviteLinkSchema = z.object({
   id: z.string().min(1),
   token: z.string().min(1),
@@ -694,6 +700,7 @@ export const apiContracts = {
   "/admin/context": defineContract(actorScopeSchema, adminContextSchema),
   "/admin/houses": defineContract(createHouseSchema, adminHouseSchema),
   "/admin/org/settings": defineContract(updateOrgSettingsSchema, orgSettingsSchema),
+  "/admin/org/slug": defineContract(updateOrgSlugSchema, orgSettingsSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,
