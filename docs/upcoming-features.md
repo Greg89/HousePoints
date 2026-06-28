@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org deletion, ownership transfer, deeper admin removal rules, domain allow-list joining, slug changes, and true multi-org membership. The first org settings slice is implemented for owner-only organization display-name updates.
+Still deferred: org deletion, ownership transfer, deeper admin removal rules, domain allow-list joining, slug changes, and true multi-org membership. The first org settings slice is implemented for owner-only organization display-name updates. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md).
 
 ### How it should work
 
@@ -28,7 +28,7 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - `OWNER` controls organization-level configuration, including houses and seasons.
 - `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
 - `OWNER` can promote members to `ADMIN` and demote admins back to `MEMBER` from Manage Team. Role changes are audited.
-- `OWNER` can rename the organization display name from Manage Settings. Slug changes are deferred because they affect URLs, links, and future invite policies.
+- `OWNER` can rename the organization display name from Manage Settings. Slug changes remain deferred, with alias/reservation planned first because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
 - Org deletion, ownership transfer, slug changes, and deeper admin-removal rules are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
@@ -131,7 +131,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 - Elevated Manage reporting should expand from the current member/house/unassigned cards into a compact operational view: audit history, invite activity, season changes, unusual point volume, and data cleanup history.
 - The Manage tab has been split into focused overview, audit-history, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
 - The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets. Houses and Seasons remain visible to admins, but are owner-only and disabled for non-owner admins.
-- Manage Settings is implemented for owner-only organization display-name changes. Slug changes and broader organization lifecycle controls remain deferred.
+- Manage Settings is implemented for owner-only organization display-name changes. Slug changes and broader organization lifecycle controls remain deferred; see [Organization Settings Design](./org-settings-design.md) for the recommended alias-backed slug and invite URL path.
 - The Team section now uses compact assignment, invite, and owner-only role-management cards. It includes audit-backed invite activity reporting for recent token generation and use.
 - The Audit section now uses the persisted `AuditEvent` table as the single source of truth for administrative history. It supports event-type filtering, cursor pagination, and includes point deletion, invite creation/use, season starts, house assignment, and role changes. Legacy fallback rows are still merged into the initial context for older records that predate durable audit events.
 
