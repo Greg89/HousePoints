@@ -440,6 +440,7 @@ export const adminAuditActionSchema = z.object({
     "INVITE_CREATED",
     "INVITE_USED",
     "SEASON_STARTED",
+    "ORG_SETTINGS_UPDATED",
     "POINTS_DEDUCTED",
     "USER_HOUSE_ASSIGNED",
     "USER_ROLE_CHANGED",
@@ -493,6 +494,7 @@ export type PointAdjustmentStats = z.infer<typeof pointAdjustmentStatsSchema>;
 
 export const adminContextSchema = z.object({
   organizationId: z.string(),
+  organizationName: z.string(),
   organizationSlug: z.string(),
   users: z.array(adminUserSchema),
   houses: z.array(adminHouseSchema),
@@ -658,6 +660,12 @@ export const orgSettingsSchema = z.object({
 
 export type OrgSettings = z.infer<typeof orgSettingsSchema>;
 
+export const updateOrgSettingsSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+}).strict();
+
+export type UpdateOrgSettingsInput = z.infer<typeof updateOrgSettingsSchema>;
+
 export const inviteLinkSchema = z.object({
   id: z.string().min(1),
   token: z.string().min(1),
@@ -685,6 +693,7 @@ export const apiContracts = {
   "/admin/audit": defineContract(adminAuditRequestSchema, pagedAdminAuditActionsSchema),
   "/admin/context": defineContract(actorScopeSchema, adminContextSchema),
   "/admin/houses": defineContract(createHouseSchema, adminHouseSchema),
+  "/admin/org/settings": defineContract(updateOrgSettingsSchema, orgSettingsSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,

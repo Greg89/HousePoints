@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, updateOrgSettings } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -51,6 +51,7 @@ const actor = {
   houseThemeEnabled: false,
   role: "OWNER" as const,
   organizationId: "org-1",
+  organizationName: "Acme Corp",
   organizationSlug: "acme",
   houseId: "house-1",
   houseName: "Slytherin",
@@ -62,6 +63,79 @@ beforeEach(() => {
   vi.clearAllMocks();
   getActorMappingForAdminMock.mockResolvedValue(actor);
   getCurrentUserForRequestMock.mockResolvedValue(actor);
+});
+
+describe("updateOrgSettings", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "org-1",
+      name: "House Points Guild",
+      slug: "acme",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "org-1",
+      name: "House Points Guild",
+      slug: "acme",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when organization settings update succeeds", async () => {
+    const formData = new FormData();
+    formData.set("name", " House Points Guild ");
+
+    await expect(updateOrgSettings(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("updateOrgSettings", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("updateOrgSettings", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/org/settings", "request-1", {
+      method: "POST",
+      body: JSON.stringify({ name: "House Points Guild" }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const formData = new FormData();
+
+    await expect(updateOrgSettings(formData)).resolves.toEqual({
+      ok: false,
+      code: "ORG_NAME_REQUIRED",
+      message: "Organization name is required.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("name", "House Points Guild");
+    const error = new ApiResponseError(
+      403,
+      "OWNER_REQUIRED",
+      "The organization settings could not be updated. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(updateOrgSettings(formData)).resolves.toEqual({
+      ok: false,
+      code: "OWNER_REQUIRED",
+      message: "The organization settings could not be updated. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "updateOrgSettings", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        organizationName: "House Points Guild",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("createHouse", () => {

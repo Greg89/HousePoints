@@ -8,6 +8,7 @@ import {
   readAdminAuditPage,
   readAdminContext,
   readPointAdjustmentStats,
+  updateOrgSettings,
 } from "./actions/admin";
 import {
   readActivityPage,
@@ -146,6 +147,11 @@ async function renderHome() {
     <AdminForms
       users={adminContext.users}
       houses={adminContext.houses}
+      organization={{
+        id: adminContext.organizationId,
+        name: adminContext.organizationName,
+        slug: adminContext.organizationSlug,
+      }}
       recentDeletedPoints={adminContext.recentDeletedPoints}
       recentAdminActions={adminContext.recentAdminActions}
       inviteStats={adminContext.inviteStats}
@@ -157,6 +163,7 @@ async function renderHome() {
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
       onPromoteUser={promoteUserRole}
+      onUpdateOrgSettings={updateOrgSettings}
       onLoadAdminAudit={readAdminAuditPage}
       onLoadPointAdjustmentStats={readPointAdjustmentStats}
       onCreateInvite={createInviteLink}

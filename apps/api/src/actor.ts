@@ -8,6 +8,7 @@ export type ActorRecord = {
   role: UserRole;
   houseId: string | null;
   organizationId: string;
+  organizationName: string;
   organizationSlug: string;
 };
 
@@ -32,6 +33,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
           organizationId: true,
           organization: {
             select: {
+              name: true,
               slug: true,
             },
           },
@@ -49,6 +51,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
       organizationId: true,
       organization: {
         select: {
+          name: true,
           slug: true,
         },
       },
@@ -70,6 +73,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
     role: actor.role,
     houseId: actor.houseId,
     organizationId: actor.organizationId,
+    organizationName: actor.organization.name,
     organizationSlug: actor.organization.slug,
   };
 }

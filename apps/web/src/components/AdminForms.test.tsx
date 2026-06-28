@@ -126,6 +126,11 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
   const props = {
     users,
     houses,
+    organization: {
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+    },
     seasons: [activeSeason, historicalSeason],
     activeSeason,
     actorRole: "OWNER" as const,
@@ -161,6 +166,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
+    onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
     onLoadAdminAudit: vi.fn().mockResolvedValue({
       items: recentAdminActions,
       nextCursor: null,
@@ -242,6 +248,10 @@ describe("AdminForms", () => {
     expect(adjustmentActivity.getByText("2 deductions")).toBeInTheDocument();
     expect(adjustmentActivity.getAllByText("20")[0]).toBeInTheDocument();
 
+    switchToManageSection("Settings");
+    expect(screen.getByRole("tab", { name: /Settings/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Organization Settings")).toBeInTheDocument();
+
     switchToManageSection("Audit");
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
@@ -255,14 +265,22 @@ describe("AdminForms", () => {
 
     const housesTab = screen.getByRole("tab", { name: /Houses/ });
     const seasonsTab = screen.getByRole("tab", { name: /Seasons/ });
+    const settingsTab = screen.getByRole("tab", { name: /Settings/ });
 
+    expect(settingsTab).toBeVisible();
     expect(housesTab).toBeVisible();
     expect(seasonsTab).toBeVisible();
+    expect(settingsTab).toBeDisabled();
     expect(housesTab).toBeDisabled();
     expect(seasonsTab).toBeDisabled();
+    expect(settingsTab).toHaveAttribute("aria-disabled", "true");
     expect(housesTab).toHaveAttribute("aria-disabled", "true");
     expect(seasonsTab).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getAllByText("Owner only")).toHaveLength(2);
+    expect(screen.getAllByText("Owner only")).toHaveLength(3);
+
+    await user.click(settingsTab);
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("form", { name: "Organization settings" })).not.toBeInTheDocument();
 
     await user.click(housesTab);
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
@@ -271,6 +289,54 @@ describe("AdminForms", () => {
     await user.click(seasonsTab);
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
+  });
+
+  it("lets owners update organization settings", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const settingsForm = within(screen.getByRole("form", { name: "Organization settings" }));
+    const nameInput = settingsForm.getByLabelText("Organization name") as HTMLInputElement;
+
+    expect(nameInput.value).toBe("Acme Corp");
+    expect(settingsForm.getByText("acme")).toBeInTheDocument();
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "House Points Guild");
+    await user.click(settingsForm.getByRole("button", { name: "Save organization" }));
+
+    await waitFor(() => expect(props.onUpdateOrgSettings).toHaveBeenCalledOnce());
+    const updateMock = props.onUpdateOrgSettings as ReturnType<typeof vi.fn>;
+    const formData = updateMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      name: "House Points Guild",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Organization updated", {
+      description: "House Points Guild",
+    });
+  });
+
+  it("shows a safe toast when organization settings update fails", async () => {
+    const { user, props } = setupAdminForms({
+      onUpdateOrgSettings: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "OWNER_REQUIRED",
+        message: "The organization settings could not be updated. Please try again.",
+      }),
+    });
+    switchToManageSection("Settings");
+    const settingsForm = within(screen.getByRole("form", { name: "Organization settings" }));
+    const nameInput = settingsForm.getByLabelText("Organization name");
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "House Points Guild");
+    await user.click(settingsForm.getByRole("button", { name: "Save organization" }));
+
+    await waitFor(() => expect(props.onUpdateOrgSettings).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to update organization", {
+      description: "The organization settings could not be updated. Please try again.",
+    });
   });
 
   it("shows audit history including deleted point awards in the Audit section", () => {

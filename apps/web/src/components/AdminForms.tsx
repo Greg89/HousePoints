@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { AdminAuditAction, DeletedPoint, InviteStats, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
   HouseMutationResult,
+  OrgSettingsMutationResult,
   RenameSeasonResult,
   RoleChangeResult,
   StartSeasonResult,
@@ -13,6 +14,7 @@ import type {
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { HouseManagement } from "./HouseManagement";
 import { ManageOverview } from "./ManageOverview";
+import { OrgSettingsManagement } from "./OrgSettingsManagement";
 import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
 import { SeasonManagement } from "./SeasonManagement";
 import { TeamManagement } from "./TeamManagement";
@@ -22,6 +24,7 @@ interface AdminFormsProps {
   houses: AdminHouse[];
   seasons: Season[];
   activeSeason: Season;
+  organization: OrgSettings;
   actorRole: UserRole;
   recentDeletedPoints: DeletedPoint[];
   recentAdminActions: AdminAuditAction[];
@@ -31,6 +34,7 @@ interface AdminFormsProps {
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
+  onUpdateOrgSettings: (formData: FormData) => Promise<OrgSettingsMutationResult>;
   onLoadAdminAudit: (
     type?: AdminAuditAction["type"],
     cursor?: string,
@@ -41,7 +45,7 @@ interface AdminFormsProps {
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
 }
 
-type ManageSectionId = "overview" | "team" | "houses" | "seasons" | "audit";
+type ManageSectionId = "overview" | "settings" | "team" | "houses" | "seasons" | "audit";
 
 const MANAGE_SECTIONS: Array<{
   id: ManageSectionId;
@@ -53,6 +57,12 @@ const MANAGE_SECTIONS: Array<{
     id: "overview",
     label: "Overview",
     description: "Operational totals and quick health signals.",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    description: "Update organization-level details.",
+    ownerOnly: true,
   },
   {
     id: "team",
@@ -83,6 +93,7 @@ export function AdminForms({
   houses,
   seasons,
   activeSeason,
+  organization,
   actorRole,
   recentDeletedPoints,
   recentAdminActions,
@@ -92,6 +103,7 @@ export function AdminForms({
   onCreateHouse,
   onAssignHouse,
   onPromoteUser,
+  onUpdateOrgSettings,
   onLoadAdminAudit,
   onLoadPointAdjustmentStats,
   onCreateInvite,
@@ -113,7 +125,7 @@ export function AdminForms({
         <div
           role="tablist"
           aria-label="Manage sections"
-          className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5"
+          className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6"
         >
           {MANAGE_SECTIONS.map((section) => {
             const isActive = section.id === activeSection;
@@ -185,6 +197,13 @@ export function AdminForms({
             pointAdjustmentStats={pointAdjustmentStats}
             seasons={seasons}
             onLoadPointAdjustmentStats={onLoadPointAdjustmentStats}
+          />
+        ) : null}
+
+        {activeSection === "settings" ? (
+          <OrgSettingsManagement
+            organization={organization}
+            onUpdateOrgSettings={onUpdateOrgSettings}
           />
         ) : null}
 

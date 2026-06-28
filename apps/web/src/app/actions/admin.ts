@@ -10,6 +10,7 @@ import {
   assignUserHouseResponseSchema,
   deletedPointSchema,
   inviteLinkSchema,
+  orgSettingsSchema,
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
 } from "@housepoints/contracts";
@@ -21,7 +22,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
@@ -83,6 +84,62 @@ export async function createHouse(formData: FormData): Promise<HouseMutationResu
     revalidatePath("/");
 
     return { ok: true };
+  });
+}
+
+export async function updateOrgSettings(formData: FormData): Promise<OrgSettingsMutationResult> {
+  return runServerAction("updateOrgSettings", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("updateOrgSettings", requestId);
+    const name = String(formData.get("name") ?? "").trim();
+
+    if (!name) {
+      return {
+        ok: false,
+        code: "ORG_NAME_REQUIRED",
+        message: "Organization name is required.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/settings", requestId, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+
+    try {
+      const organization = await parseApiResponse(
+        response,
+        orgSettingsSchema,
+        "The organization settings could not be updated. Please try again.",
+      );
+
+      logInfo("web.admin.org_settings_updated", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationName: organization.name,
+      });
+
+      revalidatePath("/");
+
+      return { ok: true };
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationName: name,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
   });
 }
 

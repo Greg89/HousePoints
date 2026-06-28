@@ -47,6 +47,7 @@ describe("getActorBySub", () => {
         houseId: "house-1",
         organizationId: "org-1",
         organization: {
+          name: "Acme Corp",
           slug: "acme",
         },
       },
@@ -59,6 +60,7 @@ describe("getActorBySub", () => {
       role: "MEMBER",
       houseId: "house-1",
       organizationId: "org-1",
+      organizationName: "Acme Corp",
       organizationSlug: "acme",
     });
 
@@ -74,6 +76,7 @@ describe("getActorBySub", () => {
             organizationId: true,
             organization: {
               select: {
+                name: true,
                 slug: true,
               },
             },
@@ -93,6 +96,7 @@ describe("getActorBySub", () => {
       houseId: "house-1",
       organizationId: "org-1",
       organization: {
+        name: "Acme Corp",
         slug: "acme",
       },
     });
@@ -104,6 +108,7 @@ describe("getActorBySub", () => {
       role: "MEMBER",
       houseId: "house-1",
       organizationId: "org-1",
+      organizationName: "Acme Corp",
       organizationSlug: "acme",
     });
 
@@ -117,6 +122,7 @@ describe("getActorBySub", () => {
         organizationId: true,
         organization: {
           select: {
+            name: true,
             slug: true,
           },
         },

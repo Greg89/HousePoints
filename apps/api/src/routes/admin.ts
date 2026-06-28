@@ -7,6 +7,7 @@ import {
   createHouseSchema,
   promoteUserSchema,
   seasonScopedRequestSchema,
+  updateOrgSettingsSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { getActorBySub, isAdminRole, isOwnerRole } from "../actor.js";
@@ -199,6 +200,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       organizationId: actor.organizationId,
+      organizationName: actor.organizationName,
       organizationSlug: actor.organizationSlug,
       users,
       houses,
@@ -211,6 +213,56 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       pointAdjustmentStats,
       adminAuditNextCursor,
     };
+  });
+
+  app.post("/admin/org/settings", async (request, reply) => {
+    const parsed = updateOrgSettingsSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", {
+        issues: parsed.error.issues,
+      });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const actor = await getActorBySub(request.auth.subject);
+
+    if (!actor || !isOwnerRole(actor.role)) {
+      warn(request.log, "admin.forbidden", {});
+      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
+    }
+
+    const updatedOrganization = await prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.update({
+        where: { id: actor.organizationId },
+        data: { name: parsed.data.name },
+        select: { id: true, name: true, slug: true },
+      });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          eventType: "ORG_SETTINGS_UPDATED",
+          summary: `${actor.displayName} renamed the organization from ${actor.organizationName} to ${organization.name}.`,
+          metadata: {
+            previousName: actor.organizationName,
+            newName: organization.name,
+          },
+        },
+      });
+
+      return organization;
+    });
+
+    info(request.log, "admin.org.settings_updated", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      previousName: actor.organizationName,
+      newName: updatedOrganization.name,
+    });
+
+    return updatedOrganization;
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {

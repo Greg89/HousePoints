@@ -24,6 +24,7 @@ import {
   seasonComparisonSchema,
   seasonContextSchema,
   seasonScopedRequestSchema,
+  updateOrgSettingsSchema,
   seasonTransitionSchema,
   memberScoreSchema,
   memberScoresSchema,
@@ -53,6 +54,7 @@ const webConsumedApiEndpoints = [
   "/admin/audit",
   "/admin/context",
   "/admin/houses",
+  "/admin/org/settings",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
   "/admin/users/role",
@@ -563,6 +565,10 @@ describe("authenticated request schemas", () => {
     [promoteUserSchema, {
       targetUserId: "user-1",
       role: "MEMBER",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [updateOrgSettingsSchema, {
+      name: "Acme Corp",
       actorAuth0Sub: "auth0|attacker",
     }],
     [adminAuditRequestSchema, {
@@ -1093,6 +1099,7 @@ describe("appUserSchema", () => {
 describe("adminContextSchema", () => {
   const valid = {
     organizationId: "org-1",
+    organizationName: "Acme Corp",
     organizationSlug: "acme",
     users: [
       {
@@ -1329,6 +1336,30 @@ describe("adminAuditActionSchema", () => {
     expect(
       adminAuditActionSchema.parse({
         id: "audit-event:audit-7",
+        type: "ORG_SETTINGS_UPDATED",
+        occurredAt: "2026-06-21T13:45:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia renamed the organization from Acme to Acme Corp.",
+        metadata: {
+          previousName: "Acme",
+          newName: "Acme Corp",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-7",
+      type: "ORG_SETTINGS_UPDATED",
+      occurredAt: "2026-06-21T13:45:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia renamed the organization from Acme to Acme Corp.",
+      metadata: {
+        previousName: "Acme",
+        newName: "Acme Corp",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-8",
         type: "POINTS_DEDUCTED",
         occurredAt: "2026-06-21T14:00:00.000Z",
         actorName: "Olivia",
@@ -1341,7 +1372,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-7",
+      id: "audit-event:audit-8",
       type: "POINTS_DEDUCTED",
       occurredAt: "2026-06-21T14:00:00.000Z",
       actorName: "Olivia",

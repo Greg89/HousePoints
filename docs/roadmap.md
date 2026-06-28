@@ -77,6 +77,6 @@ Each tier has its own file with detailed task breakdowns.
 | 5.2 | Staging environment (Railway environments) | [todo] |
 | 5.3 | Connection pooling via PgBouncer or Prisma Accelerate | [todo] |
 | 5.4 | Self-serve org creation and single-use invite joining | [done] |
-| 5.5 | Org settings, owner transfer, admin removal, and org deletion | [todo] |
+| 5.5 | Org settings, owner transfer, admin removal, and org deletion | [doing] |
 | 5.6 | Multi-org membership model | [todo] |
 | 5.7 | Query count and response-time baselines for empty, typical, and larger orgs | [done] |

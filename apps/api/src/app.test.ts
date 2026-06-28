@@ -12,6 +12,7 @@ vi.mock("@housepoints/db", () => ({
       upsert: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -73,6 +74,7 @@ const mockAuthIdentityCreate = prisma.authIdentity.create as ReturnType<typeof v
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
 const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>;
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
+const mockOrgUpdate = prisma.organization.update as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
@@ -125,7 +127,7 @@ const makeMember = (overrides = {}) => ({
   role: "MEMBER" as const,
   houseId: "house-1",
   organizationId: "org-1",
-  organization: { slug: "acme" },
+  organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
 });
@@ -139,7 +141,7 @@ const makeAdmin = (overrides = {}) => ({
   role: "ADMIN" as const,
   houseId: "house-1",
   organizationId: "org-1",
-  organization: { slug: "acme" },
+  organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
 });
@@ -400,7 +402,7 @@ describe("POST /users/bootstrap", () => {
       role: "MEMBER" as const,
       houseId: null,
       organizationId: "org-1",
-      organization: { slug: "acme" },
+      organization: { name: "Acme Corp", slug: "acme" },
       house: null,
     };
     mockFindUnique.mockResolvedValue(null);   // not found
@@ -2052,6 +2054,7 @@ describe("POST /admin/context", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       organizationId: "org-secure",
+      organizationName: "Acme Corp",
       organizationSlug: "acme",
       users: [],
       houses: [],
@@ -2113,6 +2116,7 @@ describe("POST /admin/context", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       organizationId: "org-1",
+      organizationName: "Acme Corp",
       organizationSlug: "acme",
       users: [
         {
@@ -2164,6 +2168,66 @@ describe("POST /admin/context", () => {
         where: { organizationId: "org-1" },
       }),
     );
+    await app.close();
+  });
+});
+
+describe("POST /admin/org/settings", () => {
+  it("returns 403 OWNER_REQUIRED when actor is not an owner", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/settings",
+      payload: { name: "Renamed Org" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to rename the organization and writes an audit event", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockOrgUpdate.mockResolvedValue({
+      id: "org-1",
+      name: "Renamed Org",
+      slug: "acme",
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/settings",
+      payload: { name: " Renamed Org " },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockOrgUpdate).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      data: { name: "Renamed Org" },
+      select: { id: true, name: true, slug: true },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "ORG_SETTINGS_UPDATED",
+        summary: "Olivia renamed the organization from Acme Corp to Renamed Org.",
+        metadata: {
+          previousName: "Acme Corp",
+          newName: "Renamed Org",
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "org-1",
+      name: "Renamed Org",
+      slug: "acme",
+    });
     await app.close();
   });
 });
@@ -3675,7 +3739,7 @@ describe("POST /orgs/create", () => {
       makeMember({
         role: "OWNER",
         email: "alice@example.com",
-        organization: { slug: "acme" },
+        organization: { name: "Acme Corp", slug: "acme" },
       }),
     );
     const app = await buildTestApp("auth0|member");

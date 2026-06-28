@@ -1,4 +1,4 @@
-import { Calendar, LinkSimple, ShieldCheck, TrendDown, Trash, UserPlus, UserSwitch } from "@phosphor-icons/react";
+import { Buildings, Calendar, LinkSimple, ShieldCheck, TrendDown, Trash, UserPlus, UserSwitch } from "@phosphor-icons/react";
 import { useMemo, useState, useTransition } from "react";
 import type { AdminAuditAction, PagedAdminAuditActions } from "@housepoints/contracts";
 
@@ -18,6 +18,7 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   INVITE_CREATED: "Invite created",
   INVITE_USED: "Invite used",
   SEASON_STARTED: "Season started",
+  ORG_SETTINGS_UPDATED: "Organization updated",
   POINTS_DEDUCTED: "Points deducted",
   USER_HOUSE_ASSIGNED: "House assigned",
   USER_ROLE_CHANGED: "Role changed",
@@ -28,6 +29,7 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   INVITE_CREATED: LinkSimple,
   INVITE_USED: UserPlus,
   SEASON_STARTED: Calendar,
+  ORG_SETTINGS_UPDATED: Buildings,
   POINTS_DEDUCTED: TrendDown,
   USER_HOUSE_ASSIGNED: UserSwitch,
   USER_ROLE_CHANGED: ShieldCheck,
@@ -39,6 +41,7 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "POINTS_DEDUCTED", label: "Point deductions" },
   { value: "USER_ROLE_CHANGED", label: "Role changes" },
   { value: "USER_HOUSE_ASSIGNED", label: "House assignments" },
+  { value: "ORG_SETTINGS_UPDATED", label: "Organization updates" },
   { value: "INVITE_CREATED", label: "Invites created" },
   { value: "INVITE_USED", label: "Invites used" },
   { value: "SEASON_STARTED", label: "Season starts" },
