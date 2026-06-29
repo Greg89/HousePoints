@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org deletion, ownership transfer, deeper admin removal rules, domain allow-list joining, slug-bearing invite links, and true multi-org membership. Owner-only organization display-name and slug updates are implemented in Manage Settings. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md).
+Still deferred: org deletion, ownership transfer, deeper admin removal rules, domain allow-list joining, slug-based landing/join routes, and true multi-org membership. Owner-only organization display-name and slug updates are implemented in Manage Settings. New invites display slug-bearing links while preserving token-hash join security. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md).
 
 ### How it should work
 
@@ -30,11 +30,11 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - `OWNER` can promote members to `ADMIN` and demote admins back to `MEMBER` from Manage Team. Role changes are audited.
 - `OWNER` can rename the organization display name and change the organization slug from Manage Settings. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org deletion, ownership transfer, slug-bearing invite links, and deeper admin-removal rules are not implemented yet.
+- Org deletion, ownership transfer, slug-based landing/join routes, and deeper admin-removal rules are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
-- Option A - **Invite link**: Implemented. Owner/admin generates a shareable single-use token. Any Auth0-authenticated user who follows it is added to the org as a `MEMBER`.
+- Option A - **Invite link**: Implemented. Owner/admin generates a shareable single-use invite link; the embedded token remains the secure join credential. Any Auth0-authenticated user who follows it is added to the org as a `MEMBER`.
 - Option B - **Email domain allow-list**: Deferred. This remains attractive for corporate rollouts but needs explicit product and security design.
 
 **Isolation**

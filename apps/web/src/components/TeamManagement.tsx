@@ -29,6 +29,18 @@ interface TeamManagementProps {
   onCreateInvite: () => Promise<CreateInviteResult>;
 }
 
+function formatInviteUrl(joinPath: string): string {
+  if (typeof window === "undefined") {
+    return joinPath;
+  }
+
+  try {
+    return new URL(joinPath, window.location.origin).toString();
+  } catch {
+    return joinPath;
+  }
+}
+
 export function TeamManagement({
   users,
   houses,
@@ -45,9 +57,10 @@ export function TeamManagement({
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
   const [rolePending, startRoleChange] = useTransition();
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteJoinPath, setInviteJoinPath] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const inviteUrl = inviteJoinPath ? formatInviteUrl(inviteJoinPath) : null;
   const unassignedCount = unassignedUsers.length;
   const inviteActions = recentAdminActions.filter(
     (action) => action.type === "INVITE_CREATED" || action.type === "INVITE_USED",
@@ -97,7 +110,7 @@ export function TeamManagement({
           return;
         }
 
-        setInviteToken(result.token);
+        setInviteJoinPath(result.joinPath);
         setInviteExpiry(result.expiresAt);
         setCopied(false);
       } catch (err) {
@@ -183,8 +196,8 @@ export function TeamManagement({
   }
 
   async function handleCopy() {
-    if (!inviteToken) return;
-    await navigator.clipboard.writeText(inviteToken);
+    if (!inviteUrl) return;
+    await navigator.clipboard.writeText(inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -281,19 +294,19 @@ export function TeamManagement({
               Invite Member
             </h5>
             <p className="mt-2 text-xs text-muted-foreground">
-              Generate a single-use token valid for 72 hours. Share it with the new member.
+              Generate a single-use invite link valid for 72 hours. Share it with the new member.
             </p>
           </div>
-          {inviteToken ? (
+          {inviteUrl ? (
             <div className="min-w-0 max-w-full space-y-2 overflow-hidden">
               <div className="flex h-10 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border bg-muted/50 px-3">
-                <code className="block min-w-0 max-w-full flex-1 truncate font-mono text-xs" title={inviteToken}>
-                  {inviteToken}
+                <code className="block min-w-0 max-w-full flex-1 truncate font-mono text-xs" title={inviteUrl}>
+                  {inviteUrl}
                 </code>
                 <button
                   onClick={handleCopy}
                   className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                  title="Copy token"
+                  title="Copy invite link"
                 >
                   {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                 </button>
@@ -302,7 +315,7 @@ export function TeamManagement({
                 Expires: {new Date(inviteExpiry!).toLocaleString()}
               </p>
               <button
-                onClick={() => { setInviteToken(null); setInviteExpiry(null); }}
+                onClick={() => { setInviteJoinPath(null); setInviteExpiry(null); }}
                 className="text-xs text-muted-foreground hover:text-foreground underline"
               >
                 Generate another
@@ -315,7 +328,7 @@ export function TeamManagement({
               disabled={invitePending}
               className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              {invitePending ? "Generating..." : "Generate invite token"}
+              {invitePending ? "Generating..." : "Generate invite link"}
             </button>
           )}
         </section>

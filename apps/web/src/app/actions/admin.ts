@@ -445,6 +445,7 @@ export async function createInviteLink(): Promise<CreateInviteResult> {
       return {
         ok: true,
         token: data.token,
+        joinPath: data.joinPath,
         expiresAt: data.expiresAt,
       };
     } catch (error) {

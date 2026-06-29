@@ -236,6 +236,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       id: invite.id,
       // Return the raw token once; it is never stored in the DB.
       token: rawToken,
+      joinPath: `/o/${actor.organizationSlug}/join/${rawToken}`,
       expiresAt: invite.expiresAt.toISOString(),
       usedAt: null,
     });

@@ -1549,6 +1549,7 @@ describe("inviteLinkSchema", () => {
   const valid = {
     id: "invite-1",
     token: "single-use-token",
+    joinPath: "/o/acme/join/single-use-token",
     expiresAt: "2026-06-18T12:00:00.000Z",
     usedAt: null,
   };
@@ -1560,6 +1561,9 @@ describe("inviteLinkSchema", () => {
   it("rejects missing tokens and malformed expiration timestamps", () => {
     expect(
       inviteLinkSchema.safeParse({ ...valid, token: "" }).success,
+    ).toBe(false);
+    expect(
+      inviteLinkSchema.safeParse({ ...valid, joinPath: "" }).success,
     ).toBe(false);
     expect(
       inviteLinkSchema.safeParse({ ...valid, expiresAt: "tomorrow" }).success,

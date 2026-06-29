@@ -675,6 +675,7 @@ export type UpdateOrgSlugInput = z.infer<typeof updateOrgSlugSchema>;
 export const inviteLinkSchema = z.object({
   id: z.string().min(1),
   token: z.string().min(1),
+  joinPath: z.string().min(1),
   expiresAt: z.string().datetime(),
   usedAt: z.string().datetime().nullable(),
 });

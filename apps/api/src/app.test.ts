@@ -3981,6 +3981,7 @@ describe("POST /orgs/invite", () => {
     expect(res.json()).toEqual({
       id: "invite-1",
       token: expect.stringMatching(/^[a-f0-9]{64}$/),
+      joinPath: expect.stringMatching(/^\/o\/acme\/join\/[a-f0-9]{64}$/),
       expiresAt: expiresAt.toISOString(),
       usedAt: null,
     });

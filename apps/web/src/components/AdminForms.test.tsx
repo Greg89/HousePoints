@@ -197,6 +197,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateInvite: vi.fn().mockResolvedValue({
       ok: true,
       token: "invite-token",
+      joinPath: "/o/acme/join/invite-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     }),
     onStartSeason: vi.fn().mockResolvedValue({
@@ -951,27 +952,29 @@ describe("AdminForms", () => {
     expect(screen.getByText("No invite activity has been recorded yet.")).toBeInTheDocument();
   });
 
-  it("shows generated invite tokens in the invite card", async () => {
+  it("shows generated invite links in the invite card", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Team");
 
     const inviteCard = within(screen.getByLabelText("Invite member"));
 
     await user.click(
-      inviteCard.getByRole("button", { name: "Generate invite token" }),
+      inviteCard.getByRole("button", { name: "Generate invite link" }),
     );
 
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());
-    expect(inviteCard.getByText("invite-token")).toBeInTheDocument();
-    expect(inviteCard.getByTitle("Copy token")).toBeInTheDocument();
+    expect(inviteCard.getByText(/\/o\/acme\/join\/invite-token$/)).toBeInTheDocument();
+    expect(inviteCard.getByTitle("Copy invite link")).toBeInTheDocument();
   });
 
-  it("contains long generated invite tokens inside the invite card", async () => {
+  it("contains long generated invite links inside the invite card", async () => {
     const longToken = "5dfc1b66d5c131efdfdf0d4c28de4062ebaebd5e6db57e104f0a8f93c2d1";
+    const longJoinPath = `/o/acme/join/${longToken}`;
     const { user } = setupAdminForms({
       onCreateInvite: vi.fn().mockResolvedValue({
         ok: true,
         token: longToken,
+        joinPath: longJoinPath,
         expiresAt: "2099-01-01T00:00:00.000Z",
       }),
     });
@@ -979,13 +982,13 @@ describe("AdminForms", () => {
     const inviteCard = within(screen.getByLabelText("Invite member"));
 
     await user.click(
-      inviteCard.getByRole("button", { name: "Generate invite token" }),
+      inviteCard.getByRole("button", { name: "Generate invite link" }),
     );
 
-    const tokenCode = inviteCard.getByText(longToken);
-    expect(tokenCode).toHaveClass("min-w-0", "truncate");
-    expect(tokenCode.parentElement).toHaveClass("min-w-0", "overflow-hidden");
-    expect(tokenCode.parentElement?.parentElement).toHaveClass("min-w-0", "overflow-hidden");
+    const linkCode = inviteCard.getByText(new RegExp(`${longToken}$`));
+    expect(linkCode).toHaveClass("min-w-0", "truncate");
+    expect(linkCode.parentElement).toHaveClass("min-w-0", "overflow-hidden");
+    expect(linkCode.parentElement?.parentElement).toHaveClass("min-w-0", "overflow-hidden");
     expect(screen.getByLabelText("Invite member")).toHaveClass("min-w-0", "overflow-hidden");
   });
 
@@ -1002,7 +1005,7 @@ describe("AdminForms", () => {
     const inviteCard = within(screen.getByLabelText("Invite member"));
 
     await user.click(
-      inviteCard.getByRole("button", { name: "Generate invite token" }),
+      inviteCard.getByRole("button", { name: "Generate invite link" }),
     );
 
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());

@@ -505,10 +505,12 @@ describe("createInviteLink", () => {
   beforeEach(() => {
     apiFetchMock.mockResolvedValue(Response.json({
       token: "invite-token",
+      joinPath: "/o/acme/join/invite-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     }));
     parseApiResponseMock.mockResolvedValue({
       token: "invite-token",
+      joinPath: "/o/acme/join/invite-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     });
   });
@@ -517,6 +519,7 @@ describe("createInviteLink", () => {
     await expect(createInviteLink()).resolves.toEqual({
       ok: true,
       token: "invite-token",
+      joinPath: "/o/acme/join/invite-token",
       expiresAt: "2099-01-01T00:00:00.000Z",
     });
 
