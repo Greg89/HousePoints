@@ -20,7 +20,7 @@ The first settings slice is implemented:
 - Old slugs stay reserved through `OrganizationSlugAlias`.
 - New invites return a slug-bearing join path while the token remains the one-time secure credential.
 
-Today, the slug is mostly identity metadata. It is stored uniquely, returned in app/user/admin context, shown in Settings, used during organization creation to prevent duplicates, and included in newly generated invite links. Invite joining is based on single-use token hashes and the invite's `organizationId`; slugged invite routes provide context and canonical redirects but do not replace token authority. The app does not currently route dashboards by `/:orgSlug`.
+Today, the slug is mostly identity metadata. It is stored uniquely, returned in app/user/admin context, shown in Settings, used during organization creation to prevent duplicates, and included in newly generated invite links. Invite joining is based on single-use token hashes and the invite's `organizationId`; slugged invite routes provide context and canonical redirects but do not replace token authority. The app does not currently route dashboards by `/:orgSlug`. The recommended dashboard route behavior is captured in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
 
 Product direction has shifted toward making the slug more visible in URLs and invite links. That means slug history should be treated as durable routing metadata before the app exposes slug-based entry points.
 
@@ -140,7 +140,7 @@ Recommended URL shape:
 
 | Use | Shape | Notes |
 |---|---|---|
-| Organization landing/dashboard | `/o/{slug}` | Future entry point after slug resolution exists. |
+| Organization landing/dashboard | `/o/{slug}` | Specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md); not implemented yet. |
 | Invite link | `/o/{slug}/join/{token}` | Slug is context and user trust; token remains the secret credential. |
 | Old slug redirect | `/o/{oldSlug}` -> `/o/{currentSlug}` | Uses alias lookup. |
 
@@ -209,3 +209,4 @@ Suggested order:
 2. Add owner-only slug change using the existing `Organization.slug` field plus alias reservation checks. Implemented.
 3. Update invite generation to present slug-bearing invite URLs while keeping token-hash join security. Implemented.
 4. Add slug-based landing/join routes that resolve aliases and redirect old slugs to the current slug. Implemented for invite join links.
+5. Add slug-based dashboard routes at `/o/{slug}`. Specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md); implementation remains future work.

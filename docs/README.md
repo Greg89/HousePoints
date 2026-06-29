@@ -22,6 +22,7 @@ The documents in this folder serve three purposes:
 - [Upcoming features](./upcoming-features.md): unscheduled product concepts and open design questions.
 - [Seasons design plan](./seasons-design.md): proposed product and technical plan for season-scoped scoring.
 - [Organization settings design](./org-settings-design.md): owner-only organization settings, slug-change safety, and future URL alias planning.
+- [Dashboard slug routes design](./dashboard-slug-routes-design.md): planned `/o/{slug}` dashboard routing behavior and security rules.
 
 ## Tier Detail Notes
 
