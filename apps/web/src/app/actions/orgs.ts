@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { appUserSchema } from "@housepoints/contracts";
+import { appUserSchema, joinInvitePreviewResponseSchema } from "@housepoints/contracts";
 import {
   ApiResponseError,
   apiFetch,
@@ -10,6 +10,10 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import type { CreateOrgResult, JoinOrgResult } from "@/lib/action-results";
+
+export type InviteLinkPreviewResult =
+  | { ok: true; organizationName: string; organizationSlug: string }
+  | { ok: false; code: string; message: string };
 
 export async function createOrg(
   orgName: string,
@@ -72,11 +76,67 @@ export async function createOrg(
   });
 }
 
-export async function joinOrg(inviteToken: string): Promise<JoinOrgResult> {
+export async function previewInviteLink(
+  organizationSlug: string,
+  inviteToken: string,
+): Promise<InviteLinkPreviewResult> {
+  return runServerAction("previewInviteLink", async (context) => {
+    const { requestId } = context;
+    const trimmedInviteToken = inviteToken.trim();
+    const trimmedOrganizationSlug = organizationSlug.trim();
+
+    if (!trimmedInviteToken || !trimmedOrganizationSlug) {
+      return {
+        ok: false,
+        code: "INVITE_LINK_REQUIRED",
+        message: "Invite link is missing required information.",
+      };
+    }
+
+    const response = await apiFetch("/orgs/join/preview", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        inviteToken: trimmedInviteToken,
+        organizationSlug: trimmedOrganizationSlug,
+      }),
+    });
+
+    try {
+      const data = await parseApiResponse(
+        response,
+        joinInvitePreviewResponseSchema,
+        "The invite link could not be loaded. Please ask for a new invite.",
+      );
+
+      return {
+        ok: true,
+        organizationName: data.organizationName,
+        organizationSlug: data.organizationSlug,
+      };
+    } catch (error) {
+      if (!isExpectedOrgMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        organizationSlug: trimmedOrganizationSlug,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
+}
+
+export async function joinOrg(inviteToken: string, organizationSlug?: string): Promise<JoinOrgResult> {
   return runServerAction("joinOrg", async (context) => {
     const { requestId } = context;
     const { user } = await requireAuthenticatedApiContext();
     const trimmedInviteToken = inviteToken.trim();
+    const trimmedOrganizationSlug = organizationSlug?.trim();
 
     if (!trimmedInviteToken) {
       return {
@@ -92,6 +152,7 @@ export async function joinOrg(inviteToken: string): Promise<JoinOrgResult> {
         email: user.email,
         displayName: user.name ?? "Unknown User",
         inviteToken: trimmedInviteToken,
+        ...(trimmedOrganizationSlug ? { organizationSlug: trimmedOrganizationSlug } : {}),
       }),
     });
 
@@ -105,7 +166,11 @@ export async function joinOrg(inviteToken: string): Promise<JoinOrgResult> {
         throw error;
       }
 
-      logServerActionFailed(context, error);
+      if (trimmedOrganizationSlug) {
+        logServerActionFailed(context, error, { organizationSlug: trimmedOrganizationSlug });
+      } else {
+        logServerActionFailed(context, error);
+      }
 
       return {
         ok: false,

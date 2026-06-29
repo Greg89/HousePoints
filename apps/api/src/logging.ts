@@ -74,9 +74,11 @@ export type ApiLogEvent =
   | "orgs.create.already_in_org"
   | "orgs.create.account_link_required"
   | "orgs.invite.created"
+  | "orgs.join.preview_loaded"
   | "orgs.join.invalid_token"
   | "orgs.join.token_already_used"
   | "orgs.join.token_expired"
+  | "orgs.join.organization_mismatch"
   | "orgs.join.already_in_org"
   | "orgs.join.account_link_required"
   | "orgs.join.success";

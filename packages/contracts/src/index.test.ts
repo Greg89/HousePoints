@@ -17,6 +17,8 @@ import {
   deletedPointSchema,
   deletePointTransactionSchema,
   inviteLinkSchema,
+  joinInvitePreviewResponseSchema,
+  joinInvitePreviewSchema,
   joinOrgSchema,
   promoteUserSchema,
   renameSeasonSchema,
@@ -66,6 +68,7 @@ const webConsumedApiEndpoints = [
   "/orgs/create",
   "/orgs/invite",
   "/orgs/join",
+  "/orgs/join/preview",
   "/points/adjust",
   "/points/deduct",
   "/points/delete",
@@ -557,6 +560,11 @@ describe("authenticated request schemas", () => {
     [joinOrgSchema, {
       displayName: "Alice",
       inviteToken: "invite",
+      auth0Sub: "auth0|attacker",
+    }],
+    [joinInvitePreviewSchema, {
+      inviteToken: "invite",
+      organizationSlug: "acme",
       auth0Sub: "auth0|attacker",
     }],
     [promoteUserSchema, {
@@ -1570,6 +1578,83 @@ describe("inviteLinkSchema", () => {
     ).toBe(false);
     expect(
       inviteLinkSchema.safeParse({ ...valid, usedAt: "yesterday" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("joinOrgSchema", () => {
+  it("accepts token-only and slug-context join payloads", () => {
+    expect(
+      joinOrgSchema.parse({
+        displayName: "Alice",
+        inviteToken: "single-use-token",
+      }),
+    ).toEqual({
+      displayName: "Alice",
+      inviteToken: "single-use-token",
+    });
+
+    expect(
+      joinOrgSchema.parse({
+        displayName: "Alice",
+        email: "alice@example.com",
+        inviteToken: "single-use-token",
+        organizationSlug: "acme",
+      }),
+    ).toEqual({
+      displayName: "Alice",
+      email: "alice@example.com",
+      inviteToken: "single-use-token",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("rejects malformed slug context", () => {
+    expect(
+      joinOrgSchema.safeParse({
+        displayName: "Alice",
+        inviteToken: "single-use-token",
+        organizationSlug: "Acme Corp",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("joinInvitePreviewSchema", () => {
+  it("accepts a slugged invite preview payload and response", () => {
+    expect(
+      joinInvitePreviewSchema.parse({
+        inviteToken: "single-use-token",
+        organizationSlug: "acme",
+      }),
+    ).toEqual({
+      inviteToken: "single-use-token",
+      organizationSlug: "acme",
+    });
+
+    expect(
+      joinInvitePreviewResponseSchema.parse({
+        organizationName: "Acme Corp",
+        organizationSlug: "acme",
+      }),
+    ).toEqual({
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("rejects empty tokens and malformed slugs", () => {
+    expect(
+      joinInvitePreviewSchema.safeParse({
+        inviteToken: "",
+        organizationSlug: "acme",
+      }).success,
+    ).toBe(false);
+    expect(
+      joinInvitePreviewSchema.safeParse({
+        inviteToken: "single-use-token",
+        organizationSlug: "Acme Corp",
+      }).success,
     ).toBe(false);
   });
 });

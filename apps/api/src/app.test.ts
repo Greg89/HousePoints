@@ -74,6 +74,7 @@ import {
   createPrimaryOrganizationSlugAlias,
   isOrganizationSlugReserved,
   prisma,
+  resolveOrganizationSlug,
 } from "@housepoints/db";
 
 // Typed shorthand helpers
@@ -97,6 +98,7 @@ const mockInviteFindUnique = prisma.orgInvite.findUnique as ReturnType<typeof vi
 const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi.fn>;
 const mockCreatePrimaryOrganizationSlugAlias = createPrimaryOrganizationSlugAlias as ReturnType<typeof vi.fn>;
 const mockIsOrganizationSlugReserved = isOrganizationSlugReserved as ReturnType<typeof vi.fn>;
+const mockResolveOrganizationSlug = resolveOrganizationSlug as ReturnType<typeof vi.fn>;
 const mockOrgSlugAliasCreate = prisma.organizationSlugAlias.create as ReturnType<typeof vi.fn>;
 const mockOrgSlugAliasUpdateMany = prisma.organizationSlugAlias.updateMany as ReturnType<typeof vi.fn>;
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
@@ -180,6 +182,7 @@ beforeEach(() => {
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
+  mockResolveOrganizationSlug.mockResolvedValue(null);
   mockSeasonFindMany.mockResolvedValue([]);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
@@ -4011,6 +4014,97 @@ describe("POST /orgs/invite", () => {
   });
 });
 
+describe("POST /orgs/join/preview", () => {
+  const payload = {
+    inviteToken: "single-use-token",
+    organizationSlug: "acme",
+  };
+  const invite = {
+    id: "invite-1",
+    organizationId: "org-1",
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+    usedAt: null,
+  };
+  const resolvedSlug = {
+    organizationId: "org-1",
+    matchedSlug: "acme",
+    currentSlug: "acme",
+    isPrimary: true,
+    organization: {
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+    },
+  };
+
+  it("returns canonical organization details without claiming the invite", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns the current slug when the URL used an old alias", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      matchedSlug: "old-acme",
+      currentSlug: "acme",
+      isPrimary: false,
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload: { ...payload, organizationSlug: "old-acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().organizationSlug).toBe("acme");
+    await app.close();
+  });
+
+  it("rejects an invite token that does not belong to the slugged organization", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      organizationId: "org-other",
+      organization: {
+        id: "org-other",
+        name: "Other Org",
+        slug: "other-org",
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("INVITE_ORG_MISMATCH");
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /orgs/join", () => {
   const payload = {
     displayName: "Alice",
@@ -4028,6 +4122,17 @@ describe("POST /orgs/join", () => {
     houseId: null,
     house: null,
   });
+  const resolvedSlug = {
+    organizationId: "org-1",
+    matchedSlug: "acme",
+    currentSlug: "acme",
+    isPrimary: true,
+    organization: {
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+    },
+  };
 
   it("rejects a malformed invite before starting a transaction", async () => {
     const app = await buildTestApp();
@@ -4097,6 +4202,7 @@ describe("POST /orgs/join", () => {
 
   it("updates membership and claims the invite in one transaction", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
@@ -4105,7 +4211,7 @@ describe("POST /orgs/join", () => {
     const res = await app.inject({
       method: "POST",
       url: "/orgs/join",
-      payload,
+      payload: { ...payload, organizationSlug: "acme" },
     });
 
     expect(res.statusCode).toBe(200);
@@ -4139,6 +4245,28 @@ describe("POST /orgs/join", () => {
         },
       },
     });
+    await app.close();
+  });
+
+  it("does not claim an invite when the provided organization slug does not match", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      organizationId: "org-other",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload: { ...payload, organizationSlug: "other-org" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("INVITE_ORG_MISMATCH");
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     await app.close();
   });
 

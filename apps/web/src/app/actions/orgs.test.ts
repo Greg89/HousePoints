@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse, requireAuthenticatedApiContext } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
-import { createOrg, joinOrg } from "./orgs";
+import { createOrg, joinOrg, previewInviteLink } from "./orgs";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -163,6 +163,21 @@ describe("joinOrg", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/");
   });
 
+  it("sends organization slug context when joining from a slugged invite link", async () => {
+    await expect(joinOrg(" invite-token ", " acme ")).resolves.toEqual({ ok: true });
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/orgs/join", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "user@example.com",
+        displayName: "User One",
+        inviteToken: "invite-token",
+        organizationSlug: "acme",
+      }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
   it("returns validation failures as typed results without calling the API", async () => {
     await expect(joinOrg("   ")).resolves.toEqual({
       ok: false,
@@ -203,5 +218,69 @@ describe("joinOrg", () => {
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("previewInviteLink", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthenticatedApiContextMock.mockResolvedValue(authContext);
+    apiFetchMock.mockResolvedValue(Response.json({
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("returns organization context for a valid slugged invite link", async () => {
+    await expect(previewInviteLink(" acme ", " invite-token ")).resolves.toEqual({
+      ok: true,
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("previewInviteLink", expect.any(Function));
+    expect(apiFetchMock).toHaveBeenCalledWith("/orgs/join/preview", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        inviteToken: "invite-token",
+        organizationSlug: "acme",
+      }),
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("returns validation failures without calling the API", async () => {
+    await expect(previewInviteLink("acme", "   ")).resolves.toEqual({
+      ok: false,
+      code: "INVITE_LINK_REQUIRED",
+      message: "Invite link is missing required information.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected preview failures as typed results", async () => {
+    const error = new ApiResponseError(
+      404,
+      "INVITE_ORG_MISMATCH",
+      "The invite link could not be loaded. Please ask for a new invite.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(previewInviteLink("acme", "invite-token")).resolves.toEqual({
+      ok: false,
+      code: "INVITE_ORG_MISMATCH",
+      message: "The invite link could not be loaded. Please ask for a new invite.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "previewInviteLink", requestId: "request-1" },
+      error,
+      { organizationSlug: "acme" },
+    );
   });
 });

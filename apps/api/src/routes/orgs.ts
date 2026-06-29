@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import {
   createInviteSchema,
+  joinInvitePreviewSchema,
   createOrgSchema,
   joinOrgSchema,
 } from "@housepoints/contracts";
@@ -9,10 +10,11 @@ import {
   createPrimaryOrganizationSlugAlias,
   isOrganizationSlugReserved,
   prisma,
+  resolveOrganizationSlug,
 } from "@housepoints/db";
 import { getActorBySub, isAdminRole } from "../actor.js";
 import { mapAppUser } from "../app-user.js";
-import { info, warn } from "../logging.js";
+import { info, warn, type ApiLogEvent } from "../logging.js";
 
 function generateInviteToken(): string {
   return randomBytes(32).toString("hex"); // 64-char hex string
@@ -26,6 +28,7 @@ type InviteJoinErrorCode =
   | "INVITE_NOT_FOUND"
   | "INVITE_USED"
   | "INVITE_EXPIRED"
+  | "INVITE_ORG_MISMATCH"
   | "ALREADY_IN_ORG"
   | "ACCOUNT_LINK_REQUIRED";
 
@@ -242,6 +245,94 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  app.post("/orgs/join/preview", async (request, reply) => {
+    const parsed = joinInvitePreviewSchema.safeParse(request.body);
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const { inviteToken, organizationSlug } = parsed.data;
+    const tokenHash = hashToken(inviteToken);
+    const checkedAt = new Date();
+
+    try {
+      const preview = await prisma.$transaction(async (tx) => {
+        const invite = await tx.orgInvite.findUnique({
+          where: { tokenHash },
+          select: { id: true, organizationId: true, expiresAt: true, usedAt: true },
+        });
+        const resolvedSlug = await resolveOrganizationSlug(tx, organizationSlug);
+
+        if (!invite) {
+          throw new InviteJoinError(
+            404,
+            "INVITE_NOT_FOUND",
+            "Invite link is invalid or has already been used.",
+          );
+        }
+
+        if (invite.usedAt) {
+          throw new InviteJoinError(
+            409,
+            "INVITE_USED",
+            "This invite link has already been used.",
+            invite.id,
+          );
+        }
+
+        if (invite.expiresAt <= checkedAt) {
+          throw new InviteJoinError(
+            410,
+            "INVITE_EXPIRED",
+            "This invite link has expired. Ask an admin to generate a new one.",
+            invite.id,
+          );
+        }
+
+        if (!resolvedSlug || resolvedSlug.organizationId !== invite.organizationId) {
+          throw new InviteJoinError(
+            404,
+            "INVITE_ORG_MISMATCH",
+            "This invite link is not valid for this organisation.",
+            invite.id,
+          );
+        }
+
+        return {
+          organizationName: resolvedSlug.organization.name,
+          organizationSlug: resolvedSlug.currentSlug,
+          inviteId: invite.id,
+        };
+      });
+
+      info(request.log, "orgs.join.preview_loaded", {
+        orgSlug: preview.organizationSlug,
+        inviteId: preview.inviteId,
+      });
+
+      return reply.status(200).send({
+        organizationName: preview.organizationName,
+        organizationSlug: preview.organizationSlug,
+      });
+    } catch (err) {
+      if (!(err instanceof InviteJoinError)) {
+        throw err;
+      }
+
+      warn(request.log, getInviteJoinFailureEvent(err.code), {
+        auth0Sub: request.auth.subject,
+        inviteId: err.inviteId,
+        organizationSlug,
+      });
+
+      return reply.status(err.statusCode).send({
+        code: err.code,
+        message: err.message,
+      });
+    }
+  });
+
   app.post("/orgs/join", async (request, reply) => {
     const parsed = joinOrgSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -249,7 +340,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
     }
 
-    const { email, displayName, inviteToken } = parsed.data;
+    const { email, displayName, inviteToken, organizationSlug } = parsed.data;
     const auth0Sub = request.auth.subject;
     const tokenHash = hashToken(inviteToken);
 
@@ -291,6 +382,19 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
             "This invite link has expired. Ask an admin to generate a new one.",
             invite.id,
           );
+        }
+
+        if (organizationSlug) {
+          const resolvedSlug = await resolveOrganizationSlug(tx, organizationSlug);
+
+          if (!resolvedSlug || resolvedSlug.organizationId !== invite.organizationId) {
+            throw new InviteJoinError(
+              404,
+              "INVITE_ORG_MISMATCH",
+              "This invite link is not valid for this organisation.",
+              invite.id,
+            );
+          }
         }
 
         const existingIdentity = await tx.authIdentity.findUnique({
@@ -418,20 +522,10 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      const event =
-        err.code === "INVITE_NOT_FOUND"
-          ? "orgs.join.invalid_token"
-          : err.code === "INVITE_EXPIRED"
-            ? "orgs.join.token_expired"
-            : err.code === "INVITE_USED"
-              ? "orgs.join.token_already_used"
-              : err.code === "ACCOUNT_LINK_REQUIRED"
-                ? "orgs.join.account_link_required"
-                : "orgs.join.already_in_org";
-
-      warn(request.log, event, {
+      warn(request.log, getInviteJoinFailureEvent(err.code), {
         auth0Sub,
         inviteId: err.inviteId,
+        organizationSlug,
       });
       return reply.status(err.statusCode).send({
         code: err.code,
@@ -439,4 +533,18 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       });
     }
   });
+}
+
+function getInviteJoinFailureEvent(code: InviteJoinErrorCode): ApiLogEvent {
+  return code === "INVITE_NOT_FOUND"
+    ? "orgs.join.invalid_token"
+    : code === "INVITE_EXPIRED"
+      ? "orgs.join.token_expired"
+      : code === "INVITE_USED"
+        ? "orgs.join.token_already_used"
+        : code === "INVITE_ORG_MISMATCH"
+          ? "orgs.join.organization_mismatch"
+          : code === "ACCOUNT_LINK_REQUIRED"
+            ? "orgs.join.account_link_required"
+            : "orgs.join.already_in_org";
 }

@@ -641,9 +641,26 @@ export const joinOrgSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
   /** The raw invite token from the URL */
   inviteToken: z.string().min(1),
+  /** Optional URL slug context from /o/{slug}/join/{token} links */
+  organizationSlug: slugSchema.optional(),
 }).strict();
 
 export type JoinOrgInput = z.infer<typeof joinOrgSchema>;
+
+export const joinInvitePreviewSchema = z.object({
+  /** The raw invite token from the URL */
+  inviteToken: z.string().min(1),
+  organizationSlug: slugSchema,
+}).strict();
+
+export type JoinInvitePreviewInput = z.infer<typeof joinInvitePreviewSchema>;
+
+export const joinInvitePreviewResponseSchema = z.object({
+  organizationName: z.string().min(1),
+  organizationSlug: slugSchema,
+});
+
+export type JoinInvitePreviewResponse = z.infer<typeof joinInvitePreviewResponseSchema>;
 
 export const promoteUserSchema = z.object({
   targetUserId: z.string().min(1),
@@ -719,6 +736,7 @@ export const apiContracts = {
   "/members": defineContract(actorScopeSchema, orgMembersSchema),
   "/orgs/create": defineContract(createOrgSchema, appUserSchema),
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),
+  "/orgs/join/preview": defineContract(joinInvitePreviewSchema, joinInvitePreviewResponseSchema),
   "/orgs/join": defineContract(joinOrgSchema, appUserSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
