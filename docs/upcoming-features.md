@@ -34,7 +34,7 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
-- Option A - **Invite link**: Implemented. Owner/admin generates a shareable single-use invite link shaped as `/o/{slug}/join/{token}`; the embedded token remains the secure join credential. Any Auth0-authenticated user who follows it can join the org as a `MEMBER`.
+- Option A - **Invite link**: Implemented. Owner/admin generates a shareable single-use invite link shaped as `/o/{slug}/join/{token}`; the embedded token remains the secure join credential. Any Auth0-authenticated user who follows it can join the org as a `MEMBER`. The invite landing page previews the signed-in user's membership state so same-org users see a dashboard path and users already in another org get a clear blocked state before attempting to join.
 - Option B - **Email domain allow-list**: Deferred. This remains attractive for corporate rollouts but needs explicit product and security design.
 
 **Isolation**

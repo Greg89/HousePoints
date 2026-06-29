@@ -228,10 +228,16 @@ describe("previewInviteLink", () => {
     apiFetchMock.mockResolvedValue(Response.json({
       organizationName: "Acme Corp",
       organizationSlug: "acme",
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     }));
     parseApiResponseMock.mockResolvedValue({
       organizationName: "Acme Corp",
       organizationSlug: "acme",
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     });
   });
 
@@ -240,6 +246,9 @@ describe("previewInviteLink", () => {
       ok: true,
       organizationName: "Acme Corp",
       organizationSlug: "acme",
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     });
 
     expect(runServerActionMock).toHaveBeenCalledWith("previewInviteLink", expect.any(Function));

@@ -1636,10 +1636,16 @@ describe("joinInvitePreviewSchema", () => {
       joinInvitePreviewResponseSchema.parse({
         organizationName: "Acme Corp",
         organizationSlug: "acme",
+        membershipStatus: "NONE",
+        memberOrganizationName: null,
+        memberOrganizationSlug: null,
       }),
     ).toEqual({
       organizationName: "Acme Corp",
       organizationSlug: "acme",
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     });
   });
 
@@ -1654,6 +1660,15 @@ describe("joinInvitePreviewSchema", () => {
       joinInvitePreviewSchema.safeParse({
         inviteToken: "single-use-token",
         organizationSlug: "Acme Corp",
+      }).success,
+    ).toBe(false);
+    expect(
+      joinInvitePreviewResponseSchema.safeParse({
+        organizationName: "Acme Corp",
+        organizationSlug: "acme",
+        membershipStatus: "BOGUS",
+        memberOrganizationName: null,
+        memberOrganizationSlug: null,
       }).success,
     ).toBe(false);
   });

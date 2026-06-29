@@ -299,9 +299,46 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
           );
         }
 
+        const existingIdentity = await tx.authIdentity.findUnique({
+          where: { providerSubject: request.auth.subject },
+          select: {
+            user: {
+              select: {
+                organizationId: true,
+                organization: {
+                  select: {
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+        const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
+          where: { auth0Sub: request.auth.subject },
+          select: {
+            organizationId: true,
+            organization: {
+              select: {
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        });
+        const membershipStatus = !existingUser?.organizationId
+          ? "NONE"
+          : existingUser.organizationId === invite.organizationId
+            ? "SAME_ORG"
+            : "OTHER_ORG";
+
         return {
           organizationName: resolvedSlug.organization.name,
           organizationSlug: resolvedSlug.currentSlug,
+          membershipStatus,
+          memberOrganizationName: existingUser?.organization?.name ?? null,
+          memberOrganizationSlug: existingUser?.organization?.slug ?? null,
           inviteId: invite.id,
         };
       });
@@ -314,6 +351,9 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(200).send({
         organizationName: preview.organizationName,
         organizationSlug: preview.organizationSlug,
+        membershipStatus: preview.membershipStatus,
+        memberOrganizationName: preview.memberOrganizationName,
+        memberOrganizationSlug: preview.memberOrganizationSlug,
       });
     } catch (err) {
       if (!(err instanceof InviteJoinError)) {

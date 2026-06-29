@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { InviteJoinCard } from "@/components/InviteJoinCard";
 import { WebAuthenticationError } from "@/lib/api-client";
 import { previewInviteLink } from "@/app/actions/orgs";
@@ -50,6 +51,28 @@ export default async function InviteJoinPage({ params }: InviteJoinPageProps) {
     redirect(`/o/${preview.organizationSlug}/join/${encodeURIComponent(token)}`);
   }
 
+  if (preview.membershipStatus === "SAME_ORG") {
+    return (
+      <InviteJoinMessage
+        title="You're already a member"
+        description={`This invite is for ${preview.organizationName}, and your account already belongs to that organisation.`}
+        actionHref="/"
+        actionLabel="Go to dashboard"
+      />
+    );
+  }
+
+  if (preview.membershipStatus === "OTHER_ORG") {
+    return (
+      <InviteJoinMessage
+        title="This account is already in another organisation"
+        description={`You are signed in with an account that belongs to ${preview.memberOrganizationName ?? "another organisation"}. Sign out and use a different account to join ${preview.organizationName}.`}
+        actionHref="/auth/logout"
+        actionLabel="Sign out"
+      />
+    );
+  }
+
   return (
     <InviteJoinCard
       organizationName={preview.organizationName}
@@ -75,12 +98,12 @@ function InviteJoinMessage({
       <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
         <h1 className="font-display text-2xl font-semibold text-primary">{title}</h1>
         <p className="mt-3 text-sm text-muted-foreground">{description}</p>
-        <a
+        <Link
           href={actionHref}
           className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
         >
           {actionLabel}
-        </a>
+        </Link>
       </div>
     </div>
   );

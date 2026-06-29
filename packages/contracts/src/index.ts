@@ -658,6 +658,9 @@ export type JoinInvitePreviewInput = z.infer<typeof joinInvitePreviewSchema>;
 export const joinInvitePreviewResponseSchema = z.object({
   organizationName: z.string().min(1),
   organizationSlug: slugSchema,
+  membershipStatus: z.enum(["NONE", "SAME_ORG", "OTHER_ORG"]),
+  memberOrganizationName: z.string().min(1).nullable(),
+  memberOrganizationSlug: slugSchema.nullable(),
 });
 
 export type JoinInvitePreviewResponse = z.infer<typeof joinInvitePreviewResponseSchema>;

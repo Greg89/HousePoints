@@ -12,7 +12,14 @@ import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import type { CreateOrgResult, JoinOrgResult } from "@/lib/action-results";
 
 export type InviteLinkPreviewResult =
-  | { ok: true; organizationName: string; organizationSlug: string }
+  | {
+      ok: true;
+      organizationName: string;
+      organizationSlug: string;
+      membershipStatus: "NONE" | "SAME_ORG" | "OTHER_ORG";
+      memberOrganizationName: string | null;
+      memberOrganizationSlug: string | null;
+    }
   | { ok: false; code: string; message: string };
 
 export async function createOrg(
@@ -112,6 +119,9 @@ export async function previewInviteLink(
         ok: true,
         organizationName: data.organizationName,
         organizationSlug: data.organizationSlug,
+        membershipStatus: data.membershipStatus,
+        memberOrganizationName: data.memberOrganizationName,
+        memberOrganizationSlug: data.memberOrganizationSlug,
       };
     } catch (error) {
       if (!isExpectedOrgMutationFailure(error)) {

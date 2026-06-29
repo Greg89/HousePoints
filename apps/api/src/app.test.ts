@@ -4052,6 +4052,9 @@ describe("POST /orgs/join/preview", () => {
     expect(res.json()).toEqual({
       organizationName: "Acme Corp",
       organizationSlug: "acme",
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     });
     expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).not.toHaveBeenCalled();
@@ -4076,6 +4079,66 @@ describe("POST /orgs/join/preview", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().organizationSlug).toBe("acme");
+    await app.close();
+  });
+
+  it("reports when the signed-in user already belongs to the invite organization", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      membershipStatus: "SAME_ORG",
+      memberOrganizationName: "Acme Corp",
+      memberOrganizationSlug: "acme",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("reports when the signed-in user belongs to another organization", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      membershipStatus: "OTHER_ORG",
+      memberOrganizationName: "Other Org",
+      memberOrganizationSlug: "other-org",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
