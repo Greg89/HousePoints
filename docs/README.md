@@ -23,6 +23,7 @@ The documents in this folder serve three purposes:
 - [Seasons design plan](./seasons-design.md): proposed product and technical plan for season-scoped scoring.
 - [Organization settings design](./org-settings-design.md): owner-only organization settings, slug-change safety, and future URL alias planning.
 - [Dashboard slug routes design](./dashboard-slug-routes-design.md): planned `/o/{slug}` dashboard routing behavior and security rules.
+- [Notification system design](./notifications-design.md): durable in-app notifications, account-menu inbox, and toast delivery plan.
 
 ## Tier Detail Notes
 

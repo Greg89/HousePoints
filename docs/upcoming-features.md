@@ -142,6 +142,21 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 
 ---
 
+## 3A. Notifications
+
+### What it is
+A durable in-app attention layer for events that users might miss if they are not actively watching the app.
+
+### Current state
+The app uses local toasts for immediate mutation feedback and has durable audit history for administrative events. It does not yet have per-user notification rows, unread state, or an account-menu notification center.
+
+### Proposed first slice
+Start with `MEMBER_NEEDS_HOUSE_ASSIGNMENT`: when a user accepts an invite and lands in the organization without a house, admins and owners get a durable notification plus an active-session toast if they are currently using the app.
+
+The detailed product and technical plan lives in [Notification System Design](./notifications-design.md).
+
+---
+
 ## 4. Point Adjustments
 
 ### What it is
