@@ -3,10 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "./DashboardShell";
 
+const searchParamsState = vi.hoisted(() => ({
+  value: "",
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),
   }),
+  useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -585,6 +590,8 @@ const baseProps = {
 describe("DashboardShell", () => {
   afterEach(() => {
     vi.useRealTimers();
+    searchParamsState.value = "";
+    window.history.replaceState(null, "", "/");
   });
 
   it("keeps the dashboard tabs focused for members", () => {
@@ -648,6 +655,40 @@ describe("DashboardShell", () => {
 
     expect(screen.getByText("Manage organization tools")).toBeVisible();
     expect(manageTab).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("opens the activity tab from the tab query parameter", () => {
+    searchParamsState.value = "tab=activity";
+
+    render(<DashboardShell {...baseProps} />);
+
+    expect(screen.getByRole("tab", { name: /activity/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Activity content");
+  });
+
+  it("reacts when the tab query parameter changes after render", () => {
+    const { rerender } = render(<DashboardShell {...baseProps} />);
+
+    expect(screen.getByRole("tab", { name: /overview/i })).toHaveAttribute("aria-selected", "true");
+
+    searchParamsState.value = "tab=activity";
+    rerender(<DashboardShell {...baseProps} />);
+
+    expect(screen.getByRole("tab", { name: /activity/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Activity content");
+  });
+
+  it("keeps tab clicks reflected in the URL query", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps} />);
+
+    await user.click(screen.getByRole("tab", { name: /activity/i }));
+
+    expect(window.location.search).toBe("?tab=activity");
+
+    await user.click(screen.getByRole("tab", { name: /overview/i }));
+
+    expect(window.location.search).toBe("");
   });
 
   it("shows organization report widgets on the overview tab", () => {

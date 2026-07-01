@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import * as Tabs from "@radix-ui/react-tabs";
 import {
   CaretDown,
@@ -84,6 +85,8 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"] | "manage";
+const BASE_TAB_IDS = new Set<TabId>(["overview", "activity", "leaderboard"]);
+type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const dateFormatter = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -127,6 +130,34 @@ function getSeasonTiming(season: SeasonContext["activeSeason"], now = new Date()
   };
 }
 
+function getTabFromSearchParams(searchParams: ReadableSearchParams, canManage: boolean): TabId | null {
+  const requestedTab = searchParams.get("tab");
+
+  if (requestedTab === "manage" && canManage) {
+    return "manage";
+  }
+
+  if (requestedTab && BASE_TAB_IDS.has(requestedTab as TabId)) {
+    return requestedTab as TabId;
+  }
+
+  return null;
+}
+
+function syncTabToUrl(tab: TabId, searchParams: ReadableSearchParams) {
+  const nextParams = new URLSearchParams(searchParams.toString());
+
+  if (tab === "overview") {
+    nextParams.delete("tab");
+  } else {
+    nextParams.set("tab", tab);
+  }
+
+  const nextQuery = nextParams.toString();
+  const nextUrl = nextQuery ? `?${nextQuery}` : window.location.pathname;
+  window.history.pushState(null, "", nextUrl);
+}
+
 export function DashboardShell({
   session,
   leaderboard,
@@ -153,7 +184,8 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const [awardOpen, setAwardOpen] = useState(false);
   const [deductOpen, setDeductOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const searchParams = useSearchParams();
+  const [selectedTab, setSelectedTab] = useState<TabId>("overview");
   const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(dashboardSummary.selectedSeason.id);
   const [currentNotifications, setCurrentNotifications] = useState(notifications);
@@ -164,9 +196,11 @@ export function DashboardShell({
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [isSeasonPending, startSeasonTransition] = useTransition();
   const seasonMenuRef = useRef<HTMLDivElement>(null);
-  const visibleTabs = adminSection
+  const canManageTab = Boolean(adminSection);
+  const visibleTabs = canManageTab
     ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
     : TABS;
+  const activeTab = getTabFromSearchParams(searchParams, canManageTab) ?? selectedTab;
   const selectedSeason = useMemo(
     () => seasonContext.seasons.find((season) => season.id === selectedSeasonId) ?? seasonContext.activeSeason,
     [seasonContext.activeSeason, seasonContext.seasons, selectedSeasonId],
@@ -241,7 +275,8 @@ export function DashboardShell({
       setSelectedHouseId(null);
     }
 
-    setActiveTab(nextActiveTab);
+    setSelectedTab(nextActiveTab);
+    syncTabToUrl(nextActiveTab, searchParams);
   }
 
   return (
@@ -488,7 +523,11 @@ export function DashboardShell({
               <OverviewReports
                 dashboardSummary={displayedDashboardSummary}
                 selectedHouse={selectedHouse}
-                onShowActivity={() => setActiveTab("activity")}
+                onShowActivity={() => {
+                  setSelectedTab("activity");
+                  setSelectedHouseId(null);
+                  syncTabToUrl("activity", searchParams);
+                }}
               />
             </div>
             {onCompareSeasons ? (
