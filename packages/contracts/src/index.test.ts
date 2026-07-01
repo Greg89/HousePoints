@@ -38,6 +38,11 @@ import {
   appUserSchema,
   leaderboardSchema,
   orgMembersSchema,
+  markNotificationsReadSchema,
+  notificationListRequestSchema,
+  notificationMutationResponseSchema,
+  notificationSchema,
+  pagedNotificationsSchema,
   pagedActivityFeedSchema,
   adminAuditActionSchema,
   adminAuditRequestSchema,
@@ -65,6 +70,9 @@ const webConsumedApiEndpoints = [
   "/dashboard/summary",
   "/houses/leaderboard",
   "/members",
+  "/notifications/list",
+  "/notifications/mark-all-read",
+  "/notifications/mark-read",
   "/orgs/create",
   "/orgs/invite",
   "/orgs/join",
@@ -1671,6 +1679,76 @@ describe("joinInvitePreviewSchema", () => {
         memberOrganizationSlug: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("notification schemas", () => {
+  const notification = {
+    id: "notification-1",
+    type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT" as const,
+    severity: "ACTION_REQUIRED" as const,
+    title: "New member needs a house",
+    body: "Casey joined Acme and has not been assigned to a house yet.",
+    actionLabel: "Assign house",
+    actionHref: "/?tab=manage&section=team",
+    entityType: "User",
+    entityId: "user-1",
+    readAt: null,
+    createdAt: "2026-06-30T12:00:00.000Z",
+  };
+
+  it("accepts notification list payloads and responses", () => {
+    expect(notificationListRequestSchema.parse({})).toEqual({
+      limit: 10,
+      unreadOnly: false,
+    });
+    expect(notificationListRequestSchema.parse({
+      cursor: "notification-1",
+      limit: 20,
+      unreadOnly: true,
+    })).toEqual({
+      cursor: "notification-1",
+      limit: 20,
+      unreadOnly: true,
+    });
+
+    expect(notificationSchema.parse(notification)).toEqual(notification);
+    expect(pagedNotificationsSchema.parse({
+      items: [notification],
+      unreadCount: 1,
+      nextCursor: null,
+    })).toEqual({
+      items: [notification],
+      unreadCount: 1,
+      nextCursor: null,
+    });
+  });
+
+  it("accepts mark-read payloads and mutation responses", () => {
+    expect(markNotificationsReadSchema.parse({
+      notificationIds: ["notification-1"],
+    })).toEqual({
+      notificationIds: ["notification-1"],
+    });
+    expect(notificationMutationResponseSchema.parse({ updatedCount: 1 }))
+      .toEqual({ updatedCount: 1 });
+  });
+
+  it("rejects invalid notification shapes", () => {
+    expect(notificationSchema.safeParse({
+      ...notification,
+      type: "BOGUS",
+    }).success).toBe(false);
+    expect(notificationSchema.safeParse({
+      ...notification,
+      severity: "CRITICAL",
+    }).success).toBe(false);
+    expect(markNotificationsReadSchema.safeParse({
+      notificationIds: [],
+    }).success).toBe(false);
+    expect(notificationListRequestSchema.safeParse({
+      limit: 1000,
+    }).success).toBe(false);
   });
 });
 
