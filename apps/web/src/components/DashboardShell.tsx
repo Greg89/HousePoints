@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { AccountMenu } from "./AccountMenu";
+import { NotificationPoller } from "./NotificationPoller";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
@@ -64,6 +65,7 @@ interface DashboardShellProps {
   initialSeasonComparison?: SeasonComparison | null;
   onCompareSeasons?: (fromSeasonId: string, toSeasonId: string) => Promise<SeasonComparison>;
   notifications: PagedNotifications;
+  onRefreshNotifications: () => Promise<PagedNotifications>;
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
@@ -139,6 +141,7 @@ export function DashboardShell({
   initialSeasonComparison = null,
   onCompareSeasons,
   notifications,
+  onRefreshNotifications,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   onAward,
@@ -153,6 +156,7 @@ export function DashboardShell({
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(dashboardSummary.selectedSeason.id);
+  const [currentNotifications, setCurrentNotifications] = useState(notifications);
   const [scopedLeaderboard, setScopedLeaderboard] = useState(leaderboard);
   const [scopedDashboardSummary, setScopedDashboardSummary] = useState(dashboardSummary);
   const [scopedMemberPoints, setScopedMemberPoints] = useState(memberPoints);
@@ -292,10 +296,16 @@ export function DashboardShell({
                 userName: session.userName,
                 role: session.role,
               }}
-              notifications={notifications}
+              notifications={currentNotifications}
+              onNotificationsChange={setCurrentNotifications}
               onMarkNotificationRead={onMarkNotificationRead}
               onMarkAllNotificationsRead={onMarkAllNotificationsRead}
               logoutUrl={logoutUrl}
+            />
+            <NotificationPoller
+              notifications={currentNotifications}
+              onNotificationsChange={setCurrentNotifications}
+              onRefreshNotifications={onRefreshNotifications}
             />
           </div>
         </div>

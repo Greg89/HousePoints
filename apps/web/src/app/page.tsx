@@ -202,6 +202,7 @@ async function renderHome() {
       initialSeasonComparison={initialSeasonComparison}
       onCompareSeasons={readSeasonComparison}
       notifications={notifications}
+      onRefreshNotifications={readNotifications}
       onMarkNotificationRead={markNotificationRead}
       onMarkAllNotificationsRead={markAllNotificationsRead}
       onAward={awardPoints}

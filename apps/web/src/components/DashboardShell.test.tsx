@@ -569,6 +569,11 @@ const baseProps = {
     unreadCount: 0,
     nextCursor: null,
   },
+  onRefreshNotifications: vi.fn(async () => ({
+    items: [],
+    unreadCount: 0,
+    nextCursor: null,
+  })),
   onMarkNotificationRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   onMarkAllNotificationsRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   onAward: async () => ({ ok: true as const }),

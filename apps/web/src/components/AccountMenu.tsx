@@ -19,6 +19,7 @@ type AccountMenuProps = {
     role: "MEMBER" | "ADMIN" | "OWNER";
   };
   notifications: PagedNotifications;
+  onNotificationsChange: (notifications: PagedNotifications) => void;
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   logoutUrl: string;
@@ -34,19 +35,18 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 export function AccountMenu({
   session,
   notifications,
+  onNotificationsChange,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   logoutUrl,
 }: AccountMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState(notifications.items);
-  const [unreadCount, setUnreadCount] = useState(notifications.unreadCount);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
-  const displayedUnreadCount = Math.min(unreadCount, 99);
-  const hasUnread = unreadCount > 0;
+  const displayedUnreadCount = Math.min(notifications.unreadCount, 99);
+  const hasUnread = notifications.unreadCount > 0;
 
   useEffect(() => {
     if (!open) {
@@ -76,7 +76,7 @@ export function AccountMenu({
 
   function markLocalRead(notificationIds: string[]) {
     const unreadIds = new Set(
-      items
+      notifications.items
         .filter((item) => notificationIds.includes(item.id) && !item.readAt)
         .map((item) => item.id),
     );
@@ -85,14 +85,15 @@ export function AccountMenu({
       return;
     }
 
-    setItems((currentItems) =>
-      currentItems.map((item) =>
+    onNotificationsChange({
+      ...notifications,
+      items: notifications.items.map((item) =>
         unreadIds.has(item.id)
           ? { ...item, readAt: new Date().toISOString() }
           : item,
       ),
-    );
-    setUnreadCount((currentCount) => Math.max(0, currentCount - unreadIds.size));
+      unreadCount: Math.max(0, notifications.unreadCount - unreadIds.size),
+    });
   }
 
   async function markNotificationLocally(notificationId: string) {
@@ -137,7 +138,7 @@ export function AccountMenu({
       const result = await onMarkAllNotificationsRead();
 
       if (result.ok) {
-        const unreadIds = items.filter((item) => !item.readAt).map((item) => item.id);
+        const unreadIds = notifications.items.filter((item) => !item.readAt).map((item) => item.id);
         markLocalRead(unreadIds);
         return;
       }
@@ -152,7 +153,7 @@ export function AccountMenu({
         type="button"
         aria-label={
           hasUnread
-            ? `Account menu, ${unreadCount} unread notifications`
+            ? `Account menu, ${notifications.unreadCount} unread notifications`
             : "Account menu"
         }
         aria-haspopup="dialog"
@@ -191,7 +192,7 @@ export function AccountMenu({
               <div>
                 <h2 className="text-sm font-bold">Notifications</h2>
                 <p className="text-xs text-muted-foreground">
-                  {hasUnread ? `${unreadCount} unread` : "All caught up"}
+                  {hasUnread ? `${notifications.unreadCount} unread` : "All caught up"}
                 </p>
               </div>
               <button
@@ -210,7 +211,7 @@ export function AccountMenu({
               </p>
             ) : null}
 
-            {items.length === 0 ? (
+            {notifications.items.length === 0 ? (
               <div className="rounded-xl border border-dashed p-5 text-center">
                 <Check size={24} className="mx-auto text-primary" aria-hidden="true" />
                 <p className="mt-2 text-sm font-semibold">You&apos;re all caught up.</p>
@@ -220,7 +221,7 @@ export function AccountMenu({
               </div>
             ) : (
               <div className="space-y-2">
-                {items.map((notification) => (
+                {notifications.items.map((notification) => (
                   <NotificationCard
                     key={notification.id}
                     notification={notification}

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PagedNotifications } from "@housepoints/contracts";
 import { AccountMenu } from "./AccountMenu";
 
 const pushMock = vi.hoisted(() => vi.fn());
@@ -46,10 +48,35 @@ const baseProps = {
     unreadCount: 1,
     nextCursor: null,
   },
+  onNotificationsChange: vi.fn(),
   onMarkNotificationRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   onMarkAllNotificationsRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   logoutUrl: "/auth/logout",
 };
+
+function AccountMenuHarness({
+  notifications = baseProps.notifications,
+  onNotificationsChange,
+  ...props
+}: Partial<React.ComponentProps<typeof AccountMenu>> & {
+  notifications?: PagedNotifications;
+} = {}) {
+  const [currentNotifications, setCurrentNotifications] = useState(notifications);
+
+  function handleNotificationsChange(nextNotifications: PagedNotifications) {
+    setCurrentNotifications(nextNotifications);
+    onNotificationsChange?.(nextNotifications);
+  }
+
+  return (
+    <AccountMenu
+      {...baseProps}
+      {...props}
+      notifications={currentNotifications}
+      onNotificationsChange={handleNotificationsChange}
+    />
+  );
+}
 
 describe("AccountMenu", () => {
   beforeEach(() => {
@@ -57,7 +84,7 @@ describe("AccountMenu", () => {
   });
 
   it("shows unread notification count on the account trigger", () => {
-    render(<AccountMenu {...baseProps} />);
+    render(<AccountMenuHarness />);
 
     expect(screen.getByRole("button", { name: /account menu, 1 unread notifications/i })).toHaveTextContent("1");
   });
@@ -65,8 +92,7 @@ describe("AccountMenu", () => {
   it("shows an empty notification state", async () => {
     const user = userEvent.setup();
     render(
-      <AccountMenu
-        {...baseProps}
+      <AccountMenuHarness
         notifications={{ items: [], unreadCount: 0, nextCursor: null }}
       />,
     );
@@ -80,7 +106,7 @@ describe("AccountMenu", () => {
 
   it("renders notification details and account links", async () => {
     const user = userEvent.setup();
-    render(<AccountMenu {...baseProps} />);
+    render(<AccountMenuHarness />);
 
     await user.click(screen.getByRole("button", { name: /account menu/i }));
 
@@ -98,8 +124,7 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));
     render(
-      <AccountMenu
-        {...baseProps}
+      <AccountMenuHarness
         onMarkNotificationRead={onMarkNotificationRead}
       />,
     );
@@ -115,8 +140,7 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));
     render(
-      <AccountMenu
-        {...baseProps}
+      <AccountMenuHarness
         onMarkNotificationRead={onMarkNotificationRead}
       />,
     );
@@ -133,8 +157,7 @@ describe("AccountMenu", () => {
     const user = userEvent.setup();
     const onMarkAllNotificationsRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));
     render(
-      <AccountMenu
-        {...baseProps}
+      <AccountMenuHarness
         onMarkAllNotificationsRead={onMarkAllNotificationsRead}
       />,
     );
