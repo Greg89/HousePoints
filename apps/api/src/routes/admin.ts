@@ -700,6 +700,15 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
+      const ownerRecipients = await tx.user.findMany({
+        where: {
+          organizationId: actor.organizationId,
+          role: "OWNER",
+          id: { not: actor.id },
+        },
+        select: { id: true },
+      });
+
       await tx.auditEvent.create({
         data: {
           organizationId: actor.organizationId,
@@ -714,6 +723,28 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
           },
         },
       });
+
+      const recipientIds = Array.from(
+        new Set([changedUser.id, ...ownerRecipients.map((recipient) => recipient.id)]),
+      );
+
+      if (recipientIds.length > 0) {
+        await tx.notification.createMany({
+          data: recipientIds.map((recipientUserId) => ({
+            organizationId: actor.organizationId,
+            recipientUserId,
+            type: "ROLE_CHANGED",
+            severity: "INFO",
+            title: "Role changed",
+            body: `${actor.displayName} changed ${changedUser.displayName} from ${targetUser.role} to ${changedUser.role}.`,
+            actionLabel: "View team",
+            actionHref: "/?tab=manage&section=team",
+            entityType: "User",
+            entityId: changedUser.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
 
       return changedUser;
     });

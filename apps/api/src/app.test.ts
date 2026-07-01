@@ -2963,6 +2963,7 @@ describe("POST /admin/users/role", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2981,6 +2982,7 @@ describe("POST /admin/users/role", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -3003,10 +3005,11 @@ describe("POST /admin/users/role", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("OWNER_ROLE_IMMUTABLE");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("allows an owner to promote a member to admin and writes an audit event", async () => {
+  it("allows an owner to promote a member to admin, writes audit, and notifies the target plus other owners", async () => {
     const targetUser = makeMember({
       id: "user-target",
       displayName: "Taylor",
@@ -3025,6 +3028,10 @@ describe("POST /admin/users/role", () => {
       role: "ADMIN",
       houseId: "house-1",
     });
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-owner-2" },
+      { id: "user-target" },
+    ]);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3059,6 +3066,43 @@ describe("POST /admin/users/role", () => {
           newRole: "ADMIN",
         },
       },
+    });
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        role: "OWNER",
+        id: { not: "user-owner" },
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-target",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Taylor from MEMBER to ADMIN.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-target",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-owner-2",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Taylor from MEMBER to ADMIN.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-target",
+        },
+      ],
+      skipDuplicates: true,
     });
     expect(res.json()).toEqual({
       id: "user-target",
@@ -3123,6 +3167,21 @@ describe("POST /admin/users/role", () => {
           newRole: "MEMBER",
         },
       },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [{
+        organizationId: "org-secure",
+        recipientUserId: "user-target",
+        type: "ROLE_CHANGED",
+        severity: "INFO",
+        title: "Role changed",
+        body: "Olivia changed Taylor from ADMIN to MEMBER.",
+        actionLabel: "View team",
+        actionHref: "/?tab=manage&section=team",
+        entityType: "User",
+        entityId: "user-target",
+      }],
+      skipDuplicates: true,
     });
     expect(res.json()).toEqual({
       id: "user-target",
