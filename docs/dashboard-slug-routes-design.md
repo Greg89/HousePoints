@@ -8,7 +8,8 @@ Product and engineering plan for making organization slugs visible in dashboard 
 
 The app currently has these user-facing routes:
 
-- `/`: primary authenticated dashboard.
+- `/`: primary authenticated dashboard and compatibility entry point.
+- `/o/{slug}`: slug-bearing authenticated dashboard entry point.
 - `/settings`: signed-in user settings.
 - `/o/{slug}/join/{token}`: slug-bearing invite join route.
 
@@ -19,7 +20,7 @@ Organization slugs are already durable enough to support URL work:
 - Invite links include the current slug for readability and user trust.
 - Invite joining still uses the single-use token as the secure credential.
 
-Dashboard routes are not slug-based yet. The dashboard reads the actor's organization from the authenticated session and API responses, not from the URL.
+Dashboard routes now support `/o/{slug}`. The slug route first resolves route context through the API, then renders the same dashboard only when the authenticated actor is allowed to view their own organization. Dashboard data still reads the actor's organization from the authenticated session and API responses, not from the URL.
 
 ---
 
@@ -146,6 +147,8 @@ Phase the navigation changes so links can move to slugged URLs after the route w
 - Add an authenticated API route to resolve a requested slug against aliases.
 - Cover current slug, old alias, unknown slug, no-org actor, and different-org actor states.
 
+Status: implemented.
+
 ### Phase 2 - Slugged Dashboard Route
 
 - Add `apps/web/src/app/o/[slug]/page.tsx`.
@@ -154,17 +157,23 @@ Phase the navigation changes so links can move to slugged URLs after the route w
 - Add blocked and not-found presentation states.
 - Keep `/` rendering the existing dashboard.
 
+Status: implemented.
+
 ### Phase 3 - Canonical Navigation
 
 - Update dashboard links to prefer `/o/{slug}`.
 - Update invite join and preview calls to navigate to `/o/{slug}` after successful or already-member flows.
 - Keep `/` as a compatibility entry point.
 
+Status: not started.
+
 ### Phase 4 - Optional Root Redirect
 
 - Redirect authenticated users with an organization from `/` to `/o/{currentSlug}`.
 - Preserve onboarding behavior for signed-in users without an organization.
 - Preserve Auth0 login return behavior for signed-out users.
+
+Status: not started.
 
 ---
 

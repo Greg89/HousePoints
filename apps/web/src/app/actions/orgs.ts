@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { appUserSchema, joinInvitePreviewResponseSchema } from "@housepoints/contracts";
+import {
+  appUserSchema,
+  joinInvitePreviewResponseSchema,
+  orgRouteContextSchema,
+  type OrgRouteContext,
+} from "@housepoints/contracts";
 import {
   ApiResponseError,
   apiFetch,
@@ -21,6 +26,31 @@ export type InviteLinkPreviewResult =
       memberOrganizationSlug: string | null;
     }
   | { ok: false; code: string; message: string };
+
+export async function readOrgRouteContext(
+  organizationSlug: string,
+  requestId: string,
+): Promise<OrgRouteContext> {
+  const trimmedOrganizationSlug = organizationSlug.trim();
+
+  if (!trimmedOrganizationSlug) {
+    return {
+      status: "NOT_FOUND",
+      requestedSlug: "",
+    };
+  }
+
+  const response = await apiFetch("/orgs/route-context", requestId, {
+    method: "POST",
+    body: JSON.stringify({ slug: trimmedOrganizationSlug }),
+  });
+
+  return parseApiResponse(
+    response,
+    orgRouteContextSchema,
+    "The organization route could not be loaded. Please try again.",
+  );
+}
 
 export async function createOrg(
   orgName: string,

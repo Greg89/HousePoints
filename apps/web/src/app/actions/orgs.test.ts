@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse, requireAuthenticatedApiContext } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
-import { createOrg, joinOrg, previewInviteLink } from "./orgs";
+import { createOrg, joinOrg, previewInviteLink, readOrgRouteContext } from "./orgs";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -136,6 +136,45 @@ describe("createOrg", () => {
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("readOrgRouteContext", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetchMock.mockResolvedValue(Response.json({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("reads route context for a trimmed organization slug", async () => {
+    await expect(readOrgRouteContext(" acme ", "request-2")).resolves.toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/orgs/route-context", "request-2", {
+      method: "POST",
+      body: JSON.stringify({ slug: "acme" }),
+    });
+  });
+
+  it("returns a local not-found context for empty slugs", async () => {
+    await expect(readOrgRouteContext("   ", "request-2")).resolves.toEqual({
+      status: "NOT_FOUND",
+      requestedSlug: "",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(parseApiResponseMock).not.toHaveBeenCalled();
   });
 });
 
