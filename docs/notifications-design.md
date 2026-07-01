@@ -38,7 +38,7 @@ The app does not currently have:
 - Server-sent events, websockets, or true real-time fanout.
 - A dedicated full-page notification center.
 - Notification archive/retention UI.
-- Notification producers for point deductions or org setting changes.
+- Notification producers for org setting changes.
 - User-level notification preferences.
 
 ---
@@ -68,7 +68,7 @@ Recommended initial types:
 | `POINT_AWARD_RECEIVED` | Target user | `INFO` | Open Activity |
 | `POINT_DEDUCTION_RECEIVED` | Target user and owners/admins | `ACTION_REQUIRED` or `WARNING` | Open Activity |
 
-Implemented types are `MEMBER_NEEDS_HOUSE_ASSIGNMENT`, `SEASON_STARTED`, `POINT_AWARD_RECEIVED`, and `ROLE_CHANGED`. Other types are listed so the model does not paint us into a corner.
+Implemented types are `MEMBER_NEEDS_HOUSE_ASSIGNMENT`, `SEASON_STARTED`, `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, and `ROLE_CHANGED`. Other types are listed so the model does not paint us into a corner.
 
 ---
 
@@ -369,9 +369,11 @@ Add more types only after the first workflow feels useful:
 - Role changed
 - Org settings changed
 
-Status: in progress. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Point deductions and org settings changes remain deferred.
+Status: in progress. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Org settings changes remain deferred.
 
 `POINT_AWARD_RECEIVED` is implemented as a targeted `INFO` notification created inside the point-award transaction. It notifies the recipient, links to Activity, and skips self-awards to avoid echoing an action the current user just performed.
+
+`POINT_DEDUCTION_RECEIVED` is implemented as a targeted `WARNING` notification created inside the point-deduction transaction. It notifies the deducted member, links to Activity, and stays durable without becoming an active-session action-required toast.
 
 `ROLE_CHANGED` is implemented as an informational notification created inside the owner role-management transaction. It notifies the changed user plus other owners in the organization, excluding the owner who performed the change, and links to Manage Team.
 
@@ -394,4 +396,4 @@ Answered:
 - User-level notification preferences.
 - Email delivery.
 - Server-sent events or websocket delivery.
-- Additional notification producers: point deductions and org setting changes.
+- Additional notification producers: org setting changes.

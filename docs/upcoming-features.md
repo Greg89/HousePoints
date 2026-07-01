@@ -148,9 +148,9 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 A durable in-app attention layer for events that users might miss if they are not actively watching the app.
 
 ### Current state
-The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, settings, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are implemented as org-wide informational notifications created when an owner starts a new season. `POINT_AWARD_RECEIVED` notifications are implemented as targeted informational notifications for the awarded member, with self-awards skipped to avoid inbox noise. `ROLE_CHANGED` notifications are implemented for owner role-management changes, notifying the changed user plus other owners.
+The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, settings, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are implemented as org-wide informational notifications created when an owner starts a new season. `POINT_AWARD_RECEIVED` notifications are implemented as targeted informational notifications for the awarded member, with self-awards skipped to avoid inbox noise. `POINT_DEDUCTION_RECEIVED` notifications are implemented as targeted warning notifications for the deducted member. `ROLE_CHANGED` notifications are implemented for owner role-management changes, notifying the changed user plus other owners.
 
-Still deferred: a full notification page, user notification preferences, email delivery, server-sent events or websocket fanout, and additional notification producers such as point deductions and org setting changes.
+Still deferred: a full notification page, user notification preferences, email delivery, server-sent events or websocket fanout, and additional notification producers such as org setting changes.
 
 The detailed product and technical plan lives in [Notification System Design](./notifications-design.md).
 
@@ -213,10 +213,9 @@ The product supports positive point awards, soft deletion of mistaken awards, fi
 - Add a `Deduct points` admin action with explicit confirmation copy.
 - Activity feed shows deduction rows with a negative delta and `Deducted` badge.
 - Audit shows durable `POINTS_DEDUCTED` events.
-- Direct user notifications are deferred; Activity and Audit are the MVP visibility surfaces.
+- Targeted in-app notifications, Activity, and Audit are the MVP visibility surfaces.
 
 **Open questions**
-- What production usage threshold would justify direct user notifications for deductions?
 - Should owners eventually enable/disable point adjustments per organization?
 - Should targets be limited to rival houses only, or can admins correct points inside their own house?
 - Should deduction reasons use free text, a fixed list, or both?

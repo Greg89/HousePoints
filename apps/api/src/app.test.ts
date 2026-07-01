@@ -822,6 +822,7 @@ describe("POST /points/deduct", () => {
     });
     expect(mockFindUnique).not.toHaveBeenCalled();
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -837,6 +838,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -853,6 +855,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -869,6 +872,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -885,6 +889,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_HOUSE_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -903,6 +908,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -921,6 +927,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("CROSS_ORGANIZATION_TARGET");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -939,6 +946,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(422);
     expect(res.json().code).toBe("TARGET_USER_UNASSIGNED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -957,6 +965,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("SAME_HOUSE_TARGET");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -976,6 +985,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1011,6 +1021,7 @@ describe("POST /points/deduct", () => {
     );
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1049,6 +1060,7 @@ describe("POST /points/deduct", () => {
     );
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1103,6 +1115,22 @@ describe("POST /points/deduct", () => {
           reason: "Duplicate award correction",
         },
       },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [{
+        organizationId: "org-1",
+        recipientUserId: "user-1",
+        type: "POINT_DEDUCTION_RECEIVED",
+        severity: "WARNING",
+        title: "Points deducted",
+        body: "Bob deducted 10 points from you. Reason: Duplicate award correction.",
+        actionLabel: "View activity",
+        actionHref: "/?tab=activity",
+        entityType: "PointTransaction",
+        entityId: "tx-deduction",
+        dedupeKey: "point-deduction-received:org-1:tx-deduction",
+      }],
+      skipDuplicates: true,
     });
     await app.close();
   });

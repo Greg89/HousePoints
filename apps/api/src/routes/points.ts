@@ -426,6 +426,23 @@ export async function registerPointRoutes(
         },
       });
 
+      await tx.notification.createMany({
+        data: [{
+          organizationId: actor.organizationId,
+          recipientUserId: targetUser.id,
+          type: "POINT_DEDUCTION_RECEIVED",
+          severity: "WARNING",
+          title: "Points deducted",
+          body: `${actor.displayName} deducted 10 points from you. Reason: ${parsed.data.reason}.`,
+          actionLabel: "View activity",
+          actionHref: "/?tab=activity",
+          entityType: "PointTransaction",
+          entityId: deduction.id,
+          dedupeKey: `point-deduction-received:${actor.organizationId}:${deduction.id}`,
+        }],
+        skipDuplicates: true,
+      });
+
       return deduction;
     });
 
