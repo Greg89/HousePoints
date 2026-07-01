@@ -37,4 +37,12 @@ Last updated: July 1, 2026
 - ✅ Unit tests for `route-helpers.ts` (16 tests covering all 5 helpers, including null-return paths)
 - ✅ Added `"auth.actor_not_found"` and `"owner.forbidden"` to `ApiLogEvent`
 
-Phase 2 is next: extract service functions from large route handlers (`admin.ts`, `orgs.ts`, `points.ts`).
+**Phase 2 - COMPLETE.** All quality gates green.
+
+- ✅ Slice 2a: `notifications.ts` — 3 exported service functions (`listNotifications`, `markNotificationsRead`, `markAllNotificationsRead`)
+- ✅ Slice 2a: `users.ts` — 7 exported service functions + `userSelect` hoisted to module scope
+- ✅ Slice 2b: `dashboard.ts` — 2 exported service functions (`loadLeaderboard`, `loadDashboardSummaryData`)
+- ✅ Slice 2b: `seasons.ts` — 7 exported service functions (`loadSeasonsForOrg`, `loadSeasonCompareData`, `loadSeasonCompareDetails`, `loadContributorNames`, `startSeasonTransaction`, `findSeasonForOrg`, `renameSeasonInDb`)
+- ✅ Slice 2c: `points.ts` — 8 exported service functions; all 5 handlers updated with zero inline `prisma.*` calls
+- ✅ Slice 2d: `admin.ts` — 10 exported service functions; all 8 handlers updated; `buildRecentAdminActions` and `buildPointAdjustmentStats` exported with 13 unit tests in `admin.test.ts`
+- ✅ Slice 2e: `orgs.ts` — 5 exported service functions (`checkOrgCreatePreconditions`, `createOrgInDb`, `createOrgInviteInDb`, `loadJoinPreviewInDb`, `joinOrgInDb`); all 4 handlers updated

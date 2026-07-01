@@ -90,6 +90,306 @@ async function createMemberNeedsHouseAssignmentNotifications(
   return result.count;
 }
 
+export async function checkOrgCreatePreconditions(auth0Sub: string, email?: string | null) {
+  const existingIdentity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { user: { select: { id: true, organizationId: true } } },
+  });
+  const existingUser = existingIdentity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: { id: true, organizationId: true },
+  });
+  const conflictingEmailUser = !existingUser && email
+    ? await prisma.user.findUnique({ where: { email }, select: { id: true } })
+    : null;
+  return { existingUser: existingUser ?? null, conflictingEmailUser };
+}
+
+export async function createOrgInDb(params: {
+  auth0Sub: string;
+  email?: string | null;
+  displayName: string;
+  orgName: string;
+  orgSlug: string;
+  firstHouseName: string;
+  firstHouseColor: string;
+  existingUser: { id: string; organizationId: string | null } | null;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const org = await tx.organization.create({
+      data: { name: params.orgName, slug: params.orgSlug },
+      select: { id: true, slug: true, name: true },
+    });
+
+    await createPrimaryOrganizationSlugAlias(tx, { organizationId: org.id, slug: org.slug });
+
+    const house = await tx.house.create({
+      data: { organizationId: org.id, name: params.firstHouseName, color: params.firstHouseColor },
+      select: { id: true, name: true, color: true },
+    });
+
+    const userSelect = {
+      id: true, auth0Sub: true, email: true, displayName: true, houseThemeEnabled: true, role: true,
+      organizationId: true, organization: { select: { slug: true } },
+      houseId: true, house: { select: { name: true, color: true } },
+    } as const;
+
+    const user = params.existingUser
+      ? await tx.user.update({
+          where: { id: params.existingUser.id },
+          data: {
+            organizationId: org.id,
+            houseId: house.id,
+            role: "OWNER",
+            displayName: params.displayName,
+            email: params.email ?? null,
+            authIdentities: {
+              connectOrCreate: {
+                where: { providerSubject: params.auth0Sub },
+                create: { providerSubject: params.auth0Sub },
+              },
+            },
+          },
+          select: userSelect,
+        })
+      : await tx.user.create({
+          data: {
+            auth0Sub: params.auth0Sub,
+            email: params.email ?? null,
+            displayName: params.displayName,
+            organizationId: org.id,
+            houseId: house.id,
+            role: "OWNER",
+            authIdentities: { create: { providerSubject: params.auth0Sub } },
+          },
+          select: userSelect,
+        });
+
+    const season = await tx.season.create({
+      data: {
+        organizationId: org.id,
+        name: "Season 0",
+        startsAt: new Date(),
+        isActive: true,
+        createdById: user.id,
+      },
+      select: { id: true },
+    });
+
+    return { org, house, user, season };
+  });
+}
+
+export async function createOrgInviteInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  tokenHash: string;
+  expiresAt: Date;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const invite = await tx.orgInvite.create({
+      data: {
+        organizationId: params.organizationId,
+        tokenHash: params.tokenHash,
+        createdById: params.actorId,
+        expiresAt: params.expiresAt,
+      },
+      select: { id: true, expiresAt: true },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "INVITE_CREATED",
+        summary: `${params.actorDisplayName} created an invite link.`,
+        metadata: { inviteId: invite.id, expiresAt: invite.expiresAt.toISOString() },
+      },
+    });
+    return invite;
+  });
+}
+
+export async function loadJoinPreviewInDb(params: {
+  auth0Sub: string;
+  tokenHash: string;
+  organizationSlug: string;
+  checkedAt: Date;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const invite = await tx.orgInvite.findUnique({
+      where: { tokenHash: params.tokenHash },
+      select: {
+        id: true, organizationId: true, expiresAt: true, usedAt: true,
+        organization: { select: { name: true } },
+      },
+    });
+    const resolvedSlug = await resolveOrganizationSlug(tx, params.organizationSlug);
+
+    if (!invite) {
+      throw new InviteJoinError(404, "INVITE_NOT_FOUND", "Invite link is invalid or has already been used.");
+    }
+    if (invite.usedAt) {
+      throw new InviteJoinError(409, "INVITE_USED", "This invite link has already been used.", invite.id);
+    }
+    if (invite.expiresAt <= params.checkedAt) {
+      throw new InviteJoinError(410, "INVITE_EXPIRED", "This invite link has expired. Ask an admin to generate a new one.", invite.id);
+    }
+    if (!resolvedSlug || resolvedSlug.organizationId !== invite.organizationId) {
+      throw new InviteJoinError(404, "INVITE_ORG_MISMATCH", "This invite link is not valid for this organisation.", invite.id);
+    }
+
+    const existingIdentity = await tx.authIdentity.findUnique({
+      where: { providerSubject: params.auth0Sub },
+      select: {
+        user: { select: { organizationId: true, organization: { select: { name: true, slug: true } } } },
+      },
+    });
+    const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
+      where: { auth0Sub: params.auth0Sub },
+      select: { organizationId: true, organization: { select: { name: true, slug: true } } },
+    });
+    const membershipStatus = !existingUser?.organizationId
+      ? "NONE"
+      : existingUser.organizationId === invite.organizationId
+        ? "SAME_ORG"
+        : "OTHER_ORG";
+
+    return {
+      organizationName: resolvedSlug.organization.name,
+      organizationSlug: resolvedSlug.currentSlug,
+      membershipStatus,
+      memberOrganizationName: existingUser?.organization?.name ?? null,
+      memberOrganizationSlug: existingUser?.organization?.slug ?? null,
+      inviteId: invite.id,
+    };
+  });
+}
+
+export async function joinOrgInDb(params: {
+  auth0Sub: string;
+  email?: string | null;
+  displayName: string;
+  tokenHash: string;
+  organizationSlug?: string | null;
+  claimedAt: Date;
+}) {
+  const userSelect = {
+    id: true, auth0Sub: true, email: true, displayName: true, houseThemeEnabled: true, role: true,
+    organizationId: true, organization: { select: { slug: true } },
+    houseId: true, house: { select: { name: true, color: true } },
+  } as const;
+
+  return prisma.$transaction(async (tx) => {
+    const invite = await tx.orgInvite.findUnique({
+      where: { tokenHash: params.tokenHash },
+      select: {
+        id: true, organizationId: true, expiresAt: true, usedAt: true,
+        organization: { select: { name: true } },
+      },
+    });
+
+    if (!invite) {
+      throw new InviteJoinError(404, "INVITE_NOT_FOUND", "Invite link is invalid or has already been used.");
+    }
+    if (invite.usedAt) {
+      throw new InviteJoinError(409, "INVITE_USED", "This invite link has already been used.", invite.id);
+    }
+    if (invite.expiresAt <= params.claimedAt) {
+      throw new InviteJoinError(410, "INVITE_EXPIRED", "This invite link has expired. Ask an admin to generate a new one.", invite.id);
+    }
+
+    if (params.organizationSlug) {
+      const resolvedSlug = await resolveOrganizationSlug(tx, params.organizationSlug);
+      if (!resolvedSlug || resolvedSlug.organizationId !== invite.organizationId) {
+        throw new InviteJoinError(404, "INVITE_ORG_MISMATCH", "This invite link is not valid for this organisation.", invite.id);
+      }
+    }
+
+    const existingIdentity = await tx.authIdentity.findUnique({
+      where: { providerSubject: params.auth0Sub },
+      select: { user: { select: { id: true, organizationId: true } } },
+    });
+    const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
+      where: { auth0Sub: params.auth0Sub },
+      select: { id: true, organizationId: true },
+    });
+
+    if (existingUser?.organizationId && existingUser.organizationId !== invite.organizationId) {
+      throw new InviteJoinError(409, "ALREADY_IN_ORG", "You are already a member of an organisation.", invite.id);
+    }
+
+    const conflictingEmailUser = !existingUser && params.email
+      ? await tx.user.findUnique({ where: { email: params.email }, select: { id: true } })
+      : null;
+    if (conflictingEmailUser) {
+      throw new InviteJoinError(409, "ACCOUNT_LINK_REQUIRED", "This email is already registered with another login method. Sign in with the original provider or link the accounts in Auth0.", invite.id);
+    }
+
+    const user = existingUser
+      ? await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            organizationId: invite.organizationId,
+            displayName: params.displayName,
+            email: params.email ?? undefined,
+            authIdentities: {
+              connectOrCreate: {
+                where: { providerSubject: params.auth0Sub },
+                create: { providerSubject: params.auth0Sub },
+              },
+            },
+          },
+          select: userSelect,
+        })
+      : await tx.user.create({
+          data: {
+            auth0Sub: params.auth0Sub,
+            email: params.email ?? null,
+            displayName: params.displayName,
+            organizationId: invite.organizationId,
+            authIdentities: { create: { providerSubject: params.auth0Sub } },
+          },
+          select: userSelect,
+        });
+
+    const claim = await tx.orgInvite.updateMany({
+      where: { id: invite.id, usedAt: null, expiresAt: { gt: params.claimedAt } },
+      data: { usedAt: params.claimedAt, usedById: user.id },
+    });
+    if (claim.count !== 1) {
+      throw new InviteJoinError(409, "INVITE_USED", "This invite link has already been used.", invite.id);
+    }
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: invite.organizationId,
+        actorUserId: user.id,
+        eventType: "INVITE_USED",
+        summary: `${user.displayName} joined with an invite link.`,
+        metadata: { inviteId: invite.id, usedById: user.id, usedByName: user.displayName },
+      },
+    });
+
+    const notificationCount = user.houseId
+      ? 0
+      : await createMemberNeedsHouseAssignmentNotifications(tx, {
+          organizationId: invite.organizationId,
+          organizationName: invite.organization?.name ?? "the organization",
+          joinedUserId: user.id,
+          joinedUserName: user.displayName,
+        });
+
+    return {
+      user,
+      created: !existingUser,
+      inviteId: invite.id,
+      organizationId: invite.organizationId,
+      notificationCount,
+    };
+  });
+}
+
 export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
   app.post("/orgs/route-context", async (request, reply) => {
     const parsed = await parseBody(orgRouteContextRequestSchema, request, reply);
@@ -184,26 +484,12 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(409).send({ code: "SLUG_TAKEN", message: `The slug "${orgSlug}" is already in use. Choose a different one.` });
     }
 
-    // Reject if this authenticated identity is already mapped to a user in an org.
-    const existingIdentity = await prisma.authIdentity.findUnique({
-      where: { providerSubject: auth0Sub },
-      select: { user: { select: { id: true, organizationId: true } } },
-    });
-    const existingUser = existingIdentity?.user ?? await prisma.user.findUnique({
-      where: { auth0Sub },
-      select: { id: true, organizationId: true },
-    });
+    const { existingUser, conflictingEmailUser } = await checkOrgCreatePreconditions(auth0Sub, email);
     if (existingUser?.organizationId) {
       warn(request.log, "orgs.create.already_in_org", { auth0Sub, existingOrgId: existingUser.organizationId });
       return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
     }
 
-    const conflictingEmailUser = !existingUser && email
-      ? await prisma.user.findUnique({
-          where: { email },
-          select: { id: true },
-        })
-      : null;
     if (conflictingEmailUser) {
       warn(request.log, "orgs.create.account_link_required", { auth0Sub, email });
       return reply.status(409).send({
@@ -212,86 +498,15 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const { org, house, user, season } = await prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({
-        data: { name: orgName, slug: orgSlug },
-        select: { id: true, slug: true, name: true },
-      });
-
-      await createPrimaryOrganizationSlugAlias(tx, {
-        organizationId: org.id,
-        slug: org.slug,
-      });
-
-      const house = await tx.house.create({
-        data: {
-          organizationId: org.id,
-          name: firstHouseName,
-          color: firstHouseColor,
-        },
-        select: { id: true, name: true, color: true },
-      });
-
-      const userSelect = {
-        id: true,
-        auth0Sub: true,
-        email: true,
-        displayName: true,
-        houseThemeEnabled: true,
-        role: true,
-        organizationId: true,
-        organization: { select: { slug: true } },
-        houseId: true,
-        house: { select: { name: true, color: true } },
-      } as const;
-
-      const user = existingUser
-        ? await tx.user.update({
-            where: { id: existingUser.id },
-            data: {
-              organizationId: org.id,
-              houseId: house.id,
-              role: "OWNER",
-              displayName,
-              email: email ?? null,
-              authIdentities: {
-                connectOrCreate: {
-                  where: { providerSubject: auth0Sub },
-                  create: { providerSubject: auth0Sub },
-                },
-              },
-            },
-            select: userSelect,
-          })
-        : await tx.user.create({
-            data: {
-              auth0Sub,
-              email: email ?? null,
-              displayName,
-              organizationId: org.id,
-              houseId: house.id,
-              role: "OWNER",
-              authIdentities: {
-                create: {
-                  providerSubject: auth0Sub,
-                },
-              },
-            },
-            select: userSelect,
-          });
-
-      const season = await tx.season.create({
-        data: {
-          organizationId: org.id,
-          name: "Season 0",
-          startsAt: new Date(),
-          isActive: true,
-          createdById: user.id,
-        },
-        select: { id: true },
-      });
-
-      return { org, house, user, season };
+    const { org, house, user, season } = await createOrgInDb({
+      auth0Sub,
+      email,
+      displayName,
+      orgName,
+      orgSlug,
+      firstHouseName,
+      firstHouseColor,
+      existingUser,
     });
 
     info(request.log, "orgs.created", {
@@ -315,31 +530,12 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     const tokenHash = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + parsed.expiresInHours * 60 * 60 * 1000);
 
-    const invite = await prisma.$transaction(async (tx) => {
-      const invite = await tx.orgInvite.create({
-        data: {
-          organizationId: actor.organizationId,
-          tokenHash,
-          createdById: actor.id,
-          expiresAt,
-        },
-        select: { id: true, expiresAt: true },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorUserId: actor.id,
-          eventType: "INVITE_CREATED",
-          summary: `${actor.displayName} created an invite link.`,
-          metadata: {
-            inviteId: invite.id,
-            expiresAt: invite.expiresAt.toISOString(),
-          },
-        },
-      });
-
-      return invite;
+    const invite = await createOrgInviteInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      tokenHash,
+      expiresAt,
     });
 
     info(request.log, "orgs.invite.created", { inviteId: invite.id, actorId: actor.id, orgId: actor.organizationId, expiresAt });
@@ -363,96 +559,11 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     const checkedAt = new Date();
 
     try {
-      const preview = await prisma.$transaction(async (tx) => {
-        const invite = await tx.orgInvite.findUnique({
-          where: { tokenHash },
-          select: {
-            id: true,
-            organizationId: true,
-            expiresAt: true,
-            usedAt: true,
-            organization: { select: { name: true } },
-          },
-        });
-        const resolvedSlug = await resolveOrganizationSlug(tx, organizationSlug);
-
-        if (!invite) {
-          throw new InviteJoinError(
-            404,
-            "INVITE_NOT_FOUND",
-            "Invite link is invalid or has already been used.",
-          );
-        }
-
-        if (invite.usedAt) {
-          throw new InviteJoinError(
-            409,
-            "INVITE_USED",
-            "This invite link has already been used.",
-            invite.id,
-          );
-        }
-
-        if (invite.expiresAt <= checkedAt) {
-          throw new InviteJoinError(
-            410,
-            "INVITE_EXPIRED",
-            "This invite link has expired. Ask an admin to generate a new one.",
-            invite.id,
-          );
-        }
-
-        if (!resolvedSlug || resolvedSlug.organizationId !== invite.organizationId) {
-          throw new InviteJoinError(
-            404,
-            "INVITE_ORG_MISMATCH",
-            "This invite link is not valid for this organisation.",
-            invite.id,
-          );
-        }
-
-        const existingIdentity = await tx.authIdentity.findUnique({
-          where: { providerSubject: request.auth.subject },
-          select: {
-            user: {
-              select: {
-                organizationId: true,
-                organization: {
-                  select: {
-                    name: true,
-                    slug: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-        const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
-          where: { auth0Sub: request.auth.subject },
-          select: {
-            organizationId: true,
-            organization: {
-              select: {
-                name: true,
-                slug: true,
-              },
-            },
-          },
-        });
-        const membershipStatus = !existingUser?.organizationId
-          ? "NONE"
-          : existingUser.organizationId === invite.organizationId
-            ? "SAME_ORG"
-            : "OTHER_ORG";
-
-        return {
-          organizationName: resolvedSlug.organization.name,
-          organizationSlug: resolvedSlug.currentSlug,
-          membershipStatus,
-          memberOrganizationName: existingUser?.organization?.name ?? null,
-          memberOrganizationSlug: existingUser?.organization?.slug ?? null,
-          inviteId: invite.id,
-        };
+      const preview = await loadJoinPreviewInDb({
+        auth0Sub: request.auth.subject,
+        tokenHash,
+        organizationSlug,
+        checkedAt,
       });
 
       info(request.log, "orgs.join.preview_loaded", {
@@ -493,184 +604,16 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     const auth0Sub = request.auth.subject;
     const tokenHash = hashToken(inviteToken);
 
-    const userSelect = {
-      id: true, auth0Sub: true, email: true, displayName: true, houseThemeEnabled: true, role: true,
-      organizationId: true, organization: { select: { slug: true } },
-      houseId: true, house: { select: { name: true, color: true } },
-    } as const;
     const claimedAt = new Date();
 
     try {
-      const result = await prisma.$transaction(async (tx) => {
-        const invite = await tx.orgInvite.findUnique({
-          where: { tokenHash },
-          select: {
-            id: true,
-            organizationId: true,
-            expiresAt: true,
-            usedAt: true,
-            organization: { select: { name: true } },
-          },
-        });
-
-        if (!invite) {
-          throw new InviteJoinError(
-            404,
-            "INVITE_NOT_FOUND",
-            "Invite link is invalid or has already been used.",
-          );
-        }
-
-        if (invite.usedAt) {
-          throw new InviteJoinError(
-            409,
-            "INVITE_USED",
-            "This invite link has already been used.",
-            invite.id,
-          );
-        }
-
-        if (invite.expiresAt <= claimedAt) {
-          throw new InviteJoinError(
-            410,
-            "INVITE_EXPIRED",
-            "This invite link has expired. Ask an admin to generate a new one.",
-            invite.id,
-          );
-        }
-
-        if (organizationSlug) {
-          const resolvedSlug = await resolveOrganizationSlug(tx, organizationSlug);
-
-          if (!resolvedSlug || resolvedSlug.organizationId !== invite.organizationId) {
-            throw new InviteJoinError(
-              404,
-              "INVITE_ORG_MISMATCH",
-              "This invite link is not valid for this organisation.",
-              invite.id,
-            );
-          }
-        }
-
-        const existingIdentity = await tx.authIdentity.findUnique({
-          where: { providerSubject: auth0Sub },
-          select: { user: { select: { id: true, organizationId: true } } },
-        });
-        const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
-          where: { auth0Sub },
-          select: { id: true, organizationId: true },
-        });
-
-        if (
-          existingUser?.organizationId &&
-          existingUser.organizationId !== invite.organizationId
-        ) {
-          throw new InviteJoinError(
-            409,
-            "ALREADY_IN_ORG",
-            "You are already a member of an organisation.",
-            invite.id,
-          );
-        }
-
-        const conflictingEmailUser = !existingUser && email
-          ? await tx.user.findUnique({
-              where: { email },
-              select: { id: true },
-            })
-          : null;
-
-        if (conflictingEmailUser) {
-          throw new InviteJoinError(
-            409,
-            "ACCOUNT_LINK_REQUIRED",
-            "This email is already registered with another login method. Sign in with the original provider or link the accounts in Auth0.",
-            invite.id,
-          );
-        }
-
-        const user = existingUser
-          ? await tx.user.update({
-              where: { id: existingUser.id },
-              data: {
-                organizationId: invite.organizationId,
-                displayName,
-                email: email ?? undefined,
-                authIdentities: {
-                  connectOrCreate: {
-                    where: { providerSubject: auth0Sub },
-                    create: { providerSubject: auth0Sub },
-                  },
-                },
-              },
-              select: userSelect,
-            })
-          : await tx.user.create({
-              data: {
-                auth0Sub,
-                email: email ?? null,
-                displayName,
-                organizationId: invite.organizationId,
-                authIdentities: {
-                  create: {
-                    providerSubject: auth0Sub,
-                  },
-                },
-              },
-              select: userSelect,
-            });
-
-        const claim = await tx.orgInvite.updateMany({
-          where: {
-            id: invite.id,
-            usedAt: null,
-            expiresAt: { gt: claimedAt },
-          },
-          data: {
-            usedAt: claimedAt,
-            usedById: user.id,
-          },
-        });
-
-        if (claim.count !== 1) {
-          throw new InviteJoinError(
-            409,
-            "INVITE_USED",
-            "This invite link has already been used.",
-            invite.id,
-          );
-        }
-
-        await tx.auditEvent.create({
-          data: {
-            organizationId: invite.organizationId,
-            actorUserId: user.id,
-            eventType: "INVITE_USED",
-            summary: `${user.displayName} joined with an invite link.`,
-            metadata: {
-              inviteId: invite.id,
-              usedById: user.id,
-              usedByName: user.displayName,
-            },
-          },
-        });
-
-        const notificationCount = user.houseId
-          ? 0
-              : await createMemberNeedsHouseAssignmentNotifications(tx, {
-                  organizationId: invite.organizationId,
-                  organizationName: invite.organization?.name ?? "the organization",
-                  joinedUserId: user.id,
-                  joinedUserName: user.displayName,
-                });
-
-        return {
-          user,
-          created: !existingUser,
-          inviteId: invite.id,
-          organizationId: invite.organizationId,
-          notificationCount,
-        };
+      const result = await joinOrgInDb({
+        auth0Sub,
+        email,
+        displayName,
+        tokenHash,
+        organizationSlug,
+        claimedAt,
       });
 
       info(request.log, "orgs.join.success", {

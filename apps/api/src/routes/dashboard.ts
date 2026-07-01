@@ -23,6 +23,122 @@ function lastUtcDateKeys(days: number, now: Date) {
   });
 }
 
+export async function loadLeaderboard(organizationId: string, seasonId: string) {
+  const [houses, houseTotals] = await Promise.all([
+    prisma.house.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        description: true,
+        _count: { select: { users: true } },
+      },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId"],
+      where: { organizationId, seasonId, deletedAt: null },
+      _sum: { delta: true },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const totalsByHouseId = new Map(
+    houseTotals.map((row) => [
+      row.targetHouseId,
+      { score: row._sum.delta ?? 0, transactions: row._count._all },
+    ]),
+  );
+
+  return houses
+    .map((house) => {
+      const totals = totalsByHouseId.get(house.id);
+      return {
+        id: house.id,
+        name: house.name,
+        color: house.color,
+        description: house.description,
+        score: totals?.score ?? 0,
+        transactions: totals?.transactions ?? 0,
+        memberCount: house._count.users,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
+export async function loadDashboardSummaryData(
+  organizationId: string,
+  seasonId: string,
+  velocityStartsAt: Date,
+) {
+  const [
+    houses,
+    monthlyMemberTotals,
+    monthlyTraitTotals,
+    recentTransactions,
+    velocityTransactions,
+    memberTotals,
+    houseTotals,
+    transactionTypeTotals,
+    members,
+  ] = await Promise.all([
+    prisma.house.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetUserId", "targetHouseId"],
+      where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
+      _sum: { delta: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId", "trait"],
+      where: { organizationId, seasonId, deletedAt: null, trait: { not: null } },
+      _count: { trait: true },
+    }),
+    prisma.pointTransaction.findMany({
+      where: { organizationId, seasonId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+        actor: { select: { displayName: true } },
+        targetUser: { select: { displayName: true } },
+        targetHouse: { select: { name: true, color: true } },
+        season: { select: { id: true, name: true, isActive: true } },
+      },
+    }),
+    prisma.pointTransaction.findMany({
+      where: { organizationId, seasonId, deletedAt: null, createdAt: { gte: velocityStartsAt } },
+      select: { targetHouseId: true, delta: true, createdAt: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetUserId"],
+      where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
+      _sum: { delta: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId"],
+      where: { organizationId, seasonId, deletedAt: null },
+      _sum: { delta: true },
+      _count: { _all: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["type"],
+      where: { organizationId, seasonId, deletedAt: null },
+      _sum: { delta: true },
+      _count: { _all: true },
+    }),
+    prisma.user.findMany({
+      where: { organizationId },
+      orderBy: { displayName: "asc" },
+      select: { id: true, displayName: true, role: true, houseId: true },
+    }),
+  ]);
+  return { houses, monthlyMemberTotals, monthlyTraitTotals, recentTransactions, velocityTransactions, memberTotals, houseTotals, transactionTypeTotals, members };
+}
+
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
   app.post("/houses/leaderboard", async (request, reply) => {
     const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
@@ -34,60 +150,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
     if (!season) return;
 
-    const [houses, houseTotals] = await Promise.all([
-      prisma.house.findMany({
-        where: {
-          organizationId: actor.organizationId,
-        },
-        select: {
-          id: true,
-          name: true,
-          color: true,
-          description: true,
-          _count: {
-            select: {
-              users: true,
-            },
-          },
-        },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetHouseId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-        },
-        _sum: { delta: true },
-        _count: { _all: true },
-      }),
-    ]);
-
-    const totalsByHouseId = new Map(
-      houseTotals.map((row) => [
-        row.targetHouseId,
-        {
-          score: row._sum.delta ?? 0,
-          transactions: row._count._all,
-        },
-      ]),
-    );
-
-    const leaderboard = houses
-      .map((house) => {
-        const totals = totalsByHouseId.get(house.id);
-
-        return {
-          id: house.id,
-          name: house.name,
-          color: house.color,
-          description: house.description,
-          score: totals?.score ?? 0,
-          transactions: totals?.transactions ?? 0,
-          memberCount: house._count.users,
-        };
-      })
-      .sort((a, b) => b.score - a.score);
+    const leaderboard = await loadLeaderboard(actor.organizationId, season.id);
 
     info(request.log, "leaderboard.fetched", {
       organizationId: actor.organizationId,
@@ -112,7 +175,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const velocityDates = lastUtcDateKeys(14, now);
     const velocityStartsAt = new Date(`${velocityDates[0]}T00:00:00.000Z`);
 
-    const [
+    const {
       houses,
       monthlyMemberTotals,
       monthlyTraitTotals,
@@ -122,107 +185,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       houseTotals,
       transactionTypeTotals,
       members,
-    ] = await Promise.all([
-      prisma.house.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, color: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetUserId", "targetHouseId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-          targetUserId: { not: null },
-        },
-        _sum: { delta: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetHouseId", "trait"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-          trait: { not: null },
-        },
-        _count: { trait: true },
-      }),
-      prisma.pointTransaction.findMany({
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-        },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        select: {
-          id: true,
-          type: true,
-          delta: true,
-          reason: true,
-          trait: true,
-          createdAt: true,
-          actor: { select: { displayName: true } },
-          targetUser: { select: { displayName: true } },
-          targetHouse: { select: { name: true, color: true } },
-          season: { select: { id: true, name: true, isActive: true } },
-        },
-      }),
-      prisma.pointTransaction.findMany({
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-          createdAt: { gte: velocityStartsAt },
-        },
-        select: {
-          targetHouseId: true,
-          delta: true,
-          createdAt: true,
-        },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetUserId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-          targetUserId: { not: null },
-        },
-        _sum: { delta: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetHouseId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-        },
-        _sum: { delta: true },
-        _count: { _all: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["type"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          deletedAt: null,
-        },
-        _sum: { delta: true },
-        _count: { _all: true },
-      }),
-      prisma.user.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: { displayName: "asc" },
-        select: {
-          id: true,
-          displayName: true,
-          role: true,
-          houseId: true,
-        },
-      }),
-    ]);
+    } = await loadDashboardSummaryData(actor.organizationId, season.id, velocityStartsAt);
 
     const houseById = new Map(houses.map((house) => [house.id, house]));
     const memberById = new Map(members.map((member) => [member.id, member]));

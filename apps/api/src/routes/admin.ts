@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { Prisma } from "@prisma/client";
+import { Prisma, AuditEventType } from "@prisma/client";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
@@ -16,6 +16,308 @@ import { info, warn } from "../logging.js";
 import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapDeletedPoint } from "./points.js";
 
+export async function loadAdminContextData(organizationId: string) {
+  const [
+    users,
+    houses,
+    recentDeletedPoints,
+    recentInvites,
+    inviteGeneratedCount,
+    inviteUsedCount,
+    activeSeason,
+    activeSeasonDeductionTotals,
+    recentStartedSeasons,
+    auditEvents,
+  ] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId },
+      orderBy: { displayName: "asc" },
+      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+    }),
+    prisma.house.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true, description: true },
+    }),
+    prisma.pointTransaction.findMany({
+      where: { organizationId, deletedAt: { not: null } },
+      orderBy: [{ deletedAt: "desc" }, { id: "desc" }],
+      take: 10,
+      select: {
+        id: true, type: true, delta: true, reason: true, trait: true,
+        createdAt: true, deletedAt: true, deletionReason: true,
+        actor: { select: { displayName: true } },
+        targetUser: { select: { displayName: true } },
+        targetHouse: { select: { name: true, color: true } },
+        deletedBy: { select: { displayName: true } },
+        season: { select: { id: true, name: true, isActive: true } },
+      },
+    }),
+    prisma.orgInvite.findMany({
+      where: { organizationId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 10,
+      select: {
+        id: true, createdAt: true, usedAt: true, expiresAt: true,
+        createdBy: { select: { displayName: true } },
+        usedBy: { select: { displayName: true } },
+      },
+    }),
+    prisma.orgInvite.count({ where: { organizationId } }),
+    prisma.orgInvite.count({ where: { organizationId, usedAt: { not: null } } }),
+    prisma.season.findFirst({
+      where: { organizationId, isActive: true },
+      select: { id: true, name: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId"],
+      where: { organizationId, type: "DEDUCTION", deletedAt: null, season: { isActive: true } },
+      _count: { _all: true },
+      _sum: { delta: true },
+    }),
+    prisma.season.findMany({
+      where: { organizationId, createdById: { not: null } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 10,
+      select: { id: true, name: true, createdAt: true, createdBy: { select: { displayName: true } } },
+    }),
+    prisma.auditEvent.findMany({
+      where: { organizationId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 11,
+      select: {
+        id: true, eventType: true, summary: true, metadata: true, createdAt: true,
+        actor: { select: { displayName: true } },
+      },
+    }),
+  ]);
+  return { users, houses, recentDeletedPoints, recentInvites, inviteGeneratedCount, inviteUsedCount, activeSeason, activeSeasonDeductionTotals, recentStartedSeasons, auditEvents };
+}
+
+export async function updateOrgSettingsInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  previousName: string;
+  newName: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const organization = await tx.organization.update({
+      where: { id: params.organizationId },
+      data: { name: params.newName },
+      select: { id: true, name: true, slug: true },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "ORG_SETTINGS_UPDATED",
+        summary: `${params.actorDisplayName} renamed the organization from ${params.previousName} to ${organization.name}.`,
+        metadata: { previousName: params.previousName, newName: organization.name },
+      },
+    });
+    return organization;
+  });
+}
+
+export async function updateOrgSlugInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  previousSlug: string;
+  nextSlug: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    await tx.organizationSlugAlias.updateMany({
+      where: { organizationId: params.organizationId, isPrimary: true },
+      data: { isPrimary: false, retiredAt: new Date() },
+    });
+    const organization = await tx.organization.update({
+      where: { id: params.organizationId },
+      data: { slug: params.nextSlug },
+      select: { id: true, name: true, slug: true },
+    });
+    await tx.organizationSlugAlias.create({
+      data: { organizationId: params.organizationId, slug: params.nextSlug, isPrimary: true },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "ORG_SETTINGS_UPDATED",
+        summary: `${params.actorDisplayName} changed the organization slug from ${params.previousSlug} to ${organization.slug}.`,
+        metadata: { field: "slug", previousSlug: params.previousSlug, newSlug: organization.slug },
+      },
+    });
+    return organization;
+  });
+}
+
+export async function loadPointAdjustmentStatsData(organizationId: string, seasonId: string) {
+  return Promise.all([
+    prisma.house.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true, description: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId"],
+      where: { organizationId, seasonId, type: "DEDUCTION", deletedAt: null },
+      _count: { _all: true },
+      _sum: { delta: true },
+    }),
+  ]);
+}
+
+export async function loadAuditPage(params: {
+  organizationId: string;
+  limit: number;
+  type?: string | null;
+  cursor?: string | null;
+}) {
+  const where: Prisma.AuditEventWhereInput = { organizationId: params.organizationId };
+  if (params.type) {
+    where.eventType = params.type as AuditEventType;
+  }
+  return prisma.auditEvent.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: params.limit + 1,
+    ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+    select: {
+      id: true, eventType: true, summary: true, metadata: true, createdAt: true,
+      actor: { select: { displayName: true } },
+    },
+  });
+}
+
+export async function upsertHouseForOrg(params: {
+  organizationId: string;
+  name: string;
+  color: string;
+  description?: string | null;
+}) {
+  return prisma.house.upsert({
+    where: { organizationId_name: { organizationId: params.organizationId, name: params.name } },
+    update: {
+      color: params.color,
+      ...(params.description !== undefined ? { description: params.description } : {}),
+    },
+    create: {
+      organizationId: params.organizationId,
+      name: params.name,
+      color: params.color,
+      description: params.description ?? null,
+    },
+    select: { id: true, name: true, color: true, description: true },
+  });
+}
+
+export async function findUsersForAssignment(targetUserId: string, targetHouseId: string) {
+  return Promise.all([
+    prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, displayName: true, organizationId: true },
+    }),
+    prisma.house.findUnique({
+      where: { id: targetHouseId },
+      select: { id: true, organizationId: true, name: true },
+    }),
+  ]);
+}
+
+export async function assignUserToHouseInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  targetUser: { id: string; displayName: string };
+  targetHouse: { id: string; name: string };
+}) {
+  return prisma.$transaction(async (tx) => {
+    const assignedUser = await tx.user.update({
+      where: { id: params.targetUser.id },
+      data: { houseId: params.targetHouse.id },
+      select: { id: true, displayName: true, houseId: true },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "USER_HOUSE_ASSIGNED",
+        summary: `${params.actorDisplayName} assigned ${assignedUser.displayName} to ${params.targetHouse.name}.`,
+        metadata: { targetUserId: assignedUser.id, targetUserName: assignedUser.displayName, targetHouseId: params.targetHouse.id, targetHouseName: params.targetHouse.name },
+      },
+    });
+    const resolvedAt = new Date();
+    const resolvedNotifications = await tx.notification.updateMany({
+      where: {
+        organizationId: params.organizationId,
+        type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+        entityType: "User",
+        entityId: assignedUser.id,
+        archivedAt: null,
+      },
+      data: { readAt: resolvedAt, archivedAt: resolvedAt },
+    });
+    return { assignedUser, resolvedNotificationCount: resolvedNotifications.count };
+  });
+}
+
+export async function findUserForRoleChange(targetUserId: string) {
+  return prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, displayName: true, email: true, role: true, houseId: true, organizationId: true },
+  });
+}
+
+export async function changeUserRoleInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  targetUser: { id: string; displayName: string; role: string };
+  newRole: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const changedUser = await tx.user.update({
+      where: { id: params.targetUser.id },
+      data: { role: params.newRole as "MEMBER" | "ADMIN" | "OWNER" },
+      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+    });
+    const ownerRecipients = await tx.user.findMany({
+      where: { organizationId: params.organizationId, role: "OWNER", id: { not: params.actorId } },
+      select: { id: true },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "USER_ROLE_CHANGED",
+        summary: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetUser.role} to ${changedUser.role}.`,
+        metadata: { targetUserId: changedUser.id, targetUserName: changedUser.displayName, previousRole: params.targetUser.role, newRole: changedUser.role },
+      },
+    });
+    const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.id)]));
+    if (recipientIds.length > 0) {
+      await tx.notification.createMany({
+        data: recipientIds.map((recipientUserId) => ({
+          organizationId: params.organizationId,
+          recipientUserId,
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetUser.role} to ${changedUser.role}.`,
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: changedUser.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    return changedUser;
+  });
+}
+
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
     const parsed = await parseBody(actorScopeSchema, request, reply);
@@ -24,7 +326,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireAdminActor(request, reply);
     if (!actor) return;
 
-    const [
+    const {
       users,
       houses,
       recentDeletedPoints,
@@ -35,131 +337,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       activeSeasonDeductionTotals,
       recentStartedSeasons,
       auditEvents,
-    ] = await Promise.all([
-      prisma.user.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: { displayName: "asc" },
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-          role: true,
-          houseId: true,
-        },
-      }),
-      prisma.house.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, color: true, description: true },
-      }),
-      prisma.pointTransaction.findMany({
-        where: {
-          organizationId: actor.organizationId,
-          deletedAt: { not: null },
-        },
-        orderBy: [
-          { deletedAt: "desc" },
-          { id: "desc" },
-        ],
-        take: 10,
-        select: {
-          id: true,
-          type: true,
-          delta: true,
-          reason: true,
-          trait: true,
-          createdAt: true,
-          deletedAt: true,
-          deletionReason: true,
-          actor: { select: { displayName: true } },
-          targetUser: { select: { displayName: true } },
-          targetHouse: { select: { name: true, color: true } },
-          deletedBy: { select: { displayName: true } },
-          season: { select: { id: true, name: true, isActive: true } },
-        },
-      }),
-      prisma.orgInvite.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: [
-          { createdAt: "desc" },
-          { id: "desc" },
-        ],
-        take: 10,
-        select: {
-          id: true,
-          createdAt: true,
-          usedAt: true,
-          expiresAt: true,
-          createdBy: { select: { displayName: true } },
-          usedBy: { select: { displayName: true } },
-        },
-      }),
-      prisma.orgInvite.count({
-        where: { organizationId: actor.organizationId },
-      }),
-      prisma.orgInvite.count({
-        where: {
-          organizationId: actor.organizationId,
-          usedAt: { not: null },
-        },
-      }),
-      prisma.season.findFirst({
-        where: {
-          organizationId: actor.organizationId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          name: true,
-        },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetHouseId"],
-        where: {
-          organizationId: actor.organizationId,
-          type: "DEDUCTION",
-          deletedAt: null,
-          season: {
-            isActive: true,
-          },
-        },
-        _count: { _all: true },
-        _sum: { delta: true },
-      }),
-      prisma.season.findMany({
-        where: {
-          organizationId: actor.organizationId,
-          createdById: { not: null },
-        },
-        orderBy: [
-          { createdAt: "desc" },
-          { id: "desc" },
-        ],
-        take: 10,
-        select: {
-          id: true,
-          name: true,
-          createdAt: true,
-          createdBy: { select: { displayName: true } },
-        },
-      }),
-      prisma.auditEvent.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: [
-          { createdAt: "desc" },
-          { id: "desc" },
-        ],
-        take: 11,
-        select: {
-          id: true,
-          eventType: true,
-          summary: true,
-          metadata: true,
-          createdAt: true,
-          actor: { select: { displayName: true } },
-        },
-      }),
-    ]);
+    } = await loadAdminContextData(actor.organizationId);
     const recentAuditEvents = auditEvents.slice(0, 10);
     const adminAuditNextCursor = auditEvents.length > 10
       ? recentAuditEvents.at(-1)?.id ?? null
@@ -213,27 +391,12 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
 
-    const updatedOrganization = await prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.update({
-        where: { id: actor.organizationId },
-        data: { name: parsed.name },
-        select: { id: true, name: true, slug: true },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorUserId: actor.id,
-          eventType: "ORG_SETTINGS_UPDATED",
-          summary: `${actor.displayName} renamed the organization from ${actor.organizationName} to ${organization.name}.`,
-          metadata: {
-            previousName: actor.organizationName,
-            newName: organization.name,
-          },
-        },
-      });
-
-      return organization;
+    const updatedOrganization = await updateOrgSettingsInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      previousName: actor.organizationName,
+      newName: parsed.name,
     });
 
     info(request.log, "admin.org.settings_updated", {
@@ -276,47 +439,12 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     try {
-      const updatedOrganization = await prisma.$transaction(async (tx) => {
-        await tx.organizationSlugAlias.updateMany({
-          where: {
-            organizationId: actor.organizationId,
-            isPrimary: true,
-          },
-          data: {
-            isPrimary: false,
-            retiredAt: new Date(),
-          },
-        });
-
-        const organization = await tx.organization.update({
-          where: { id: actor.organizationId },
-          data: { slug: nextSlug },
-          select: { id: true, name: true, slug: true },
-        });
-
-        await tx.organizationSlugAlias.create({
-          data: {
-            organizationId: actor.organizationId,
-            slug: nextSlug,
-            isPrimary: true,
-          },
-        });
-
-        await tx.auditEvent.create({
-          data: {
-            organizationId: actor.organizationId,
-            actorUserId: actor.id,
-            eventType: "ORG_SETTINGS_UPDATED",
-            summary: `${actor.displayName} changed the organization slug from ${previousSlug} to ${organization.slug}.`,
-            metadata: {
-              field: "slug",
-              previousSlug,
-              newSlug: organization.slug,
-            },
-          },
-        });
-
-        return organization;
+      const updatedOrganization = await updateOrgSlugInDb({
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        actorDisplayName: actor.displayName,
+        previousSlug,
+        nextSlug,
       });
 
       info(request.log, "admin.org.slug_updated", {
@@ -357,24 +485,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
     if (!season) return;
 
-    const [houses, deductionTotals] = await Promise.all([
-      prisma.house.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, color: true, description: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["targetHouseId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: season.id,
-          type: "DEDUCTION",
-          deletedAt: null,
-        },
-        _count: { _all: true },
-        _sum: { delta: true },
-      }),
-    ]);
+    const [houses, deductionTotals] = await loadPointAdjustmentStatsData(
+      actor.organizationId,
+      season.id,
+    );
     const stats = buildPointAdjustmentStats(houses, season, deductionTotals);
 
     info(request.log, "admin.point_adjustments.loaded", {
@@ -396,25 +510,11 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     if (!actor) return;
 
     const limit = parsed.limit;
-    const auditEvents = await prisma.auditEvent.findMany({
-      where: {
-        organizationId: actor.organizationId,
-        ...(parsed.type ? { eventType: parsed.type } : {}),
-      },
-      orderBy: [
-        { createdAt: "desc" },
-        { id: "desc" },
-      ],
-      take: limit + 1,
-      ...(parsed.cursor ? { cursor: { id: parsed.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        eventType: true,
-        summary: true,
-        metadata: true,
-        createdAt: true,
-        actor: { select: { displayName: true } },
-      },
+    const auditEvents = await loadAuditPage({
+      organizationId: actor.organizationId,
+      limit,
+      type: parsed.type,
+      cursor: parsed.cursor,
     });
     const pageEvents = auditEvents.slice(0, limit);
 
@@ -443,29 +543,11 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
 
-    const house = await prisma.house.upsert({
-      where: {
-        organizationId_name: {
-          organizationId: actor.organizationId,
-          name: parsed.name,
-        },
-      },
-      update: {
-        color: parsed.color,
-        ...(parsed.description !== undefined ? { description: parsed.description } : {}),
-      },
-      create: {
-        organizationId: actor.organizationId,
-        name: parsed.name,
-        color: parsed.color,
-        description: parsed.description ?? null,
-      },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-        description: true,
-      },
+    const house = await upsertHouseForOrg({
+      organizationId: actor.organizationId,
+      name: parsed.name,
+      color: parsed.color,
+      description: parsed.description,
     });
 
     info(request.log, "admin.house.created", {
@@ -485,16 +567,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireAdminActor(request, reply);
     if (!actor) return;
 
-    const [targetUser, targetHouse] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: parsed.targetUserId },
-        select: { id: true, displayName: true, organizationId: true },
-      }),
-      prisma.house.findUnique({
-        where: { id: parsed.targetHouseId },
-        select: { id: true, organizationId: true, name: true },
-      }),
-    ]);
+    const [targetUser, targetHouse] = await findUsersForAssignment(
+      parsed.targetUserId,
+      parsed.targetHouseId,
+    );
 
     if (!targetUser || targetUser.organizationId !== actor.organizationId) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
@@ -504,51 +580,12 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ message: "Target house not found", code: "TARGET_HOUSE_NOT_FOUND" });
     }
 
-    const assignmentResult = await prisma.$transaction(async (tx) => {
-      const assignedUser = await tx.user.update({
-        where: { id: targetUser.id },
-        data: { houseId: targetHouse.id },
-        select: {
-          id: true,
-          displayName: true,
-          houseId: true,
-        },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorUserId: actor.id,
-          eventType: "USER_HOUSE_ASSIGNED",
-          summary: `${actor.displayName} assigned ${assignedUser.displayName} to ${targetHouse.name}.`,
-          metadata: {
-            targetUserId: assignedUser.id,
-            targetUserName: assignedUser.displayName,
-            targetHouseId: targetHouse.id,
-            targetHouseName: targetHouse.name,
-          },
-        },
-      });
-
-      const resolvedAt = new Date();
-      const resolvedNotifications = await tx.notification.updateMany({
-        where: {
-          organizationId: actor.organizationId,
-          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
-          entityType: "User",
-          entityId: assignedUser.id,
-          archivedAt: null,
-        },
-        data: {
-          readAt: resolvedAt,
-          archivedAt: resolvedAt,
-        },
-      });
-
-      return {
-        assignedUser,
-        resolvedNotificationCount: resolvedNotifications.count,
-      };
+    const assignmentResult = await assignUserToHouseInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      targetUser,
+      targetHouse,
     });
 
     info(request.log, "admin.user.house_assigned", {
@@ -570,17 +607,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id: parsed.targetUserId },
-      select: {
-        id: true,
-        displayName: true,
-        email: true,
-        role: true,
-        houseId: true,
-        organizationId: true,
-      },
-    });
+    const targetUser = await findUserForRoleChange(parsed.targetUserId);
 
     if (!targetUser || targetUser.organizationId !== actor.organizationId) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
@@ -593,66 +620,12 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const updatedUser = await prisma.$transaction(async (tx) => {
-      const changedUser = await tx.user.update({
-        where: { id: targetUser.id },
-        data: { role: parsed.role },
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-          role: true,
-          houseId: true,
-        },
-      });
-
-      const ownerRecipients = await tx.user.findMany({
-        where: {
-          organizationId: actor.organizationId,
-          role: "OWNER",
-          id: { not: actor.id },
-        },
-        select: { id: true },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorUserId: actor.id,
-          eventType: "USER_ROLE_CHANGED",
-          summary: `${actor.displayName} changed ${changedUser.displayName} from ${targetUser.role} to ${changedUser.role}.`,
-          metadata: {
-            targetUserId: changedUser.id,
-            targetUserName: changedUser.displayName,
-            previousRole: targetUser.role,
-            newRole: changedUser.role,
-          },
-        },
-      });
-
-      const recipientIds = Array.from(
-        new Set([changedUser.id, ...ownerRecipients.map((recipient) => recipient.id)]),
-      );
-
-      if (recipientIds.length > 0) {
-        await tx.notification.createMany({
-          data: recipientIds.map((recipientUserId) => ({
-            organizationId: actor.organizationId,
-            recipientUserId,
-            type: "ROLE_CHANGED",
-            severity: "INFO",
-            title: "Role changed",
-            body: `${actor.displayName} changed ${changedUser.displayName} from ${targetUser.role} to ${changedUser.role}.`,
-            actionLabel: "View team",
-            actionHref: "/?tab=manage&section=team",
-            entityType: "User",
-            entityId: changedUser.id,
-          })),
-          skipDuplicates: true,
-        });
-      }
-
-      return changedUser;
+    const updatedUser = await changeUserRoleInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      targetUser: { id: targetUser.id, displayName: targetUser.displayName, role: targetUser.role },
+      newRole: parsed.role,
     });
 
     info(request.log, "admin.user.role_changed", {
@@ -679,7 +652,7 @@ function hasTargetHouseId(
   return Boolean(row.targetHouseId);
 }
 
-function buildPointAdjustmentStats(
+export function buildPointAdjustmentStats(
   houses: Array<{
     id: string;
     name: string;
@@ -728,7 +701,7 @@ function buildPointAdjustmentStats(
   };
 }
 
-function buildRecentAdminActions(
+export function buildRecentAdminActions(
   deletedPoints: Array<{
     id: string;
     delta: number;
