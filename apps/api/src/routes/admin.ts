@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma, AuditEventType } from "@prisma/client";
+import { buildRoleChangedNotificationData } from "../notifications.js";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
@@ -299,17 +300,14 @@ export async function changeUserRoleInDb(params: {
     const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.id)]));
     if (recipientIds.length > 0) {
       await tx.notification.createMany({
-        data: recipientIds.map((recipientUserId) => ({
+        data: recipientIds.map((recipientId) => buildRoleChangedNotificationData({
           organizationId: params.organizationId,
-          recipientUserId,
-          type: "ROLE_CHANGED",
-          severity: "INFO",
-          title: "Role changed",
-          body: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetUser.role} to ${changedUser.role}.`,
-          actionLabel: "View team",
-          actionHref: "/?tab=manage&section=team",
-          entityType: "User",
-          entityId: changedUser.id,
+          recipientId,
+          actorDisplayName: params.actorDisplayName,
+          targetUserDisplayName: changedUser.displayName,
+          targetUserId: changedUser.id,
+          previousRole: params.targetUser.role,
+          newRole: changedUser.role,
         })),
         skipDuplicates: true,
       });

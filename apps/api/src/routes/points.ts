@@ -5,13 +5,13 @@ import {
   deletePointTransactionSchema,
   deductPointsSchema,
   seasonScopedRequestSchema,
-  TRAIT_LABELS,
   type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
+import { buildPointAwardNotificationData, buildPointDeductionNotificationData } from "../notifications.js";
 
 export function mapActivityItem(tx: {
   id: string;
@@ -109,19 +109,14 @@ export async function createPointAward(params: {
 
     if (params.targetUserId !== params.actorId) {
       await tx.notification.createMany({
-        data: [{
+        data: [buildPointAwardNotificationData({
           organizationId: params.organizationId,
           recipientUserId: params.targetUserId,
-          type: "POINT_AWARD_RECEIVED",
-          severity: "INFO",
-          title: "Points awarded",
-          body: `${params.actorDisplayName} awarded you ${params.delta} points for ${TRAIT_LABELS[params.trait]}.`,
-          actionLabel: "View activity",
-          actionHref: "/?tab=activity",
-          entityType: "PointTransaction",
-          entityId: award.id,
-          dedupeKey: `point-award-received:${params.organizationId}:${award.id}`,
-        }],
+          actorDisplayName: params.actorDisplayName,
+          delta: params.delta,
+          trait: params.trait,
+          transactionId: award.id,
+        })],
         skipDuplicates: true,
       });
     }
@@ -210,19 +205,13 @@ export async function createPointDeduction(params: {
     });
 
     await tx.notification.createMany({
-      data: [{
+      data: [buildPointDeductionNotificationData({
         organizationId: params.organizationId,
         recipientUserId: params.targetUserId,
-        type: "POINT_DEDUCTION_RECEIVED",
-        severity: "WARNING",
-        title: "Points deducted",
-        body: `${params.actorDisplayName} deducted 10 points from you. Reason: ${params.reason}.`,
-        actionLabel: "View activity",
-        actionHref: "/?tab=activity",
-        entityType: "PointTransaction",
-        entityId: deduction.id,
-        dedupeKey: `point-deduction-received:${params.organizationId}:${deduction.id}`,
-      }],
+        actorDisplayName: params.actorDisplayName,
+        reason: params.reason,
+        transactionId: deduction.id,
+      })],
       skipDuplicates: true,
     });
 

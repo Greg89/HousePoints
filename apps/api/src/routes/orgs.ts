@@ -1,5 +1,4 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { Prisma } from "@prisma/client";
 import type { FastifyInstance } from "fastify";
 import {
   createInviteSchema,
@@ -18,6 +17,7 @@ import { getUserOrgContextBySub } from "../actor.js";
 import { mapAppUser } from "../app-user.js";
 import { info, warn, type ApiLogEvent } from "../logging.js";
 import { parseBody, requireAdminActor } from "../route-helpers.js";
+import { buildMemberNeedsAssignmentNotificationData } from "../notifications.js";
 
 function generateInviteToken(): string {
   return randomBytes(32).toString("hex"); // 64-char hex string
@@ -45,49 +45,6 @@ class InviteJoinError extends Error {
     super(message);
     this.name = "InviteJoinError";
   }
-}
-
-async function createMemberNeedsHouseAssignmentNotifications(
-  tx: Prisma.TransactionClient,
-  input: {
-    organizationId: string;
-    organizationName: string;
-    joinedUserId: string;
-    joinedUserName: string;
-  },
-): Promise<number> {
-  const recipients = await tx.user.findMany({
-    where: {
-      organizationId: input.organizationId,
-      role: { in: ["ADMIN", "OWNER"] },
-      id: { not: input.joinedUserId },
-    },
-    select: { id: true },
-  });
-
-  if (recipients.length === 0) {
-    return 0;
-  }
-
-  const dedupeKey = `member-needs-house-assignment:${input.organizationId}:${input.joinedUserId}`;
-  const result = await tx.notification.createMany({
-    data: recipients.map((recipient) => ({
-      organizationId: input.organizationId,
-      recipientUserId: recipient.id,
-      type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
-      severity: "ACTION_REQUIRED",
-      title: "New member needs a house",
-      body: `${input.joinedUserName} joined ${input.organizationName} and has not been assigned to a house yet.`,
-      actionLabel: "Assign house",
-      actionHref: "/?tab=manage&section=team",
-      entityType: "User",
-      entityId: input.joinedUserId,
-      dedupeKey,
-    })),
-    skipDuplicates: true,
-  });
-
-  return result.count;
 }
 
 export async function checkOrgCreatePreconditions(auth0Sub: string, email?: string | null) {
@@ -371,14 +328,30 @@ export async function joinOrgInDb(params: {
       },
     });
 
-    const notificationCount = user.houseId
-      ? 0
-      : await createMemberNeedsHouseAssignmentNotifications(tx, {
+    let notificationCount = 0;
+    if (!user.houseId) {
+      const notificationRecipients = await tx.user.findMany({
+        where: {
           organizationId: invite.organizationId,
-          organizationName: invite.organization?.name ?? "the organization",
-          joinedUserId: user.id,
-          joinedUserName: user.displayName,
+          role: { in: ["ADMIN", "OWNER"] },
+          id: { not: user.id },
+        },
+        select: { id: true },
+      });
+      if (notificationRecipients.length > 0) {
+        const created = await tx.notification.createMany({
+          data: notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
+            organizationId: invite.organizationId,
+            recipientId: recipient.id,
+            joinedUserName: user.displayName,
+            organizationName: invite.organization?.name ?? "the organization",
+            joinedUserId: user.id,
+          })),
+          skipDuplicates: true,
         });
+        notificationCount = created.count;
+      }
+    }
 
     return {
       user,

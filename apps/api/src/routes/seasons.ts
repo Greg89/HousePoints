@@ -7,9 +7,10 @@ import {
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { ActorRecord } from "../actor.js";
-import { info, warn } from "../logging.js";
-import { mapSeason, SeasonScopeError } from "../season-scope.js";
+import { SeasonScopeError, mapSeason } from "../season-scope.js";
 import { parseBody, requireActor, requireOwnerActor } from "../route-helpers.js";
+import { info, warn } from "../logging.js";
+import { buildSeasonStartedNotificationData } from "../notifications.js";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -182,18 +183,12 @@ export async function startSeasonTransaction(actor: ActorRecord, seasonName: str
 
     if (notificationRecipients.length > 0) {
       await tx.notification.createMany({
-        data: notificationRecipients.map((recipient) => ({
+        data: notificationRecipients.map((recipient) => buildSeasonStartedNotificationData({
           organizationId: actor.organizationId,
-          recipientUserId: recipient.id,
-          type: "SEASON_STARTED",
-          severity: "INFO",
-          title: "Season started",
-          body: `${actor.displayName} started ${activeSeason.name}. House standings and leaderboards now use the new season.`,
-          actionLabel: "View overview",
-          actionHref: "/",
-          entityType: "Season",
-          entityId: activeSeason.id,
-          dedupeKey: `season-started:${actor.organizationId}:${activeSeason.id}`,
+          recipientId: recipient.id,
+          actorDisplayName: actor.displayName,
+          seasonName: activeSeason.name,
+          seasonId: activeSeason.id,
         })),
         skipDuplicates: true,
       });

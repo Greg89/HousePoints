@@ -37,7 +37,12 @@ Last updated: July 1, 2026
 - ✅ Unit tests for `route-helpers.ts` (16 tests covering all 5 helpers, including null-return paths)
 - ✅ Added `"auth.actor_not_found"` and `"owner.forbidden"` to `ApiLogEvent`
 
-**Phase 2 - COMPLETE.** All quality gates green.
+**Phase 3 - COMPLETE.** All quality gates green.
+
+- ✅ Slice 3a: `apps/api/src/notifications.ts` created with 5 exported factory functions (`buildPointAwardNotificationData`, `buildPointDeductionNotificationData`, `buildSeasonStartedNotificationData`, `buildRoleChangedNotificationData`, `buildMemberNeedsAssignmentNotificationData`)
+- ✅ All inline `notification.createMany` calls with hardcoded string templates replaced with factory calls in `points.ts`, `seasons.ts`, `admin.ts`, `orgs.ts`
+- ✅ `createMemberNeedsHouseAssignmentNotifications` removed from `orgs.ts`
+- ✅ 23 unit tests in `notifications.test.ts`
 
 - ✅ Slice 2a: `notifications.ts` — 3 exported service functions (`listNotifications`, `markNotificationsRead`, `markAllNotificationsRead`)
 - ✅ Slice 2a: `users.ts` — 7 exported service functions + `userSelect` hoisted to module scope
