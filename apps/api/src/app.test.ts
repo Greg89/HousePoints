@@ -2622,6 +2622,7 @@ describe("POST /admin/users/assign-house", () => {
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2637,6 +2638,7 @@ describe("POST /admin/users/assign-house", () => {
       payload: { targetUserId: "user-999", targetHouseId: "house-1" },
     });
     expect(res.statusCode).toBe(404);
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2663,10 +2665,11 @@ describe("POST /admin/users/assign-house", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("TARGET_HOUSE_NOT_FOUND");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("assigns a user to a house and returns the updated user summary", async () => {
+  it("assigns a user to a house, writes audit history, and resolves matching assignment notifications", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "user-1",
@@ -2683,6 +2686,7 @@ describe("POST /admin/users/assign-house", () => {
       displayName: "Alice",
       houseId: "house-1",
     });
+    mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -2718,6 +2722,19 @@ describe("POST /admin/users/assign-house", () => {
           targetHouseId: "house-1",
           targetHouseName: "Phoenix",
         },
+      },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+        entityType: "User",
+        entityId: "user-1",
+        archivedAt: null,
+      },
+      data: {
+        readAt: expect.any(Date),
+        archivedAt: expect.any(Date),
       },
     });
     await app.close();

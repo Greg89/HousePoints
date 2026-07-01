@@ -588,7 +588,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ message: "Target house not found", code: "TARGET_HOUSE_NOT_FOUND" });
     }
 
-    const updatedUser = await prisma.$transaction(async (tx) => {
+    const assignmentResult = await prisma.$transaction(async (tx) => {
       const assignedUser = await tx.user.update({
         where: { id: targetUser.id },
         data: { houseId: targetHouse.id },
@@ -614,18 +614,37 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         },
       });
 
-      return assignedUser;
+      const resolvedAt = new Date();
+      const resolvedNotifications = await tx.notification.updateMany({
+        where: {
+          organizationId: actor.organizationId,
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          entityType: "User",
+          entityId: assignedUser.id,
+          archivedAt: null,
+        },
+        data: {
+          readAt: resolvedAt,
+          archivedAt: resolvedAt,
+        },
+      });
+
+      return {
+        assignedUser,
+        resolvedNotificationCount: resolvedNotifications.count,
+      };
     });
 
     info(request.log, "admin.user.house_assigned", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
-      targetUserId: updatedUser.id,
+      targetUserId: assignmentResult.assignedUser.id,
       targetHouseId: targetHouse.id,
       targetHouseName: targetHouse.name,
+      resolvedNotificationCount: assignmentResult.resolvedNotificationCount,
     });
 
-    return updatedUser;
+    return assignmentResult.assignedUser;
   });
 
   app.post("/admin/users/role", async (request, reply) => {
