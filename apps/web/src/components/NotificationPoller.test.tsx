@@ -76,6 +76,7 @@ describe("NotificationPoller", () => {
         notifications={initialNotifications}
         onNotificationsChange={onNotificationsChange}
         onRefreshNotifications={onRefreshNotifications}
+        dashboardHref="/o/acme"
         pollIntervalMs={1_000}
       />,
     );
@@ -99,7 +100,7 @@ describe("NotificationPoller", () => {
       action: { onClick: (event: unknown) => void };
     };
     toastOptions.action.onClick({});
-    expect(pushMock).toHaveBeenCalledWith("/?tab=manage&section=team");
+    expect(pushMock).toHaveBeenCalledWith("/o/acme?tab=manage&section=team");
   });
 
   it("does not toast initial unread notifications or repeat the same observed notification", async () => {
@@ -110,6 +111,7 @@ describe("NotificationPoller", () => {
         notifications={initialNotifications}
         onNotificationsChange={vi.fn()}
         onRefreshNotifications={onRefreshNotifications}
+        dashboardHref="/o/acme"
         pollIntervalMs={1_000}
       />,
     );
@@ -144,6 +146,7 @@ describe("NotificationPoller", () => {
         notifications={{ items: [], unreadCount: 0, nextCursor: null }}
         onNotificationsChange={onNotificationsChange}
         onRefreshNotifications={vi.fn(async () => informationalNotifications)}
+        dashboardHref="/o/acme"
         pollIntervalMs={1_000}
       />,
     );

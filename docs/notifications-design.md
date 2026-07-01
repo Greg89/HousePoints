@@ -157,7 +157,7 @@ Action: Assign house
 Href: /?tab=manage&section=team
 ```
 
-Once slugged dashboard routes are implemented, the href should become:
+The dashboard normalizes this legacy root dashboard href to the signed-in user's slugged dashboard route before navigation:
 
 ```text
 /o/{orgSlug}?tab=manage&section=team

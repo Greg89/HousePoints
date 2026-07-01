@@ -184,6 +184,7 @@ const baseProps = {
     houseColor: "#22c55e",
     houseThemeEnabled: false,
     role: "MEMBER" as const,
+    organizationSlug: "acme",
   },
   leaderboard: [
     {
@@ -583,6 +584,7 @@ const baseProps = {
   onMarkAllNotificationsRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   onAward: async () => ({ ok: true as const }),
   onDeduct: async () => ({ ok: true as const }),
+  dashboardHref: "/o/acme",
   loginUrl: "/auth/login",
   logoutUrl: "/auth/logout",
 };
@@ -602,6 +604,7 @@ describe("DashboardShell", () => {
     expect(screen.getByRole("tab", { name: /leaderboard/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /manage/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /deduct points/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "House Points" })).toHaveAttribute("href", "/o/acme");
   });
 
   it("shows the deduction action for admins", () => {

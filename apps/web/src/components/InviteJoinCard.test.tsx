@@ -73,4 +73,33 @@ describe("InviteJoinCard", () => {
       });
     });
   });
+
+  it("redirects to the organization dashboard after joining without an override", async () => {
+    const user = userEvent.setup();
+    const assignMock = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, assign: assignMock },
+    });
+
+    render(
+      <InviteJoinCard
+        organizationName="Acme Corp"
+        organizationSlug="acme"
+        inviteToken="single-use-token"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /join organisation/i }));
+
+    await waitFor(() => {
+      expect(assignMock).toHaveBeenCalledWith("/o/acme");
+    });
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
 });

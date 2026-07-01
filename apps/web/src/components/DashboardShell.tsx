@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import * as Tabs from "@radix-ui/react-tabs";
 import {
@@ -48,6 +49,7 @@ interface DashboardShellProps {
     houseColor: string | null;
     houseThemeEnabled: boolean;
     role: "MEMBER" | "ADMIN" | "OWNER";
+    organizationSlug: string | null;
   };
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];
@@ -72,6 +74,7 @@ interface DashboardShellProps {
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
+  dashboardHref: string;
   loginUrl: string;
   logoutUrl: string;
   showSeasonOverviewCard?: boolean;
@@ -178,6 +181,7 @@ export function DashboardShell({
   onAward,
   onDeduct,
   onDeletePoint,
+  dashboardHref,
   logoutUrl,
   showSeasonOverviewCard = false,
   adminSection,
@@ -284,9 +288,9 @@ export function DashboardShell({
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <h1 className="font-display text-xl font-bold tracking-wide text-primary">
+          <Link href={dashboardHref} className="font-display text-xl font-bold tracking-wide text-primary">
             House Points
-          </h1>
+          </Link>
           <div className="flex items-center gap-3">
             {/* Current house badge */}
             {session.houseName && (
@@ -331,6 +335,7 @@ export function DashboardShell({
                 userName: session.userName,
                 role: session.role,
               }}
+              dashboardHref={dashboardHref}
               notifications={currentNotifications}
               onNotificationsChange={setCurrentNotifications}
               onMarkNotificationRead={onMarkNotificationRead}
@@ -341,6 +346,7 @@ export function DashboardShell({
               notifications={currentNotifications}
               onNotificationsChange={setCurrentNotifications}
               onRefreshNotifications={onRefreshNotifications}
+              dashboardHref={dashboardHref}
             />
           </div>
         </div>

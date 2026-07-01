@@ -11,6 +11,7 @@ type NotificationPollerProps = {
   notifications: PagedNotifications;
   onNotificationsChange: (notifications: PagedNotifications) => void;
   onRefreshNotifications: () => Promise<PagedNotifications>;
+  dashboardHref: string;
   pollIntervalMs?: number;
 };
 
@@ -18,6 +19,7 @@ export function NotificationPoller({
   notifications,
   onNotificationsChange,
   onRefreshNotifications,
+  dashboardHref,
   pollIntervalMs = NOTIFICATION_POLL_INTERVAL_MS,
 }: NotificationPollerProps) {
   const router = useRouter();
@@ -34,7 +36,7 @@ export function NotificationPoller({
           return;
         }
 
-        showNewActionRequiredToasts(nextNotifications, seenUnreadIds.current, router.push);
+        showNewActionRequiredToasts(nextNotifications, seenUnreadIds.current, router.push, dashboardHref);
         onNotificationsChange(nextNotifications);
       } catch {
         // Polling is only a lightweight active-session cue. Durable notifications
@@ -50,7 +52,7 @@ export function NotificationPoller({
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [onNotificationsChange, onRefreshNotifications, pollIntervalMs, router.push]);
+  }, [dashboardHref, onNotificationsChange, onRefreshNotifications, pollIntervalMs, router.push]);
 
   return null;
 }
@@ -59,6 +61,7 @@ function showNewActionRequiredToasts(
   notifications: PagedNotifications,
   seenUnreadIds: Set<string>,
   navigate: (href: string) => void,
+  dashboardHref: string,
 ) {
   const newActionRequiredNotifications = notifications.items.filter((notification) => {
     if (notification.readAt || notification.severity !== "ACTION_REQUIRED") {
@@ -80,7 +83,7 @@ function showNewActionRequiredToasts(
 
   if (newActionRequiredNotifications.length === 1) {
     const [notification] = newActionRequiredNotifications;
-    const actionHref = getSafeInternalHref(notification.actionHref);
+    const actionHref = getSafeInternalHref(notification.actionHref, dashboardHref);
 
     toast(notification.title, {
       description: notification.body,
@@ -107,9 +110,17 @@ function getUnreadNotificationIds(notifications: PagedNotifications) {
     .map((notification) => notification.id);
 }
 
-function getSafeInternalHref(href: Notification["actionHref"]) {
+function getSafeInternalHref(href: Notification["actionHref"], dashboardHref: string) {
   if (!href?.startsWith("/") || href.startsWith("//")) {
     return null;
+  }
+
+  if (href === "/") {
+    return dashboardHref;
+  }
+
+  if (href.startsWith("/?")) {
+    return `${dashboardHref}${href.slice(1)}`;
   }
 
   return href;

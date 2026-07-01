@@ -129,6 +129,10 @@ export async function renderDashboardPage(route: string) {
     hasAdminContext: Boolean(adminContext),
   });
 
+  const dashboardHref = session.organizationSlug
+    ? `/o/${encodeURIComponent(session.organizationSlug)}`
+    : "/";
+
   const adminSection = adminContext === ADMIN_CONTEXT_FAILED ? (
     <AdminUnavailablePanel />
   ) : adminContext ? (
@@ -170,6 +174,7 @@ export async function renderDashboardPage(route: string) {
         houseColor: session.houseColor ?? null,
         houseThemeEnabled: Boolean(session.houseThemeEnabled),
         role: session.role ?? "MEMBER",
+        organizationSlug: session.organizationSlug ?? null,
       }}
       leaderboard={leaderboard}
       members={members}
@@ -189,6 +194,7 @@ export async function renderDashboardPage(route: string) {
       onAward={awardPoints}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
+      dashboardHref={dashboardHref}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
       showSeasonOverviewCard={showSeasonOverviewCard}

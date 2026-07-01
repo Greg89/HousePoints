@@ -165,7 +165,7 @@ Status: implemented.
 - Update invite join and preview calls to navigate to `/o/{slug}` after successful or already-member flows.
 - Keep `/` as a compatibility entry point.
 
-Status: not started.
+Status: implemented. Dashboard header links use `/o/{slug}` when the signed-in session has an organization slug, invite join success and already-member flows route to the slugged dashboard, and existing dashboard notification action links are normalized to the slugged dashboard before navigating.
 
 ### Phase 4 - Optional Root Redirect
 

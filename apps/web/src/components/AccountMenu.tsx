@@ -22,6 +22,7 @@ type AccountMenuProps = {
   onNotificationsChange: (notifications: PagedNotifications) => void;
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
+  dashboardHref: string;
   logoutUrl: string;
 };
 
@@ -38,6 +39,7 @@ export function AccountMenu({
   onNotificationsChange,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  dashboardHref,
   logoutUrl,
 }: AccountMenuProps) {
   const router = useRouter();
@@ -225,6 +227,7 @@ export function AccountMenu({
                   <NotificationCard
                     key={notification.id}
                     notification={notification}
+                    dashboardHref={dashboardHref}
                     disabled={isPending}
                     onMarkRead={handleMarkRead}
                     onOpenAction={handleOpenAction}
@@ -258,17 +261,19 @@ export function AccountMenu({
 
 function NotificationCard({
   notification,
+  dashboardHref,
   disabled,
   onMarkRead,
   onOpenAction,
 }: {
   notification: Notification;
+  dashboardHref: string;
   disabled: boolean;
   onMarkRead: (notificationId: string) => void;
   onOpenAction: (notification: Notification, href: string) => void;
 }) {
   const unread = !notification.readAt;
-  const actionHref = getSafeInternalHref(notification.actionHref);
+  const actionHref = getSafeInternalHref(notification.actionHref, dashboardHref);
 
   return (
     <article
@@ -330,9 +335,17 @@ function NotificationCard({
   );
 }
 
-function getSafeInternalHref(href: string | null) {
+function getSafeInternalHref(href: string | null, dashboardHref: string) {
   if (!href?.startsWith("/") || href.startsWith("//")) {
     return null;
+  }
+
+  if (href === "/") {
+    return dashboardHref;
+  }
+
+  if (href.startsWith("/?")) {
+    return `${dashboardHref}${href.slice(1)}`;
   }
 
   return href;

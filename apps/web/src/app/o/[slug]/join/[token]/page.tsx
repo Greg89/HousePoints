@@ -56,7 +56,7 @@ export default async function InviteJoinPage({ params }: InviteJoinPageProps) {
       <InviteJoinMessage
         title="You're already a member"
         description={`This invite is for ${preview.organizationName}, and your account already belongs to that organisation.`}
-        actionHref="/"
+        actionHref={`/o/${encodeURIComponent(preview.organizationSlug)}`}
         actionLabel="Go to dashboard"
       />
     );

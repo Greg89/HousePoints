@@ -44,10 +44,10 @@ Implemented product behavior:
 
 ## Slug Change Risk
 
-Changing a slug is low-risk in the current app shape because:
+Changing a slug is controlled in the current app shape because:
 
-- Dashboard routes are not slug-based.
-- Invite tokens are not slug-scoped in the URL or join payload.
+- Dashboard and invite URLs resolve through slug aliases and redirect to the current slug.
+- Invite tokens are not slug-scoped in the join payload.
 - Membership, points, houses, seasons, and audit records all reference `organizationId`.
 
 Changing a slug becomes higher-risk if we later add:
@@ -140,7 +140,7 @@ Recommended URL shape:
 
 | Use | Shape | Notes |
 |---|---|---|
-| Organization landing/dashboard | `/o/{slug}` | Implemented as an authenticated dashboard entry point; canonical navigation remains a follow-up. |
+| Organization landing/dashboard | `/o/{slug}` | Implemented as an authenticated dashboard entry point and preferred by dashboard navigation. |
 | Invite link | `/o/{slug}/join/{token}` | Slug is context and user trust; token remains the secret credential. |
 | Old slug redirect | `/o/{oldSlug}` -> `/o/{currentSlug}` | Uses alias lookup. |
 
@@ -209,4 +209,4 @@ Suggested order:
 2. Add owner-only slug change using the existing `Organization.slug` field plus alias reservation checks. Implemented.
 3. Update invite generation to present slug-bearing invite URLs while keeping token-hash join security. Implemented.
 4. Add slug-based landing/join routes that resolve aliases and redirect old slugs to the current slug. Implemented for invite join links.
-5. Add slug-based dashboard routes at `/o/{slug}`. Implemented. Canonical navigation and optional root redirects remain follow-up work.
+5. Add slug-based dashboard routes at `/o/{slug}`. Implemented with canonical dashboard navigation. Optional root redirects remain follow-up work.

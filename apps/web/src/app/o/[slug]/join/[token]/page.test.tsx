@@ -29,7 +29,7 @@ describe("InviteJoinPage", () => {
     }));
 
     expect(screen.getByRole("heading", { name: "You're already a member" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to dashboard" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Go to dashboard" })).toHaveAttribute("href", "/o/acme");
     expect(screen.queryByRole("button", { name: /join organisation/i })).not.toBeInTheDocument();
   });
 

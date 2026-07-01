@@ -51,6 +51,7 @@ const baseProps = {
   onNotificationsChange: vi.fn(),
   onMarkNotificationRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   onMarkAllNotificationsRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
+  dashboardHref: "/o/acme",
   logoutUrl: "/auth/logout",
 };
 
@@ -133,7 +134,7 @@ describe("AccountMenu", () => {
     await user.click(screen.getByRole("button", { name: /assign house/i }));
 
     expect(onMarkNotificationRead).toHaveBeenCalledWith("notification-1");
-    expect(pushMock).toHaveBeenCalledWith("/?tab=manage&section=team");
+    expect(pushMock).toHaveBeenCalledWith("/o/acme?tab=manage&section=team");
   });
 
   it("marks a single notification read from the row action", async () => {
