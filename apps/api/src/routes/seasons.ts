@@ -406,6 +406,32 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
           },
         });
 
+        const notificationRecipients = await tx.user.findMany({
+          where: {
+            organizationId: actor.organizationId,
+          },
+          select: { id: true },
+        });
+
+        if (notificationRecipients.length > 0) {
+          await tx.notification.createMany({
+            data: notificationRecipients.map((recipient) => ({
+              organizationId: actor.organizationId,
+              recipientUserId: recipient.id,
+              type: "SEASON_STARTED",
+              severity: "INFO",
+              title: "Season started",
+              body: `${actor.displayName} started ${activeSeason.name}. House standings and leaderboards now use the new season.`,
+              actionLabel: "View overview",
+              actionHref: "/",
+              entityType: "Season",
+              entityId: activeSeason.id,
+              dedupeKey: `season-started:${actor.organizationId}:${activeSeason.id}`,
+            })),
+            skipDuplicates: true,
+          });
+        }
+
         return {
           previousSeason,
           activeSeason,

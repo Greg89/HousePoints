@@ -1682,6 +1682,12 @@ describe("POST /seasons/start", () => {
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-owner" },
+      { id: "user-admin" },
+      { id: "user-member" },
+    ]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 3 });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -1733,6 +1739,56 @@ describe("POST /seasons/start", () => {
         },
       },
     });
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-owner",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Olivia started Q4 2026. House standings and leaderboards now use the new season.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-next",
+          dedupeKey: "season-started:org-secure:season-next",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-admin",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Olivia started Q4 2026. House standings and leaderboards now use the new season.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-next",
+          dedupeKey: "season-started:org-secure:season-next",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-member",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Olivia started Q4 2026. House standings and leaderboards now use the new season.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-next",
+          dedupeKey: "season-started:org-secure:season-next",
+        },
+      ],
+      skipDuplicates: true,
+    });
     expect(res.json()).toEqual({
       previousSeason: {
         id: "season-active",
@@ -1765,6 +1821,7 @@ describe("POST /seasons/start", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1781,6 +1838,7 @@ describe("POST /seasons/start", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1798,6 +1856,44 @@ describe("POST /seasons/start", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
     expect(mockSeasonCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("skips season-start notification creation when the organization has no recipients", async () => {
+    const nextSeason = {
+      id: "season-next",
+      name: "Q4 2026",
+      startsAt: new Date("2026-08-01T12:00:00.000Z"),
+      endsAt: null,
+      isActive: true,
+    };
+    const closedSeason = {
+      ...ACTIVE_SEASON,
+      endsAt: new Date("2026-08-01T12:00:00.000Z"),
+      isActive: false,
+    };
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonUpdate.mockResolvedValue(closedSeason);
+    mockSeasonCreate.mockResolvedValue(nextSeason);
+    mockUserFindMany.mockResolvedValue([]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/start",
+      payload: { name: "Q4 2026" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 });
