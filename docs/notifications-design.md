@@ -23,17 +23,22 @@ A toast is useful when an admin is actively using the app, but it is not enough.
 The app currently has:
 
 - Local success/error toasts through `sonner`.
-- A profile/settings button in the dashboard header.
+- Durable per-user notification rows with read/unread and archived state.
+- Account-menu notification center in the dashboard header.
+- Unread count badge on the account menu trigger.
+- Explicit mark-read and mark-all-read actions.
+- Active-session polling that shows one toast per newly observed unread action-required notification.
+- Automatic cleanup for resolved house-assignment notifications when a member is assigned to a house.
 - Admin Manage Team with unassigned-member counts and grouped assignment dropdowns.
 - Invite activity surfaced from the admin audit stream.
 - Durable audit events for administrative history.
 
 The app does not currently have:
 
-- Durable per-user notifications.
-- Notification read/unread state.
-- A notification center or inbox.
-- Real-time fanout for admins.
+- Server-sent events, websockets, or true real-time fanout.
+- A dedicated full-page notification center.
+- Notification archive/retention UI.
+- Additional notification producers beyond member-needs-house-assignment.
 - User-level notification preferences.
 
 ---
@@ -63,7 +68,7 @@ Recommended initial types:
 | `POINT_AWARD_RECEIVED` | Target user | `INFO` | Open Activity |
 | `POINT_DEDUCTION_RECEIVED` | Target user and owners/admins | `ACTION_REQUIRED` or `WARNING` | Open Activity |
 
-MVP should implement only `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. Other types are listed so the model does not paint us into a corner.
+MVP implements only `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. Other types are listed so the model does not paint us into a corner.
 
 ---
 
@@ -121,7 +126,7 @@ For MVP, `dedupeKey` prevents repeatedly notifying the same admin about the same
 member-needs-house-assignment:{organizationId}:{userId}
 ```
 
-When the user is assigned to a house, related notifications can be auto-archived or marked resolved in a later slice. MVP can leave them readable as historical notifications, with the action landing on Manage Team where the current state is visible.
+When the user is assigned to a house, related `MEMBER_NEEDS_HOUSE_ASSIGNMENT` notifications are marked read and archived in the same transaction as the assignment and audit event.
 
 ---
 
@@ -190,6 +195,8 @@ Each item should include:
 
 The API must derive `recipientUserId` and `organizationId` from the actor. The client should never submit a recipient id for reads or mark-read operations.
 
+Assignment resolution is not a separate public notification endpoint. It is handled by `POST /admin/users/assign-house` so the task cleanup stays atomic with the state change that resolves it.
+
 ---
 
 ## Web UX
@@ -234,19 +241,20 @@ Action behavior:
 - Opening the popover should not automatically mark everything read.
 - Clicking a notification action should mark that notification read.
 - `Mark all read` should be explicit.
+- When an assignment notification is resolved by assigning the member to a house, it should disappear from the active menu list because it has been archived.
 
 ### Toast Behavior
 
 Toasts should be generated only for newly observed unread notifications during an active session.
 
-For MVP, use lightweight polling:
+MVP uses lightweight polling:
 
 - Load notification summary during dashboard render.
 - Poll every 60-120 seconds while the dashboard is open.
 - When a new unread action-required notification appears, show a toast.
 - Toast links to the same action href.
 
-This is enough for a fun internal app that people check occasionally. Server-sent events or websockets can wait until there is a stronger real-time need.
+This is enough for a fun internal app that people check occasionally. Server-sent events or websockets remain deferred until there is a stronger real-time need.
 
 Suggested toast copy:
 
@@ -311,12 +319,16 @@ Recommended defaults:
 - Add `POST /notifications/list`, `POST /notifications/mark-read`, and `POST /notifications/mark-all-read`.
 - Add tests for organization scoping, recipient scoping, unread count, pagination, and mark-read ownership.
 
+Status: implemented.
+
 ### Phase 2 - Invite Accepted Notification
 
 - On invite join, create `MEMBER_NEEDS_HOUSE_ASSIGNMENT` notifications for admins/owners when the joined user has no house.
 - Use a deterministic dedupe key per recipient and joined user.
 - Keep existing invite audit behavior unchanged.
 - Add API tests for notification creation, no regular-member recipients, no duplicate notifications, and no token leakage.
+
+Status: implemented.
 
 ### Phase 3 - Account Menu Notification Center
 
@@ -327,12 +339,25 @@ Recommended defaults:
 - Link the action to Manage Team.
 - Add component tests for unread badge, empty state, action link, and mark-read behavior.
 
+Status: implemented.
+
 ### Phase 4 - Active Session Toasts
 
 - Add a client-side notification poller for active dashboard sessions.
 - Show toasts only for newly observed unread notifications.
 - Avoid repeating the same toast in one browser session.
 - Add tests around polling, dedupe, and action-required toast display.
+
+Status: implemented.
+
+### Phase 4A - Assignment Notification Resolution
+
+- When a member is assigned to a house, mark matching `MEMBER_NEEDS_HOUSE_ASSIGNMENT` notifications read and archive them.
+- Scope cleanup by organization, notification type, `entityType`, target user id, and unresolved archive state.
+- Keep audit history unchanged.
+- Add API tests for successful cleanup and no cleanup on forbidden or not-found assignment paths.
+
+Status: implemented.
 
 ### Phase 5 - Additional Notification Types
 
@@ -349,7 +374,18 @@ Add more types only after the first workflow feels useful:
 ## Open Questions
 
 - Should owners receive all admin notifications, or only org-level notifications plus team setup alerts?
-- Should assigning a member to a house auto-archive the related action-required notification?
 - Do admins need a dedicated full notification page, or is the account menu enough for expected volume?
 - Should notification actions support deep links into Manage sections before dashboard query-param tab state exists?
 - Should notification emails ever exist, or is in-app only enough for this product?
+
+Answered:
+
+- Assigning a member to a house should auto-archive the related action-required notifications. Implemented as mark-read plus archive inside the assignment transaction.
+
+## Deferred
+
+- Dedicated notification page with pagination beyond the account-menu preview.
+- User-level notification preferences.
+- Email delivery.
+- Server-sent events or websocket delivery.
+- Additional notification producers: season starts, role changes, point awards, point deductions, and org setting changes.
