@@ -1,15 +1,19 @@
-export function mapAppUser(user: {
-  id: string;
-  auth0Sub: string;
-  email: string | null;
-  displayName: string;
-  houseThemeEnabled: boolean;
-  role: "MEMBER" | "ADMIN" | "OWNER";
-  houseId: string | null;
-  organizationId: string | null;
-  organization: { slug: string } | null;
-  house: { name: string; color: string } | null;
-}) {
+import type { Prisma } from "@prisma/client";
+
+export const APP_USER_SELECT = {
+  id: true,
+  auth0Sub: true,
+  email: true,
+  displayName: true,
+  houseThemeEnabled: true,
+  role: true,
+  organizationId: true,
+  organization: { select: { slug: true } },
+  houseId: true,
+  house: { select: { name: true, color: true } },
+} as const;
+
+export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>) {
   return {
     id: user.id,
     auth0Sub: user.auth0Sub,

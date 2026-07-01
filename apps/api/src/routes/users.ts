@@ -5,23 +5,10 @@ import {
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { mapAppUser } from "../app-user.js";
+import { mapAppUser, APP_USER_SELECT } from "../app-user.js";
 import { info, warn } from "../logging.js";
 import type { VerifyIdToken } from "../auth.js";
 import { parseBody, requireActor } from "../route-helpers.js";
-
-const userSelect = {
-  id: true,
-  auth0Sub: true,
-  email: true,
-  displayName: true,
-  houseThemeEnabled: true,
-  role: true,
-  organizationId: true,
-  organization: { select: { slug: true } },
-  houseId: true,
-  house: { select: { name: true, color: true } },
-} as const;
 
 function readVerifiedEmailClaim(claims: Record<string, unknown>): string | null {
   return typeof claims.email === "string" && claims.email_verified === true
@@ -84,18 +71,17 @@ async function readVerifiedEmailFromIdToken(input: {
 export async function findExistingUser(auth0Sub: string) {
   const identity = await prisma.authIdentity.findUnique({
     where: { providerSubject: auth0Sub },
-    select: { user: { select: userSelect } },
+    select: { userId: true },
   });
-  return identity?.user ?? await prisma.user.findUnique({
-    where: { auth0Sub },
-    select: userSelect,
-  });
+  return identity
+    ? prisma.user.findUnique({ where: { id: identity.userId }, select: APP_USER_SELECT })
+    : prisma.user.findUnique({ where: { auth0Sub }, select: APP_USER_SELECT });
 }
 
 export async function findUserByVerifiedEmail(email: string) {
   return prisma.user.findUnique({
     where: { email },
-    select: userSelect,
+    select: APP_USER_SELECT,
   });
 }
 
@@ -124,7 +110,7 @@ export async function createBootstrappedUser(params: {
       displayName: params.displayName,
       authIdentities: { create: { providerSubject: params.auth0Sub } },
     },
-    select: userSelect,
+    select: APP_USER_SELECT,
   });
 }
 

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import {
   actorScopeSchema,
   markNotificationsReadSchema,
@@ -9,21 +10,21 @@ import type { ActorRecord } from "../actor.js";
 import { info } from "../logging.js";
 import { parseBody, requireActor } from "../route-helpers.js";
 
-type NotificationRecord = {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  body: string;
-  actionLabel: string | null;
-  actionHref: string | null;
-  entityType: string | null;
-  entityId: string | null;
-  readAt: Date | null;
-  createdAt: Date;
-};
+const NOTIFICATION_SELECT = {
+  id: true,
+  type: true,
+  severity: true,
+  title: true,
+  body: true,
+  actionLabel: true,
+  actionHref: true,
+  entityType: true,
+  entityId: true,
+  readAt: true,
+  createdAt: true,
+} as const;
 
-function mapNotification(notification: NotificationRecord) {
+function mapNotification(notification: Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>) {
   return {
     id: notification.id,
     type: notification.type,
@@ -58,19 +59,7 @@ export async function listNotifications(
       ],
       take: params.limit + 1,
       ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        type: true,
-        severity: true,
-        title: true,
-        body: true,
-        actionLabel: true,
-        actionHref: true,
-        entityType: true,
-        entityId: true,
-        readAt: true,
-        createdAt: true,
-      },
+      select: NOTIFICATION_SELECT,
     }),
     prisma.notification.count({
       where: {

@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import {
   adjustPointsSchema,
   activityFeedRequestSchema,
   deletePointTransactionSchema,
   deductPointsSchema,
   seasonScopedRequestSchema,
-  type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -13,18 +13,15 @@ import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { buildPointAwardNotificationData, buildPointDeductionNotificationData } from "../notifications.js";
 
-export function mapActivityItem(tx: {
-  id: string;
-  actor: { displayName: string };
-  targetUser: { displayName: string } | null;
-  targetHouse: { name: string; color: string };
-  type: PointTransactionType;
-  delta: number;
-  reason: string;
-  trait: Trait | null;
-  createdAt: Date;
-  season?: { id: string; name: string; isActive: boolean } | null;
-}) {
+export const ACTIVITY_ITEM_SELECT = {
+  id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+  actor: { select: { displayName: true } },
+  targetUser: { select: { displayName: true } },
+  targetHouse: { select: { name: true, color: true } },
+  season: { select: { id: true, name: true, isActive: true } },
+} as const;
+
+export function mapActivityItem(tx: Prisma.PointTransactionGetPayload<{ select: typeof ACTIVITY_ITEM_SELECT }>) {
   return {
     id: tx.id,
     actorName: tx.actor.displayName,
@@ -46,21 +43,17 @@ export function mapActivityItem(tx: {
   };
 }
 
-export function mapDeletedPoint(tx: {
-  id: string;
-  actor: { displayName: string };
-  targetUser: { displayName: string } | null;
-  targetHouse: { name: string; color: string };
-  type: PointTransactionType;
-  delta: number;
-  reason: string;
-  trait: Trait | null;
-  createdAt: Date;
-  deletedAt: Date | null;
-  deletedBy: { displayName: string } | null;
-  deletionReason: string | null;
-  season?: { id: string; name: string; isActive: boolean } | null;
-}) {
+export const DELETED_POINT_SELECT = {
+  id: true, type: true, delta: true, reason: true, trait: true,
+  createdAt: true, deletedAt: true, deletionReason: true,
+  actor: { select: { displayName: true } },
+  targetUser: { select: { displayName: true } },
+  targetHouse: { select: { name: true, color: true } },
+  deletedBy: { select: { displayName: true } },
+  season: { select: { id: true, name: true, isActive: true } },
+} as const;
+
+export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: typeof DELETED_POINT_SELECT }>) {
   return {
     ...mapActivityItem(tx),
     deletedAt: (tx.deletedAt ?? tx.createdAt).toISOString(),
@@ -238,13 +231,7 @@ export async function listTransactions(params: {
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: params.limit + 1,
     ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
-    select: {
-      id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
-      actor: { select: { displayName: true } },
-      targetUser: { select: { displayName: true } },
-      targetHouse: { select: { name: true, color: true } },
-      season: { select: { id: true, name: true, isActive: true } },
-    },
+    select: ACTIVITY_ITEM_SELECT,
   });
   return {
     items: transactions.slice(0, params.limit),

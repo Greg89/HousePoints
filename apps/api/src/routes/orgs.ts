@@ -14,7 +14,7 @@ import {
   resolveOrganizationSlug,
 } from "@housepoints/db";
 import { getUserOrgContextBySub } from "../actor.js";
-import { mapAppUser } from "../app-user.js";
+import { mapAppUser, APP_USER_SELECT } from "../app-user.js";
 import { info, warn, type ApiLogEvent } from "../logging.js";
 import { parseBody, requireAdminActor } from "../route-helpers.js";
 import { buildMemberNeedsAssignmentNotificationData } from "../notifications.js";
@@ -85,12 +85,6 @@ export async function createOrgInDb(params: {
       select: { id: true, name: true, color: true },
     });
 
-    const userSelect = {
-      id: true, auth0Sub: true, email: true, displayName: true, houseThemeEnabled: true, role: true,
-      organizationId: true, organization: { select: { slug: true } },
-      houseId: true, house: { select: { name: true, color: true } },
-    } as const;
-
     const user = params.existingUser
       ? await tx.user.update({
           where: { id: params.existingUser.id },
@@ -107,19 +101,19 @@ export async function createOrgInDb(params: {
               },
             },
           },
-          select: userSelect,
+          select: APP_USER_SELECT,
         })
       : await tx.user.create({
           data: {
             auth0Sub: params.auth0Sub,
-            email: params.email ?? null,
+            email: params.email,
             displayName: params.displayName,
             organizationId: org.id,
             houseId: house.id,
             role: "OWNER",
             authIdentities: { create: { providerSubject: params.auth0Sub } },
           },
-          select: userSelect,
+          select: APP_USER_SELECT,
         });
 
     const season = await tx.season.create({
@@ -231,12 +225,6 @@ export async function joinOrgInDb(params: {
   organizationSlug?: string | null;
   claimedAt: Date;
 }) {
-  const userSelect = {
-    id: true, auth0Sub: true, email: true, displayName: true, houseThemeEnabled: true, role: true,
-    organizationId: true, organization: { select: { slug: true } },
-    houseId: true, house: { select: { name: true, color: true } },
-  } as const;
-
   return prisma.$transaction(async (tx) => {
     const invite = await tx.orgInvite.findUnique({
       where: { tokenHash: params.tokenHash },
@@ -297,7 +285,7 @@ export async function joinOrgInDb(params: {
               },
             },
           },
-          select: userSelect,
+          select: APP_USER_SELECT,
         })
       : await tx.user.create({
           data: {
@@ -307,7 +295,7 @@ export async function joinOrgInDb(params: {
             organizationId: invite.organizationId,
             authIdentities: { create: { providerSubject: params.auth0Sub } },
           },
-          select: userSelect,
+          select: APP_USER_SELECT,
         });
 
     const claim = await tx.orgInvite.updateMany({

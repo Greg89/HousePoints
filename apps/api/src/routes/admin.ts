@@ -15,7 +15,7 @@ import {
 import { isOrganizationSlugReserved, prisma } from "@housepoints/db";
 import { info, warn } from "../logging.js";
 import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
-import { mapDeletedPoint } from "./points.js";
+import { mapDeletedPoint, DELETED_POINT_SELECT } from "./points.js";
 
 export async function loadAdminContextData(organizationId: string) {
   const [
@@ -44,15 +44,7 @@ export async function loadAdminContextData(organizationId: string) {
       where: { organizationId, deletedAt: { not: null } },
       orderBy: [{ deletedAt: "desc" }, { id: "desc" }],
       take: 10,
-      select: {
-        id: true, type: true, delta: true, reason: true, trait: true,
-        createdAt: true, deletedAt: true, deletionReason: true,
-        actor: { select: { displayName: true } },
-        targetUser: { select: { displayName: true } },
-        targetHouse: { select: { name: true, color: true } },
-        deletedBy: { select: { displayName: true } },
-        season: { select: { id: true, name: true, isActive: true } },
-      },
+      select: DELETED_POINT_SELECT,
     }),
     prisma.orgInvite.findMany({
       where: { organizationId },
