@@ -51,3 +51,22 @@ Last updated: July 1, 2026
 - ✅ Slice 2c: `points.ts` — 8 exported service functions; all 5 handlers updated with zero inline `prisma.*` calls
 - ✅ Slice 2d: `admin.ts` — 10 exported service functions; all 8 handlers updated; `buildRecentAdminActions` and `buildPointAdjustmentStats` exported with 13 unit tests in `admin.test.ts`
 - ✅ Slice 2e: `orgs.ts` — 5 exported service functions (`checkOrgCreatePreconditions`, `createOrgInDb`, `createOrgInviteInDb`, `loadJoinPreviewInDb`, `joinOrgInDb`); all 4 handlers updated
+
+**Phase 2 - COMPLETE.** All quality gates green.
+
+**Phase 4 - COMPLETE.** All quality gates green.
+
+- ✅ `packages/contracts/src/index.ts` replaced with 9-line pure re-export barrel
+- ✅ Domain schema files created: `shared.ts`, `point-schemas.ts`, `user-schemas.ts`, `season-schemas.ts`, `dashboard-schemas.ts`, `admin-schemas.ts`, `notification-schemas.ts`, `org-schemas.ts`, `api-contracts.ts`
+- ✅ No consumer import paths changed
+
+**Phase 5 - COMPLETE.** All quality gates green.
+
+- ✅ `mapAppUser` in `app-user.ts`: exported `APP_USER_SELECT`; parameter type is now `Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>`
+- ✅ `mapActivityItem` and `mapDeletedPoint` in `routes/points.ts`: exported `ACTIVITY_ITEM_SELECT` and `DELETED_POINT_SELECT`; parameter types derived from `Prisma.PointTransactionGetPayload`
+- ✅ `mapNotification` in `routes/notifications.ts`: `NOTIFICATION_SELECT` const added; `NotificationRecord` manual type removed; parameter type is `Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>`
+- ✅ `APP_USER_SELECT` now used in all three call sites (`users.ts`, `orgs.ts` ×2); `DELETED_POINT_SELECT` shared with `admin.ts` query
+
+## Overall Pass: COMPLETE
+
+All five phases are complete and all acceptance criteria are met. Feature development may resume.
