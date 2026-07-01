@@ -667,7 +667,7 @@ describe("POST /points/adjust", () => {
     await app.close();
   });
 
-  it("awards points and returns 200 with the transaction id and trait", async () => {
+  it("awards points, notifies the recipient, and returns 201 with the transaction id and trait", async () => {
     const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
@@ -713,6 +713,58 @@ describe("POST /points/adjust", () => {
         }),
       }),
     );
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [{
+        organizationId: "org-1",
+        recipientUserId: "user-1",
+        type: "POINT_AWARD_RECEIVED",
+        severity: "INFO",
+        title: "Points awarded",
+        body: "Bob awarded you 15 points for Technical Excellence.",
+        actionLabel: "View activity",
+        actionHref: "/?tab=activity",
+        entityType: "PointTransaction",
+        entityId: "tx-abc",
+        dedupeKey: "point-award-received:org-1:tx-abc",
+      }],
+      skipDuplicates: true,
+    });
+    await app.close();
+  });
+
+  it("does not create a recipient notification for self-awards", async () => {
+    const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
+    mockFindUnique
+      .mockResolvedValueOnce(actor)
+      .mockResolvedValueOnce(actor);
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxCreate.mockResolvedValue({
+      id: "tx-self",
+      organizationId: "org-1",
+      seasonId: "season-active",
+      actorUserId: "user-2",
+      targetUserId: "user-2",
+      targetHouseId: "house-1",
+      type: "AWARD",
+      delta: 5,
+      reason: "Kept the build green",
+      trait: "RELIABILITY",
+      createdAt: new Date(),
+    });
+    const app = await buildTestApp("auth0|admin");
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-2",
+        delta: 5,
+        reason: "Kept the build green",
+        trait: "RELIABILITY",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().id).toBe("tx-self");
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 

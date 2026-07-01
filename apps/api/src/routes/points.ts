@@ -5,6 +5,7 @@ import {
   deletePointTransactionSchema,
   deductPointsSchema,
   seasonScopedRequestSchema,
+  TRAIT_LABELS,
   type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
@@ -143,6 +144,7 @@ export async function registerPointRoutes(
       });
     }
 
+    const targetHouseId = targetUser.houseId;
     let activeSeason;
     try {
       activeSeason = await resolveSeasonScope(actor);
@@ -160,18 +162,41 @@ export async function registerPointRoutes(
       throw err;
     }
 
-    const transaction = await prisma.pointTransaction.create({
-      data: {
-        organizationId: actor.organizationId,
-        seasonId: activeSeason.id,
-        actorUserId: actor.id,
-        targetUserId: targetUser.id,
-        targetHouseId: targetUser.houseId,
-        type: "AWARD",
-        delta: parsed.data.delta,
-        reason: parsed.data.reason,
-        trait: parsed.data.trait,
-      },
+    const transaction = await prisma.$transaction(async (tx) => {
+      const award = await tx.pointTransaction.create({
+        data: {
+          organizationId: actor.organizationId,
+          seasonId: activeSeason.id,
+          actorUserId: actor.id,
+          targetUserId: targetUser.id,
+          targetHouseId,
+          type: "AWARD",
+          delta: parsed.data.delta,
+          reason: parsed.data.reason,
+          trait: parsed.data.trait,
+        },
+      });
+
+      if (targetUser.id !== actor.id) {
+        await tx.notification.createMany({
+          data: [{
+            organizationId: actor.organizationId,
+            recipientUserId: targetUser.id,
+            type: "POINT_AWARD_RECEIVED",
+            severity: "INFO",
+            title: "Points awarded",
+            body: `${actor.displayName} awarded you ${parsed.data.delta} points for ${TRAIT_LABELS[parsed.data.trait]}.`,
+            actionLabel: "View activity",
+            actionHref: "/?tab=activity",
+            entityType: "PointTransaction",
+            entityId: award.id,
+            dedupeKey: `point-award-received:${actor.organizationId}:${award.id}`,
+          }],
+          skipDuplicates: true,
+        });
+      }
+
+      return award;
     });
 
     info(request.log, "points.adjusted", {

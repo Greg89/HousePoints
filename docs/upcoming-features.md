@@ -148,9 +148,9 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 A durable in-app attention layer for events that users might miss if they are not actively watching the app.
 
 ### Current state
-The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, settings, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are also implemented as org-wide informational notifications created when an owner starts a new season.
+The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, settings, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are implemented as org-wide informational notifications created when an owner starts a new season. `POINT_AWARD_RECEIVED` notifications are implemented as targeted informational notifications for the awarded member, with self-awards skipped to avoid inbox noise.
 
-Still deferred: a full notification page, user notification preferences, email delivery, server-sent events or websocket fanout, and additional notification producers such as role changes, point awards, point deductions, and org setting changes.
+Still deferred: a full notification page, user notification preferences, email delivery, server-sent events or websocket fanout, and additional notification producers such as role changes, point deductions, and org setting changes.
 
 The detailed product and technical plan lives in [Notification System Design](./notifications-design.md).
 

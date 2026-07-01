@@ -38,7 +38,7 @@ The app does not currently have:
 - Server-sent events, websockets, or true real-time fanout.
 - A dedicated full-page notification center.
 - Notification archive/retention UI.
-- Notification producers for role changes, point awards, point deductions, or org setting changes.
+- Notification producers for role changes, point deductions, or org setting changes.
 - User-level notification preferences.
 
 ---
@@ -68,7 +68,7 @@ Recommended initial types:
 | `POINT_AWARD_RECEIVED` | Target user | `INFO` | Open Activity |
 | `POINT_DEDUCTION_RECEIVED` | Target user and owners/admins | `ACTION_REQUIRED` or `WARNING` | Open Activity |
 
-Implemented types are `MEMBER_NEEDS_HOUSE_ASSIGNMENT` and `SEASON_STARTED`. Other types are listed so the model does not paint us into a corner.
+Implemented types are `MEMBER_NEEDS_HOUSE_ASSIGNMENT`, `SEASON_STARTED`, and `POINT_AWARD_RECEIVED`. Other types are listed so the model does not paint us into a corner.
 
 ---
 
@@ -369,7 +369,9 @@ Add more types only after the first workflow feels useful:
 - Role changed
 - Org settings changed
 
-Status: in progress. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Point awards, point deductions, role changes, and org settings changes remain deferred.
+Status: in progress. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Point deductions, role changes, and org settings changes remain deferred.
+
+`POINT_AWARD_RECEIVED` is implemented as a targeted `INFO` notification created inside the point-award transaction. It notifies the recipient, links to Activity, and skips self-awards to avoid echoing an action the current user just performed.
 
 ---
 
@@ -390,4 +392,4 @@ Answered:
 - User-level notification preferences.
 - Email delivery.
 - Server-sent events or websocket delivery.
-- Additional notification producers: role changes, point awards, point deductions, and org setting changes.
+- Additional notification producers: role changes, point deductions, and org setting changes.
