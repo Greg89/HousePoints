@@ -44,6 +44,7 @@ export type WebLogEvent =
   | "web.admin.user_assigned"
   | "web.admin.user_role_changed"
   | "web.admin.assignment_failed"
+  | "web.notifications.load_failed"
   | "web.points.deleted"
   | "web.seasons.initial_comparison_failed"
   | "web.seasons.renamed"

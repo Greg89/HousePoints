@@ -17,6 +17,11 @@ import {
   readLeaderboard,
   readMembers,
 } from "./actions/dashboard";
+import {
+  markAllNotificationsRead,
+  markNotificationRead,
+  readNotifications,
+} from "./actions/notifications";
 import { awardPoints, deductPoints } from "./actions/points";
 import {
   readMemberScores,
@@ -32,7 +37,7 @@ import { AdminForms } from "@/components/AdminForms";
 import { AdminUnavailablePanel } from "@/components/AdminUnavailablePanel";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { logError, logInfo, logWarn, serializeErrorForLog } from "@/lib/logging";
-import type { Season, SeasonComparison } from "@housepoints/contracts";
+import type { PagedNotifications, Season, SeasonComparison } from "@housepoints/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -124,13 +129,14 @@ async function renderHome() {
   }
 
   // Fetch dashboard data in parallel. Admin tools are optional for rendering the core dashboard.
-  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, adminContext] = await Promise.all([
+  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
     readActivityPage(undefined, requestId),
     readMemberScores(undefined, requestId),
     readDashboardSummary(undefined, requestId),
     readSeasonContext(requestId),
+    readNotificationsForDashboard(requestId),
     readAdminContextForDashboard(session.role, requestId),
   ]);
   const initialSeasonComparison = await readInitialSeasonComparison(seasonContext.seasons, requestId);
@@ -195,6 +201,9 @@ async function renderHome() {
       onSeasonChange={readSeasonReports}
       initialSeasonComparison={initialSeasonComparison}
       onCompareSeasons={readSeasonComparison}
+      notifications={notifications}
+      onMarkNotificationRead={markNotificationRead}
+      onMarkAllNotificationsRead={markAllNotificationsRead}
       onAward={awardPoints}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
@@ -204,6 +213,24 @@ async function renderHome() {
       adminSection={adminSection}
     />
   );
+}
+
+async function readNotificationsForDashboard(requestId: string): Promise<PagedNotifications> {
+  try {
+    return await readNotifications(requestId);
+  } catch (error) {
+    logWarn("web.notifications.load_failed", {
+      ...serializeErrorForLog(error),
+      requestId,
+      route: "/",
+    });
+
+    return {
+      items: [],
+      unreadCount: 0,
+      nextCursor: null,
+    };
+  }
 }
 
 async function readInitialSeasonComparison(

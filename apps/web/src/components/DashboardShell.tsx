@@ -11,11 +11,10 @@ import {
   ChartBar,
   Star,
   MinusCircle,
-  SignOut,
-  User,
   Wrench,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
+import { AccountMenu } from "./AccountMenu";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
@@ -23,7 +22,7 @@ import { OverviewReports } from "./OverviewReports";
 import { SeasonComparisonReport } from "./SeasonComparisonReport";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import { DeductPointsDialog } from "./DeductPointsDialog";
-import type { AwardPointsResult, DeductPointsResult, DeletePointResult } from "@/lib/action-results";
+import type { AwardPointsResult, DeductPointsResult, DeletePointResult, NotificationMutationResult } from "@/lib/action-results";
 import { resolveHouseThemeStyle } from "@/lib/house-theme";
 import type {
   DashboardSummary,
@@ -32,6 +31,7 @@ import type {
   ActivityItem,
   MemberScore,
   PagedActivityFeed,
+  PagedNotifications,
   SeasonComparison,
   SeasonContext,
   Trait,
@@ -63,6 +63,9 @@ interface DashboardShellProps {
   }>;
   initialSeasonComparison?: SeasonComparison | null;
   onCompareSeasons?: (fromSeasonId: string, toSeasonId: string) => Promise<SeasonComparison>;
+  notifications: PagedNotifications;
+  onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
+  onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
@@ -135,6 +138,9 @@ export function DashboardShell({
   onSeasonChange,
   initialSeasonComparison = null,
   onCompareSeasons,
+  notifications,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
   onAward,
   onDeduct,
   onDeletePoint,
@@ -281,23 +287,16 @@ export function DashboardShell({
                 Deduct Points
               </motion.button>
             ) : null}
-            {/* User / logout */}
-            <div className="flex items-center gap-1">
-              <a
-                href="/settings"
-                className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors"
-                aria-label="Profile settings"
-              >
-                <User size={16} className="text-primary" />
-              </a>
-              <a
-                href={logoutUrl}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                aria-label="Sign out"
-              >
-                <SignOut size={18} />
-              </a>
-            </div>
+            <AccountMenu
+              session={{
+                userName: session.userName,
+                role: session.role,
+              }}
+              notifications={notifications}
+              onMarkNotificationRead={onMarkNotificationRead}
+              onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+              logoutUrl={logoutUrl}
+            />
           </div>
         </div>
       </header>

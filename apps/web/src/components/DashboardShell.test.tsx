@@ -3,6 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "./DashboardShell";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+}));
+
 vi.mock("framer-motion", () => ({
   motion: {
     button: ({
@@ -558,6 +564,13 @@ const baseProps = {
   })),
   initialSeasonComparison,
   onCompareSeasons: vi.fn(async () => initialSeasonComparison),
+  notifications: {
+    items: [],
+    unreadCount: 0,
+    nextCursor: null,
+  },
+  onMarkNotificationRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
+  onMarkAllNotificationsRead: vi.fn(async () => ({ ok: true as const, updatedCount: 1 })),
   onAward: async () => ({ ok: true as const }),
   onDeduct: async () => ({ ok: true as const }),
   loginUrl: "/auth/login",
