@@ -4436,6 +4436,178 @@ describe("POST /orgs/join/preview", () => {
   });
 });
 
+describe("POST /orgs/route-context", () => {
+  const resolvedSlug = {
+    organizationId: "org-1",
+    matchedSlug: "acme",
+    currentSlug: "acme",
+    isPrimary: true,
+    organization: {
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+    },
+  };
+
+  it("returns MATCH for the actor's current organization slug", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    expect(mockResolveOrganizationSlug).toHaveBeenCalledWith(prisma, "acme");
+    await app.close();
+  });
+
+  it("returns ALIAS_REDIRECT for an old slug owned by the actor's organization", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      matchedSlug: "old-acme",
+      isPrimary: false,
+    });
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "old-acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "ALIAS_REDIRECT",
+      requestedSlug: "old-acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns NOT_FOUND for an unknown slug without exposing organization data", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(null);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "not-real" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "NOT_FOUND",
+      requestedSlug: "not-real",
+    });
+    await app.close();
+  });
+
+  it("returns NO_ACTOR_ORG for signed-in users who have not joined an organization", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns DIFFERENT_ORG when the requested slug belongs to another organization", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    });
+    await app.close();
+  });
+
+  it("rejects malformed slug requests before resolving aliases", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "Acme Corp" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockResolveOrganizationSlug).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /orgs/join", () => {
   const payload = {
     displayName: "Alice",

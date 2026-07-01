@@ -20,6 +20,8 @@ import {
   joinInvitePreviewResponseSchema,
   joinInvitePreviewSchema,
   joinOrgSchema,
+  orgRouteContextRequestSchema,
+  orgRouteContextSchema,
   promoteUserSchema,
   renameSeasonSchema,
   seasonCompareRequestSchema,
@@ -77,6 +79,7 @@ const webConsumedApiEndpoints = [
   "/orgs/invite",
   "/orgs/join",
   "/orgs/join/preview",
+  "/orgs/route-context",
   "/points/adjust",
   "/points/deduct",
   "/points/delete",
@@ -574,6 +577,10 @@ describe("authenticated request schemas", () => {
       inviteToken: "invite",
       organizationSlug: "acme",
       auth0Sub: "auth0|attacker",
+    }],
+    [orgRouteContextRequestSchema, {
+      slug: "acme",
+      actorAuth0Sub: "auth0|attacker",
     }],
     [promoteUserSchema, {
       targetUserId: "user-1",
@@ -1679,6 +1686,81 @@ describe("joinInvitePreviewSchema", () => {
         memberOrganizationSlug: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("orgRouteContextSchema", () => {
+  it("accepts the slug dashboard route context states", () => {
+    expect(orgRouteContextRequestSchema.parse({ slug: "acme" })).toEqual({
+      slug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    })).toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "ALIAS_REDIRECT",
+      requestedSlug: "old-acme",
+      organizationSlug: "acme",
+    })).toEqual({
+      status: "ALIAS_REDIRECT",
+      requestedSlug: "old-acme",
+      organizationSlug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    })).toEqual({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    })).toEqual({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "NOT_FOUND",
+      requestedSlug: "missing-org",
+    })).toEqual({
+      status: "NOT_FOUND",
+      requestedSlug: "missing-org",
+    });
+  });
+
+  it("rejects malformed slugs and invalid route states", () => {
+    expect(orgRouteContextRequestSchema.safeParse({ slug: "Acme Corp" }).success).toBe(false);
+    expect(orgRouteContextRequestSchema.safeParse({ slug: "acme", organizationId: "org-1" }).success).toBe(false);
+    expect(orgRouteContextSchema.safeParse({
+      status: "MATCH",
+      requestedSlug: "acme",
+    }).success).toBe(false);
+    expect(orgRouteContextSchema.safeParse({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+    }).success).toBe(false);
   });
 });
 

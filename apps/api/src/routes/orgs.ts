@@ -6,6 +6,7 @@ import {
   joinInvitePreviewSchema,
   createOrgSchema,
   joinOrgSchema,
+  orgRouteContextRequestSchema,
 } from "@housepoints/contracts";
 import {
   createPrimaryOrganizationSlugAlias,
@@ -43,6 +44,41 @@ class InviteJoinError extends Error {
     super(message);
     this.name = "InviteJoinError";
   }
+}
+
+async function getUserOrgContextBySub(auth0Sub: string): Promise<{
+  organizationId: string | null;
+  organizationName: string | null;
+  organizationSlug: string | null;
+} | null> {
+  const userSelect = {
+    organizationId: true,
+    organization: {
+      select: {
+        name: true,
+        slug: true,
+      },
+    },
+  } as const;
+
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { user: { select: userSelect } },
+  });
+  const user = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: userSelect,
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    organizationId: user.organizationId,
+    organizationName: user.organization?.name ?? null,
+    organizationSlug: user.organization?.slug ?? null,
+  };
 }
 
 async function createMemberNeedsHouseAssignmentNotifications(
@@ -89,6 +125,81 @@ async function createMemberNeedsHouseAssignmentNotifications(
 }
 
 export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
+  app.post("/orgs/route-context", async (request, reply) => {
+    const parsed = orgRouteContextRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
+      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+    }
+
+    const requestedSlug = parsed.data.slug;
+    const [resolvedSlug, actorOrg] = await Promise.all([
+      resolveOrganizationSlug(prisma, requestedSlug),
+      getUserOrgContextBySub(request.auth.subject),
+    ]);
+
+    if (!resolvedSlug) {
+      info(request.log, "orgs.route_context.not_found", {
+        requestedSlug,
+        actorOrganizationId: actorOrg?.organizationId ?? null,
+      });
+      return reply.status(200).send({
+        status: "NOT_FOUND",
+        requestedSlug,
+      });
+    }
+
+    if (!actorOrg?.organizationId || !actorOrg.organizationSlug || !actorOrg.organizationName) {
+      info(request.log, "orgs.route_context.no_actor_org", {
+        requestedSlug,
+        organizationId: resolvedSlug.organizationId,
+      });
+      return reply.status(200).send({
+        status: "NO_ACTOR_ORG",
+        requestedSlug,
+        organizationSlug: resolvedSlug.currentSlug,
+      });
+    }
+
+    if (actorOrg.organizationId !== resolvedSlug.organizationId) {
+      info(request.log, "orgs.route_context.different_org", {
+        requestedSlug,
+        organizationId: resolvedSlug.organizationId,
+        actorOrganizationId: actorOrg.organizationId,
+      });
+      return reply.status(200).send({
+        status: "DIFFERENT_ORG",
+        requestedSlug,
+        organizationSlug: resolvedSlug.currentSlug,
+        actorOrganizationSlug: actorOrg.organizationSlug,
+        actorOrganizationName: actorOrg.organizationName,
+      });
+    }
+
+    if (resolvedSlug.currentSlug !== requestedSlug) {
+      info(request.log, "orgs.route_context.alias_redirect", {
+        requestedSlug,
+        organizationId: resolvedSlug.organizationId,
+        organizationSlug: resolvedSlug.currentSlug,
+      });
+      return reply.status(200).send({
+        status: "ALIAS_REDIRECT",
+        requestedSlug,
+        organizationSlug: resolvedSlug.currentSlug,
+      });
+    }
+
+    info(request.log, "orgs.route_context.match", {
+      requestedSlug,
+      organizationId: resolvedSlug.organizationId,
+    });
+    return reply.status(200).send({
+      status: "MATCH",
+      requestedSlug,
+      organizationSlug: resolvedSlug.currentSlug,
+    });
+  });
+
   app.post("/orgs/create", async (request, reply) => {
     const parsed = createOrgSchema.safeParse(request.body);
     if (!parsed.success) {

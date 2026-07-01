@@ -85,7 +85,12 @@ export type ApiLogEvent =
   | "orgs.join.organization_mismatch"
   | "orgs.join.already_in_org"
   | "orgs.join.account_link_required"
-  | "orgs.join.success";
+  | "orgs.join.success"
+  | "orgs.route_context.alias_redirect"
+  | "orgs.route_context.different_org"
+  | "orgs.route_context.match"
+  | "orgs.route_context.no_actor_org"
+  | "orgs.route_context.not_found";
 
 type ApiLogger = {
   logger: FastifyBaseLogger;

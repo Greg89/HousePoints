@@ -730,6 +730,43 @@ export const joinInvitePreviewResponseSchema = z.object({
 
 export type JoinInvitePreviewResponse = z.infer<typeof joinInvitePreviewResponseSchema>;
 
+export const orgRouteContextRequestSchema = z.object({
+  slug: slugSchema,
+}).strict();
+
+export type OrgRouteContextRequest = z.infer<typeof orgRouteContextRequestSchema>;
+
+export const orgRouteContextSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("MATCH"),
+    requestedSlug: slugSchema,
+    organizationSlug: slugSchema,
+  }),
+  z.object({
+    status: z.literal("ALIAS_REDIRECT"),
+    requestedSlug: slugSchema,
+    organizationSlug: slugSchema,
+  }),
+  z.object({
+    status: z.literal("DIFFERENT_ORG"),
+    requestedSlug: slugSchema,
+    organizationSlug: slugSchema,
+    actorOrganizationSlug: slugSchema,
+    actorOrganizationName: z.string().min(1),
+  }),
+  z.object({
+    status: z.literal("NO_ACTOR_ORG"),
+    requestedSlug: slugSchema,
+    organizationSlug: slugSchema.optional(),
+  }),
+  z.object({
+    status: z.literal("NOT_FOUND"),
+    requestedSlug: slugSchema,
+  }),
+]);
+
+export type OrgRouteContext = z.infer<typeof orgRouteContextSchema>;
+
 export const promoteUserSchema = z.object({
   targetUserId: z.string().min(1),
   role: z.enum(["MEMBER", "ADMIN"]),
@@ -809,6 +846,7 @@ export const apiContracts = {
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),
   "/orgs/join/preview": defineContract(joinInvitePreviewSchema, joinInvitePreviewResponseSchema),
   "/orgs/join": defineContract(joinOrgSchema, appUserSchema),
+  "/orgs/route-context": defineContract(orgRouteContextRequestSchema, orgRouteContextSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,
