@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import type { FastifyInstance } from "fastify";
 import {
   createInviteSchema,
@@ -42,6 +43,49 @@ class InviteJoinError extends Error {
     super(message);
     this.name = "InviteJoinError";
   }
+}
+
+async function createMemberNeedsHouseAssignmentNotifications(
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    organizationName: string;
+    joinedUserId: string;
+    joinedUserName: string;
+  },
+): Promise<number> {
+  const recipients = await tx.user.findMany({
+    where: {
+      organizationId: input.organizationId,
+      role: { in: ["ADMIN", "OWNER"] },
+      id: { not: input.joinedUserId },
+    },
+    select: { id: true },
+  });
+
+  if (recipients.length === 0) {
+    return 0;
+  }
+
+  const dedupeKey = `member-needs-house-assignment:${input.organizationId}:${input.joinedUserId}`;
+  const result = await tx.notification.createMany({
+    data: recipients.map((recipient) => ({
+      organizationId: input.organizationId,
+      recipientUserId: recipient.id,
+      type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+      severity: "ACTION_REQUIRED",
+      title: "New member needs a house",
+      body: `${input.joinedUserName} joined ${input.organizationName} and has not been assigned to a house yet.`,
+      actionLabel: "Assign house",
+      actionHref: "/?tab=manage&section=team",
+      entityType: "User",
+      entityId: input.joinedUserId,
+      dedupeKey,
+    })),
+    skipDuplicates: true,
+  });
+
+  return result.count;
 }
 
 export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
@@ -260,7 +304,13 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       const preview = await prisma.$transaction(async (tx) => {
         const invite = await tx.orgInvite.findUnique({
           where: { tokenHash },
-          select: { id: true, organizationId: true, expiresAt: true, usedAt: true },
+          select: {
+            id: true,
+            organizationId: true,
+            expiresAt: true,
+            usedAt: true,
+            organization: { select: { name: true } },
+          },
         });
         const resolvedSlug = await resolveOrganizationSlug(tx, organizationSlug);
 
@@ -395,7 +445,13 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       const result = await prisma.$transaction(async (tx) => {
         const invite = await tx.orgInvite.findUnique({
           where: { tokenHash },
-          select: { id: true, organizationId: true, expiresAt: true, usedAt: true },
+          select: {
+            id: true,
+            organizationId: true,
+            expiresAt: true,
+            usedAt: true,
+            organization: { select: { name: true } },
+          },
         });
 
         if (!invite) {
@@ -540,11 +596,21 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
           },
         });
 
+        const notificationCount = user.houseId
+          ? 0
+              : await createMemberNeedsHouseAssignmentNotifications(tx, {
+                  organizationId: invite.organizationId,
+                  organizationName: invite.organization?.name ?? "the organization",
+                  joinedUserId: user.id,
+                  joinedUserName: user.displayName,
+                });
+
         return {
           user,
           created: !existingUser,
           inviteId: invite.id,
           organizationId: invite.organizationId,
+          notificationCount,
         };
       });
 
@@ -552,6 +618,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
         userId: result.user.id,
         orgId: result.organizationId,
         inviteId: result.inviteId,
+        notificationCount: result.notificationCount,
       });
       return reply.status(200).send({
         ...mapAppUser(result.user),

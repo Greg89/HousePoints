@@ -51,6 +51,7 @@ vi.mock("@housepoints/db", () => ({
     },
     notification: {
       count: vi.fn(),
+      createMany: vi.fn(),
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
@@ -109,6 +110,7 @@ const mockOrgSlugAliasUpdateMany = prisma.organizationSlugAlias.updateMany as Re
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
 const mockAuditEventFindMany = prisma.auditEvent.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.fn>;
+const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
 const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
@@ -186,6 +188,7 @@ beforeEach(() => {
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
+  mockUserFindMany.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
@@ -195,6 +198,7 @@ beforeEach(() => {
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
   mockNotificationCount.mockResolvedValue(0);
+  mockNotificationCreateMany.mockResolvedValue({ count: 0 });
   mockNotificationFindMany.mockResolvedValue([]);
   mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
   mockTransaction.mockImplementation(
@@ -4033,6 +4037,7 @@ describe("POST /orgs/join/preview", () => {
   const invite = {
     id: "invite-1",
     organizationId: "org-1",
+    organization: { name: "Acme Corp" },
     expiresAt: new Date("2099-01-01T00:00:00Z"),
     usedAt: null,
   };
@@ -4188,6 +4193,7 @@ describe("POST /orgs/join", () => {
   const invite = {
     id: "invite-1",
     organizationId: "org-1",
+    organization: { name: "Acme Corp" },
     expiresAt: new Date("2099-01-01T00:00:00Z"),
     usedAt: null,
   };
@@ -4279,6 +4285,11 @@ describe("POST /orgs/join", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue(joinedUser);
+    mockUserFindMany.mockResolvedValue([
+      { id: "admin-1" },
+      { id: "owner-1" },
+    ]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 2 });
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
     const app = await buildTestApp();
 
@@ -4319,6 +4330,118 @@ describe("POST /orgs/join", () => {
         },
       },
     });
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        role: { in: ["ADMIN", "OWNER"] },
+        id: { not: "user-1" },
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-1",
+          recipientUserId: "admin-1",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          severity: "ACTION_REQUIRED",
+          title: "New member needs a house",
+          body: "Alice joined Acme Corp and has not been assigned to a house yet.",
+          actionLabel: "Assign house",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-1",
+          dedupeKey: "member-needs-house-assignment:org-1:user-1",
+        },
+        {
+          organizationId: "org-1",
+          recipientUserId: "owner-1",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          severity: "ACTION_REQUIRED",
+          title: "New member needs a house",
+          body: "Alice joined Acme Corp and has not been assigned to a house yet.",
+          actionLabel: "Assign house",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-1",
+          dedupeKey: "member-needs-house-assignment:org-1:user-1",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(JSON.stringify(mockNotificationCreateMany.mock.calls)).not.toContain("single-use-token");
+    await app.close();
+  });
+
+  it("does not create assignment notifications when the joined user already has a house", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(makeMember({
+      email: "alice@example.com",
+      houseId: "house-1",
+      house: { name: "Phoenix", color: "#7c3aed" },
+    }));
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockUserFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("skips notification creation when no admin or owner recipients exist", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    mockUserFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        role: { in: ["ADMIN", "OWNER"] },
+        id: { not: "user-1" },
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("uses skipDuplicates so assignment notifications are idempotent", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    mockUserFindMany.mockResolvedValue([{ id: "admin-1" }]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 0 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      skipDuplicates: true,
+    }));
     await app.close();
   });
 
