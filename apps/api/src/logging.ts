@@ -11,6 +11,8 @@ export type ApiLogEvent =
   | "api.shutdown_failed"
   | "auth.token_missing"
   | "auth.token_invalid"
+  | "auth.actor_not_found"
+  | "owner.forbidden"
   | "request.received"
   | "request.completed"
   | "request.validation_failed"

@@ -12,28 +12,17 @@ import {
   updateOrgSettingsSchema,
 } from "@housepoints/contracts";
 import { isOrganizationSlugReserved, prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole, isOwnerRole } from "../actor.js";
 import { info, warn } from "../logging.js";
-import { resolveSeasonScope, SeasonScopeError } from "../season-scope.js";
+import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapDeletedPoint } from "./points.js";
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
-    const parsed = actorScopeSchema.safeParse(request.body);
+    const parsed = await parseBody(actorScopeSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
     const [
       users,
@@ -218,26 +207,16 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/org/settings", async (request, reply) => {
-    const parsed = updateOrgSettingsSchema.safeParse(request.body);
+    const parsed = await parseBody(updateOrgSettingsSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isOwnerRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
-    }
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
 
     const updatedOrganization = await prisma.$transaction(async (tx) => {
       const organization = await tx.organization.update({
         where: { id: actor.organizationId },
-        data: { name: parsed.data.name },
+        data: { name: parsed.name },
         select: { id: true, name: true, slug: true },
       });
 
@@ -268,23 +247,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/org/slug", async (request, reply) => {
-    const parsed = updateOrgSlugSchema.safeParse(request.body);
+    const parsed = await parseBody(updateOrgSlugSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isOwnerRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
-    }
-
-    const nextSlug = parsed.data.slug;
+    const nextSlug = parsed.slug;
     const previousSlug = actor.organizationSlug;
 
     if (nextSlug === previousSlug) {
@@ -379,37 +348,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {
-    const parsed = seasonScopedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
-
-    let season;
-    try {
-      season = await resolveSeasonScope(actor, parsed.data.seasonId);
-    } catch (error) {
-      if (error instanceof SeasonScopeError) {
-        warn(request.log, error.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-          requestedSeasonId: parsed.data.seasonId ?? null,
-        });
-        return reply.status(error.statusCode).send({ message: error.message, code: error.code });
-      }
-
-      throw error;
-    }
+    const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
+    if (!season) return;
 
     const [houses, deductionTotals] = await Promise.all([
       prisma.house.findMany({
@@ -443,34 +389,24 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/audit", async (request, reply) => {
-    const parsed = adminAuditRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(adminAuditRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
-
-    const limit = parsed.data.limit;
+    const limit = parsed.limit;
     const auditEvents = await prisma.auditEvent.findMany({
       where: {
         organizationId: actor.organizationId,
-        ...(parsed.data.type ? { eventType: parsed.data.type } : {}),
+        ...(parsed.type ? { eventType: parsed.type } : {}),
       },
       orderBy: [
         { createdAt: "desc" },
         { id: "desc" },
       ],
       take: limit + 1,
-      ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
+      ...(parsed.cursor ? { cursor: { id: parsed.cursor }, skip: 1 } : {}),
       select: {
         id: true,
         eventType: true,
@@ -485,8 +421,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     info(request.log, "admin.audit.loaded", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
-      filterType: parsed.data.type ?? null,
-      cursor: parsed.data.cursor ?? null,
+      filterType: parsed.type ?? null,
+      cursor: parsed.cursor ?? null,
       actions: pageEvents.length,
       hasNextPage: auditEvents.length > limit,
     });
@@ -501,38 +437,28 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/houses", async (request, reply) => {
-    const parsed = createHouseSchema.safeParse(request.body);
+    const parsed = await parseBody(createHouseSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isOwnerRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
-    }
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
 
     const house = await prisma.house.upsert({
       where: {
         organizationId_name: {
           organizationId: actor.organizationId,
-          name: parsed.data.name,
+          name: parsed.name,
         },
       },
       update: {
-        color: parsed.data.color,
-        ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
+        color: parsed.color,
+        ...(parsed.description !== undefined ? { description: parsed.description } : {}),
       },
       create: {
         organizationId: actor.organizationId,
-        name: parsed.data.name,
-        color: parsed.data.color,
-        description: parsed.data.description ?? null,
+        name: parsed.name,
+        color: parsed.color,
+        description: parsed.description ?? null,
       },
       select: {
         id: true,
@@ -553,29 +479,19 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/users/assign-house", async (request, reply) => {
-    const parsed = assignUserHouseSchema.safeParse(request.body);
+    const parsed = await parseBody(assignUserHouseSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
     const [targetUser, targetHouse] = await Promise.all([
       prisma.user.findUnique({
-        where: { id: parsed.data.targetUserId },
+        where: { id: parsed.targetUserId },
         select: { id: true, displayName: true, organizationId: true },
       }),
       prisma.house.findUnique({
-        where: { id: parsed.data.targetHouseId },
+        where: { id: parsed.targetHouseId },
         select: { id: true, organizationId: true, name: true },
       }),
     ]);
@@ -648,24 +564,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/admin/users/role", async (request, reply) => {
-    const parsed = promoteUserSchema.safeParse(request.body);
+    const parsed = await parseBody(promoteUserSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isOwnerRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
-    }
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
 
     const targetUser = await prisma.user.findUnique({
-      where: { id: parsed.data.targetUserId },
+      where: { id: parsed.targetUserId },
       select: {
         id: true,
         displayName: true,
@@ -690,7 +596,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const updatedUser = await prisma.$transaction(async (tx) => {
       const changedUser = await tx.user.update({
         where: { id: targetUser.id },
-        data: { role: parsed.data.role },
+        data: { role: parsed.role },
         select: {
           id: true,
           displayName: true,

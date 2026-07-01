@@ -3,13 +3,11 @@ import {
   seasonScopedRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub } from "../actor.js";
-import { info, warn } from "../logging.js";
+import { info } from "../logging.js";
 import {
   mapSeason,
-  resolveSeasonScope,
-  SeasonScopeError,
 } from "../season-scope.js";
+import { parseBody, requireActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapActivityItem } from "./points.js";
 
 function utcDateKey(date: Date) {
@@ -27,36 +25,14 @@ function lastUtcDateKeys(days: number, now: Date) {
 
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
   app.post("/houses/leaderboard", async (request, reply) => {
-    const parsed = seasonScopedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    let season;
-    try {
-      season = await resolveSeasonScope(actor, parsed.data.seasonId);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-          seasonId: parsed.data.seasonId,
-        });
-        return reply.status(err.statusCode).send({ message: err.message, code: err.code });
-      }
-      throw err;
-    }
+    const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
+    if (!season) return;
 
     const [houses, houseTotals] = await Promise.all([
       prisma.house.findMany({
@@ -123,36 +99,14 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post("/dashboard/summary", async (request, reply) => {
-    const parsed = seasonScopedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    let season;
-    try {
-      season = await resolveSeasonScope(actor, parsed.data.seasonId);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-          seasonId: parsed.data.seasonId,
-        });
-        return reply.status(err.statusCode).send({ message: err.message, code: err.code });
-      }
-      throw err;
-    }
+    const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
+    if (!season) return;
 
     const now = new Date();
     const velocityDates = lastUtcDateKeys(14, now);

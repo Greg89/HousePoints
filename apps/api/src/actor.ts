@@ -77,3 +77,46 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
     organizationSlug: actor.organization.slug,
   };
 }
+
+export type UserOrgContext = {
+  organizationId: string | null;
+  organizationName: string | null;
+  organizationSlug: string | null;
+};
+
+/**
+ * Resolves a user's organization context by Auth0 subject.
+ * Returns null if the user does not exist. Returns an object with null org
+ * fields if the user exists but has not yet joined an organization.
+ * Used by routes that need to check org membership without requiring it.
+ */
+export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgContext | null> {
+  const userSelect = {
+    organizationId: true,
+    organization: {
+      select: {
+        name: true,
+        slug: true,
+      },
+    },
+  } as const;
+
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { user: { select: userSelect } },
+  });
+  const user = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: userSelect,
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    organizationId: user.organizationId,
+    organizationName: user.organization?.name ?? null,
+    organizationSlug: user.organization?.slug ?? null,
+  };
+}

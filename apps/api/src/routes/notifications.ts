@@ -5,8 +5,8 @@ import {
   notificationListRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub } from "../actor.js";
-import { info, warn } from "../logging.js";
+import { info } from "../logging.js";
+import { parseBody, requireActor } from "../route-helpers.js";
 
 type NotificationRecord = {
   id: string;
@@ -40,28 +40,18 @@ function mapNotification(notification: NotificationRecord) {
 
 export async function registerNotificationRoutes(app: FastifyInstance): Promise<void> {
   app.post("/notifications/list", async (request, reply) => {
-    const parsed = notificationListRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(notificationListRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "notifications.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    const limit = parsed.data.limit;
+    const limit = parsed.limit;
     const where = {
       organizationId: actor.organizationId,
       recipientUserId: actor.id,
       archivedAt: null,
-      ...(parsed.data.unreadOnly ? { readAt: null } : {}),
+      ...(parsed.unreadOnly ? { readAt: null } : {}),
     };
     const [notifications, unreadCount] = await Promise.all([
       prisma.notification.findMany({
@@ -71,7 +61,7 @@ export async function registerNotificationRoutes(app: FastifyInstance): Promise<
           { id: "desc" },
         ],
         take: limit + 1,
-        ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
+        ...(parsed.cursor ? { cursor: { id: parsed.cursor }, skip: 1 } : {}),
         select: {
           id: true,
           type: true,
@@ -100,8 +90,8 @@ export async function registerNotificationRoutes(app: FastifyInstance): Promise<
     info(request.log, "notifications.loaded", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
-      unreadOnly: parsed.data.unreadOnly,
-      cursor: parsed.data.cursor ?? null,
+      unreadOnly: parsed.unreadOnly,
+      cursor: parsed.cursor ?? null,
       notifications: pageNotifications.length,
       unreadCount,
       hasNextPage: notifications.length > limit,
@@ -115,25 +105,15 @@ export async function registerNotificationRoutes(app: FastifyInstance): Promise<
   });
 
   app.post("/notifications/mark-read", async (request, reply) => {
-    const parsed = markNotificationsReadSchema.safeParse(request.body);
+    const parsed = await parseBody(markNotificationsReadSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "notifications.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
     const result = await prisma.notification.updateMany({
       where: {
-        id: { in: parsed.data.notificationIds },
+        id: { in: parsed.notificationIds },
         organizationId: actor.organizationId,
         recipientUserId: actor.id,
         archivedAt: null,
@@ -147,7 +127,7 @@ export async function registerNotificationRoutes(app: FastifyInstance): Promise<
     info(request.log, "notifications.marked_read", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
-      requestedCount: parsed.data.notificationIds.length,
+      requestedCount: parsed.notificationIds.length,
       updatedCount: result.count,
     });
 
@@ -155,21 +135,11 @@ export async function registerNotificationRoutes(app: FastifyInstance): Promise<
   });
 
   app.post("/notifications/mark-all-read", async (request, reply) => {
-    const parsed = actorScopeSchema.safeParse(request.body);
+    const parsed = await parseBody(actorScopeSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "notifications.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
     const result = await prisma.notification.updateMany({
       where: {

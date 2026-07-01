@@ -14,9 +14,10 @@ import {
   prisma,
   resolveOrganizationSlug,
 } from "@housepoints/db";
-import { getActorBySub, isAdminRole } from "../actor.js";
+import { getUserOrgContextBySub } from "../actor.js";
 import { mapAppUser } from "../app-user.js";
 import { info, warn, type ApiLogEvent } from "../logging.js";
+import { parseBody, requireAdminActor } from "../route-helpers.js";
 
 function generateInviteToken(): string {
   return randomBytes(32).toString("hex"); // 64-char hex string
@@ -44,41 +45,6 @@ class InviteJoinError extends Error {
     super(message);
     this.name = "InviteJoinError";
   }
-}
-
-async function getUserOrgContextBySub(auth0Sub: string): Promise<{
-  organizationId: string | null;
-  organizationName: string | null;
-  organizationSlug: string | null;
-} | null> {
-  const userSelect = {
-    organizationId: true,
-    organization: {
-      select: {
-        name: true,
-        slug: true,
-      },
-    },
-  } as const;
-
-  const identity = await prisma.authIdentity.findUnique({
-    where: { providerSubject: auth0Sub },
-    select: { user: { select: userSelect } },
-  });
-  const user = identity?.user ?? await prisma.user.findUnique({
-    where: { auth0Sub },
-    select: userSelect,
-  });
-
-  if (!user) {
-    return null;
-  }
-
-  return {
-    organizationId: user.organizationId,
-    organizationName: user.organization?.name ?? null,
-    organizationSlug: user.organization?.slug ?? null,
-  };
 }
 
 async function createMemberNeedsHouseAssignmentNotifications(
@@ -126,13 +92,10 @@ async function createMemberNeedsHouseAssignmentNotifications(
 
 export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
   app.post("/orgs/route-context", async (request, reply) => {
-    const parsed = orgRouteContextRequestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const parsed = await parseBody(orgRouteContextRequestSchema, request, reply);
+    if (!parsed) return;
 
-    const requestedSlug = parsed.data.slug;
+    const requestedSlug = parsed.slug;
     const [resolvedSlug, actorOrg] = await Promise.all([
       resolveOrganizationSlug(prisma, requestedSlug),
       getUserOrgContextBySub(request.auth.subject),
@@ -201,11 +164,8 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/orgs/create", async (request, reply) => {
-    const parsed = createOrgSchema.safeParse(request.body);
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const parsed = await parseBody(createOrgSchema, request, reply);
+    if (!parsed) return;
 
     const {
       email,
@@ -214,7 +174,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
       orgSlug,
       firstHouseName,
       firstHouseColor,
-    } = parsed.data;
+    } = parsed;
     const auth0Sub = request.auth.subject;
 
     // Reject if slug is already taken or reserved by an alias.
@@ -345,21 +305,15 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/orgs/invite", async (request, reply) => {
-    const parsed = createInviteSchema.safeParse(request.body);
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const parsed = await parseBody(createInviteSchema, request, reply);
+    if (!parsed) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ code: "ADMIN_REQUIRED", message: "Admin access required" });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
     const rawToken = generateInviteToken();
     const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + parsed.data.expiresInHours * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + parsed.expiresInHours * 60 * 60 * 1000);
 
     const invite = await prisma.$transaction(async (tx) => {
       const invite = await tx.orgInvite.create({
@@ -401,13 +355,10 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/orgs/join/preview", async (request, reply) => {
-    const parsed = joinInvitePreviewSchema.safeParse(request.body);
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const parsed = await parseBody(joinInvitePreviewSchema, request, reply);
+    if (!parsed) return;
 
-    const { inviteToken, organizationSlug } = parsed.data;
+    const { inviteToken, organizationSlug } = parsed;
     const tokenHash = hashToken(inviteToken);
     const checkedAt = new Date();
 
@@ -535,13 +486,10 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/orgs/join", async (request, reply) => {
-    const parsed = joinOrgSchema.safeParse(request.body);
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const parsed = await parseBody(joinOrgSchema, request, reply);
+    if (!parsed) return;
 
-    const { email, displayName, inviteToken, organizationSlug } = parsed.data;
+    const { email, displayName, inviteToken, organizationSlug } = parsed;
     const auth0Sub = request.auth.subject;
     const tokenHash = hashToken(inviteToken);
 

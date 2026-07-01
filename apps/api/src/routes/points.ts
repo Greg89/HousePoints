@@ -10,9 +10,8 @@ import {
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole } from "../actor.js";
 import { info, warn } from "../logging.js";
-import { resolveSeasonScope, SeasonScopeError } from "../season-scope.js";
+import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
 
 export function mapActivityItem(tx: {
   id: string;
@@ -79,34 +78,18 @@ export async function registerPointRoutes(
   options: PointRouteOptions,
 ): Promise<void> {
   app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
-    const parsed = adjustPointsSchema.safeParse(request.body);
+    const parsed = await parseBody(adjustPointsSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {
-        targetUserId: parsed.data.targetUserId,
-        delta: parsed.data.delta,
-      });
-      return reply.status(403).send({
-        message: "Signed-in user is not mapped to an internal account",
-        code: "ACTOR_NOT_MAPPED",
-      });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
     if (!actor.houseId) {
       warn(request.log, "points.actor_house_unassigned", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
-        targetUserId: parsed.data.targetUserId,
-        delta: parsed.data.delta,
+        targetUserId: parsed.targetUserId,
+        delta: parsed.delta,
       });
       return reply.status(403).send({
         message: "Signed-in user must be assigned to a house before awarding points",
@@ -116,7 +99,7 @@ export async function registerPointRoutes(
 
     // Resolve the target user and derive their house
     const targetUser = await prisma.user.findUnique({
-      where: { id: parsed.data.targetUserId },
+      where: { id: parsed.targetUserId },
       select: { id: true, organizationId: true, houseId: true, displayName: true },
     });
 
@@ -125,7 +108,7 @@ export async function registerPointRoutes(
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
         actorOrganizationId: actor.organizationId,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(403).send({
         message: "Target user is outside your organization",
@@ -145,22 +128,8 @@ export async function registerPointRoutes(
     }
 
     const targetHouseId = targetUser.houseId;
-    let activeSeason;
-    try {
-      activeSeason = await resolveSeasonScope(actor);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, "points.active_season_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-        });
-        return reply.status(err.statusCode).send({
-          message: "An active season is required before points can be awarded",
-          code: err.code,
-        });
-      }
-      throw err;
-    }
+    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
+    if (!activeSeason) return;
 
     const transaction = await prisma.$transaction(async (tx) => {
       const award = await tx.pointTransaction.create({
@@ -171,9 +140,9 @@ export async function registerPointRoutes(
           targetUserId: targetUser.id,
           targetHouseId,
           type: "AWARD",
-          delta: parsed.data.delta,
-          reason: parsed.data.reason,
-          trait: parsed.data.trait,
+          delta: parsed.delta,
+          reason: parsed.reason,
+          trait: parsed.trait,
         },
       });
 
@@ -185,7 +154,7 @@ export async function registerPointRoutes(
             type: "POINT_AWARD_RECEIVED",
             severity: "INFO",
             title: "Points awarded",
-            body: `${actor.displayName} awarded you ${parsed.data.delta} points for ${TRAIT_LABELS[parsed.data.trait]}.`,
+            body: `${actor.displayName} awarded you ${parsed.delta} points for ${TRAIT_LABELS[parsed.trait]}.`,
             actionLabel: "View activity",
             actionHref: "/?tab=activity",
             entityType: "PointTransaction",
@@ -221,40 +190,17 @@ export async function registerPointRoutes(
       });
     }
 
-    const parsed = deductPointsSchema.safeParse(request.body);
+    const parsed = await parseBody(deductPointsSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.deduct.actor_not_found", {
-        targetUserId: parsed.data.targetUserId,
-      });
-      return reply.status(403).send({
-        message: "Signed-in user is not mapped to an internal account",
-        code: "ACTOR_NOT_MAPPED",
-      });
-    }
-
-    if (!isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {
-        actorUserId: actor.id,
-        targetUserId: parsed.data.targetUserId,
-      });
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
     if (!actor.houseId) {
       warn(request.log, "points.deduct.actor_house_required", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(403).send({
         message: "Signed-in user must be assigned to a house before deducting points",
@@ -263,7 +209,7 @@ export async function registerPointRoutes(
     }
 
     const targetUser = await prisma.user.findUnique({
-      where: { id: parsed.data.targetUserId },
+      where: { id: parsed.targetUserId },
       select: { id: true, organizationId: true, houseId: true, displayName: true },
     });
 
@@ -271,7 +217,7 @@ export async function registerPointRoutes(
       warn(request.log, "points.deduct.target_user_not_found", {
         actorUserId: actor.id,
         actorOrganizationId: actor.organizationId,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(404).send({
         message: "Target user was not found",
@@ -316,22 +262,8 @@ export async function registerPointRoutes(
     }
 
     const targetHouseId = targetUser.houseId;
-    let activeSeason;
-    try {
-      activeSeason = await resolveSeasonScope(actor);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, "points.deduct.active_season_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-        });
-        return reply.status(err.statusCode).send({
-          message: "An active season is required before points can be deducted",
-          code: err.code,
-        });
-      }
-      throw err;
-    }
+    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
+    if (!activeSeason) return;
 
     const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [recentHouseDeduction, recentTargetDeduction] = await Promise.all([
@@ -401,7 +333,7 @@ export async function registerPointRoutes(
           targetHouseId,
           type: "DEDUCTION",
           delta: -10,
-          reason: parsed.data.reason,
+          reason: parsed.reason,
           trait: null,
         },
         select: { id: true },
@@ -421,7 +353,7 @@ export async function registerPointRoutes(
             seasonId: activeSeason.id,
             seasonName: activeSeason.name,
             delta: -10,
-            reason: parsed.data.reason,
+            reason: parsed.reason,
           },
         },
       });
@@ -433,7 +365,7 @@ export async function registerPointRoutes(
           type: "POINT_DEDUCTION_RECEIVED",
           severity: "WARNING",
           title: "Points deducted",
-          body: `${actor.displayName} deducted 10 points from you. Reason: ${parsed.data.reason}.`,
+          body: `${actor.displayName} deducted 10 points from you. Reason: ${parsed.reason}.`,
           actionLabel: "View activity",
           actionHref: "/?tab=activity",
           entityType: "PointTransaction",
@@ -460,34 +392,14 @@ export async function registerPointRoutes(
   });
 
   app.post("/users/scores", async (request, reply) => {
-    const parsed = seasonScopedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    let season;
-    try {
-      season = await resolveSeasonScope(actor, parsed.data.seasonId);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-          seasonId: parsed.data.seasonId,
-        });
-        return reply.status(err.statusCode).send({ message: err.message, code: err.code });
-      }
-      throw err;
-    }
+    const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
+    if (!season) return;
 
     const grouped = await prisma.pointTransaction.groupBy({
       by: ["targetUserId"],
@@ -508,19 +420,11 @@ export async function registerPointRoutes(
   });
 
   app.post("/transactions/recent", async (request, reply) => {
-    const parsed = activityFeedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(activityFeedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
     const transactions = await prisma.pointTransaction.findMany({
       where: { organizationId: actor.organizationId, deletedAt: null },
@@ -528,8 +432,8 @@ export async function registerPointRoutes(
         { createdAt: "desc" },
         { id: "desc" },
       ],
-      take: parsed.data.limit + 1,
-      ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
+      take: parsed.limit + 1,
+      ...(parsed.cursor ? { cursor: { id: parsed.cursor }, skip: 1 } : {}),
       select: {
         id: true,
         type: true,
@@ -544,8 +448,8 @@ export async function registerPointRoutes(
       },
     });
 
-    const items = transactions.slice(0, parsed.data.limit);
-    const nextCursor = transactions.length > parsed.data.limit ? items.at(-1)?.id ?? null : null;
+    const items = transactions.slice(0, parsed.limit);
+    const nextCursor = transactions.length > parsed.limit ? items.at(-1)?.id ?? null : null;
 
     return {
       items: items.map(mapActivityItem),
@@ -554,22 +458,14 @@ export async function registerPointRoutes(
   });
 
   app.post("/points/delete", async (request, reply) => {
-    const parsed = deletePointTransactionSchema.safeParse(request.body);
+    const parsed = await parseBody(deletePointTransactionSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
     const existing = await prisma.pointTransaction.findUnique({
-      where: { id: parsed.data.transactionId },
+      where: { id: parsed.transactionId },
       select: {
         id: true,
         organizationId: true,
@@ -581,7 +477,7 @@ export async function registerPointRoutes(
       warn(request.log, "points.delete.not_found", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
-        transactionId: parsed.data.transactionId,
+        transactionId: parsed.transactionId,
       });
       return reply.status(404).send({ message: "Point transaction not found", code: "POINT_TRANSACTION_NOT_FOUND" });
     }
@@ -595,7 +491,7 @@ export async function registerPointRoutes(
       return reply.status(409).send({ message: "Point transaction is already deleted", code: "POINT_TRANSACTION_ALREADY_DELETED" });
     }
 
-    const deletionReason = parsed.data.reason?.trim() || null;
+    const deletionReason = parsed.reason?.trim() || null;
     const deletedPoint = await prisma.$transaction(async (tx) => {
       const point = await tx.pointTransaction.update({
         where: { id: existing.id },
