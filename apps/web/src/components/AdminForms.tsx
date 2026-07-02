@@ -34,6 +34,7 @@ interface AdminFormsProps {
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
+  onTransferOwnership: (formData: FormData) => Promise<RoleChangeResult>;
   onUpdateOrgSlug: (formData: FormData) => Promise<OrgSettingsMutationResult>;
   onUpdateOrgSettings: (formData: FormData) => Promise<OrgSettingsMutationResult>;
   onLoadAdminAudit: (
@@ -104,6 +105,7 @@ export function AdminForms({
   onCreateHouse,
   onAssignHouse,
   onPromoteUser,
+  onTransferOwnership,
   onUpdateOrgSlug,
   onUpdateOrgSettings,
   onLoadAdminAudit,
@@ -204,7 +206,9 @@ export function AdminForms({
 
         {activeSection === "settings" ? (
           <OrgSettingsManagement
+            users={users}
             organization={organization}
+            onTransferOwnership={onTransferOwnership}
             onUpdateOrgSlug={onUpdateOrgSlug}
             onUpdateOrgSettings={onUpdateOrgSettings}
           />

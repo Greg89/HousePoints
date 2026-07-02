@@ -9,6 +9,7 @@ import {
   createHouseSchema,
   promoteUserSchema,
   seasonScopedRequestSchema,
+  transferOwnerSchema,
   updateOrgSlugSchema,
   updateOrgSettingsSchema,
 } from "@housepoints/contracts";
@@ -308,6 +309,69 @@ export async function changeUserRoleInDb(params: {
   });
 }
 
+export async function transferOwnershipInDb(params: {
+  organizationId: string;
+  actor: { id: string; displayName: string };
+  targetUser: { id: string; displayName: string; email: string | null; role: string; houseId: string | null };
+}) {
+  return prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: params.actor.id },
+      data: { role: "ADMIN" },
+      select: { id: true },
+    });
+
+    const newOwner = await tx.user.update({
+      where: { id: params.targetUser.id },
+      data: { role: "OWNER" },
+      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actor.id,
+        eventType: "USER_ROLE_CHANGED",
+        summary: `${params.actor.displayName} transferred ownership to ${newOwner.displayName}.`,
+        metadata: {
+          previousOwnerId: params.actor.id,
+          previousOwnerName: params.actor.displayName,
+          newOwnerId: newOwner.id,
+          newOwnerName: newOwner.displayName,
+          previousRole: params.targetUser.role,
+          newRole: "OWNER",
+        },
+      },
+    });
+
+    await tx.notification.createMany({
+      data: [
+        buildRoleChangedNotificationData({
+          organizationId: params.organizationId,
+          recipientId: newOwner.id,
+          actorDisplayName: params.actor.displayName,
+          targetUserDisplayName: newOwner.displayName,
+          targetUserId: newOwner.id,
+          previousRole: params.targetUser.role,
+          newRole: "OWNER",
+        }),
+        buildRoleChangedNotificationData({
+          organizationId: params.organizationId,
+          recipientId: params.actor.id,
+          actorDisplayName: params.actor.displayName,
+          targetUserDisplayName: params.actor.displayName,
+          targetUserId: params.actor.id,
+          previousRole: "OWNER",
+          newRole: "ADMIN",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+
+    return newOwner;
+  });
+}
+
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
     const parsed = await parseBody(actorScopeSchema, request, reply);
@@ -463,6 +527,55 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
       throw error;
     }
+  });
+
+  app.post("/admin/org/owner", async (request, reply) => {
+    const parsed = await parseBody(transferOwnerSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    if (parsed.targetUserId === actor.id) {
+      return reply.status(409).send({
+        message: "Choose a different member to transfer ownership to.",
+        code: "OWNER_TRANSFER_SELF",
+      });
+    }
+
+    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+
+    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+      return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
+    }
+
+    if (targetUser.role === "OWNER") {
+      return reply.status(409).send({
+        message: "That member is already an owner.",
+        code: "TARGET_ALREADY_OWNER",
+      });
+    }
+
+    const newOwner = await transferOwnershipInDb({
+      organizationId: actor.organizationId,
+      actor: { id: actor.id, displayName: actor.displayName },
+      targetUser: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+        role: targetUser.role,
+        houseId: targetUser.houseId,
+      },
+    });
+
+    info(request.log, "admin.org.owner_transferred", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      newOwnerId: newOwner.id,
+      previousOwnerId: actor.id,
+    });
+
+    return newOwner;
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {

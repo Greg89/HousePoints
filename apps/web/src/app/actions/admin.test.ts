@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, updateOrgSettings, updateOrgSlug } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, transferOwnership, updateOrgSettings, updateOrgSlug } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -495,6 +495,85 @@ describe("promoteUserRole", () => {
         organizationId: "org-1",
         targetUserId: "target-1",
         role: "ADMIN",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("transferOwnership", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "target-1",
+      displayName: "Target User",
+      email: "target@example.com",
+      role: "OWNER",
+      houseId: "house-1",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "target-1",
+      displayName: "Target User",
+      email: "target@example.com",
+      role: "OWNER",
+      houseId: "house-1",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when ownership transfer succeeds", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+
+    await expect(transferOwnership(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("transferOwnership", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("transferOwnership", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/org/owner", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: "target-1",
+      }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const formData = new FormData();
+
+    await expect(transferOwnership(formData)).resolves.toEqual({
+      ok: false,
+      code: "OWNER_TRANSFER_TARGET_REQUIRED",
+      message: "Choose the member who should become owner.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    const error = new ApiResponseError(
+      409,
+      "TARGET_ALREADY_OWNER",
+      "Ownership could not be transferred. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(transferOwnership(formData)).resolves.toEqual({
+      ok: false,
+      code: "TARGET_ALREADY_OWNER",
+      message: "Ownership could not be transferred. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "transferOwnership", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        targetUserId: "target-1",
       },
     );
     expect(revalidatePathMock).not.toHaveBeenCalled();

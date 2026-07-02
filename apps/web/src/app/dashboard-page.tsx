@@ -8,6 +8,7 @@ import {
   readAdminAuditPage,
   readAdminContext,
   readPointAdjustmentStats,
+  transferOwnership,
   updateOrgSlug,
   updateOrgSettings,
 } from "./actions/admin";
@@ -155,6 +156,7 @@ export async function renderDashboardPage(route: string) {
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
       onPromoteUser={promoteUserRole}
+      onTransferOwnership={transferOwnership}
       onUpdateOrgSlug={updateOrgSlug}
       onUpdateOrgSettings={updateOrgSettings}
       onLoadAdminAudit={readAdminAuditPage}

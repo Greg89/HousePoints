@@ -1,22 +1,29 @@
 import { useTransition, type FormEvent } from "react";
-import { Buildings } from "@phosphor-icons/react";
+import { Buildings, Crown } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { OrgSettings } from "@housepoints/contracts";
-import type { OrgSettingsMutationResult } from "@/lib/action-results";
+import type { OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { AdminUser } from "./AdminManageTypes";
 
 interface OrgSettingsManagementProps {
+  users: AdminUser[];
   organization: OrgSettings;
+  onTransferOwnership: (formData: FormData) => Promise<RoleChangeResult>;
   onUpdateOrgSlug: (formData: FormData) => Promise<OrgSettingsMutationResult>;
   onUpdateOrgSettings: (formData: FormData) => Promise<OrgSettingsMutationResult>;
 }
 
 export function OrgSettingsManagement({
+  users,
   organization,
+  onTransferOwnership,
   onUpdateOrgSlug,
   onUpdateOrgSettings,
 }: OrgSettingsManagementProps) {
   const [isNamePending, startNameTransition] = useTransition();
   const [isSlugPending, startSlugTransition] = useTransition();
+  const [isOwnerPending, startOwnerTransition] = useTransition();
+  const ownerCandidates = users.filter((user) => user.role !== "OWNER");
 
   function handleNameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,6 +84,57 @@ export function OrgSettingsManagement({
         form.reset();
       } catch (err) {
         toast.error("Failed to update organization slug", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
+  function handleOwnerSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+    const targetUser = users.find((user) => user.id === targetUserId);
+
+    if (!targetUser) {
+      toast.error("Choose a new owner", {
+        description: "Select a member before transferring ownership.",
+      });
+      return;
+    }
+
+    if (confirmation !== "TRANSFER") {
+      toast.error("Ownership confirmation does not match", {
+        description: "Type TRANSFER to confirm this change.",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Transfer ownership to ${targetUser.displayName}? You will become an admin after this change.`,
+    );
+
+    if (!confirmed) return;
+
+    startOwnerTransition(async () => {
+      try {
+        const result = await onTransferOwnership(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to transfer ownership", {
+            description: result.message,
+          });
+          return;
+        }
+
+        toast.success("Ownership transferred", {
+          description: `${targetUser.displayName} is now the organization owner.`,
+        });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to transfer ownership", {
           description: err instanceof Error ? err.message : "Something went wrong",
         });
       }
@@ -199,6 +257,67 @@ export function OrgSettingsManagement({
           className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
           {isSlugPending ? "Saving slug..." : "Change organization slug"}
+        </button>
+      </form>
+
+      <form
+        aria-label="Transfer ownership"
+        onSubmit={handleOwnerSubmit}
+        className="grid max-w-xl gap-4 rounded-xl border bg-card p-5"
+      >
+        <div>
+          <h5 className="flex items-center gap-2 text-sm font-semibold">
+            <Crown size={16} />
+            Transfer Ownership
+          </h5>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Move organization ownership to another member. Your account will become an admin after the transfer.
+          </p>
+        </div>
+
+        <label htmlFor="organization-new-owner" className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+          New owner
+          <select
+            id="organization-new-owner"
+            name="targetUserId"
+            required
+            defaultValue=""
+            disabled={ownerCandidates.length === 0}
+            className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
+          >
+            <option value="" disabled>
+              {ownerCandidates.length > 0 ? "Select member..." : "No members eligible"}
+            </option>
+            {ownerCandidates.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.displayName} ({user.role.toLowerCase()})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid gap-1.5">
+          <label htmlFor="organization-owner-confirmation" className="text-xs font-semibold text-muted-foreground">
+            Confirm transfer
+          </label>
+          <input
+            id="organization-owner-confirmation"
+            name="confirmation"
+            placeholder="TRANSFER"
+            required
+            className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+          />
+          <span className="text-xs font-normal text-muted-foreground">
+            Type <span className="font-mono">TRANSFER</span> to confirm.
+          </span>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isOwnerPending || ownerCandidates.length === 0}
+          className="h-10 rounded-lg border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+        >
+          {isOwnerPending ? "Transferring..." : "Transfer ownership"}
         </button>
       </form>
     </section>

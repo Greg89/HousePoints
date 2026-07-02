@@ -123,6 +123,12 @@ export const promoteUserSchema = z.object({
 
 export type PromoteUserInput = z.infer<typeof promoteUserSchema>;
 
+export const transferOwnerSchema = z.object({
+  targetUserId: z.string().min(1),
+}).strict();
+
+export type TransferOwnerInput = z.infer<typeof transferOwnerSchema>;
+
 export const orgSettingsSchema = z.object({
   id: z.string(),
   name: z.string(),

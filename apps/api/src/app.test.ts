@@ -3222,6 +3222,186 @@ describe("POST /admin/users/role", () => {
   });
 });
 
+describe("POST /admin/org/owner", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects transferring ownership to self", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-owner" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OWNER_TRANSFER_SELF");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when the target user is outside the owner's organization", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-other" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects transferring ownership to another owner", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({
+        id: "user-owner-2",
+        displayName: "Second Owner",
+        organizationId: "org-secure",
+      }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-owner-2" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("TARGET_ALREADY_OWNER");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to transfer ownership, demotes the actor to admin, writes audit, and notifies both users", async () => {
+    const targetUser = makeAdmin({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "ADMIN" as const,
+      organizationId: "org-secure",
+      houseId: "house-1",
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(targetUser);
+    mockUserUpdate
+      .mockResolvedValueOnce({ id: "user-owner" })
+      .mockResolvedValueOnce({
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+        role: "OWNER",
+        houseId: "house-1",
+      });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenNthCalledWith(1, {
+      where: { id: "user-owner" },
+      data: { role: "ADMIN" },
+      select: { id: true },
+    });
+    expect(mockUserUpdate).toHaveBeenNthCalledWith(2, {
+      where: { id: "user-target" },
+      data: { role: "OWNER" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        role: true,
+        houseId: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "USER_ROLE_CHANGED",
+        summary: "Olivia transferred ownership to Taylor.",
+        metadata: {
+          previousOwnerId: "user-owner",
+          previousOwnerName: "Olivia",
+          newOwnerId: "user-target",
+          newOwnerName: "Taylor",
+          previousRole: "ADMIN",
+          newRole: "OWNER",
+        },
+      },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-target",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Taylor from ADMIN to OWNER.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-target",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-owner",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Olivia from OWNER to ADMIN.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-owner",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "OWNER",
+      houseId: "house-1",
+    });
+    await app.close();
+  });
+});
+
 describe("POST /transactions/recent", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);

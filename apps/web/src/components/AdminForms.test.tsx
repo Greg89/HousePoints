@@ -166,6 +166,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
+    onTransferOwnership: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSlug: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
     onLoadAdminAudit: vi.fn().mockResolvedValue({
@@ -356,6 +357,53 @@ describe("AdminForms", () => {
     expect(toast.error).toHaveBeenCalledWith("Slug confirmation does not match", {
       description: "Type acme to confirm this change.",
     });
+  });
+
+  it("lets owners transfer ownership from the Settings section", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
+
+    await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
+    await user.type(transferForm.getByLabelText("Confirm transfer"), "TRANSFER");
+    await user.click(transferForm.getByRole("button", { name: "Transfer ownership" }));
+
+    await waitFor(() => expect(props.onTransferOwnership).toHaveBeenCalledOnce());
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Transfer ownership to Ben Unassigned? You will become an admin after this change.",
+    );
+
+    const transferMock = props.onTransferOwnership as ReturnType<typeof vi.fn>;
+    const formData = transferMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-2",
+      confirmation: "TRANSFER",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Ownership transferred", {
+      description: "Ben Unassigned is now the organization owner.",
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it("does not submit ownership transfer when confirmation does not match", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
+
+    await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
+    await user.type(transferForm.getByLabelText("Confirm transfer"), "wrong");
+    await user.click(transferForm.getByRole("button", { name: "Transfer ownership" }));
+
+    expect(props.onTransferOwnership).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Ownership confirmation does not match", {
+      description: "Type TRANSFER to confirm this change.",
+    });
+    confirmSpy.mockRestore();
   });
 
   it("shows a safe toast when organization slug update fails", async () => {

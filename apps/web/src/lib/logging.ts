@@ -39,6 +39,7 @@ export type WebLogEvent =
   | "web.admin.house_created"
   | "web.admin.house_create_failed"
   | "web.admin.org_slug_updated"
+  | "web.admin.owner_transferred"
   | "web.admin.org_settings_updated"
   | "web.admin.point_adjustments_loaded"
   | "web.admin.user_assigned"

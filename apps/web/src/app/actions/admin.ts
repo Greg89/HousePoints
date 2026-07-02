@@ -199,6 +199,62 @@ export async function updateOrgSlug(formData: FormData): Promise<OrgSettingsMuta
   });
 }
 
+export async function transferOwnership(formData: FormData): Promise<RoleChangeResult> {
+  return runServerAction("transferOwnership", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("transferOwnership", requestId);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+
+    if (!targetUserId) {
+      return {
+        ok: false,
+        code: "OWNER_TRANSFER_TARGET_REQUIRED",
+        message: "Choose the member who should become owner.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/owner", requestId, {
+      method: "POST",
+      body: JSON.stringify({ targetUserId }),
+    });
+
+    try {
+      await parseApiResponse(
+        response,
+        adminUserSchema,
+        "Ownership could not be transferred. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    logInfo("web.admin.owner_transferred", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      targetUserId,
+    });
+
+    revalidatePath("/");
+
+    return { ok: true };
+  });
+}
+
 export async function assignUserHouse(formData: FormData): Promise<HouseAssignmentResult> {
   return runServerAction("assignUserHouse", async (context) => {
     const { requestId } = context;

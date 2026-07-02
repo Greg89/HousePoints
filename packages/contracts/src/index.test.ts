@@ -30,6 +30,7 @@ import {
   seasonScopedRequestSchema,
   updateOrgSettingsSchema,
   updateOrgSlugSchema,
+  transferOwnerSchema,
   seasonTransitionSchema,
   memberScoreSchema,
   memberScoresSchema,
@@ -66,6 +67,7 @@ const webConsumedApiEndpoints = [
   "/admin/houses",
   "/admin/org/settings",
   "/admin/org/slug",
+  "/admin/org/owner",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
   "/admin/users/role",
@@ -590,6 +592,10 @@ describe("authenticated request schemas", () => {
     [promoteUserSchema, {
       targetUserId: "user-1",
       role: "MEMBER",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [transferOwnerSchema, {
+      targetUserId: "user-1",
       actorAuth0Sub: "auth0|attacker",
     }],
     [updateOrgSettingsSchema, {

@@ -13,6 +13,7 @@ import {
   assignUserHouseSchema,
   assignUserHouseResponseSchema,
   promoteUserSchema,
+  transferOwnerSchema,
   adminUserSchema,
 } from "./admin-schemas.js";
 import {
@@ -84,6 +85,7 @@ export const apiContracts = {
   "/admin/houses": defineContract(createHouseSchema, adminHouseSchema),
   "/admin/org/settings": defineContract(updateOrgSettingsSchema, orgSettingsSchema),
   "/admin/org/slug": defineContract(updateOrgSlugSchema, orgSettingsSchema),
+  "/admin/org/owner": defineContract(transferOwnerSchema, adminUserSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,

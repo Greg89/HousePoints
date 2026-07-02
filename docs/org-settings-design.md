@@ -158,12 +158,15 @@ Security notes:
 This design does not include:
 
 - Organization deletion or archival.
-- Ownership transfer.
 - Multi-org membership.
 - Public org discovery.
 - Domain allow-list joining.
 
 Those should each get their own small design pass before implementation.
+
+Related org administration now implemented outside this slug-specific design:
+
+- Organization ownership transfer is available as an owner-only Manage Settings action. The acting owner becomes an admin, the selected member becomes owner, and the change is audited as a role-change event.
 
 ---
 

@@ -72,13 +72,13 @@ For an internal team app the simplest approach is enabling Railway's built-in PI
 
 ## 5.5 Org settings, owner transfer, deeper admin removal, and org deletion [doing]
 
-The app supports creating and joining organizations. The first org settings slice is implemented: owners can update the organization display name from Manage Settings, and the change is audited. Broader organization administration remains future work.
+The app supports creating and joining organizations. Owners can update organization settings from Manage Settings, and sensitive changes are audited. Broader organization administration remains future work.
 
 Deferred sub-features:
 
 - Rename organization display name. Implemented for owners in Manage Settings.
-- Change organization slug safely. Alias/reservation support and owner-only slug changes are implemented; slug-bearing invite URLs are the next slice. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
-- Transfer owner role.
+- Change organization slug safely. Alias/reservation support, owner-only slug changes, slug-bearing invite URLs, and slug-based dashboard routes are implemented. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
+- Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization.
 - Delete or archive an organization.
