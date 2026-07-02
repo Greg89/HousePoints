@@ -47,12 +47,14 @@ The DB package uses `packages/db/.env` for Prisma commands and database-backed t
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/housepoints_local"
+DATABASE_POOL_MAX="5"
 ```
 
 API variables:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/housepoints"
+DATABASE_POOL_MAX="5"
 PORT="4000"
 API_PORT="4000"
 LOG_LEVEL="info"
@@ -87,6 +89,7 @@ SEQ_API_KEY=""
 ```
 
 Set `CORS_ALLOWED_ORIGINS` to exact web origins only, comma-separated when there is more than one origin.
+Leave `DATABASE_POOL_MAX` unset to use the default direct Postgres pool cap of `5` connections per process, or set it explicitly per environment when tuning Railway connection usage.
 Set API `AUTH0_CLIENT_ID` to the same Auth0 application client ID used by the web service. The API uses it to verify the web session ID token when safely linking same-email Auth0 identities.
 Set `POINT_ADJUSTMENTS_ENABLED="true"` on both the API and web apps to enable the admin/owner `Deduct points` flow. Leave it unset or `"false"` to hide the web action and block the API endpoint.
 
@@ -203,6 +206,7 @@ Deploy as separate Railway services from this repo:
 API service variables:
 
 - `DATABASE_URL`
+- optional `DATABASE_POOL_MAX` (defaults to `5` direct Postgres connections per process)
 - `AUTH0_DOMAIN`
 - `AUTH0_CLIENT_ID` (same value as the web Auth0 application client ID; enables verified same-email account linking)
 - `AUTH0_AUDIENCE`
