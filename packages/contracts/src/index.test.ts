@@ -1885,29 +1885,74 @@ describe("notification schemas", () => {
 });
 
 describe("updateProfileResponseSchema", () => {
-  it("accepts an updated user summary", () => {
+  it("accepts an updated app user summary without creation state", () => {
     const response = {
       id: "user-1",
+      auth0Sub: "auth0|user-1",
+      email: "alice@example.com",
       displayName: "Alice Updated",
       houseThemeEnabled: true,
+      role: "OWNER" as const,
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
+      organizationContexts: [
+        {
+          organizationId: "org-1",
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          role: "OWNER" as const,
+          houseId: "house-1",
+          houseName: "Phoenix",
+          houseColor: "#7c3aed",
+          isCurrent: true,
+        },
+      ],
     };
 
     expect(updateProfileResponseSchema.parse(response)).toEqual(response);
   });
 
-  it("rejects missing user ids and invalid display names", () => {
+  it("rejects missing app user fields and creation state", () => {
     expect(
       updateProfileResponseSchema.safeParse({
-        id: "",
-        displayName: "Alice",
-        houseThemeEnabled: false,
+        id: "user-1",
+        displayName: "Alice Updated",
       }).success,
     ).toBe(false);
     expect(
       updateProfileResponseSchema.safeParse({
         id: "user-1",
-        displayName: "",
+        auth0Sub: "auth0|user-1",
+        email: null,
+        displayName: "Alice Updated",
+        houseThemeEnabled: true,
+        role: "MEMBER",
+        organizationId: null,
+        organizationSlug: null,
+        houseId: null,
+        houseName: null,
+        houseColor: null,
+        organizationContexts: [],
+        created: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      updateProfileResponseSchema.safeParse({
+        id: "user-1",
+        auth0Sub: "auth0|user-1",
+        email: null,
+        displayName: "Alice",
         houseThemeEnabled: false,
+        role: "SUPER_ADMIN",
+        organizationId: null,
+        organizationSlug: null,
+        houseId: null,
+        houseName: null,
+        houseColor: null,
+        organizationContexts: [],
       }).success,
     ).toBe(false);
   });

@@ -3104,9 +3104,19 @@ describe("POST /users/profile", () => {
   it("updates and returns the authenticated user's display name", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockUserUpdate.mockResolvedValue({
-      id: "user-1",
-      displayName: "Alice Updated",
-      houseThemeEnabled: false,
+      ...makeMember({
+        displayName: "Alice Updated",
+        role: "MEMBER",
+      }),
+      memberships: [
+        {
+          organizationId: "org-1",
+          role: "MEMBER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+          house: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ],
     });
     const app = await buildTestApp();
 
@@ -3117,15 +3127,28 @@ describe("POST /users/profile", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       id: "user-1",
       displayName: "Alice Updated",
       houseThemeEnabled: false,
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "MEMBER",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { displayName: "Alice Updated" },
-      select: { id: true, displayName: true, houseThemeEnabled: true },
+      select: expect.objectContaining({
+        id: true,
+        displayName: true,
+        houseThemeEnabled: true,
+        memberships: expect.any(Object),
+      }),
     });
     await app.close();
   });
@@ -3133,9 +3156,16 @@ describe("POST /users/profile", () => {
   it("updates and returns the authenticated user's house theme preference", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockUserUpdate.mockResolvedValue({
-      id: "user-1",
-      displayName: "Alice",
-      houseThemeEnabled: true,
+      ...makeMember({ houseThemeEnabled: true }),
+      memberships: [
+        {
+          organizationId: "org-1",
+          role: "MEMBER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+          house: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ],
     });
     const app = await buildTestApp();
 
@@ -3146,15 +3176,28 @@ describe("POST /users/profile", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       id: "user-1",
       displayName: "Alice",
       houseThemeEnabled: true,
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "MEMBER",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { houseThemeEnabled: true },
-      select: { id: true, displayName: true, houseThemeEnabled: true },
+      select: expect.objectContaining({
+        id: true,
+        displayName: true,
+        houseThemeEnabled: true,
+        memberships: expect.any(Object),
+      }),
     });
     await app.close();
   });

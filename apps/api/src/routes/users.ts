@@ -124,7 +124,7 @@ export async function updateUserProfile(
       ...(update.displayName !== undefined ? { displayName: update.displayName } : {}),
       ...(update.houseThemeEnabled !== undefined ? { houseThemeEnabled: update.houseThemeEnabled } : {}),
     },
-    select: { id: true, displayName: true, houseThemeEnabled: true },
+    select: APP_USER_SELECT,
   });
 }
 
@@ -261,7 +261,7 @@ export async function registerUserRoutes(
       houseThemeEnabled: updated.houseThemeEnabled,
     });
 
-    return updated;
+    return mapAppUser(updated);
   });
 
   app.post("/members", async (request, reply) => {

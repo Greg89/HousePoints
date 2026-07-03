@@ -62,11 +62,7 @@ export const updateProfileSchema = z.object({
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
-export const updateProfileResponseSchema = z.object({
-  id: z.string().min(1),
-  displayName: z.string().min(1).max(120),
-  houseThemeEnabled: z.boolean(),
-});
+export const updateProfileResponseSchema = appUserSchema.omit({ created: true }).strict();
 
 export type UpdateProfileResponse = z.infer<
   typeof updateProfileResponseSchema
