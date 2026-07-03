@@ -2385,6 +2385,73 @@ describe("POST /admin/context", () => {
     await app.close();
   });
 
+  it("builds team management users from active memberships instead of legacy user organization fields", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindMany.mockResolvedValue([
+      {
+        role: "MEMBER",
+        houseId: null,
+        user: {
+          id: "user-cross-shadow",
+          displayName: "Casey Cross",
+          email: "casey@example.com",
+        },
+      },
+      {
+        role: "ADMIN",
+        houseId: "house-2",
+        user: {
+          id: "user-admin",
+          displayName: "Ada Admin",
+          email: "ada@example.com",
+        },
+      },
+    ]);
+    mockHouseFindMany.mockResolvedValue([]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().users).toEqual([
+      {
+        id: "user-cross-shadow",
+        displayName: "Casey Cross",
+        email: "casey@example.com",
+        role: "MEMBER",
+        houseId: null,
+      },
+      {
+        id: "user-admin",
+        displayName: "Ada Admin",
+        email: "ada@example.com",
+        role: "ADMIN",
+        houseId: "house-2",
+      },
+    ]);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    expect(mockUserFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("allows an owner and returns the complete organization context", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
     mockMembershipFindMany.mockResolvedValue([
