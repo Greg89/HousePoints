@@ -146,6 +146,18 @@ export async function checkDeductionCooldowns(params: {
   targetUserId: string;
 }) {
   const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const actorHouseMemberships = await prisma.organizationMembership.findMany({
+    where: {
+      organizationId: params.organizationId,
+      houseId: params.actorHouseId,
+      isActive: true,
+      archivedAt: null,
+    },
+    select: { userId: true },
+  });
+  const actorHouseUserIds = actorHouseMemberships.map((membership) => membership.userId);
+
   return Promise.all([
     prisma.pointTransaction.findFirst({
       where: {
@@ -153,7 +165,7 @@ export async function checkDeductionCooldowns(params: {
         seasonId: params.seasonId,
         type: "DEDUCTION",
         createdAt: { gte: cooldownWindowStartsAt },
-        actor: { houseId: params.actorHouseId },
+        actorUserId: { in: actorHouseUserIds },
       },
       select: { id: true, createdAt: true },
       orderBy: { createdAt: "desc" },

@@ -158,7 +158,7 @@ This gives the API a membership-aware identity boundary without changing UI beha
 
 ### Phase 3 - Move Admin And Member Reads To Memberships
 
-Status: in progress. `/members` and `/admin/context` now read active membership rows for user role and house assignment while preserving the existing response shapes. Notification recipient fanout now reads active membership rows for admin/owner and org-wide announcements. Dashboard summary, house leaderboard member counts, season comparison contributor names, and point award/deduction target validation now use active memberships for org-scoped member reads.
+Status: in progress. `/members` and `/admin/context` now read active membership rows for user role and house assignment while preserving the existing response shapes. Notification recipient fanout now reads active membership rows for admin/owner and org-wide announcements. Dashboard summary, house leaderboard member counts, season comparison contributor names, point award/deduction target validation, and deduction house cooldown checks now use active memberships for org-scoped member reads.
 
 Update reads that currently query `User.organizationId`:
 
@@ -169,6 +169,7 @@ Update reads that currently query `User.organizationId`:
 - house leaderboard member counts - implemented.
 - season comparison contributor names - implemented.
 - point award/deduction target validation - implemented.
+- deduction house cooldown checks - implemented.
 - invite activity and role-management candidate lists
 
 Response shape can stay the same:

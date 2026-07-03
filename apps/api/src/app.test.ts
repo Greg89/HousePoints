@@ -202,6 +202,15 @@ const makeTargetMembership = (overrides = {}) => ({
   ...overrides,
 });
 
+const makeActorMembership = (overrides = {}) => ({
+  id: "membership-admin",
+  organizationId: "org-1",
+  role: "ADMIN" as const,
+  houseId: "house-1",
+  organization: { name: "Acme Corp", slug: "acme" },
+  ...overrides,
+});
+
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
@@ -1025,8 +1034,12 @@ describe("POST /points/deduct", () => {
 
   it("returns 409 DEDUCTION_COOLDOWN_ACTIVE when the actor house already deducted recently", async () => {
     const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
-    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({
+      houseId: "legacy-house",
+      memberships: [makeActorMembership({ houseId: "house-1" })],
+    }));
     mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
+    mockMembershipFindMany.mockResolvedValue([{ userId: "user-2" }, { userId: "user-owner" }]);
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxFindFirst.mockResolvedValueOnce({
       id: "tx-recent-house-deduction",
@@ -1042,13 +1055,22 @@ describe("POST /points/deduct", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("DEDUCTION_COOLDOWN_ACTIVE");
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        houseId: "house-1",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { userId: true },
+    });
     expect(mockTxFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
           seasonId: "season-active",
           type: "DEDUCTION",
-          actor: { houseId: "house-1" },
+          actorUserId: { in: ["user-2", "user-owner"] },
         }),
       }),
     );
