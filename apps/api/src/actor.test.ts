@@ -12,7 +12,13 @@ vi.mock("@housepoints/db", () => ({
 }));
 
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole, isOwnerRole } from "./actor";
+import {
+  getActorBySub,
+  getUserOrgContextBySub,
+  getUserRouteOrgContextBySub,
+  isAdminRole,
+  isOwnerRole,
+} from "./actor";
 
 const mockIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
@@ -38,6 +44,31 @@ const actorUserSelect = {
       organizationId: true,
       role: true,
       houseId: true,
+      organization: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
+    },
+  },
+};
+
+const orgContextUserSelect = {
+  organizationId: true,
+  organization: {
+    select: {
+      name: true,
+      slug: true,
+    },
+  },
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+    },
+    select: {
+      organizationId: true,
       organization: {
         select: {
           name: true,
@@ -213,5 +244,135 @@ describe("getActorBySub", () => {
     });
 
     await expect(getActorBySub("auth0|member")).resolves.toBeNull();
+  });
+});
+
+describe("getUserOrgContextBySub", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns the active membership context when the legacy current organization shadow is empty", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+
+    expect(mockIdentityFindUnique).toHaveBeenCalledWith({
+      where: { providerSubject: "auth0|member" },
+      select: { user: { select: orgContextUserSelect } },
+    });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy current organization when it matches an active membership", async () => {
+    mockIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue({
+      organizationId: "org-2",
+      organization: {
+        name: "Legacy Org",
+        slug: "legacy-org",
+      },
+      memberships: [
+        {
+          organizationId: "org-1",
+          organization: {
+            name: "Acme Corp",
+            slug: "acme",
+          },
+        },
+        {
+          organizationId: "org-2",
+          organization: {
+            name: "Current Org",
+            slug: "current-org",
+          },
+        },
+      ],
+    });
+
+    await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
+      organizationId: "org-2",
+      organizationName: "Current Org",
+      organizationSlug: "current-org",
+    });
+  });
+
+  it("falls back to legacy organization fields when no active membership exists", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-legacy",
+        organization: {
+          name: "Legacy Org",
+          slug: "legacy-org",
+        },
+        memberships: [],
+      },
+    });
+
+    await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
+      organizationId: "org-legacy",
+      organizationName: "Legacy Org",
+      organizationSlug: "legacy-org",
+    });
+  });
+});
+
+describe("getUserRouteOrgContextBySub", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns requested membership plus an active fallback organization when the legacy shadow is empty", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+          {
+            organizationId: "org-2",
+            organization: {
+              name: "Second Org",
+              slug: "second-org",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getUserRouteOrgContextBySub("auth0|member", "org-2")).resolves.toEqual({
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+      requestedMembership: {
+        organizationId: "org-2",
+        organizationName: "Second Org",
+        organizationSlug: "second-org",
+      },
+    });
   });
 });

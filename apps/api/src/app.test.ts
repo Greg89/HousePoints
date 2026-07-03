@@ -5380,6 +5380,42 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
+  it("returns DIFFERENT_ORG from active memberships when the legacy current organization is empty", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-other",
+            organization: {
+              name: "Other Org",
+              slug: "other-org",
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    });
+    await app.close();
+  });
+
   it("rejects malformed slug requests before resolving aliases", async () => {
     const app = await buildTestApp();
 

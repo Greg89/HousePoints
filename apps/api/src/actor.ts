@@ -131,6 +131,21 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
         slug: true,
       },
     },
+    memberships: {
+      where: {
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        organizationId: true,
+        organization: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    },
   } as const;
 
   const identity = await prisma.authIdentity.findUnique({
@@ -144,6 +159,33 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
 
   if (!user) {
     return null;
+  }
+
+  return resolvePreferredOrgContext(user);
+}
+
+type PreferredOrgContextSource = {
+  organizationId: string | null;
+  organization: { name: string; slug: string } | null;
+  memberships?: Array<{
+    organizationId: string;
+    organization: { name: string; slug: string };
+  }>;
+};
+
+function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
+  const activeMemberships = user.memberships ?? [];
+  const legacyCurrentMembership = activeMemberships.find(
+    (membership) => membership.organizationId === user.organizationId,
+  );
+  const preferredMembership = legacyCurrentMembership ?? activeMemberships[0] ?? null;
+
+  if (preferredMembership) {
+    return {
+      organizationId: preferredMembership.organizationId,
+      organizationName: preferredMembership.organization.name,
+      organizationSlug: preferredMembership.organization.slug,
+    };
   }
 
   return {
@@ -200,9 +242,7 @@ export async function getUserRouteOrgContextBySub(
   );
 
   return {
-    organizationId: user.organizationId,
-    organizationName: user.organization?.name ?? null,
-    organizationSlug: user.organization?.slug ?? null,
+    ...resolvePreferredOrgContext(user),
     requestedMembership: requestedMembership
       ? {
           organizationId: requestedMembership.organizationId,
