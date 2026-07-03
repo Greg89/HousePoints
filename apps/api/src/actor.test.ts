@@ -195,7 +195,7 @@ describe("getActorBySub", () => {
     });
   });
 
-  it("falls back to legacy user org fields when no active membership exists yet", async () => {
+  it("returns null when no active membership exists even if legacy org fields are present", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
@@ -211,17 +211,7 @@ describe("getActorBySub", () => {
       },
     });
 
-    await expect(getActorBySub("auth0|member")).resolves.toEqual({
-      id: "user-1",
-      auth0Sub: "auth0|member",
-      displayName: "Member User",
-      membershipId: null,
-      role: "MEMBER",
-      houseId: "house-1",
-      organizationId: "org-1",
-      organizationName: "Acme Corp",
-      organizationSlug: "acme",
-    });
+    await expect(getActorBySub("auth0|member")).resolves.toBeNull();
   });
 
   it("uses the first active membership when the legacy organization shadow is empty", async () => {

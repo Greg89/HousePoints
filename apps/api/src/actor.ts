@@ -6,7 +6,7 @@ export type ActorRecord = {
   id: string;
   auth0Sub: string;
   displayName: string;
-  membershipId: string | null;
+  membershipId: string;
   role: UserRole;
   houseId: string | null;
   organizationId: string;
@@ -88,21 +88,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
     };
   }
 
-  if (!actor.organizationId || !actor.organization) {
-    return null;
-  }
-
-  return {
-    id: actor.id,
-    auth0Sub,
-    displayName: actor.displayName,
-    membershipId: null,
-    role: actor.role,
-    houseId: actor.houseId,
-    organizationId: actor.organizationId,
-    organizationName: actor.organization.name,
-    organizationSlug: actor.organization.slug,
-  };
+  return null;
 }
 
 export type UserOrgContext = {

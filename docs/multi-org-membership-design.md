@@ -212,7 +212,7 @@ Only after production has run safely with membership reads/writes:
 - remove `User.role`;
 - remove `User.houseId`;
 - update contracts to stop exposing legacy global role/org/house fields except through active membership context;
-- remove fallback paths from actor resolution.
+- remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships.
 
 ## Endpoint Behavior Changes
 
