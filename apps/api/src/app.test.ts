@@ -5346,6 +5346,15 @@ describe("POST /orgs/join", () => {
         usedById: "user-1",
       },
     });
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "MEMBER",
+        houseId: null,
+      },
+      select: { id: true },
+    });
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",
@@ -5501,11 +5510,94 @@ describe("POST /orgs/join", () => {
     await app.close();
   });
 
-  it("does not claim an invite for a user already in another organization", async () => {
+  it("creates a membership when an existing user joins another organization", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
       organizationId: "org-other",
+    });
+    mockUserUpdate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "user-1" },
+        data: expect.objectContaining({
+          organizationId: "org-1",
+          houseId: null,
+          role: "MEMBER",
+        }),
+      }),
+    );
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "MEMBER",
+        houseId: null,
+      },
+      select: { id: true },
+    });
+    expect(mockInviteUpdateMany).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("reactivates an archived membership when the invite is valid", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: "org-other",
+    });
+    mockMembershipFindFirst.mockResolvedValue({
+      id: "membership-archived",
+      isActive: false,
+      archivedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    mockUserUpdate.mockResolvedValue(joinedUser);
+    mockMembershipUpdate.mockResolvedValue({ id: "membership-archived" });
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-archived" },
+      data: {
+        isActive: true,
+        archivedAt: null,
+        role: "MEMBER",
+        houseId: null,
+      },
+      select: { id: true },
+    });
+    expect(mockMembershipCreate).not.toHaveBeenCalled();
+    expect(mockInviteUpdateMany).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("does not claim an invite when the user already has an active membership in that organization", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: "org-1",
+    });
+    mockMembershipFindFirst.mockResolvedValue({
+      id: "membership-1",
+      isActive: true,
+      archivedAt: null,
     });
     const app = await buildTestApp();
 
@@ -5517,6 +5609,7 @@ describe("POST /orgs/join", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ALREADY_IN_ORG");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });

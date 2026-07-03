@@ -270,10 +270,6 @@ export async function joinOrgInDb(params: {
       select: { id: true, organizationId: true },
     });
 
-    if (existingUser?.organizationId && existingUser.organizationId !== invite.organizationId) {
-      throw new InviteJoinError(409, "ALREADY_IN_ORG", "You are already a member of an organisation.", invite.id);
-    }
-
     const conflictingEmailUser = !existingUser && params.email
       ? await tx.user.findUnique({ where: { email: params.email }, select: { id: true } })
       : null;
@@ -281,11 +277,23 @@ export async function joinOrgInDb(params: {
       throw new InviteJoinError(409, "ACCOUNT_LINK_REQUIRED", "This email is already registered with another login method. Sign in with the original provider or link the accounts in Auth0.", invite.id);
     }
 
+    const existingMembership = existingUser
+      ? await tx.organizationMembership.findFirst({
+          where: { organizationId: invite.organizationId, userId: existingUser.id },
+          select: { id: true, isActive: true, archivedAt: true },
+        })
+      : null;
+    if (existingMembership?.isActive && !existingMembership.archivedAt) {
+      throw new InviteJoinError(409, "ALREADY_IN_ORG", "You are already a member of this organisation.", invite.id);
+    }
+
     const user = existingUser
       ? await tx.user.update({
           where: { id: existingUser.id },
           data: {
             organizationId: invite.organizationId,
+            houseId: null,
+            role: "MEMBER",
             displayName: params.displayName,
             email: params.email ?? undefined,
             authIdentities: {
@@ -307,6 +315,29 @@ export async function joinOrgInDb(params: {
           },
           select: APP_USER_SELECT,
         });
+
+    if (existingMembership) {
+      await tx.organizationMembership.update({
+        where: { id: existingMembership.id },
+        data: {
+          isActive: true,
+          archivedAt: null,
+          role: "MEMBER",
+          houseId: null,
+        },
+        select: { id: true },
+      });
+    } else {
+      await tx.organizationMembership.create({
+        data: {
+          organizationId: invite.organizationId,
+          userId: user.id,
+          role: "MEMBER",
+          houseId: null,
+        },
+        select: { id: true },
+      });
+    }
 
     const claim = await tx.orgInvite.updateMany({
       where: { id: invite.id, usedAt: null, expiresAt: { gt: params.claimedAt } },
