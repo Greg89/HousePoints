@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { redirect } from "next/navigation";
 import {
   assignUserHouse,
   createHouse,
@@ -39,6 +40,7 @@ import { AdminUnavailablePanel } from "@/components/AdminUnavailablePanel";
 import { DashboardShell } from "@/components/DashboardShell";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { logInfo, logWarn, serializeErrorForLog } from "@/lib/logging";
+import { getRootOrganizationRedirect } from "./dashboard-routing";
 import type { PagedNotifications, Season, SeasonComparison } from "@housepoints/contracts";
 
 const ADMIN_CONTEXT_FAILED = Symbol("ADMIN_CONTEXT_FAILED");
@@ -110,6 +112,11 @@ export async function renderDashboardPage(route: string) {
         </div>
       </div>
     );
+  }
+
+  const rootRedirect = getRootOrganizationRedirect(route, session);
+  if (rootRedirect) {
+    redirect(rootRedirect);
   }
 
   const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext] = await Promise.all([
