@@ -311,13 +311,6 @@ export async function assignUserToHouseInDb(params: {
   });
 }
 
-export async function findUserForRoleChange(targetUserId: string) {
-  return prisma.user.findUnique({
-    where: { id: targetUserId },
-    select: { id: true, displayName: true, email: true, role: true, houseId: true, organizationId: true },
-  });
-}
-
 export async function findMembershipForRoleChange(organizationId: string, targetUserId: string) {
   return prisma.organizationMembership.findFirst({
     where: {
@@ -510,11 +503,29 @@ export async function removeOrgMemberInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetUser: { id: string; displayName: string; role: string };
+  targetMembership: {
+    id: string;
+    userId: string;
+    role: string;
+    user: { id: string; displayName: string };
+  };
 }) {
   return prisma.$transaction(async (tx) => {
+    const removedAt = new Date();
+    const removedMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
+      data: {
+        isActive: false,
+        archivedAt: removedAt,
+        houseId: null,
+        role: "MEMBER",
+      },
+      select: {
+        user: { select: { id: true, displayName: true } },
+      },
+    });
     const removedUser = await tx.user.update({
-      where: { id: params.targetUser.id },
+      where: { id: params.targetMembership.userId },
       data: {
         organizationId: null,
         houseId: null,
@@ -523,11 +534,10 @@ export async function removeOrgMemberInDb(params: {
       select: { id: true, displayName: true },
     });
 
-    const removedAt = new Date();
     await tx.notification.updateMany({
       where: {
         organizationId: params.organizationId,
-        recipientUserId: removedUser.id,
+        recipientUserId: removedMembership.user.id,
         archivedAt: null,
       },
       data: { readAt: removedAt, archivedAt: removedAt },
@@ -538,7 +548,7 @@ export async function removeOrgMemberInDb(params: {
         organizationId: params.organizationId,
         type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
         entityType: "User",
-        entityId: removedUser.id,
+        entityId: removedMembership.user.id,
         archivedAt: null,
       },
       data: { readAt: removedAt, archivedAt: removedAt },
@@ -549,11 +559,11 @@ export async function removeOrgMemberInDb(params: {
         organizationId: params.organizationId,
         actorUserId: params.actorId,
         eventType: "USER_REMOVED_FROM_ORG",
-        summary: `${params.actorDisplayName} removed ${removedUser.displayName} from the organization.`,
+        summary: `${params.actorDisplayName} removed ${removedMembership.user.displayName} from the organization.`,
         metadata: {
-          targetUserId: removedUser.id,
-          targetUserName: removedUser.displayName,
-          previousRole: params.targetUser.role,
+          targetUserId: removedMembership.user.id,
+          targetUserName: removedMembership.user.displayName,
+          previousRole: params.targetMembership.role,
         },
       },
     });
@@ -952,13 +962,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+    const targetMembership = await findMembershipForRoleChange(actor.organizationId, parsed.targetUserId);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
-    if (targetUser.role === "OWNER") {
+    if (targetMembership.role === "OWNER") {
       return reply.status(409).send({
         message: "Transfer ownership before removing an owner.",
         code: "OWNER_REMOVE_FORBIDDEN",
@@ -969,18 +979,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
-      targetUser: {
-        id: targetUser.id,
-        displayName: targetUser.displayName,
-        role: targetUser.role,
-      },
+      targetMembership,
     });
 
     info(request.log, "admin.user.removed_from_org", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
       targetUserId: removedUser.id,
-      previousRole: targetUser.role,
+      previousRole: targetMembership.role,
     });
 
     return removedUser;

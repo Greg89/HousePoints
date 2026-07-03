@@ -3619,9 +3619,8 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("returns 404 when target user is outside the owner's organization", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3637,13 +3636,18 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("rejects removing another owner", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeOwner({
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-owner-2",
+      userId: "user-owner-2",
+      role: "OWNER",
+      houseId: "house-1",
+      user: {
         id: "user-owner-2",
         displayName: "Second Owner",
-        organizationId: "org-secure",
-      }));
+        email: "second-owner@acme.com",
+      },
+    });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3666,9 +3670,24 @@ describe("POST /admin/users/remove", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: targetUser.role,
+      houseId: targetUser.houseId,
+      user: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+      },
+    });
+    mockMembershipUpdate.mockResolvedValue({
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+      },
+    });
     mockUserUpdate.mockResolvedValue({
       id: "user-target",
       displayName: "Taylor",
@@ -3683,6 +3702,18 @@ describe("POST /admin/users/remove", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-target" },
+      data: {
+        isActive: false,
+        archivedAt: expect.any(Date),
+        houseId: null,
+        role: "MEMBER",
+      },
+      select: {
+        user: { select: { id: true, displayName: true } },
+      },
+    });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-target" },
       data: {
