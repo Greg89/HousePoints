@@ -24,7 +24,7 @@ function lastUtcDateKeys(days: number, now: Date) {
 }
 
 export async function loadLeaderboard(organizationId: string, seasonId: string) {
-  const [houses, houseTotals] = await Promise.all([
+  const [houses, houseTotals, memberships] = await Promise.all([
     prisma.house.findMany({
       where: { organizationId },
       select: {
@@ -32,7 +32,6 @@ export async function loadLeaderboard(organizationId: string, seasonId: string) 
         name: true,
         color: true,
         description: true,
-        _count: { select: { users: true } },
       },
     }),
     prisma.pointTransaction.groupBy({
@@ -40,6 +39,10 @@ export async function loadLeaderboard(organizationId: string, seasonId: string) 
       where: { organizationId, seasonId, deletedAt: null },
       _sum: { delta: true },
       _count: { _all: true },
+    }),
+    prisma.organizationMembership.findMany({
+      where: { organizationId, isActive: true, archivedAt: null, houseId: { not: null } },
+      select: { houseId: true },
     }),
   ]);
 
@@ -49,6 +52,14 @@ export async function loadLeaderboard(organizationId: string, seasonId: string) 
       { score: row._sum.delta ?? 0, transactions: row._count._all },
     ]),
   );
+  const memberCountsByHouseId = new Map<string, number>();
+  for (const membership of memberships) {
+    if (!membership.houseId) continue;
+    memberCountsByHouseId.set(
+      membership.houseId,
+      (memberCountsByHouseId.get(membership.houseId) ?? 0) + 1,
+    );
+  }
 
   return houses
     .map((house) => {
@@ -60,7 +71,7 @@ export async function loadLeaderboard(organizationId: string, seasonId: string) 
         description: house.description,
         score: totals?.score ?? 0,
         transactions: totals?.transactions ?? 0,
-        memberCount: house._count.users,
+        memberCount: memberCountsByHouseId.get(house.id) ?? 0,
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -80,7 +91,7 @@ export async function loadDashboardSummaryData(
     memberTotals,
     houseTotals,
     transactionTypeTotals,
-    members,
+    memberships,
   ] = await Promise.all([
     prisma.house.findMany({
       where: { organizationId },
@@ -130,12 +141,27 @@ export async function loadDashboardSummaryData(
       _sum: { delta: true },
       _count: { _all: true },
     }),
-    prisma.user.findMany({
-      where: { organizationId },
-      orderBy: { displayName: "asc" },
-      select: { id: true, displayName: true, role: true, houseId: true },
+    prisma.organizationMembership.findMany({
+      where: { organizationId, isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
     }),
   ]);
+  const members = memberships.map((membership) => ({
+    id: membership.user.id,
+    displayName: membership.user.displayName,
+    role: membership.role,
+    houseId: membership.houseId,
+  }));
   return { houses, monthlyMemberTotals, monthlyTraitTotals, recentTransactions, velocityTransactions, memberTotals, houseTotals, transactionTypeTotals, members };
 }
 

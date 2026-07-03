@@ -1453,11 +1453,11 @@ describe("POST /seasons/compare", () => {
           _sum: { delta: -10 },
         },
       ]);
-    mockUserFindMany.mockResolvedValue([
-      { id: "user-1", displayName: "Alice" },
-      { id: "user-2", displayName: "Bob" },
-      { id: "user-3", displayName: "Cora" },
-      { id: "user-4", displayName: "Drew" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "user-1", displayName: "Alice" } },
+      { user: { id: "user-2", displayName: "Bob" } },
+      { user: { id: "user-3", displayName: "Cora" } },
+      { user: { id: "user-4", displayName: "Drew" } },
     ]);
     const app = await buildTestApp();
 
@@ -1508,11 +1508,13 @@ describe("POST /seasons/compare", () => {
         },
       }),
     );
-    expect(mockUserFindMany).toHaveBeenCalledWith(
+    expect(mockMembershipFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: { in: ["user-1", "user-2", "user-3", "user-4"] },
           organizationId: "org-secure",
+          isActive: true,
+          archivedAt: null,
+          userId: { in: ["user-1", "user-2", "user-3", "user-4"] },
         },
       }),
     );
@@ -1703,7 +1705,9 @@ describe("POST /seasons/compare", () => {
     mockTxGroupBy
       .mockResolvedValueOnce(houseTotals)
       .mockResolvedValueOnce(contributorTotals);
-    mockUserFindMany.mockResolvedValue(users);
+    mockMembershipFindMany.mockResolvedValue(
+      users.map((user) => ({ user })),
+    );
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -1718,12 +1722,14 @@ describe("POST /seasons/compare", () => {
     expect(res.statusCode).toBe(200);
     expect(mockHouseFindMany).toHaveBeenCalledTimes(1);
     expect(mockTxGroupBy).toHaveBeenCalledTimes(2);
-    expect(mockUserFindMany).toHaveBeenCalledTimes(1);
-    expect(mockUserFindMany).toHaveBeenCalledWith(
+    expect(mockMembershipFindMany).toHaveBeenCalledTimes(1);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: { in: users.map((user) => user.id) },
           organizationId: "org-secure",
+          isActive: true,
+          archivedAt: null,
+          userId: { in: users.map((user) => user.id) },
         },
       }),
     );
@@ -2073,14 +2079,12 @@ describe("POST /houses/leaderboard", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
-        _count: { users: 2 },
       },
       {
         id: "house-2",
         name: "Dragon",
         color: "#dc2626",
         description: "Fire team",
-        _count: { users: 1 },
       },
     ]);
     mockTxGroupBy.mockResolvedValue([
@@ -2095,6 +2099,12 @@ describe("POST /houses/leaderboard", () => {
         _count: { _all: 2 },
       },
     ]);
+    mockMembershipFindMany.mockResolvedValue([
+      { houseId: "house-1" },
+      { houseId: "house-1" },
+      { houseId: "house-2" },
+      { houseId: null },
+    ]);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -2108,10 +2118,22 @@ describe("POST /houses/leaderboard", () => {
       expect.objectContaining({
         where: { organizationId: "org-secure" },
         select: expect.objectContaining({
-          _count: { select: { users: true } },
+          id: true,
+          name: true,
+          color: true,
+          description: true,
         }),
       }),
     );
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
+        houseId: { not: null },
+      },
+      select: { houseId: true },
+    });
     expect(mockTxGroupBy).toHaveBeenCalledWith({
       by: ["targetHouseId"],
       where: {
@@ -2156,9 +2178,9 @@ describe("POST /houses/leaderboard", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
-        _count: { users: 2 },
       },
     ]);
+    mockMembershipFindMany.mockResolvedValue([{ houseId: "house-1" }]);
     mockTxGroupBy.mockResolvedValue([
       {
         targetHouseId: "house-1",
@@ -4168,24 +4190,30 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-1", delta: 12, createdAt: now },
         { targetHouseId: "house-2", delta: 4, createdAt: now },
       ]);
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-1",
-        displayName: "Alice",
         role: "MEMBER",
         houseId: "house-1",
+        user: {
+          id: "user-1",
+          displayName: "Alice",
+        },
       },
       {
-        id: "user-2",
-        displayName: "Bob",
         role: "ADMIN",
         houseId: "house-1",
+        user: {
+          id: "user-2",
+          displayName: "Bob",
+        },
       },
       {
-        id: "user-3",
-        displayName: "Cora",
         role: "MEMBER",
         houseId: "house-2",
+        user: {
+          id: "user-3",
+          displayName: "Cora",
+        },
       },
     ]);
     const app = await buildTestApp();
@@ -4309,11 +4337,20 @@ describe("POST /dashboard/summary", () => {
         }),
       );
     }
-    expect(mockUserFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: "org-1" },
-      }),
-    );
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-1", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
     for (const call of mockTxFindMany.mock.calls) {
       expect(call[0]).toEqual(
         expect.objectContaining({
@@ -4361,12 +4398,14 @@ describe("POST /dashboard/summary", () => {
         { type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } },
       ]);
     mockTxFindMany.mockResolvedValue([]);
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-3",
-        displayName: "Cora",
         role: "MEMBER",
         houseId: "house-2",
+        user: {
+          id: "user-3",
+          displayName: "Cora",
+        },
       },
     ]);
     const app = await buildTestApp();

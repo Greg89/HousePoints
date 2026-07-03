@@ -127,10 +127,24 @@ export async function loadContributorNames(
   organizationId: string,
 ) {
   if (!userIds.length) return [];
-  return prisma.user.findMany({
-    where: { id: { in: userIds }, organizationId },
-    select: { id: true, displayName: true },
+  const memberships = await prisma.organizationMembership.findMany({
+    where: {
+      organizationId,
+      isActive: true,
+      archivedAt: null,
+      userId: { in: userIds },
+    },
+    select: {
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+    },
   });
+
+  return memberships.map((membership) => membership.user);
 }
 
 export async function startSeasonTransaction(actor: ActorRecord, seasonName: string) {
