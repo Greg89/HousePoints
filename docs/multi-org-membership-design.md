@@ -182,7 +182,7 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now prefers active memberships before legacy fallback. Create org now creates an owner membership, no longer blocks users who already belong to another organization, and reloads the user after membership writes so the response includes current membership contexts. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, then reloads the user after membership writes so the response includes current membership contexts. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
+Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now uses active memberships without legacy current-org fallback. Create org now creates an owner membership, no longer blocks users who already belong to another organization, and reloads the user after membership writes so the response includes current membership contexts. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, then reloads the user after membership writes so the response includes current membership contexts. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
 
 Update workflows:
 
@@ -263,7 +263,7 @@ Current:
 
 Target:
 
-- Route-context checks active membership for requested slug - implemented with legacy current-org fallback.
+- Route-context checks active membership for requested slug - implemented without legacy current-org fallback.
 - If the user lacks membership, show blocked state.
 - If the slug is an alias for an organization where the user has membership, redirect to current slug.
 

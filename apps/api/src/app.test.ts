@@ -155,7 +155,29 @@ const SEASON_ZERO = {
 };
 
 /** Full user shape returned by prisma.user.findUnique (matches select in app.ts) */
-const makeMember = (overrides = {}) => ({
+const withDefaultMembership = <T extends {
+  id: string;
+  role: "MEMBER" | "ADMIN" | "OWNER";
+  houseId: string | null;
+  organizationId: string | null;
+  organization: { name: string; slug: string } | null;
+  memberships?: unknown[];
+}>(user: T): T & { memberships: unknown[] } => ({
+  ...user,
+  memberships: user.memberships ?? (user.organizationId && user.organization
+    ? [
+        {
+          id: `membership-${user.id}`,
+          organizationId: user.organizationId,
+          role: user.role,
+          houseId: user.houseId,
+          organization: user.organization,
+        },
+      ]
+    : []),
+});
+
+const makeMember = (overrides = {}) => withDefaultMembership({
   id: "user-1",
   auth0Sub: "auth0|member",
   email: "member@acme.com",
@@ -169,7 +191,7 @@ const makeMember = (overrides = {}) => ({
   ...overrides,
 });
 
-const makeAdmin = (overrides = {}) => ({
+const makeAdmin = (overrides = {}) => withDefaultMembership({
   id: "user-2",
   auth0Sub: "auth0|admin",
   email: "admin@acme.com",
@@ -183,12 +205,17 @@ const makeAdmin = (overrides = {}) => ({
   ...overrides,
 });
 
-const makeOwner = (overrides = {}) => ({
-  ...makeAdmin(),
+const makeOwner = (overrides = {}) => withDefaultMembership({
   id: "user-owner",
   auth0Sub: "auth0|owner",
+  email: "owner@acme.com",
   displayName: "Olivia",
+  houseThemeEnabled: false,
   role: "OWNER" as const,
+  houseId: "house-1",
+  organizationId: "org-1",
+  organization: { name: "Acme Corp", slug: "acme" },
+  house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
 });
 
@@ -5346,6 +5373,15 @@ describe("POST /orgs/route-context", () => {
           name: "Acme Corp",
           slug: "acme",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -5416,6 +5452,15 @@ describe("POST /orgs/route-context", () => {
           name: "Acme Corp",
           slug: "acme",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -5444,6 +5489,15 @@ describe("POST /orgs/route-context", () => {
           name: "Acme Corp",
           slug: "acme",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -5487,7 +5541,7 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
-  it("returns DIFFERENT_ORG when the requested slug belongs to another organization", async () => {
+  it("returns NO_ACTOR_ORG when only legacy org fields exist", async () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
@@ -5496,6 +5550,7 @@ describe("POST /orgs/route-context", () => {
           name: "Other Org",
           slug: "other-org",
         },
+        memberships: [],
       },
     });
     const app = await buildTestApp();
@@ -5508,11 +5563,9 @@ describe("POST /orgs/route-context", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
-      status: "DIFFERENT_ORG",
+      status: "NO_ACTOR_ORG",
       requestedSlug: "acme",
       organizationSlug: "acme",
-      actorOrganizationSlug: "other-org",
-      actorOrganizationName: "Other Org",
     });
     await app.close();
   });

@@ -454,7 +454,7 @@ describe("getUserOrgContextBySub", () => {
     expect(mockFindUnique).not.toHaveBeenCalled();
   });
 
-  it("keeps the legacy current organization when it matches an active membership", async () => {
+  it("uses the first active membership without consulting the legacy current organization shadow", async () => {
     mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
       organizationId: "org-2",
@@ -481,13 +481,13 @@ describe("getUserOrgContextBySub", () => {
     });
 
     await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
-      organizationId: "org-2",
-      organizationName: "Current Org",
-      organizationSlug: "current-org",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
     });
   });
 
-  it("falls back to legacy organization fields when no active membership exists", async () => {
+  it("returns empty org fields when no active membership exists", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         organizationId: "org-legacy",
@@ -500,9 +500,9 @@ describe("getUserOrgContextBySub", () => {
     });
 
     await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
-      organizationId: "org-legacy",
-      organizationName: "Legacy Org",
-      organizationSlug: "legacy-org",
+      organizationId: null,
+      organizationName: null,
+      organizationSlug: null,
     });
   });
 });

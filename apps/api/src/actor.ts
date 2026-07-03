@@ -150,8 +150,6 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
 }
 
 type PreferredOrgContextSource = {
-  organizationId: string | null;
-  organization: { name: string; slug: string } | null;
   memberships?: Array<{
     organizationId: string;
     organization: { name: string; slug: string };
@@ -174,7 +172,7 @@ function resolvePreferredMembership(user: PreferredMembershipSource) {
 }
 
 function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
-  const preferredMembership = pickPreferredMembership(user.memberships, user.organizationId);
+  const preferredMembership = user.memberships?.[0] ?? null;
 
   if (preferredMembership) {
     return {
@@ -185,9 +183,9 @@ function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgCon
   }
 
   return {
-    organizationId: user.organizationId,
-    organizationName: user.organization?.name ?? null,
-    organizationSlug: user.organization?.slug ?? null,
+    organizationId: null,
+    organizationName: null,
+    organizationSlug: null,
   };
 }
 
