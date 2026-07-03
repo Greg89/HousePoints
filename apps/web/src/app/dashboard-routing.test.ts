@@ -13,6 +13,62 @@ describe("getRootOrganizationRedirect", () => {
     ).toBe("/o/acme%20corp");
   });
 
+  it("prefers the current active membership when redirecting from the root route", () => {
+    expect(
+      getRootOrganizationRedirect("/", {
+        isAuthenticated: true,
+        organizationSlug: "legacy-org",
+        organizationContexts: [
+          {
+            organizationId: "org-1",
+            organizationName: "Acme Org",
+            organizationSlug: "acme",
+            role: "MEMBER",
+            houseId: "house-1",
+            houseName: "Living Room",
+            houseColor: "#7c3aed",
+            isCurrent: false,
+          },
+          {
+            organizationId: "org-2",
+            organizationName: "Beta Org",
+            organizationSlug: "beta org",
+            role: "ADMIN",
+            houseId: "house-2",
+            houseName: "Bedroom",
+            houseColor: "#f97316",
+            isCurrent: true,
+          },
+        ],
+        needsOrg: false,
+        needsHouseAssignment: false,
+      }),
+    ).toBe("/o/beta%20org");
+  });
+
+  it("falls back to the first active membership before the legacy organization slug", () => {
+    expect(
+      getRootOrganizationRedirect("/", {
+        isAuthenticated: true,
+        organizationSlug: "legacy-org",
+        organizationContexts: [
+          {
+            organizationId: "org-1",
+            organizationName: "Acme Org",
+            organizationSlug: "acme",
+            role: "MEMBER",
+            houseId: "house-1",
+            houseName: "Living Room",
+            houseColor: "#7c3aed",
+            isCurrent: false,
+          },
+        ],
+        needsOrg: false,
+        needsHouseAssignment: false,
+      }),
+    ).toBe("/o/acme");
+  });
+
   it("does not redirect scoped organization routes", () => {
     expect(
       getRootOrganizationRedirect("/o/acme", {

@@ -1,6 +1,9 @@
+import type { AppUserOrganizationContext } from "@housepoints/contracts";
+
 type RootRedirectSession = {
   isAuthenticated: boolean;
   organizationSlug?: string | null;
+  organizationContexts?: AppUserOrganizationContext[];
   needsOrg?: boolean;
   needsHouseAssignment?: boolean;
 };
@@ -13,11 +16,19 @@ export function getRootOrganizationRedirect(
     route !== "/" ||
     !session.isAuthenticated ||
     session.needsOrg ||
-    session.needsHouseAssignment ||
-    !session.organizationSlug
+    session.needsHouseAssignment
   ) {
     return null;
   }
 
-  return `/o/${encodeURIComponent(session.organizationSlug)}`;
+  const organizationSlug =
+    session.organizationContexts?.find((context) => context.isCurrent)?.organizationSlug ??
+    session.organizationContexts?.[0]?.organizationSlug ??
+    session.organizationSlug;
+
+  if (!organizationSlug) {
+    return null;
+  }
+
+  return `/o/${encodeURIComponent(organizationSlug)}`;
 }
