@@ -69,7 +69,28 @@ type PointRouteOptions = {
 export async function findTargetUser(targetUserId: string) {
   return prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { id: true, organizationId: true, houseId: true, displayName: true },
+    select: { id: true },
+  });
+}
+
+export async function findTargetMembership(organizationId: string, targetUserId: string) {
+  return prisma.organizationMembership.findFirst({
+    where: {
+      organizationId,
+      userId: targetUserId,
+      isActive: true,
+      archivedAt: null,
+    },
+    select: {
+      userId: true,
+      houseId: true,
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+    },
   });
 }
 
@@ -321,9 +342,9 @@ export async function registerPointRoutes(
       });
     }
 
-    const targetUser = await findTargetUser(parsed.targetUserId);
+    const targetMembership = await findTargetMembership(actor.organizationId, parsed.targetUserId);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       warn(request.log, "points.cross_organization_target", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
@@ -336,10 +357,10 @@ export async function registerPointRoutes(
       });
     }
 
-    if (!targetUser.houseId) {
+    if (!targetMembership.houseId) {
       warn(request.log, "points.target_user_unassigned", {
         actorUserId: actor.id,
-        targetUserId: targetUser.id,
+        targetUserId: targetMembership.userId,
       });
       return reply.status(422).send({
         message: "Target user is not assigned to a house",
@@ -347,7 +368,8 @@ export async function registerPointRoutes(
       });
     }
 
-    const targetHouseId = targetUser.houseId;
+    const targetUser = targetMembership.user;
+    const targetHouseId = targetMembership.houseId;
     const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
     if (!activeSeason) return;
 
@@ -370,7 +392,7 @@ export async function registerPointRoutes(
       actorAuth0Sub: actor.auth0Sub,
       organizationId: actor.organizationId,
       targetUserId: targetUser.id,
-      targetHouseId: targetUser.houseId,
+      targetHouseId,
       delta: transaction.delta,
     });
 
@@ -404,26 +426,28 @@ export async function registerPointRoutes(
       });
     }
 
-    const targetUser = await findTargetUser(parsed.targetUserId);
+    const targetMembership = await findTargetMembership(actor.organizationId, parsed.targetUserId);
 
-    if (!targetUser) {
-      warn(request.log, "points.deduct.target_user_not_found", {
-        actorUserId: actor.id,
-        actorOrganizationId: actor.organizationId,
-        targetUserId: parsed.targetUserId,
-      });
-      return reply.status(404).send({
-        message: "Target user was not found",
-        code: "TARGET_USER_NOT_FOUND",
-      });
-    }
+    if (!targetMembership) {
+      const targetUserExists = await findTargetUser(parsed.targetUserId);
 
-    if (targetUser.organizationId !== actor.organizationId) {
+      if (!targetUserExists) {
+        warn(request.log, "points.deduct.target_user_not_found", {
+          actorUserId: actor.id,
+          actorOrganizationId: actor.organizationId,
+          targetUserId: parsed.targetUserId,
+        });
+        return reply.status(404).send({
+          message: "Target user was not found",
+          code: "TARGET_USER_NOT_FOUND",
+        });
+      }
+
       warn(request.log, "points.deduct.cross_organization_target", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
         actorOrganizationId: actor.organizationId,
-        targetUserId: targetUser.id,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(403).send({
         message: "Target user is outside your organization",
@@ -431,10 +455,10 @@ export async function registerPointRoutes(
       });
     }
 
-    if (!targetUser.houseId) {
+    if (!targetMembership.houseId) {
       warn(request.log, "points.deduct.target_user_unassigned", {
         actorUserId: actor.id,
-        targetUserId: targetUser.id,
+        targetUserId: targetMembership.userId,
       });
       return reply.status(422).send({
         message: "Target user is not assigned to a house",
@@ -442,11 +466,11 @@ export async function registerPointRoutes(
       });
     }
 
-    if (targetUser.houseId === actor.houseId) {
+    if (targetMembership.houseId === actor.houseId) {
       warn(request.log, "points.deduct.same_house_target", {
         actorUserId: actor.id,
         actorHouseId: actor.houseId,
-        targetUserId: targetUser.id,
+        targetUserId: targetMembership.userId,
       });
       return reply.status(409).send({
         message: "Points can only be deducted from members in another house",
@@ -454,7 +478,8 @@ export async function registerPointRoutes(
       });
     }
 
-    const targetHouseId = targetUser.houseId;
+    const targetUser = targetMembership.user;
+    const targetHouseId = targetMembership.houseId;
     const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
     if (!activeSeason) return;
 
@@ -513,7 +538,7 @@ export async function registerPointRoutes(
       actorAuth0Sub: actor.auth0Sub,
       organizationId: actor.organizationId,
       targetUserId: targetUser.id,
-      targetHouseId: targetUser.houseId,
+      targetHouseId,
       delta: -10,
     });
 

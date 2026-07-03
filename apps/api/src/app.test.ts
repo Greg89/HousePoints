@@ -192,6 +192,16 @@ const makeOwner = (overrides = {}) => ({
   ...overrides,
 });
 
+const makeTargetMembership = (overrides = {}) => ({
+  userId: "user-1",
+  houseId: "house-1",
+  user: {
+    id: "user-1",
+    displayName: "Alice",
+  },
+  ...overrides,
+});
+
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
@@ -641,9 +651,8 @@ describe("POST /points/adjust", () => {
   });
 
   it("returns 422 TARGET_USER_UNASSIGNED when target has no house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())   // getActorBySub
-      .mockResolvedValueOnce(makeMember({ houseId: null })); // target user: no house
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: null }));
     const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
@@ -680,10 +689,8 @@ describe("POST /points/adjust", () => {
   });
 
   it("awards points, notifies the recipient, and returns 201 with the transaction id and trait", async () => {
-    const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())  // getActorBySub
-      .mockResolvedValueOnce(targetUser);  // target user lookup
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({
       id: "tx-abc",
@@ -725,6 +732,24 @@ describe("POST /points/adjust", () => {
         }),
       }),
     );
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        userId: "user-1",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        userId: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [{
         organizationId: "org-1",
@@ -746,9 +771,11 @@ describe("POST /points/adjust", () => {
 
   it("does not create a recipient notification for self-awards", async () => {
     const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
-    mockFindUnique
-      .mockResolvedValueOnce(actor)
-      .mockResolvedValueOnce(actor);
+    mockFindUnique.mockResolvedValueOnce(actor);
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({
+      userId: "user-2",
+      user: { id: "user-2", displayName: "Bob" },
+    }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({
       id: "tx-self",
@@ -781,10 +808,8 @@ describe("POST /points/adjust", () => {
   });
 
   it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
-    const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())
-      .mockResolvedValueOnce(targetUser);
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp();
     const res = await app.inject({
@@ -944,9 +969,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 422 TARGET_USER_UNASSIGNED when target has no house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())
-      .mockResolvedValueOnce(makeMember({ houseId: null }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: null }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -963,9 +987,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 409 SAME_HOUSE_TARGET when target is in the actor house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ houseId: "house-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-1" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -982,9 +1005,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ houseId: "house-2" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp("auth0|admin");
 
@@ -1003,9 +1025,8 @@ describe("POST /points/deduct", () => {
 
   it("returns 409 DEDUCTION_COOLDOWN_ACTIVE when the actor house already deducted recently", async () => {
     const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxFindFirst.mockResolvedValueOnce({
       id: "tx-recent-house-deduction",
@@ -1039,9 +1060,8 @@ describe("POST /points/deduct", () => {
 
   it("returns 409 TARGET_DEDUCTION_LIMIT_ACTIVE when the target already received a recent deduction", async () => {
     const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxFindFirst
       .mockResolvedValueOnce(null)
@@ -1077,9 +1097,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("creates a fixed deduction for admins against another house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({ id: "tx-deduction" });
     const app = await buildTestApp("auth0|admin");
@@ -1148,9 +1167,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("allows owners to create deductions", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({ id: "tx-owner-deduction" });
     const app = await buildTestApp("auth0|owner");
