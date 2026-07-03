@@ -180,11 +180,13 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
+Status: in progress. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration.
+
 Update workflows:
 
 - Create org: create global user if needed, then create owner membership.
 - Join org: allow joining another org by creating a new membership instead of returning `ALREADY_IN_ORG`.
-- Assign house: update membership `houseId`.
+- Assign house: update membership `houseId` - implemented with legacy `User.houseId` shadow write.
 - Promote/demote: update membership `role`.
 - Transfer ownership: update membership roles.
 - Remove member: archive membership and archive relevant notifications.

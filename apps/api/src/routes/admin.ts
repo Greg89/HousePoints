@@ -235,11 +235,24 @@ export async function upsertHouseForOrg(params: {
   });
 }
 
-export async function findUsersForAssignment(targetUserId: string, targetHouseId: string) {
+export async function findAssignmentTargets(
+  organizationId: string,
+  targetUserId: string,
+  targetHouseId: string,
+) {
   return Promise.all([
-    prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, displayName: true, organizationId: true },
+    prisma.organizationMembership.findFirst({
+      where: {
+        organizationId,
+        userId: targetUserId,
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        userId: true,
+        user: { select: { id: true, displayName: true } },
+      },
     }),
     prisma.house.findUnique({
       where: { id: targetHouseId },
@@ -252,15 +265,28 @@ export async function assignUserToHouseInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetUser: { id: string; displayName: string };
+  targetMembership: { id: string; userId: string; user: { id: string; displayName: string } };
   targetHouse: { id: string; name: string };
 }) {
   return prisma.$transaction(async (tx) => {
-    const assignedUser = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const assignedMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: { houseId: params.targetHouse.id },
-      select: { id: true, displayName: true, houseId: true },
+      select: {
+        houseId: true,
+        user: { select: { id: true, displayName: true } },
+      },
     });
+    await tx.user.update({
+      where: { id: params.targetMembership.userId },
+      data: { houseId: params.targetHouse.id },
+      select: { id: true },
+    });
+    const assignedUser = {
+      id: assignedMembership.user.id,
+      displayName: assignedMembership.user.displayName,
+      houseId: assignedMembership.houseId,
+    };
     await tx.auditEvent.create({
       data: {
         organizationId: params.organizationId,
@@ -760,12 +786,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireAdminActor(request, reply);
     if (!actor) return;
 
-    const [targetUser, targetHouse] = await findUsersForAssignment(
+    const [targetMembership, targetHouse] = await findAssignmentTargets(
+      actor.organizationId,
       parsed.targetUserId,
       parsed.targetHouseId,
     );
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
@@ -777,7 +804,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
-      targetUser,
+      targetMembership,
       targetHouse,
     });
 

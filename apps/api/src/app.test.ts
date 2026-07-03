@@ -24,7 +24,9 @@ vi.mock("@housepoints/db", () => ({
       update: vi.fn(),
     },
     organizationMembership: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
     },
     authIdentity: {
       findUnique: vi.fn(),
@@ -89,7 +91,9 @@ import {
 // Typed shorthand helpers
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipFindFirst = prisma.organizationMembership.findFirst as ReturnType<typeof vi.fn>;
 const mockMembershipFindMany = prisma.organizationMembership.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipUpdate = prisma.organizationMembership.update as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockAuthIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
@@ -193,6 +197,7 @@ beforeEach(() => {
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
   mockUserFindMany.mockResolvedValue([]);
+  mockMembershipFindFirst.mockResolvedValue(null);
   mockMembershipFindMany.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
@@ -2848,8 +2853,7 @@ describe("POST /admin/users/assign-house", () => {
 
   it("returns 404 when target user is not found", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin()); // getActorBySub
-    // targetUser and targetHouse both null â€” returned via Promise.all
-    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
     mockHouseFindUnique.mockResolvedValue(HOUSE);
     const app = await buildTestApp();
     const res = await app.inject({
@@ -2864,10 +2868,13 @@ describe("POST /admin/users/assign-house", () => {
 
   it("returns 404 when target house belongs to another organization", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin({ organizationId: "org-1" }));
-    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      id: "user-1",
-      displayName: "Alice",
-      organizationId: "org-1",
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-1",
+      userId: "user-1",
+      user: {
+        id: "user-1",
+        displayName: "Alice",
+      },
     });
     mockHouseFindUnique.mockResolvedValue({
       id: "house-other",
@@ -2891,21 +2898,27 @@ describe("POST /admin/users/assign-house", () => {
 
   it("assigns a user to a house, writes audit history, and resolves matching assignment notifications", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
-    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      id: "user-1",
-      displayName: "Alice",
-      organizationId: "org-1",
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-1",
+      userId: "user-1",
+      user: {
+        id: "user-1",
+        displayName: "Alice",
+      },
     });
     mockHouseFindUnique.mockResolvedValue({
       id: "house-1",
       organizationId: "org-1",
       name: "Phoenix",
     });
-    mockUserUpdate.mockResolvedValue({
-      id: "user-1",
-      displayName: "Alice",
+    mockMembershipUpdate.mockResolvedValue({
       houseId: "house-1",
+      user: {
+        id: "user-1",
+        displayName: "Alice",
+      },
     });
+    mockUserUpdate.mockResolvedValue({ id: "user-1" });
     mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
     const app = await buildTestApp("auth0|admin");
 
@@ -2921,14 +2934,31 @@ describe("POST /admin/users/assign-house", () => {
       displayName: "Alice",
       houseId: "house-1",
     });
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        userId: "user-1",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        userId: true,
+        user: { select: { id: true, displayName: true } },
+      },
+    });
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-1" },
+      data: { houseId: "house-1" },
+      select: {
+        houseId: true,
+        user: { select: { id: true, displayName: true } },
+      },
+    });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { houseId: "house-1" },
-      select: {
-        id: true,
-        displayName: true,
-        houseId: true,
-      },
+      select: { id: true },
     });
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
