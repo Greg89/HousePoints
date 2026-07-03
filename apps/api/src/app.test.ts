@@ -3402,6 +3402,135 @@ describe("POST /admin/org/owner", () => {
   });
 });
 
+describe("POST /admin/users/remove", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects owner self-removal", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-owner" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ORG_MEMBER_REMOVE_SELF");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when target user is outside the owner's organization", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-other" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects removing another owner", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({
+        id: "user-owner-2",
+        displayName: "Second Owner",
+        organizationId: "org-secure",
+      }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-owner-2" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OWNER_REMOVE_FORBIDDEN");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("removes a member from the organization, clears org-scoped fields, archives notifications, and writes audit", async () => {
+    const targetUser = makeMember({
+      id: "user-target",
+      displayName: "Taylor",
+      role: "ADMIN" as const,
+      organizationId: "org-secure",
+      houseId: "house-1",
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(targetUser);
+    mockUserUpdate.mockResolvedValue({
+      id: "user-target",
+      displayName: "Taylor",
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-target" },
+      data: {
+        organizationId: null,
+        houseId: null,
+        role: "MEMBER",
+      },
+      select: { id: true, displayName: true },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledTimes(2);
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "USER_REMOVED_FROM_ORG",
+        summary: "Olivia removed Taylor from the organization.",
+        metadata: {
+          targetUserId: "user-target",
+          targetUserName: "Taylor",
+          previousRole: "ADMIN",
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor",
+    });
+    await app.close();
+  });
+});
+
 describe("POST /transactions/recent", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);

@@ -38,6 +38,7 @@ export type ApiLogEvent =
   | "admin.org.settings_updated"
   | "admin.point_adjustments.loaded"
   | "admin.user.house_assigned"
+  | "admin.user.removed_from_org"
   | "admin.user.role_changed"
   | "leaderboard.fetched"
   | "notifications.actor_not_found"

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, transferOwnership, updateOrgSettings, updateOrgSlug } from "./admin";
+import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, transferOwnership, updateOrgSettings, updateOrgSlug } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -569,6 +569,79 @@ describe("transferOwnership", () => {
 
     expect(logServerActionFailedMock).toHaveBeenCalledWith(
       { action: "transferOwnership", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        targetUserId: "target-1",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeOrgMember", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "target-1",
+      displayName: "Target User",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "target-1",
+      displayName: "Target User",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when member removal succeeds", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+
+    await expect(removeOrgMember(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("removeOrgMember", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("removeOrgMember", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/users/remove", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: "target-1",
+      }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const formData = new FormData();
+
+    await expect(removeOrgMember(formData)).resolves.toEqual({
+      ok: false,
+      code: "ORG_MEMBER_REMOVE_TARGET_REQUIRED",
+      message: "Choose the member to remove.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    const error = new ApiResponseError(
+      409,
+      "OWNER_REMOVE_FORBIDDEN",
+      "The member could not be removed. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(removeOrgMember(formData)).resolves.toEqual({
+      ok: false,
+      code: "OWNER_REMOVE_FORBIDDEN",
+      message: "The member could not be removed. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "removeOrgMember", requestId: "request-1" },
       error,
       {
         actorUserId: "user-1",

@@ -166,6 +166,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
+    onRemoveOrgMember: vi.fn().mockResolvedValue({ ok: true }),
     onTransferOwnership: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSlug: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
@@ -906,6 +907,43 @@ describe("AdminForms", () => {
     expect(promoteForm.getByRole("button", { name: "Promote to admin" })).toBeDisabled();
     expect(demoteForm.getByLabelText("Admin to demote")).toBeDisabled();
     expect(demoteForm.getByRole("button", { name: "Remove admin access" })).toBeDisabled();
+  });
+
+  it("lets owners remove non-owner members from the Team section", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Team");
+    const removalForm = within(screen.getByRole("form", { name: "Remove organization member" }));
+
+    await user.selectOptions(removalForm.getByLabelText("Member to remove"), "user-2");
+    await user.click(removalForm.getByRole("button", { name: "Remove member" }));
+
+    await waitFor(() => expect(props.onRemoveOrgMember).toHaveBeenCalledOnce());
+    expect(confirmSpy).toHaveBeenCalledWith(
+      "Remove Ben Unassigned from the organization? Their account will keep existing history, but they will lose access until invited again.",
+    );
+
+    const removeMock = props.onRemoveOrgMember as ReturnType<typeof vi.fn>;
+    const formData = removeMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-2",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Member removed", {
+      description: "Ben Unassigned no longer has access to this organization.",
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it("shows member removal to admins but keeps it owner-only", () => {
+    setupAdminForms({ actorRole: "ADMIN" });
+    switchToManageSection("Team");
+    const removalSection = within(screen.getByLabelText("Member removal"));
+    const removalForm = within(screen.getByRole("form", { name: "Remove organization member" }));
+
+    expect(removalSection.getByText("Owner only")).toBeInTheDocument();
+    expect(removalForm.getByLabelText("Member to remove")).toBeDisabled();
+    expect(removalForm.getByRole("button", { name: "Remove member" })).toBeDisabled();
   });
 
   it("shows a safe toast when role promotion returns an expected failure", async () => {

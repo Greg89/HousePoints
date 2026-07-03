@@ -4,6 +4,7 @@ import {
   Copy,
   LinkSimple,
   ShieldCheck,
+  UserMinus,
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import type { AdminAuditAction, InviteStats, UserRole } from "@housepoints/contr
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
+  MemberRemovalResult,
   RoleChangeResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
@@ -26,6 +28,7 @@ interface TeamManagementProps {
   actorRole: UserRole;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
   onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
+  onRemoveOrgMember: (formData: FormData) => Promise<MemberRemovalResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
 }
 
@@ -52,10 +55,12 @@ export function TeamManagement({
   actorRole,
   onAssignHouse,
   onPromoteUser,
+  onRemoveOrgMember,
   onCreateInvite,
 }: TeamManagementProps) {
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
+  const [removePending, startRemove] = useTransition();
   const [rolePending, startRoleChange] = useTransition();
   const [inviteJoinPath, setInviteJoinPath] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
@@ -68,6 +73,7 @@ export function TeamManagement({
   const isOwner = actorRole === "OWNER";
   const promotionCandidates = users.filter((user) => user.role === "MEMBER");
   const demotionCandidates = users.filter((user) => user.role === "ADMIN");
+  const removalCandidates = users.filter((user) => user.role !== "OWNER");
 
   function handleAssign(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -189,6 +195,43 @@ export function TeamManagement({
         form.reset();
       } catch (err) {
         toast.error("Failed to update role", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
+  function handleRemoveMember(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isOwner) return;
+
+    const formData = new FormData(e.currentTarget);
+    const targetUserId = String(formData.get("targetUserId") ?? "");
+    const userName = users.find((user) => user.id === targetUserId)?.displayName ?? "this member";
+    const form = e.currentTarget;
+    const confirmed = window.confirm(
+      `Remove ${userName} from the organization? Their account will keep existing history, but they will lose access until invited again.`,
+    );
+
+    if (!confirmed) return;
+
+    startRemove(async () => {
+      try {
+        const result = await onRemoveOrgMember(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to remove member", {
+            description: result.message,
+          });
+          return;
+        }
+
+        toast.success("Member removed", {
+          description: `${userName} no longer has access to this organization.`,
+        });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to remove member", {
           description: err instanceof Error ? err.message : "Something went wrong",
         });
       }
@@ -416,6 +459,55 @@ export function TeamManagement({
           </p>
         </section>
       </div>
+
+      <section
+        aria-label="Member removal"
+        className="grid max-w-2xl content-start gap-4 rounded-xl border bg-card p-5"
+      >
+        <div>
+          <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
+            <span className="flex items-center gap-2">
+              <UserMinus size={16} />
+              Remove Member
+            </span>
+            {!isOwner ? (
+              <span className="rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                Owner only
+              </span>
+            ) : null}
+          </h5>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Remove a member from this organization without deleting their account or historical point records.
+          </p>
+        </div>
+        <form aria-label="Remove organization member" onSubmit={handleRemoveMember} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+            Member
+            <select
+              name="targetUserId"
+              aria-label="Member to remove"
+              className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
+              required
+              defaultValue=""
+              disabled={!isOwner || removalCandidates.length === 0}
+            >
+              <option value="" disabled>
+                {removalCandidates.length > 0 ? "Select member..." : "No members eligible"}
+              </option>
+              {removalCandidates.map((user) => (
+                <option key={user.id} value={user.id}>{user.displayName} ({user.role.toLowerCase()})</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={!isOwner || removePending || removalCandidates.length === 0}
+            className="h-10 rounded-lg border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+          >
+            {removePending ? "Removing..." : "Remove member"}
+          </button>
+        </form>
+      </section>
 
       <section className="rounded-xl border bg-card p-5" aria-label="Invite activity">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

@@ -13,6 +13,8 @@ import {
   assignUserHouseSchema,
   assignUserHouseResponseSchema,
   promoteUserSchema,
+  removeOrgMemberResponseSchema,
+  removeOrgMemberSchema,
   transferOwnerSchema,
   adminUserSchema,
 } from "./admin-schemas.js";
@@ -93,6 +95,10 @@ export const apiContracts = {
   "/admin/users/assign-house": defineContract(
     assignUserHouseSchema,
     assignUserHouseResponseSchema,
+  ),
+  "/admin/users/remove": defineContract(
+    removeOrgMemberSchema,
+    removeOrgMemberResponseSchema,
   ),
   "/admin/users/role": defineContract(promoteUserSchema, adminUserSchema),
   "/dashboard/summary": defineContract(

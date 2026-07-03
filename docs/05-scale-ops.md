@@ -80,7 +80,7 @@ Deferred sub-features:
 - Change organization slug safely. Alias/reservation support, owner-only slug changes, slug-bearing invite URLs, and slug-based dashboard routes are implemented. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
 - Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
-- Remove users from an organization.
+- Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
 - Delete or archive an organization.
 
 ---

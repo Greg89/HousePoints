@@ -53,6 +53,7 @@ export const adminAuditActionSchema = z.object({
     "POINTS_DEDUCTED",
     "USER_HOUSE_ASSIGNED",
     "USER_ROLE_CHANGED",
+    "USER_REMOVED_FROM_ORG",
   ]),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),
@@ -128,6 +129,21 @@ export const transferOwnerSchema = z.object({
 }).strict();
 
 export type TransferOwnerInput = z.infer<typeof transferOwnerSchema>;
+
+export const removeOrgMemberSchema = z.object({
+  targetUserId: z.string().min(1),
+}).strict();
+
+export type RemoveOrgMemberInput = z.infer<typeof removeOrgMemberSchema>;
+
+export const removeOrgMemberResponseSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1),
+});
+
+export type RemoveOrgMemberResponse = z.infer<
+  typeof removeOrgMemberResponseSchema
+>;
 
 export const orgSettingsSchema = z.object({
   id: z.string(),

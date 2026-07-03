@@ -8,6 +8,7 @@ import {
   assignUserHouseSchema,
   createHouseSchema,
   promoteUserSchema,
+  removeOrgMemberSchema,
   seasonScopedRequestSchema,
   transferOwnerSchema,
   updateOrgSlugSchema,
@@ -369,6 +370,62 @@ export async function transferOwnershipInDb(params: {
     });
 
     return newOwner;
+  });
+}
+
+export async function removeOrgMemberInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  targetUser: { id: string; displayName: string; role: string };
+}) {
+  return prisma.$transaction(async (tx) => {
+    const removedUser = await tx.user.update({
+      where: { id: params.targetUser.id },
+      data: {
+        organizationId: null,
+        houseId: null,
+        role: "MEMBER",
+      },
+      select: { id: true, displayName: true },
+    });
+
+    const removedAt = new Date();
+    await tx.notification.updateMany({
+      where: {
+        organizationId: params.organizationId,
+        recipientUserId: removedUser.id,
+        archivedAt: null,
+      },
+      data: { readAt: removedAt, archivedAt: removedAt },
+    });
+
+    await tx.notification.updateMany({
+      where: {
+        organizationId: params.organizationId,
+        type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+        entityType: "User",
+        entityId: removedUser.id,
+        archivedAt: null,
+      },
+      data: { readAt: removedAt, archivedAt: removedAt },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "USER_REMOVED_FROM_ORG",
+        summary: `${params.actorDisplayName} removed ${removedUser.displayName} from the organization.`,
+        metadata: {
+          targetUserId: removedUser.id,
+          targetUserName: removedUser.displayName,
+          previousRole: params.targetUser.role,
+        },
+      },
+    });
+
+    return removedUser;
   });
 }
 
@@ -740,6 +797,54 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return updatedUser;
+  });
+
+  app.post("/admin/users/remove", async (request, reply) => {
+    const parsed = await parseBody(removeOrgMemberSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    if (parsed.targetUserId === actor.id) {
+      return reply.status(409).send({
+        message: "Owners cannot remove themselves from the organization.",
+        code: "ORG_MEMBER_REMOVE_SELF",
+      });
+    }
+
+    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+
+    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+      return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
+    }
+
+    if (targetUser.role === "OWNER") {
+      return reply.status(409).send({
+        message: "Transfer ownership before removing an owner.",
+        code: "OWNER_REMOVE_FORBIDDEN",
+      });
+    }
+
+    const removedUser = await removeOrgMemberInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      targetUser: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        role: targetUser.role,
+      },
+    });
+
+    info(request.log, "admin.user.removed_from_org", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      targetUserId: removedUser.id,
+      previousRole: targetUser.role,
+    });
+
+    return removedUser;
   });
 }
 

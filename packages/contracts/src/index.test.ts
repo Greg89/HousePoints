@@ -23,6 +23,7 @@ import {
   orgRouteContextRequestSchema,
   orgRouteContextSchema,
   promoteUserSchema,
+  removeOrgMemberSchema,
   renameSeasonSchema,
   seasonCompareRequestSchema,
   seasonComparisonSchema,
@@ -70,6 +71,7 @@ const webConsumedApiEndpoints = [
   "/admin/org/owner",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
+  "/admin/users/remove",
   "/admin/users/role",
   "/dashboard/summary",
   "/houses/leaderboard",
@@ -595,6 +597,10 @@ describe("authenticated request schemas", () => {
       actorAuth0Sub: "auth0|attacker",
     }],
     [transferOwnerSchema, {
+      targetUserId: "user-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [removeOrgMemberSchema, {
       targetUserId: "user-1",
       actorAuth0Sub: "auth0|attacker",
     }],
@@ -1417,6 +1423,32 @@ describe("adminAuditActionSchema", () => {
         targetUserId: "user-2",
         targetUserName: "Ben",
         delta: "-10",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-9",
+        type: "USER_REMOVED_FROM_ORG",
+        occurredAt: "2026-06-21T14:15:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia removed Ben from the organization.",
+        metadata: {
+          targetUserId: "user-2",
+          targetUserName: "Ben",
+          previousRole: "MEMBER",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-9",
+      type: "USER_REMOVED_FROM_ORG",
+      occurredAt: "2026-06-21T14:15:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia removed Ben from the organization.",
+      metadata: {
+        targetUserId: "user-2",
+        targetUserName: "Ben",
+        previousRole: "MEMBER",
       },
     });
   });

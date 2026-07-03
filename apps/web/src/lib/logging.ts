@@ -43,6 +43,7 @@ export type WebLogEvent =
   | "web.admin.org_settings_updated"
   | "web.admin.point_adjustments_loaded"
   | "web.admin.user_assigned"
+  | "web.admin.user_removed"
   | "web.admin.user_role_changed"
   | "web.admin.assignment_failed"
   | "web.notifications.load_failed"

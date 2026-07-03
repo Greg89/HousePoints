@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org deletion, ownership transfer, deeper admin removal rules, domain allow-list joining, optional root redirects for dashboard slug routes, and true multi-org membership. Owner-only organization display-name and slug updates are implemented in Manage Settings. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), and the dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
+Still deferred: org deletion, domain allow-list joining, optional root redirects for dashboard slug routes, and true multi-org membership. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, and member removal are implemented in Manage. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), and the dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
 
 ### How it should work
 
@@ -27,10 +27,10 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - `OWNER` exists.
 - `OWNER` controls organization-level configuration, including houses and seasons.
 - `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
-- `OWNER` can promote members to `ADMIN` and demote admins back to `MEMBER` from Manage Team. Role changes are audited.
+- `OWNER` can promote members to `ADMIN`, demote admins back to `MEMBER`, and remove non-owner users from the organization from Manage Team. Role changes and removals are audited.
 - `OWNER` can rename the organization display name and change the organization slug from Manage Settings. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org deletion, ownership transfer, optional root redirects for dashboard slug routes, and deeper admin-removal rules are not implemented yet.
+- Org deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
@@ -47,7 +47,7 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - Do we allow a user to leave an org and join another? What happens to their transaction history?
 - Do we need multi-use standing invite links, or is single-use enough for the first production cohort?
 - Do we need an "org discovery" page, or is the invite link the only entry point?
-- What happens to an org if the owner leaves?
+- What final retention and recovery rules do we want for org deletion or archival?
 
 ---
 
