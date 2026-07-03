@@ -9,7 +9,7 @@ import {
   SignOut,
   User,
 } from "@phosphor-icons/react";
-import type { Notification, PagedNotifications } from "@housepoints/contracts";
+import type { AppUserOrganizationContext, Notification, PagedNotifications } from "@housepoints/contracts";
 import type { NotificationMutationResult } from "@/lib/action-results";
 import { cn } from "@/lib/cn";
 
@@ -17,6 +17,7 @@ type AccountMenuProps = {
   session: {
     userName: string;
     role: "MEMBER" | "ADMIN" | "OWNER";
+    organizationContexts: AppUserOrganizationContext[];
   };
   notifications: PagedNotifications;
   onNotificationsChange: (notifications: PagedNotifications) => void;
@@ -49,6 +50,8 @@ export function AccountMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const displayedUnreadCount = Math.min(notifications.unreadCount, 99);
   const hasUnread = notifications.unreadCount > 0;
+  const currentOrganization = session.organizationContexts.find((context) => context.isCurrent) ?? null;
+  const canSwitchOrganizations = session.organizationContexts.length > 1;
 
   useEffect(() => {
     if (!open) {
@@ -187,7 +190,31 @@ export function AccountMenu({
             </p>
             <p className="mt-1 font-display text-lg font-semibold leading-tight">{session.userName}</p>
             <p className="mt-1 text-xs font-medium text-muted-foreground">{formatRole(session.role)}</p>
+            {currentOrganization ? (
+              <p className="mt-2 text-xs font-semibold text-primary">
+                {currentOrganization.organizationName}
+              </p>
+            ) : null}
           </div>
+
+          {canSwitchOrganizations ? (
+            <section className="border-b bg-muted/10 p-3" aria-label="Switch organization">
+              <div className="mb-2 px-1">
+                <h2 className="text-sm font-bold">Switch organization</h2>
+                <p className="text-xs text-muted-foreground">
+                  Notifications and dashboard data follow the selected organization.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {session.organizationContexts.map((context) => (
+                  <OrganizationSwitchLink
+                    key={context.organizationId}
+                    context={context}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="max-h-96 overflow-y-auto p-3" aria-label="Notifications">
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
@@ -256,6 +283,46 @@ export function AccountMenu({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function OrganizationSwitchLink({ context }: { context: AppUserOrganizationContext }) {
+  const content = (
+    <>
+      <span className="min-w-0">
+        <span className="block truncate font-semibold">{context.organizationName}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {formatRole(context.role)}
+          {context.houseName ? `, ${context.houseName}` : ""}
+        </span>
+      </span>
+      {context.isCurrent ? (
+        <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary">
+          Current
+        </span>
+      ) : null}
+    </>
+  );
+
+  const className = cn(
+    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+    context.isCurrent
+      ? "bg-primary/5 text-foreground"
+      : "bg-card text-foreground hover:bg-muted/70",
+  );
+
+  if (context.isCurrent) {
+    return (
+      <span className={className} aria-current="page">
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <a className={className} href={`/o/${encodeURIComponent(context.organizationSlug)}`}>
+      {content}
+    </a>
   );
 }
 

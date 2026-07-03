@@ -336,6 +336,7 @@ export function DashboardShell({
               session={{
                 userName: session.userName,
                 role: session.role,
+                organizationContexts: session.organizationContexts,
               }}
               dashboardHref={dashboardHref}
               notifications={currentNotifications}

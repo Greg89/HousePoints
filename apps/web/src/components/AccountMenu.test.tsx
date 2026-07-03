@@ -42,6 +42,18 @@ const baseProps = {
   session: {
     userName: "Gregory Dodson",
     role: "ADMIN" as const,
+    organizationContexts: [
+      {
+        organizationId: "org-1",
+        organizationName: "Acme Corp",
+        organizationSlug: "acme",
+        role: "ADMIN" as const,
+        houseId: "house-1",
+        houseName: "Slytherin",
+        houseColor: "#22c55e",
+        isCurrent: true,
+      },
+    ],
   },
   notifications: {
     items: [unreadNotification, readNotification],
@@ -114,11 +126,44 @@ describe("AccountMenu", () => {
     const dialog = screen.getByRole("dialog", { name: /account and notifications/i });
     expect(dialog).toHaveTextContent("Gregory Dodson");
     expect(dialog).toHaveTextContent("Admin");
+    expect(dialog).toHaveTextContent("Acme Corp");
+    expect(within(dialog).queryByRole("region", { name: /switch organization/i })).not.toBeInTheDocument();
     expect(within(dialog).getByText("New member needs a house")).toBeInTheDocument();
     expect(within(dialog).getByText("Action required")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /assign house/i })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/settings");
     expect(within(dialog).getByRole("link", { name: /sign out/i })).toHaveAttribute("href", "/auth/logout");
+  });
+
+  it("shows organization switch links when the user belongs to multiple organizations", async () => {
+    const user = userEvent.setup();
+    render(
+      <AccountMenuHarness
+        session={{
+          ...baseProps.session,
+          organizationContexts: [
+            ...baseProps.session.organizationContexts,
+            {
+              organizationId: "org-2",
+              organizationName: "Beta Org",
+              organizationSlug: "beta",
+              role: "OWNER",
+              houseId: null,
+              houseName: null,
+              houseColor: null,
+              isCurrent: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+
+    const switcher = screen.getByRole("region", { name: /switch organization/i });
+    expect(within(switcher).getByText("Acme Corp")).toBeInTheDocument();
+    expect(within(switcher).getByText("Current")).toBeInTheDocument();
+    expect(within(switcher).getByRole("link", { name: /beta org/i })).toHaveAttribute("href", "/o/beta");
   });
 
   it("marks an action notification read before navigating", async () => {
