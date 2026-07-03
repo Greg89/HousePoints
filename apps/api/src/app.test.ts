@@ -5067,11 +5067,17 @@ describe("POST /orgs/join/preview", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-1",
-        organization: {
-          name: "Acme Corp",
-          slug: "acme",
-        },
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -5136,11 +5142,17 @@ describe("POST /orgs/join/preview", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-other",
-        organization: {
-          name: "Other Org",
-          slug: "other-org",
-        },
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-other",
+            organization: {
+              name: "Other Org",
+              slug: "other-org",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -5156,6 +5168,37 @@ describe("POST /orgs/join/preview", () => {
       membershipStatus: "OTHER_ORG",
       memberOrganizationName: "Other Org",
       memberOrganizationSlug: "other-org",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("ignores stale legacy organization shadows when no active memberships exist", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+        memberships: [],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     });
     expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     await app.close();

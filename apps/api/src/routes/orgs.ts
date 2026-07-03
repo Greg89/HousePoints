@@ -227,19 +227,13 @@ export async function loadJoinPreviewInDb(params: {
     const otherMembership = activeMemberships.find(
       (membership) => membership.organizationId !== invite.organizationId,
     );
-    const legacyMembershipStatus = !existingUser?.organizationId
-      ? "NONE"
-      : existingUser.organizationId === invite.organizationId
-        ? "SAME_ORG"
-        : "OTHER_ORG";
     const membershipStatus = inviteMembership
       ? "SAME_ORG"
       : otherMembership
         ? "OTHER_ORG"
-        : legacyMembershipStatus;
+        : "NONE";
     const memberOrganization = inviteMembership?.organization
       ?? otherMembership?.organization
-      ?? existingUser?.organization
       ?? null;
 
     return {

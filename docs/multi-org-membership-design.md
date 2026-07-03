@@ -182,7 +182,7 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. Invite preview and dashboard route-context now use active memberships before legacy current-org shadows. Create org now creates an owner membership and no longer blocks users who already belong to another organization. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
+Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now prefers active memberships before legacy fallback. Create org now creates an owner membership and no longer blocks users who already belong to another organization. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
 
 Update workflows:
 
@@ -236,10 +236,12 @@ Current:
 
 Target:
 
-- `NONE` - user has no active membership in invite org.
+- `NONE` - user has no active memberships.
 - `SAME_ORG` - user already has active membership in invite org.
-- `OTHER_ORG` no longer blocks joining, but can be used for copy such as "You also belong to ...".
+- `OTHER_ORG` - user has active membership in another org; this no longer blocks joining, but can be used for copy such as "You also belong to ...".
 - Archived membership in invite org can be reactivated if product policy allows it.
+
+Status: implemented for active memberships; stale legacy current-org shadows no longer affect invite preview membership status.
 
 ### Invite Join
 
