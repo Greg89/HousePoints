@@ -244,21 +244,7 @@ export async function getActorBySubForOrganizationSlug(
     };
   }
 
-  if (actor.organization?.slug !== organizationSlug || !actor.organizationId) {
-    return null;
-  }
-
-  return {
-    id: actor.id,
-    auth0Sub,
-    displayName: actor.displayName,
-    membershipId: null,
-    role: actor.role,
-    houseId: actor.houseId,
-    organizationId: actor.organizationId,
-    organizationName: actor.organization.name,
-    organizationSlug: actor.organization.slug,
-  };
+  return null;
 }
 
 export async function getUserRouteOrgContextBySub(

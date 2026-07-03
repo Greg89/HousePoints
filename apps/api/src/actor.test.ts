@@ -406,6 +406,27 @@ describe("getActorBySubForOrganizationSlug", () => {
 
     await expect(getActorBySubForOrganizationSlug("auth0|member", "beta")).resolves.toBeNull();
   });
+
+  it("does not fall back to legacy user org fields for scoped API calls", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-legacy",
+        organization: {
+          name: "Legacy Acme",
+          slug: "legacy-acme",
+        },
+        memberships: [],
+      },
+    });
+
+    await expect(
+      getActorBySubForOrganizationSlug("auth0|member", "legacy-acme"),
+    ).resolves.toBeNull();
+  });
 });
 
 describe("getUserOrgContextBySub", () => {
