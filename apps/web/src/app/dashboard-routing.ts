@@ -21,9 +21,16 @@ export function getRootOrganizationRedirect(
     return null;
   }
 
+  const organizationContexts = session.organizationContexts ?? [];
+  const selectedOrganizationSlug = organizationContexts.some(
+    (context) => context.organizationSlug === session.organizationSlug,
+  )
+    ? session.organizationSlug
+    : null;
   const organizationSlug =
-    session.organizationContexts?.find((context) => context.isCurrent)?.organizationSlug ??
-    session.organizationContexts?.[0]?.organizationSlug ??
+    selectedOrganizationSlug ??
+    organizationContexts.find((context) => context.isCurrent)?.organizationSlug ??
+    organizationContexts[0]?.organizationSlug ??
     session.organizationSlug;
 
   if (!organizationSlug) {
