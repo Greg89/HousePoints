@@ -108,7 +108,7 @@ The integration suite intentionally asserts that invalid operations fail. Prisma
 
 **Scope:** Critical happy path only, not exhaustive.
 
-**Status:** Implemented as an opt-in staging/local harness.
+**Status:** Implemented as an opt-in staging/local harness and scheduled staging monitor.
 
 Prerequisite: a seeded test database, test Auth0 tenant or staging environment, and a test user that belongs to an organization with at least one assignable target member.
 
@@ -130,3 +130,14 @@ npm run test:e2e
 ```
 
 The test is skipped when required environment variables are missing so normal unit-test and build gates remain stable without Auth0 credentials.
+
+Scheduled staging coverage now runs through `.github/workflows/e2e-staging.yml`. The workflow can be started manually with `workflow_dispatch` and also runs on a weekday cron schedule from the default branch. It uses the `staging` GitHub Environment for E2E secrets, validates required configuration before running, installs Chromium through Playwright, and uploads the Playwright HTML report plus trace/test results as workflow artifacts.
+
+Required GitHub Environment secrets for `staging`:
+
+- `E2E_BASE_URL`
+- `E2E_USER_EMAIL`
+- `E2E_USER_PASSWORD`
+- `E2E_TARGET_MEMBER`
+
+The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).
