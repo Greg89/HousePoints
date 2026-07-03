@@ -147,7 +147,7 @@ Verification:
 
 ### Phase 2 - Dual-Read Actor Resolution
 
-Status: implemented.
+Status: implemented. Actor resolution now uses the active membership fallback path even when the legacy current-org shadow is empty or stale.
 
 - Update `getActorBySub` to prefer `OrganizationMembership` when it exists.
 - Fall back to legacy fields for safety.

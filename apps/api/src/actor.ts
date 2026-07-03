@@ -71,9 +71,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
     return null;
   }
 
-  const activeMembership = (actor.memberships ?? []).find(
-    (membership) => membership.organizationId === actor.organizationId,
-  );
+  const activeMembership = resolvePreferredMembership(actor);
 
   if (activeMembership) {
     return {
@@ -172,6 +170,24 @@ type PreferredOrgContextSource = {
     organization: { name: string; slug: string };
   }>;
 };
+
+type PreferredMembershipSource = {
+  organizationId: string | null;
+  memberships?: Array<{
+    id: string;
+    organizationId: string;
+    role: UserRole;
+    houseId: string | null;
+    organization: { name: string; slug: string };
+  }>;
+};
+
+function resolvePreferredMembership(user: PreferredMembershipSource) {
+  const activeMemberships = user.memberships ?? [];
+  return activeMemberships.find(
+    (membership) => membership.organizationId === user.organizationId,
+  ) ?? activeMemberships[0] ?? null;
+}
 
 function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
   const activeMemberships = user.memberships ?? [];

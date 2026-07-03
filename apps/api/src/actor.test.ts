@@ -223,6 +223,80 @@ describe("getActorBySub", () => {
     });
   });
 
+  it("uses the first active membership when the legacy organization shadow is empty", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: null,
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-1",
+      role: "ADMIN",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("uses the first active membership when the legacy organization shadow is stale", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: null,
+        organizationId: "org-stale",
+        organization: null,
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-1",
+      role: "OWNER",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
   it("returns null when no user matches the Auth0 subject", async () => {
     mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue(null);
