@@ -111,7 +111,7 @@ The E2E account should not be a real user. If tests mutate data, the staging org
 
 Grow the suite slowly:
 
-1. Smoke: login and dashboard render.
+1. Smoke: login, dashboard render, primary tabs navigate, and Manage renders when available.
 2. Core: award points, Activity shows the transaction, Leaderboard shows the target.
 3. Team: generate invite, assign house, promote/demote admin.
 4. Seasons: switch historical season and verify reports/standings update.
@@ -139,4 +139,4 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A4 - What's new UX | Deferred | Depends on release records. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
 | B2 - Test data contract | Deferred | Needs stable staging account/org setup. |
-| B3 - E2E coverage expansion | Deferred | Add one workflow slice at a time. |
+| B3 - E2E coverage expansion | In progress | Read-only dashboard smoke coverage added. |

@@ -112,7 +112,16 @@ The integration suite intentionally asserts that invalid operations fail. Prisma
 
 Prerequisite: a seeded test database, test Auth0 tenant or staging environment, and a test user that belongs to an organization with at least one assignable target member.
 
-Implemented test path:
+Implemented E2E paths:
+
+Read-only dashboard smoke:
+
+1. Login flow - visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard.
+2. Dashboard shell - confirm the welcome state and Award Points action render.
+3. Core tabs - switch through Overview, Activity, and Leaderboard.
+4. Manage tab - if the staging user has elevated access, confirm the Manage section navigation renders.
+
+Mutating happy path:
 
 1. Login flow - visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard.
 2. Award points - click Award Points, select a target member, enter amount and reason, submit, and confirm the award succeeds.

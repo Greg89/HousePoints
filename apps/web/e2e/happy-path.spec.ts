@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { exactNamePattern, missingRequiredEnv, signInIfNeeded } from "./support/auth";
 
 const requiredEnv = [
   "E2E_BASE_URL",
@@ -7,48 +8,19 @@ const requiredEnv = [
   "E2E_TARGET_MEMBER",
 ] as const;
 
-const missingEnv = requiredEnv.filter((name) => !process.env[name]);
+const missingEnv = missingRequiredEnv(requiredEnv);
 
 test.skip(
   missingEnv.length > 0,
   `Missing E2E environment variables: ${missingEnv.join(", ")}`,
 );
 
-async function fillFirstVisible(page: Page, selectors: string, value: string) {
-  const field = page.locator(selectors).first();
-  await expect(field).toBeVisible();
-  await field.fill(value);
-}
-
-async function completeAuth0Login(page: Page) {
-  await fillFirstVisible(
-    page,
-    'input[name="username"], input[name="email"], input[type="email"]',
-    process.env.E2E_USER_EMAIL!,
-  );
-  await fillFirstVisible(
-    page,
-    'input[name="password"], input[type="password"]',
-    process.env.E2E_USER_PASSWORD!,
-  );
-  await page.getByRole("button", { name: /^(continue|log in|sign in)$/i }).click();
-}
-
-function exactNamePattern(value: string) {
-  return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
-}
-
 test("login, award points, and see activity plus leaderboard updates", async ({ page }) => {
   const targetMember = process.env.E2E_TARGET_MEMBER!;
   const note = `Playwright E2E recognition ${Date.now()}`;
 
   await page.goto("/");
-
-  const signInLink = page.getByRole("link", { name: /sign in/i });
-  if (await signInLink.isVisible().catch(() => false)) {
-    await signInLink.click();
-    await completeAuth0Login(page);
-  }
+  await signInIfNeeded(page);
 
   await expect(page.getByText(/welcome back/i)).toBeVisible();
 
