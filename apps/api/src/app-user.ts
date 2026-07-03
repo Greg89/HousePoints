@@ -8,12 +8,54 @@ export const APP_USER_SELECT = {
   houseThemeEnabled: true,
   role: true,
   organizationId: true,
-  organization: { select: { slug: true } },
+  organization: { select: { name: true, slug: true } },
   houseId: true,
   house: { select: { name: true, color: true } },
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+    },
+    orderBy: { organization: { name: "asc" } },
+    select: {
+      organizationId: true,
+      role: true,
+      houseId: true,
+      organization: { select: { name: true, slug: true } },
+      house: { select: { name: true, color: true } },
+    },
+  },
 } as const;
 
 export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>) {
+  const organizationContexts = (user.memberships ?? []).map((membership) => ({
+    organizationId: membership.organizationId,
+    organizationName: membership.organization.name,
+    organizationSlug: membership.organization.slug,
+    role: membership.role,
+    houseId: membership.houseId,
+    houseName: membership.house?.name ?? null,
+    houseColor: membership.house?.color ?? null,
+    isCurrent: membership.organizationId === user.organizationId,
+  }));
+
+  if (
+    user.organizationId &&
+    user.organization &&
+    !organizationContexts.some((context) => context.organizationId === user.organizationId)
+  ) {
+    organizationContexts.push({
+      organizationId: user.organizationId,
+      organizationName: user.organization.name,
+      organizationSlug: user.organization.slug,
+      role: user.role,
+      houseId: user.houseId,
+      houseName: user.house?.name ?? null,
+      houseColor: user.house?.color ?? null,
+      isCurrent: true,
+    });
+  }
+
   return {
     id: user.id,
     auth0Sub: user.auth0Sub,
@@ -26,5 +68,6 @@ export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER
     houseId: user.houseId,
     houseName: user.house?.name ?? null,
     houseColor: user.house?.color ?? null,
+    organizationContexts,
   };
 }

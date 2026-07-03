@@ -54,6 +54,7 @@ const appUser = {
   houseId: "house-1",
   houseName: "Phoenix",
   houseColor: "#7c3aed",
+  organizationContexts: [],
   created: false,
 };
 

@@ -1120,6 +1120,18 @@ describe("appUserSchema", () => {
     houseId: "house-1",
     houseName: "Phoenix",
     houseColor: "#7c3aed",
+    organizationContexts: [
+      {
+        organizationId: "org-1",
+        organizationName: "Acme Corp",
+        organizationSlug: "acme",
+        role: "OWNER" as const,
+        houseId: "house-1",
+        houseName: "Phoenix",
+        houseColor: "#7c3aed",
+        isCurrent: true,
+      },
+    ],
     created: true,
   };
 
