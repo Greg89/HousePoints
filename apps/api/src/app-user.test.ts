@@ -227,7 +227,52 @@ describe("mapAppUser", () => {
     }));
   });
 
-  it("adds the current legacy organization context when memberships are not selected yet", () => {
+  it("does not add stale legacy organization context when active memberships exist", () => {
+    expect(
+      mapAppUser({
+        id: "user-1",
+        auth0Sub: "auth0|user-1",
+        email: "alice@example.com",
+        displayName: "Alice",
+        houseThemeEnabled: false,
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-stale",
+        organization: { name: "Stale Org", slug: "stale" },
+        house: { name: "Legacy House", color: "#111111" },
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: null,
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: null,
+          },
+        ],
+      }),
+    ).toEqual(expect.objectContaining({
+      role: "ADMIN",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      houseId: null,
+      houseName: null,
+      houseColor: null,
+      organizationContexts: [
+        {
+          organizationId: "org-1",
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          role: "ADMIN",
+          houseId: null,
+          houseName: null,
+          houseColor: null,
+          isCurrent: true,
+        },
+      ],
+    }));
+  });
+
+  it("adds the current legacy organization context only when no memberships are selected yet", () => {
     expect(
       mapAppUser({
         id: "user-1",

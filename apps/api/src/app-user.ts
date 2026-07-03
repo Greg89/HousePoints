@@ -31,6 +31,7 @@ export const APP_USER_SELECT = {
 export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>) {
   const activeMemberships = user.memberships ?? [];
   const currentMembership = pickPreferredMembership(activeMemberships, user.organizationId);
+  const hasActiveMemberships = activeMemberships.length > 0;
   const currentOrganizationId = currentMembership?.organizationId ?? user.organizationId;
 
   const organizationContexts = activeMemberships.map((membership) => ({
@@ -45,6 +46,7 @@ export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER
   }));
 
   if (
+    !hasActiveMemberships &&
     user.organizationId &&
     user.organization &&
     !organizationContexts.some((context) => context.organizationId === user.organizationId)
@@ -67,12 +69,12 @@ export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER
     email: user.email,
     displayName: user.displayName,
     houseThemeEnabled: user.houseThemeEnabled,
-    role: currentMembership?.role ?? user.role,
-    organizationId: currentMembership?.organizationId ?? user.organizationId,
-    organizationSlug: currentMembership?.organization.slug ?? user.organization?.slug ?? null,
-    houseId: currentMembership?.houseId ?? user.houseId,
-    houseName: currentMembership?.house?.name ?? user.house?.name ?? null,
-    houseColor: currentMembership?.house?.color ?? user.house?.color ?? null,
+    role: currentMembership?.role ?? (hasActiveMemberships ? "MEMBER" : user.role),
+    organizationId: currentMembership?.organizationId ?? (hasActiveMemberships ? null : user.organizationId),
+    organizationSlug: currentMembership?.organization.slug ?? (hasActiveMemberships ? null : user.organization?.slug ?? null),
+    houseId: currentMembership?.houseId ?? (hasActiveMemberships ? null : user.houseId),
+    houseName: currentMembership?.house?.name ?? (hasActiveMemberships ? null : user.house?.name ?? null),
+    houseColor: currentMembership?.house?.color ?? (hasActiveMemberships ? null : user.house?.color ?? null),
     organizationContexts,
   };
 }
