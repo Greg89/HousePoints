@@ -5,6 +5,7 @@ export type ActorRecord = {
   id: string;
   auth0Sub: string;
   displayName: string;
+  membershipId: string | null;
   role: UserRole;
   houseId: string | null;
   organizationId: string;
@@ -20,35 +21,28 @@ export function isOwnerRole(role: UserRole): boolean {
   return role === "OWNER";
 }
 
-export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
-  const identity = await prisma.authIdentity.findUnique({
-    where: { providerSubject: auth0Sub },
+const actorUserSelect = {
+  id: true,
+  displayName: true,
+  role: true,
+  houseId: true,
+  organizationId: true,
+  organization: {
     select: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          role: true,
-          houseId: true,
-          organizationId: true,
-          organization: {
-            select: {
-              name: true,
-              slug: true,
-            },
-          },
-        },
-      },
+      name: true,
+      slug: true,
     },
-  });
-  const actor = identity?.user ?? await prisma.user.findUnique({
-    where: { auth0Sub },
+  },
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+    },
     select: {
       id: true,
-      displayName: true,
+      organizationId: true,
       role: true,
       houseId: true,
-      organizationId: true,
       organization: {
         select: {
           name: true,
@@ -56,10 +50,43 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
         },
       },
     },
+  },
+} as const;
+
+export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: {
+      user: {
+        select: actorUserSelect,
+      },
+    },
+  });
+  const actor = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: actorUserSelect,
   });
 
   if (!actor) {
     return null;
+  }
+
+  const activeMembership = (actor.memberships ?? []).find(
+    (membership) => membership.organizationId === actor.organizationId,
+  );
+
+  if (activeMembership) {
+    return {
+      id: actor.id,
+      auth0Sub,
+      displayName: actor.displayName,
+      membershipId: activeMembership.id,
+      role: activeMembership.role,
+      houseId: activeMembership.houseId,
+      organizationId: activeMembership.organizationId,
+      organizationName: activeMembership.organization.name,
+      organizationSlug: activeMembership.organization.slug,
+    };
   }
 
   if (!actor.organizationId || !actor.organization) {
@@ -70,6 +97,7 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
     id: actor.id,
     auth0Sub,
     displayName: actor.displayName,
+    membershipId: null,
     role: actor.role,
     houseId: actor.houseId,
     organizationId: actor.organizationId,

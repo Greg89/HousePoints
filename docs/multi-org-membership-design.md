@@ -147,6 +147,8 @@ Verification:
 
 ### Phase 2 - Dual-Read Actor Resolution
 
+Status: implemented.
+
 - Update `getActorBySub` to prefer `OrganizationMembership` when it exists.
 - Fall back to legacy fields for safety.
 - Add `membershipId` to `ActorRecord`.

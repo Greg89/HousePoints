@@ -16,6 +16,37 @@ import { getActorBySub, isAdminRole, isOwnerRole } from "./actor";
 
 const mockIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const actorUserSelect = {
+  id: true,
+  displayName: true,
+  role: true,
+  houseId: true,
+  organizationId: true,
+  organization: {
+    select: {
+      name: true,
+      slug: true,
+    },
+  },
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+    },
+    select: {
+      id: true,
+      organizationId: true,
+      role: true,
+      houseId: true,
+      organization: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
+    },
+  },
+};
 
 describe("isAdminRole", () => {
   it("allows admin and owner roles to use admin capabilities", () => {
@@ -38,18 +69,30 @@ describe("getActorBySub", () => {
     vi.resetAllMocks();
   });
 
-  it("looks up actors by linked Auth0 identity with the expected select shape", async () => {
+  it("prefers active membership fields when resolving an actor by linked Auth0 identity", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
         role: "MEMBER",
-        houseId: "house-1",
+        houseId: "legacy-house",
         organizationId: "org-1",
         organization: {
-          name: "Acme Corp",
-          slug: "acme",
+          name: "Legacy Acme",
+          slug: "legacy-acme",
         },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "membership-house",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
 
@@ -57,8 +100,9 @@ describe("getActorBySub", () => {
       id: "user-1",
       auth0Sub: "github|member",
       displayName: "Member User",
-      role: "MEMBER",
-      houseId: "house-1",
+      membershipId: "membership-1",
+      role: "ADMIN",
+      houseId: "membership-house",
       organizationId: "org-1",
       organizationName: "Acme Corp",
       organizationSlug: "acme",
@@ -68,19 +112,7 @@ describe("getActorBySub", () => {
       where: { providerSubject: "github|member" },
       select: {
         user: {
-          select: {
-            id: true,
-            displayName: true,
-            role: true,
-            houseId: true,
-            organizationId: true,
-            organization: {
-              select: {
-                name: true,
-                slug: true,
-              },
-            },
-          },
+          select: actorUserSelect,
         },
       },
     });
@@ -99,14 +131,27 @@ describe("getActorBySub", () => {
         name: "Acme Corp",
         slug: "acme",
       },
+      memberships: [
+        {
+          id: "membership-1",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-2",
+          organization: {
+            name: "Acme Corp",
+            slug: "acme",
+          },
+        },
+      ],
     });
 
     await expect(getActorBySub("auth0|member")).resolves.toEqual({
       id: "user-1",
       auth0Sub: "auth0|member",
       displayName: "Member User",
-      role: "MEMBER",
-      houseId: "house-1",
+      membershipId: "membership-1",
+      role: "OWNER",
+      houseId: "house-2",
       organizationId: "org-1",
       organizationName: "Acme Corp",
       organizationSlug: "acme",
@@ -114,19 +159,36 @@ describe("getActorBySub", () => {
 
     expect(mockFindUnique).toHaveBeenCalledWith({
       where: { auth0Sub: "auth0|member" },
-      select: {
-        id: true,
-        displayName: true,
-        role: true,
-        houseId: true,
-        organizationId: true,
+      select: actorUserSelect,
+    });
+  });
+
+  it("falls back to legacy user org fields when no active membership exists yet", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: "house-1",
+        organizationId: "org-1",
         organization: {
-          select: {
-            name: true,
-            slug: true,
-          },
+          name: "Acme Corp",
+          slug: "acme",
         },
+        memberships: [],
       },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: null,
+      role: "MEMBER",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
     });
   });
 
@@ -146,6 +208,7 @@ describe("getActorBySub", () => {
         houseId: null,
         organizationId: null,
         organization: null,
+        memberships: [],
       },
     });
 

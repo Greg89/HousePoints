@@ -17,9 +17,12 @@ const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const actor: ActorRecord = {
   id: "user-1",
   auth0Sub: "auth0|user-1",
+  displayName: "Test User",
+  membershipId: "membership-1",
   role: "MEMBER",
   houseId: "house-1",
   organizationId: "org-1",
+  organizationName: "Acme Corp",
   organizationSlug: "acme",
 };
 
