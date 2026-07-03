@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { pickPreferredMembership } from "./membership-context.js";
 
 export const APP_USER_SELECT = {
   id: true,
@@ -29,14 +30,8 @@ export const APP_USER_SELECT = {
 
 export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>) {
   const activeMemberships = user.memberships ?? [];
-  const currentOrganizationId =
-    activeMemberships.find((membership) => membership.organizationId === user.organizationId)
-      ?.organizationId ??
-    activeMemberships[0]?.organizationId ??
-    user.organizationId;
-  const currentMembership =
-    activeMemberships.find((membership) => membership.organizationId === currentOrganizationId) ??
-    null;
+  const currentMembership = pickPreferredMembership(activeMemberships, user.organizationId);
+  const currentOrganizationId = currentMembership?.organizationId ?? user.organizationId;
 
   const organizationContexts = activeMemberships.map((membership) => ({
     organizationId: membership.organizationId,

@@ -1,5 +1,6 @@
 import type { UserRole } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { pickPreferredMembership } from "./membership-context.js";
 
 export type ActorRecord = {
   id: string;
@@ -183,18 +184,11 @@ type PreferredMembershipSource = {
 };
 
 function resolvePreferredMembership(user: PreferredMembershipSource) {
-  const activeMemberships = user.memberships ?? [];
-  return activeMemberships.find(
-    (membership) => membership.organizationId === user.organizationId,
-  ) ?? activeMemberships[0] ?? null;
+  return pickPreferredMembership(user.memberships, user.organizationId);
 }
 
 function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
-  const activeMemberships = user.memberships ?? [];
-  const legacyCurrentMembership = activeMemberships.find(
-    (membership) => membership.organizationId === user.organizationId,
-  );
-  const preferredMembership = legacyCurrentMembership ?? activeMemberships[0] ?? null;
+  const preferredMembership = pickPreferredMembership(user.memberships, user.organizationId);
 
   if (preferredMembership) {
     return {
