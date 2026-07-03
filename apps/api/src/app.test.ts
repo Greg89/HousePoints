@@ -3396,7 +3396,15 @@ describe("POST /admin/org/owner", () => {
 
   it("returns 404 when the target user is outside the owner's organization", async () => {
     mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
-    mockMembershipFindFirst.mockResolvedValueOnce(null);
+    mockMembershipFindFirst
+      .mockResolvedValueOnce({
+        id: "membership-owner",
+        userId: "user-owner",
+        role: "OWNER",
+        houseId: "house-1",
+        user: { id: "user-owner", displayName: "Olivia", email: "admin@acme.com" },
+      })
+      .mockResolvedValueOnce(null);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3413,13 +3421,22 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("rejects transferring ownership to another owner", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeOwner({
-        id: "user-owner-2",
-        displayName: "Second Owner",
-        organizationId: "org-secure",
-      }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst
+      .mockResolvedValueOnce({
+        id: "membership-owner",
+        userId: "user-owner",
+        role: "OWNER",
+        houseId: "house-1",
+        user: { id: "user-owner", displayName: "Olivia", email: "admin@acme.com" },
+      })
+      .mockResolvedValueOnce({
+        id: "membership-owner-2",
+        userId: "user-owner-2",
+        role: "OWNER",
+        houseId: "house-1",
+        user: { id: "user-owner-2", displayName: "Second Owner", email: "second-owner@acme.com" },
+      });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3444,18 +3461,40 @@ describe("POST /admin/org/owner", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate
-      .mockResolvedValueOnce({ id: "user-owner" })
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst
       .mockResolvedValueOnce({
-        id: "user-target",
-        displayName: "Taylor",
-        email: "taylor@acme.com",
+        id: "membership-owner",
+        userId: "user-owner",
         role: "OWNER",
         houseId: "house-1",
+        user: { id: "user-owner", displayName: "Olivia", email: "admin@acme.com" },
+      })
+      .mockResolvedValueOnce({
+        id: "membership-target",
+        userId: "user-target",
+        role: targetUser.role,
+        houseId: targetUser.houseId,
+        user: {
+          id: targetUser.id,
+          displayName: targetUser.displayName,
+          email: targetUser.email,
+        },
       });
+    mockMembershipUpdate
+      .mockResolvedValueOnce({ id: "membership-owner" })
+      .mockResolvedValueOnce({
+        role: "OWNER",
+        houseId: "house-1",
+        user: {
+          id: "user-target",
+          displayName: "Taylor",
+          email: "taylor@acme.com",
+        },
+      });
+    mockUserUpdate
+      .mockResolvedValueOnce({ id: "user-owner" })
+      .mockResolvedValueOnce({ id: "user-target" });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3466,6 +3505,20 @@ describe("POST /admin/org/owner", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockMembershipUpdate).toHaveBeenNthCalledWith(1, {
+      where: { id: "membership-owner" },
+      data: { role: "ADMIN" },
+      select: { id: true },
+    });
+    expect(mockMembershipUpdate).toHaveBeenNthCalledWith(2, {
+      where: { id: "membership-target" },
+      data: { role: "OWNER" },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
+    });
     expect(mockUserUpdate).toHaveBeenNthCalledWith(1, {
       where: { id: "user-owner" },
       data: { role: "ADMIN" },
@@ -3474,13 +3527,7 @@ describe("POST /admin/org/owner", () => {
     expect(mockUserUpdate).toHaveBeenNthCalledWith(2, {
       where: { id: "user-target" },
       data: { role: "OWNER" },
-      select: {
-        id: true,
-        displayName: true,
-        email: true,
-        role: true,
-        houseId: true,
-      },
+      select: { id: true },
     });
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {

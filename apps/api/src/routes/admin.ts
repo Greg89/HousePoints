@@ -418,20 +418,48 @@ export async function changeUserRoleInDb(params: {
 export async function transferOwnershipInDb(params: {
   organizationId: string;
   actor: { id: string; displayName: string };
-  targetUser: { id: string; displayName: string; email: string | null; role: string; houseId: string | null };
+  actorMembership: { id: string; userId: string };
+  targetMembership: {
+    id: string;
+    userId: string;
+    role: string;
+    houseId: string | null;
+    user: { id: string; displayName: string; email: string | null };
+  };
 }) {
   return prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: params.actor.id },
+    await tx.organizationMembership.update({
+      where: { id: params.actorMembership.id },
       data: { role: "ADMIN" },
       select: { id: true },
     });
 
-    const newOwner = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const newOwnerMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: { role: "OWNER" },
-      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
     });
+    await tx.user.update({
+      where: { id: params.actorMembership.userId },
+      data: { role: "ADMIN" },
+      select: { id: true },
+    });
+    await tx.user.update({
+      where: { id: params.targetMembership.userId },
+      data: { role: "OWNER" },
+      select: { id: true },
+    });
+    const newOwner = {
+      id: newOwnerMembership.user.id,
+      displayName: newOwnerMembership.user.displayName,
+      email: newOwnerMembership.user.email,
+      role: newOwnerMembership.role,
+      houseId: newOwnerMembership.houseId,
+    };
 
     await tx.auditEvent.create({
       data: {
@@ -444,7 +472,7 @@ export async function transferOwnershipInDb(params: {
           previousOwnerName: params.actor.displayName,
           newOwnerId: newOwner.id,
           newOwnerName: newOwner.displayName,
-          previousRole: params.targetUser.role,
+          previousRole: params.targetMembership.role,
           newRole: "OWNER",
         },
       },
@@ -458,7 +486,7 @@ export async function transferOwnershipInDb(params: {
           actorDisplayName: params.actor.displayName,
           targetUserDisplayName: newOwner.displayName,
           targetUserId: newOwner.id,
-          previousRole: params.targetUser.role,
+          previousRole: params.targetMembership.role,
           newRole: "OWNER",
         }),
         buildRoleChangedNotificationData({
@@ -705,13 +733,23 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+    const [actorMembership, targetMembership] = await Promise.all([
+      findMembershipForRoleChange(actor.organizationId, actor.id),
+      findMembershipForRoleChange(actor.organizationId, parsed.targetUserId),
+    ]);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!actorMembership || actorMembership.role !== "OWNER") {
+      return reply.status(403).send({
+        message: "Owner role required",
+        code: "OWNER_REQUIRED",
+      });
+    }
+
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
-    if (targetUser.role === "OWNER") {
+    if (targetMembership.role === "OWNER") {
       return reply.status(409).send({
         message: "That member is already an owner.",
         code: "TARGET_ALREADY_OWNER",
@@ -721,13 +759,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const newOwner = await transferOwnershipInDb({
       organizationId: actor.organizationId,
       actor: { id: actor.id, displayName: actor.displayName },
-      targetUser: {
-        id: targetUser.id,
-        displayName: targetUser.displayName,
-        email: targetUser.email,
-        role: targetUser.role,
-        houseId: targetUser.houseId,
-      },
+      actorMembership,
+      targetMembership,
     });
 
     info(request.log, "admin.org.owner_transferred", {

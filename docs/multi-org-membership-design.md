@@ -180,7 +180,7 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion now validates the target through active membership, updates `OrganizationMembership.role`, and shadow-writes legacy `User.role`.
+Status: in progress. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`.
 
 Update workflows:
 
@@ -188,7 +188,7 @@ Update workflows:
 - Join org: allow joining another org by creating a new membership instead of returning `ALREADY_IN_ORG`.
 - Assign house: update membership `houseId` - implemented with legacy `User.houseId` shadow write.
 - Promote/demote: update membership `role` - implemented with legacy `User.role` shadow write.
-- Transfer ownership: update membership roles.
+- Transfer ownership: update membership roles - implemented with legacy `User.role` shadow writes.
 - Remove member: archive membership and archive relevant notifications.
 
 At the end of this phase, `User.organizationId`, `User.role`, and `User.houseId` are legacy shadows only.
