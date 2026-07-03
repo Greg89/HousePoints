@@ -305,9 +305,15 @@ export async function changeUserRoleInDb(params: {
       data: { role: params.newRole as "MEMBER" | "ADMIN" | "OWNER" },
       select: { id: true, displayName: true, email: true, role: true, houseId: true },
     });
-    const ownerRecipients = await tx.user.findMany({
-      where: { organizationId: params.organizationId, role: "OWNER", id: { not: params.actorId } },
-      select: { id: true },
+    const ownerRecipients = await tx.organizationMembership.findMany({
+      where: {
+        organizationId: params.organizationId,
+        role: "OWNER",
+        userId: { not: params.actorId },
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
     });
     await tx.auditEvent.create({
       data: {
@@ -318,7 +324,7 @@ export async function changeUserRoleInDb(params: {
         metadata: { targetUserId: changedUser.id, targetUserName: changedUser.displayName, previousRole: params.targetUser.role, newRole: changedUser.role },
       },
     });
-    const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.id)]));
+    const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.user.id)]));
     if (recipientIds.length > 0) {
       await tx.notification.createMany({
         data: recipientIds.map((recipientId) => buildRoleChangedNotificationData({

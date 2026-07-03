@@ -1767,10 +1767,10 @@ describe("POST /seasons/start", () => {
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
-    mockUserFindMany.mockResolvedValue([
-      { id: "user-owner" },
-      { id: "user-admin" },
-      { id: "user-member" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "user-owner" } },
+      { user: { id: "user-admin" } },
+      { user: { id: "user-member" } },
     ]);
     mockNotificationCreateMany.mockResolvedValue({ count: 3 });
     const app = await buildTestApp("auth0|owner");
@@ -1824,11 +1824,13 @@ describe("POST /seasons/start", () => {
         },
       },
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [
@@ -1962,7 +1964,7 @@ describe("POST /seasons/start", () => {
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
-    mockUserFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([]);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -1972,11 +1974,13 @@ describe("POST /seasons/start", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -3074,9 +3078,9 @@ describe("POST /admin/users/role", () => {
       role: "ADMIN",
       houseId: "house-1",
     });
-    mockUserFindMany.mockResolvedValue([
-      { id: "user-owner-2" },
-      { id: "user-target" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "user-owner-2" } },
+      { user: { id: "user-target" } },
     ]);
     const app = await buildTestApp("auth0|owner");
 
@@ -3113,13 +3117,15 @@ describe("POST /admin/users/role", () => {
         },
       },
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-secure",
         role: "OWNER",
-        id: { not: "user-owner" },
+        userId: { not: "user-owner" },
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [
@@ -5059,9 +5065,9 @@ describe("POST /orgs/join", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue(joinedUser);
-    mockUserFindMany.mockResolvedValue([
-      { id: "admin-1" },
-      { id: "owner-1" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "admin-1" } },
+      { user: { id: "owner-1" } },
     ]);
     mockNotificationCreateMany.mockResolvedValue({ count: 2 });
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
@@ -5104,13 +5110,15 @@ describe("POST /orgs/join", () => {
         },
       },
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-1",
         role: { in: ["ADMIN", "OWNER"] },
-        id: { not: "user-1" },
+        userId: { not: "user-1" },
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [
@@ -5167,6 +5175,7 @@ describe("POST /orgs/join", () => {
     expect(res.statusCode).toBe(200);
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     expect(mockUserFindMany).not.toHaveBeenCalled();
+    expect(mockMembershipFindMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -5175,7 +5184,7 @@ describe("POST /orgs/join", () => {
     mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
-    mockUserFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([]);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -5185,13 +5194,15 @@ describe("POST /orgs/join", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-1",
         role: { in: ["ADMIN", "OWNER"] },
-        id: { not: "user-1" },
+        userId: { not: "user-1" },
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -5202,7 +5213,7 @@ describe("POST /orgs/join", () => {
     mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
-    mockUserFindMany.mockResolvedValue([{ id: "admin-1" }]);
+    mockMembershipFindMany.mockResolvedValue([{ user: { id: "admin-1" } }]);
     mockNotificationCreateMany.mockResolvedValue({ count: 0 });
     const app = await buildTestApp();
 

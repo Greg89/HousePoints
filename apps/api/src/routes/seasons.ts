@@ -176,16 +176,20 @@ export async function startSeasonTransaction(actor: ActorRecord, seasonName: str
       },
     });
 
-    const notificationRecipients = await tx.user.findMany({
-      where: { organizationId: actor.organizationId },
-      select: { id: true },
+    const notificationRecipients = await tx.organizationMembership.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
     });
 
     if (notificationRecipients.length > 0) {
       await tx.notification.createMany({
         data: notificationRecipients.map((recipient) => buildSeasonStartedNotificationData({
           organizationId: actor.organizationId,
-          recipientId: recipient.id,
+          recipientId: recipient.user.id,
           actorDisplayName: actor.displayName,
           seasonName: activeSeason.name,
           seasonId: activeSeason.id,

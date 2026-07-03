@@ -318,19 +318,21 @@ export async function joinOrgInDb(params: {
 
     let notificationCount = 0;
     if (!user.houseId) {
-      const notificationRecipients = await tx.user.findMany({
+      const notificationRecipients = await tx.organizationMembership.findMany({
         where: {
           organizationId: invite.organizationId,
           role: { in: ["ADMIN", "OWNER"] },
-          id: { not: user.id },
+          userId: { not: user.id },
+          isActive: true,
+          archivedAt: null,
         },
-        select: { id: true },
+        select: { user: { select: { id: true } } },
       });
       if (notificationRecipients.length > 0) {
         const created = await tx.notification.createMany({
           data: notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
             organizationId: invite.organizationId,
-            recipientId: recipient.id,
+            recipientId: recipient.user.id,
             joinedUserName: user.displayName,
             organizationName: invite.organization?.name ?? "the organization",
             joinedUserId: user.id,
