@@ -1,10 +1,15 @@
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import { logWarn } from "@/lib/logging";
 
 type CurrentUserMapping = Awaited<ReturnType<typeof getCurrentUserForRequest>>;
 
 export async function getActorMappingForAdmin(action: string, requestId: string) {
-  const mapping = resolveActiveActorMapping(await getCurrentUserForRequest(requestId));
+  const activeOrganizationSlug = await readActiveOrganizationSlug();
+  const mapping = resolveActiveActorMapping(
+    await getCurrentUserForRequest(requestId),
+    activeOrganizationSlug,
+  );
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     logWarn("web.admin.forbidden", {
@@ -19,8 +24,12 @@ export async function getActorMappingForAdmin(action: string, requestId: string)
   return mapping;
 }
 
-export function resolveActiveActorMapping(mapping: CurrentUserMapping): CurrentUserMapping {
+export function resolveActiveActorMapping(
+  mapping: CurrentUserMapping,
+  activeOrganizationSlug?: string | null,
+): CurrentUserMapping {
   const activeOrganizationContext =
+    mapping.organizationContexts.find((context) => context.organizationSlug === activeOrganizationSlug) ??
     mapping.organizationContexts.find((context) => context.isCurrent) ??
     mapping.organizationContexts[0] ??
     null;

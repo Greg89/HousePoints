@@ -14,6 +14,7 @@ vi.mock("@housepoints/db", () => ({
 import { prisma } from "@housepoints/db";
 import {
   getActorBySub,
+  getActorBySubForOrganizationSlug,
   getUserOrgContextBySub,
   getUserRouteOrgContextBySub,
   isAdminRole,
@@ -318,6 +319,92 @@ describe("getActorBySub", () => {
     });
 
     await expect(getActorBySub("auth0|member")).resolves.toBeNull();
+  });
+});
+
+describe("getActorBySubForOrganizationSlug", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns the membership-scoped actor for the requested organization slug", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-1",
+        organization: {
+          name: "Legacy Acme",
+          slug: "legacy-acme",
+        },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+          {
+            id: "membership-2",
+            organizationId: "org-2",
+            role: "ADMIN",
+            houseId: "house-2",
+            organization: {
+              name: "Beta Org",
+              slug: "beta",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySubForOrganizationSlug("auth0|member", "beta")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-2",
+      role: "ADMIN",
+      houseId: "house-2",
+      organizationId: "org-2",
+      organizationName: "Beta Org",
+      organizationSlug: "beta",
+    });
+  });
+
+  it("returns null when the requested slug is not one of the user's active memberships", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-1",
+        organization: {
+          name: "Legacy Acme",
+          slug: "legacy-acme",
+        },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySubForOrganizationSlug("auth0|member", "beta")).resolves.toBeNull();
   });
 });
 

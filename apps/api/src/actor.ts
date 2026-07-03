@@ -205,6 +205,62 @@ function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgCon
   };
 }
 
+export async function getActorBySubForOrganizationSlug(
+  auth0Sub: string,
+  organizationSlug: string,
+): Promise<ActorRecord | null> {
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: {
+      user: {
+        select: actorUserSelect,
+      },
+    },
+  });
+  const actor = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: actorUserSelect,
+  });
+
+  if (!actor) {
+    return null;
+  }
+
+  const requestedMembership = (actor.memberships ?? []).find(
+    (membership) => membership.organization.slug === organizationSlug,
+  );
+
+  if (requestedMembership) {
+    return {
+      id: actor.id,
+      auth0Sub,
+      displayName: actor.displayName,
+      membershipId: requestedMembership.id,
+      role: requestedMembership.role,
+      houseId: requestedMembership.houseId,
+      organizationId: requestedMembership.organizationId,
+      organizationName: requestedMembership.organization.name,
+      organizationSlug: requestedMembership.organization.slug,
+    };
+  }
+
+  if (actor.organization?.slug !== organizationSlug || !actor.organizationId) {
+    return null;
+  }
+
+  return {
+    id: actor.id,
+    auth0Sub,
+    displayName: actor.displayName,
+    membershipId: null,
+    role: actor.role,
+    houseId: actor.houseId,
+    organizationId: actor.organizationId,
+    organizationName: actor.organization.name,
+    organizationSlug: actor.organization.slug,
+  };
+}
+
 export async function getUserRouteOrgContextBySub(
   auth0Sub: string,
   requestedOrganizationId: string,

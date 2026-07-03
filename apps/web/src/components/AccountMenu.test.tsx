@@ -163,7 +163,7 @@ describe("AccountMenu", () => {
     const switcher = screen.getByRole("region", { name: /switch organization/i });
     expect(within(switcher).getByText("Acme Corp")).toBeInTheDocument();
     expect(within(switcher).getByText("Current")).toBeInTheDocument();
-    expect(within(switcher).getByRole("link", { name: /beta org/i })).toHaveAttribute("href", "/o/beta");
+    expect(within(switcher).getByRole("link", { name: /beta org/i })).toHaveAttribute("href", "/o/beta/switch");
   });
 
   it("marks an action notification read before navigating", async () => {

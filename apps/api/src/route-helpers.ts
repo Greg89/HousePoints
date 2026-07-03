@@ -1,6 +1,12 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { ZodType, z } from "zod";
-import { getActorBySub, isAdminRole, isOwnerRole, type ActorRecord } from "./actor.js";
+import {
+  getActorBySub,
+  getActorBySubForOrganizationSlug,
+  isAdminRole,
+  isOwnerRole,
+  type ActorRecord,
+} from "./actor.js";
 import { warn } from "./logging.js";
 import { resolveSeasonScope, SeasonScopeError } from "./season-scope.js";
 
@@ -42,10 +48,13 @@ export async function requireActor(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<ActorRecord | null> {
-  const actor = await getActorBySub(request.auth.subject);
+  const organizationSlug = readScopedOrganizationSlug(request);
+  const actor = organizationSlug
+    ? await getActorBySubForOrganizationSlug(request.auth.subject, organizationSlug)
+    : await getActorBySub(request.auth.subject);
 
   if (!actor) {
-    warn(request.log, "auth.actor_not_found", {});
+    warn(request.log, "auth.actor_not_found", { organizationSlug });
     await reply.status(403).send({
       code: "ACTOR_NOT_MAPPED",
       message: "Signed-in user is not mapped to an internal account",
@@ -54,6 +63,12 @@ export async function requireActor(
   }
 
   return actor;
+}
+
+function readScopedOrganizationSlug(request: FastifyRequest): string | null {
+  const raw = request.headers["x-housepoints-organization-slug"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 /**

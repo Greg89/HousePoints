@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import { logWarn } from "@/lib/logging";
 import { getActorMappingForAdmin, resolveActiveActorMapping } from "./admin-auth";
@@ -7,10 +8,15 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUserForRequest: vi.fn(),
 }));
 
+vi.mock("@/lib/active-organization", () => ({
+  readActiveOrganizationSlug: vi.fn(),
+}));
+
 vi.mock("@/lib/logging", () => ({
   logWarn: vi.fn(),
 }));
 
+const readActiveOrganizationSlugMock = vi.mocked(readActiveOrganizationSlug);
 const getCurrentUserForRequestMock = vi.mocked(getCurrentUserForRequest);
 const logWarnMock = vi.mocked(logWarn);
 
@@ -52,11 +58,41 @@ describe("resolveActiveActorMapping", () => {
       houseColor: "#22c55e",
     });
   });
+
+  it("prefers the selected organization slug when multiple memberships exist", () => {
+    expect(
+      resolveActiveActorMapping(
+        {
+          ...mapping,
+          organizationContexts: [
+            mapping.organizationContexts[0],
+            {
+              organizationId: "org-2",
+              organizationName: "Beta Org",
+              organizationSlug: "beta",
+              role: "OWNER" as const,
+              houseId: null,
+              houseName: null,
+              houseColor: null,
+              isCurrent: false,
+            },
+          ],
+        },
+        "beta",
+      ),
+    ).toMatchObject({
+      role: "OWNER",
+      organizationId: "org-2",
+      organizationSlug: "beta",
+      houseId: null,
+    });
+  });
 });
 
 describe("getActorMappingForAdmin", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    readActiveOrganizationSlugMock.mockResolvedValue(null);
   });
 
   it("authorizes admins from the active membership context", async () => {

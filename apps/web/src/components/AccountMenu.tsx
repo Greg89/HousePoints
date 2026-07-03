@@ -320,7 +320,7 @@ function OrganizationSwitchLink({ context }: { context: AppUserOrganizationConte
   }
 
   return (
-    <a className={className} href={`/o/${encodeURIComponent(context.organizationSlug)}`}>
+    <a className={className} href={`/o/${encodeURIComponent(context.organizationSlug)}/switch`}>
       {content}
     </a>
   );
