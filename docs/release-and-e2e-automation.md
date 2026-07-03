@@ -29,6 +29,8 @@ Implemented first slice:
 
 Future A1 automation can generate GitHub Releases and static release pages from the same release metadata. The current manual version gives the project a durable public release history without notifying users inside the app yet.
 
+Automation scaffolding is staged under `tools/release/`. The committed `templates/release-page.html` file is the future machine-rendered release page shape, while the current `site/releases/template.html` remains the human-copyable manual template.
+
 ### Phase A2 - In-App Release Records
 
 Add an app-owned release record instead of having CI write notification rows directly.
@@ -134,7 +136,7 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 
 | Phase | Status | Notes |
 |---|---|---|
-| A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold and workflow added; semantic generation deferred. |
+| A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold, workflow, and future generator template added; semantic generation deferred. |
 | A2 - In-app release records | Deferred | Required before in-app release broadcasts. |
 | A3 - Production notification broadcast | Deferred | Should be app-owned, not direct DB writes from CI. |
 | A4 - What's new UX | Deferred | Depends on release records. |

@@ -27,6 +27,8 @@ The workflow publishes the `site` directory as the Pages artifact. The static si
 - `site/releases/template.html` - copyable structure for future release entries.
 - `site/assets/styles.css` - shared styling.
 
+Automation scaffolding lives under `tools/release/`. It is not active yet, but it documents the future semantic-release integration point and includes the machine-oriented release-page template that a generator can render into `site/releases/`.
+
 ## Commit Convention
 
 Use Conventional Commit prefixes for release intent going forward:
@@ -89,3 +91,17 @@ Staging E2E workflow
 5. Broadcast in-app release notifications after production deploys and health checks pass.
 
 GitHub Actions should trigger app behavior for user notifications. It should not write release notifications directly into the production database.
+
+## Future Semantic Release Shape
+
+The likely automated release pipeline is:
+
+1. Production branch receives a promotion merge.
+2. Semantic-release analyzes Conventional Commits since the previous production tag.
+3. Semantic-release calculates the next version and generates release notes.
+4. A HousePoints release script renders `tools/release/templates/release-page.html` into a new `site/releases/vX.Y.Z.html` page.
+5. The script updates `site/releases/index.html`.
+6. Semantic-release creates the GitHub Release with the same notes.
+7. The Pages publishing workflow deploys the updated `site` directory.
+
+Keep the manual release note process until the release-note structure is boring and repeatable. Automation should make the known process faster; it should not decide the product communication style before the team has learned what readers need.
