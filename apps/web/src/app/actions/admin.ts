@@ -25,7 +25,7 @@ import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
-import { getActorMappingForAdmin } from "./admin-auth";
+import { getActorMappingForAdmin, resolveActiveActorMapping } from "./admin-auth";
 
 export async function createHouse(formData: FormData): Promise<HouseMutationResult> {
   return runServerAction("createHouse", async (context) => {
@@ -447,7 +447,7 @@ export async function readAdminContext(requestId: string = randomUUID()) {
     return null;
   }
 
-  const mapping = await getCurrentUserForRequest(requestId);
+  const mapping = resolveActiveActorMapping(await getCurrentUserForRequest(requestId));
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     return null;
@@ -541,7 +541,7 @@ export async function readPointAdjustmentStats(
 export async function createInviteLink(): Promise<CreateInviteResult> {
   return runServerAction("createInviteLink", async (context) => {
     const { requestId } = context;
-    const actor = await getCurrentUserForRequest(requestId);
+    const actor = await getActorMappingForAdmin("createInviteLink", requestId);
 
     const response = await apiFetch("/orgs/invite", requestId, {
       method: "POST",

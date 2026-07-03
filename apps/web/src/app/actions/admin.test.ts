@@ -33,6 +33,7 @@ vi.mock("@/lib/api-client", async (importActual) => {
 
 vi.mock("./admin-auth", () => ({
   getActorMappingForAdmin: vi.fn(),
+  resolveActiveActorMapping: vi.fn((mapping) => mapping),
 }));
 
 const apiFetchMock = vi.mocked(apiFetch);
@@ -677,6 +678,7 @@ describe("createInviteLink", () => {
     });
 
     expect(runServerActionMock).toHaveBeenCalledWith("createInviteLink", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("createInviteLink", "request-1");
     expect(apiFetchMock).toHaveBeenCalledWith("/orgs/invite", "request-1", {
       method: "POST",
       body: JSON.stringify({}),
