@@ -124,6 +124,8 @@ Do this in safe, reversible slices.
 
 ### Phase 1 - Add Membership Table And Backfill
 
+Status: implemented.
+
 Schema:
 
 - Add `OrganizationMembership`.
@@ -139,8 +141,9 @@ Data migration:
 
 Verification:
 
-- Integration test ensures every existing org user has one active membership after migration.
-- Contract tests do not need to change.
+- Migration backfills one active membership for every existing user with an organization.
+- Integration tests cover membership creation, uniqueness by organization/user, and unassigned memberships.
+- Contract tests do not need to change because application response shapes are unchanged.
 
 ### Phase 2 - Dual-Read Actor Resolution
 
@@ -291,7 +294,7 @@ Multi-org unlocks safer organization archive behavior:
 
 ## First Implementation Slice
 
-Recommended first code slice:
+First code slice:
 
 1. Add `OrganizationMembership` schema and migration.
 2. Backfill memberships from existing user org fields.
@@ -299,4 +302,4 @@ Recommended first code slice:
 4. Do not change application reads yet.
 5. Update docs and leave quality gates green.
 
-This creates the new table with almost no behavior change, which is the safest foundation for the larger migration.
+Status: implemented. This creates the new table with no intended application behavior change, which is the safest foundation for the larger migration.

@@ -13,6 +13,7 @@ type CreatedRecords = {
   organizationIds: string[];
   houseIds: string[];
   userIds: string[];
+  membershipIds: string[];
   seasonIds: string[];
   auditEventIds: string[];
 };
@@ -21,6 +22,7 @@ const created: CreatedRecords = {
   organizationIds: [],
   houseIds: [],
   userIds: [],
+  membershipIds: [],
   seasonIds: [],
   auditEventIds: [],
 };
@@ -31,6 +33,9 @@ async function cleanup() {
   });
   await prisma.pointTransaction.deleteMany({
     where: { organizationId: { in: created.organizationIds } },
+  });
+  await prisma.organizationMembership.deleteMany({
+    where: { id: { in: created.membershipIds } },
   });
   await prisma.user.deleteMany({ where: { id: { in: created.userIds } } });
   await prisma.season.deleteMany({ where: { id: { in: created.seasonIds } } });
@@ -90,6 +95,26 @@ async function createLedgerFixture() {
   });
   created.userIds.push(target.id);
 
+  const actorMembership = await prisma.organizationMembership.create({
+    data: {
+      organizationId: organization.id,
+      userId: actor.id,
+      role: "ADMIN",
+      houseId: house.id,
+    },
+  });
+  created.membershipIds.push(actorMembership.id);
+
+  const targetMembership = await prisma.organizationMembership.create({
+    data: {
+      organizationId: organization.id,
+      userId: target.id,
+      role: "MEMBER",
+      houseId: house.id,
+    },
+  });
+  created.membershipIds.push(targetMembership.id);
+
   const season = await prisma.season.create({
     data: {
       organizationId: organization.id,
@@ -110,6 +135,65 @@ async function run() {
   }
 
   const { organization, house, actor, target, season } = await createLedgerFixture();
+
+  const actorMembership = await prisma.organizationMembership.findUniqueOrThrow({
+    where: {
+      organizationId_userId: {
+        organizationId: organization.id,
+        userId: actor.id,
+      },
+    },
+    include: {
+      organization: true,
+      user: true,
+      house: true,
+    },
+  });
+
+  assert.equal(actorMembership.organization.id, organization.id);
+  assert.equal(actorMembership.user.id, actor.id);
+  assert.equal(actorMembership.house?.id, house.id);
+  assert.equal(actorMembership.role, "ADMIN");
+  assert.equal(actorMembership.isActive, true);
+  assert.equal(actorMembership.archivedAt, null);
+
+  await assert.rejects(
+    () =>
+      prisma.organizationMembership.create({
+        data: {
+          organizationId: organization.id,
+          userId: actor.id,
+          role: "MEMBER",
+        },
+      }),
+    (error) => {
+      assertPrismaErrorCode(error, "P2002");
+      return true;
+    },
+  );
+
+  const unassignedMember = await prisma.user.create({
+    data: {
+      auth0Sub: `auth0|${runId}-unassigned`,
+      email: `${runId}-unassigned@example.com`,
+      displayName: "Integration Unassigned",
+      organizationId: organization.id,
+    },
+  });
+  created.userIds.push(unassignedMember.id);
+
+  const unassignedMembership = await prisma.organizationMembership.create({
+    data: {
+      organizationId: organization.id,
+      userId: unassignedMember.id,
+      role: "MEMBER",
+      houseId: null,
+    },
+  });
+  created.membershipIds.push(unassignedMembership.id);
+
+  assert.equal(unassignedMembership.houseId, null);
+  assert.equal(unassignedMembership.isActive, true);
 
   await createPrimaryOrganizationSlugAlias(prisma, {
     organizationId: organization.id,
