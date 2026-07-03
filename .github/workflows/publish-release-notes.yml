@@ -11,19 +11,25 @@ permissions:
 
 concurrency:
   group: github-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish:
     name: Publish static release notes
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Verify release notes site
+        run: |
+          test -d site || (echo "site/ directory is missing" && exit 1)
+          test -f site/index.html || (echo "site/index.html is missing" && exit 1)
+          test -f site/releases/index.html || (echo "site/releases/index.html is missing" && exit 1)
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
