@@ -180,7 +180,7 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. Create org now creates an owner membership and no longer blocks users who already belong to another organization. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
+Status: in progress. Invite preview now uses active memberships before legacy current-org shadows. Create org now creates an owner membership and no longer blocks users who already belong to another organization. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
 
 Update workflows:
 

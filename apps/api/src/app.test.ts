@@ -4985,6 +4985,45 @@ describe("POST /orgs/join/preview", () => {
     await app.close();
   });
 
+  it("uses active memberships over the legacy current organization shadow", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      membershipStatus: "SAME_ORG",
+      memberOrganizationName: "Acme Corp",
+      memberOrganizationSlug: "acme",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("reports when the signed-in user belongs to another organization", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);

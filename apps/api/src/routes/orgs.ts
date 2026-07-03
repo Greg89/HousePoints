@@ -200,28 +200,54 @@ export async function loadJoinPreviewInDb(params: {
       throw new InviteJoinError(404, "INVITE_ORG_MISMATCH", "This invite link is not valid for this organisation.", invite.id);
     }
 
+    const previewUserSelect = {
+      id: true,
+      organizationId: true,
+      organization: { select: { name: true, slug: true } },
+      memberships: {
+        where: { isActive: true, archivedAt: null },
+        select: {
+          organizationId: true,
+          organization: { select: { name: true, slug: true } },
+        },
+      },
+    } as const;
     const existingIdentity = await tx.authIdentity.findUnique({
       where: { providerSubject: params.auth0Sub },
-      select: {
-        user: { select: { organizationId: true, organization: { select: { name: true, slug: true } } } },
-      },
+      select: { user: { select: previewUserSelect } },
     });
     const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
       where: { auth0Sub: params.auth0Sub },
-      select: { organizationId: true, organization: { select: { name: true, slug: true } } },
+      select: previewUserSelect,
     });
-    const membershipStatus = !existingUser?.organizationId
+    const activeMemberships = existingUser?.memberships ?? [];
+    const inviteMembership = activeMemberships.find(
+      (membership) => membership.organizationId === invite.organizationId,
+    );
+    const otherMembership = activeMemberships.find(
+      (membership) => membership.organizationId !== invite.organizationId,
+    );
+    const legacyMembershipStatus = !existingUser?.organizationId
       ? "NONE"
       : existingUser.organizationId === invite.organizationId
         ? "SAME_ORG"
         : "OTHER_ORG";
+    const membershipStatus = inviteMembership
+      ? "SAME_ORG"
+      : otherMembership
+        ? "OTHER_ORG"
+        : legacyMembershipStatus;
+    const memberOrganization = inviteMembership?.organization
+      ?? otherMembership?.organization
+      ?? existingUser?.organization
+      ?? null;
 
     return {
       organizationName: resolvedSlug.organization.name,
       organizationSlug: resolvedSlug.currentSlug,
       membershipStatus,
-      memberOrganizationName: existingUser?.organization?.name ?? null,
-      memberOrganizationSlug: existingUser?.organization?.slug ?? null,
+      memberOrganizationName: memberOrganization?.name ?? null,
+      memberOrganizationSlug: memberOrganization?.slug ?? null,
       inviteId: invite.id,
     };
   });
