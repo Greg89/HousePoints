@@ -31,7 +31,7 @@ async function completeAuth0Login(page: Page) {
     'input[name="password"], input[type="password"]',
     process.env.E2E_USER_PASSWORD!,
   );
-  await page.getByRole("button", { name: /continue|log in|sign in/i }).click();
+  await page.getByRole("button", { name: /^(continue|log in|sign in)$/i }).click();
 }
 
 test("login, award points, and see activity plus leaderboard updates", async ({ page }) => {
