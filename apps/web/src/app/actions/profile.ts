@@ -59,12 +59,19 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   };
 
   const mapping = await getCurrentUserForRequest(requestId);
+  const activeOrganizationContext =
+    mapping.organizationContexts.find((context) => context.isCurrent) ??
+    mapping.organizationContexts[0] ??
+    null;
+  const organizationId = activeOrganizationContext?.organizationId ?? mapping.organizationId;
+  const organizationSlug = activeOrganizationContext?.organizationSlug ?? mapping.organizationSlug;
+  const houseId = activeOrganizationContext?.houseId ?? mapping.houseId;
 
   logInfo("web.session.read", {
     requestId,
     userSub: summary.userSub,
     appUserId: mapping.id,
-    hasHouse: Boolean(mapping.houseId),
+    hasHouse: Boolean(houseId),
   });
 
   logInfo("web.action.completed", {
@@ -76,16 +83,16 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     ...summary,
     userName: mapping.displayName,  // DB is source of truth; Auth0 token may be stale
     appUserId: mapping.id,
-    organizationId: mapping.organizationId,
-    organizationSlug: mapping.organizationSlug,
-    houseId: mapping.houseId,
-    houseName: mapping.houseName,
-    houseColor: mapping.houseColor,
+    organizationId,
+    organizationSlug,
+    houseId,
+    houseName: activeOrganizationContext?.houseName ?? mapping.houseName,
+    houseColor: activeOrganizationContext?.houseColor ?? mapping.houseColor,
     organizationContexts: mapping.organizationContexts,
     houseThemeEnabled: mapping.houseThemeEnabled,
-    role: mapping.role,
-    needsOrg: !mapping.organizationId,
-    needsHouseAssignment: !!mapping.organizationId && !mapping.houseId,
+    role: activeOrganizationContext?.role ?? mapping.role,
+    needsOrg: !organizationId,
+    needsHouseAssignment: !!organizationId && !houseId,
   };
 }
 

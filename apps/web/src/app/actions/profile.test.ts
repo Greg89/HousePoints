@@ -120,6 +120,49 @@ describe("readSessionSummary", () => {
       needsHouseAssignment: false,
     });
   });
+
+  it("derives the active session organization from membership contexts before legacy fields", async () => {
+    getOptionalAuthenticatedApiContextMock.mockResolvedValue({
+      user: {
+        sub: "auth0|user-1",
+        email: "stale@example.com",
+        name: "Stale Token Name",
+      },
+      accessToken: "access-token",
+    });
+    getCurrentUserForRequestMock.mockResolvedValue({
+      ...currentUser,
+      role: "MEMBER",
+      organizationId: null,
+      organizationSlug: null,
+      houseId: null,
+      houseName: null,
+      houseColor: null,
+      organizationContexts: [
+        {
+          organizationId: "org-2",
+          organizationName: "Beta Org",
+          organizationSlug: "beta",
+          role: "ADMIN",
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#2563eb",
+          isCurrent: true,
+        },
+      ],
+    });
+
+    await expect(readSessionSummary("request-1")).resolves.toMatchObject({
+      organizationId: "org-2",
+      organizationSlug: "beta",
+      houseId: "house-2",
+      houseName: "Ravenclaw",
+      houseColor: "#2563eb",
+      role: "ADMIN",
+      needsOrg: false,
+      needsHouseAssignment: false,
+    });
+  });
 });
 
 describe("updateDisplayName", () => {
