@@ -34,6 +34,10 @@ async function completeAuth0Login(page: Page) {
   await page.getByRole("button", { name: /^(continue|log in|sign in)$/i }).click();
 }
 
+function exactNamePattern(value: string) {
+  return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+}
+
 test("login, award points, and see activity plus leaderboard updates", async ({ page }) => {
   const targetMember = process.env.E2E_TARGET_MEMBER!;
   const note = `Playwright E2E recognition ${Date.now()}`;
@@ -52,9 +56,9 @@ test("login, award points, and see activity plus leaderboard updates", async ({ 
   const dialog = page.getByRole("dialog", { name: /award points/i });
 
   await dialog.getByText(/select a team member/i).click();
-  await page.getByRole("option", { name: new RegExp(targetMember, "i") }).click();
+  await page.getByRole("option", { name: exactNamePattern(targetMember) }).click();
 
-  await dialog.getByRole("button", { name: "+5" }).click();
+  await dialog.getByRole("button", { name: "+5", exact: true }).click();
 
   await dialog.getByText(/select a trait/i).click();
   await page.getByRole("option", { name: /collaboration/i }).click();
@@ -68,5 +72,5 @@ test("login, award points, and see activity plus leaderboard updates", async ({ 
   await expect(page.getByText(note)).toBeVisible();
 
   await page.getByRole("tab", { name: /leaderboard/i }).click();
-  await expect(page.getByText(new RegExp(targetMember, "i"))).toBeVisible();
+  await expect(page.getByText(exactNamePattern(targetMember))).toBeVisible();
 });
