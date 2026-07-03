@@ -85,7 +85,7 @@ export async function createOrgInDb(params: {
       select: { id: true, name: true, color: true },
     });
 
-    const user = params.existingUser
+    const userIdentity = params.existingUser
       ? await tx.user.update({
           where: { id: params.existingUser.id },
           data: {
@@ -101,7 +101,7 @@ export async function createOrgInDb(params: {
               },
             },
           },
-          select: APP_USER_SELECT,
+          select: { id: true },
         })
       : await tx.user.create({
           data: {
@@ -113,13 +113,13 @@ export async function createOrgInDb(params: {
             role: "OWNER",
             authIdentities: { create: { providerSubject: params.auth0Sub } },
           },
-          select: APP_USER_SELECT,
+          select: { id: true },
         });
 
     await tx.organizationMembership.create({
       data: {
         organizationId: org.id,
-        userId: user.id,
+        userId: userIdentity.id,
         role: "OWNER",
         houseId: house.id,
       },
@@ -132,10 +132,18 @@ export async function createOrgInDb(params: {
         name: "Season 0",
         startsAt: new Date(),
         isActive: true,
-        createdById: user.id,
+        createdById: userIdentity.id,
       },
       select: { id: true },
     });
+
+    const user = await tx.user.findUnique({
+      where: { id: userIdentity.id },
+      select: APP_USER_SELECT,
+    });
+    if (!user) {
+      throw new Error("Organization owner could not be reloaded.");
+    }
 
     return { org, house, user, season };
   });

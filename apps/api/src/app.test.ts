@@ -4784,6 +4784,22 @@ describe("POST /orgs/create", () => {
     mockOrgCreate.mockResolvedValue(ORG);
     mockHouseCreate.mockResolvedValue(HOUSE);
     mockSeasonCreate.mockResolvedValue({ id: "season-0" });
+    mockFindUnique.mockResolvedValue({
+      ...makeMember({
+        role: "OWNER",
+        email: "alice@example.com",
+        organization: { name: "Acme Corp", slug: "acme" },
+      }),
+      memberships: [
+        {
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+          house: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ],
+    });
     mockUserUpdate.mockResolvedValue(
       makeMember({
         role: "OWNER",
@@ -4804,6 +4820,15 @@ describe("POST /orgs/create", () => {
       role: "OWNER",
       organizationId: "org-1",
       houseId: "house-1",
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "OWNER",
+          houseId: "house-1",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockUserUpdate).toHaveBeenCalledWith(
@@ -4829,10 +4854,27 @@ describe("POST /orgs/create", () => {
   });
 
   it("atomically creates the organization, first house, and assigned owner", async () => {
-    mockFindUnique.mockResolvedValue({
-      id: "user-1",
-      organizationId: null,
-    });
+    mockFindUnique
+      .mockResolvedValueOnce({
+        id: "user-1",
+        organizationId: null,
+      })
+      .mockResolvedValueOnce({
+        ...makeMember({
+          role: "OWNER",
+          email: "alice@example.com",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }),
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: { name: "Phoenix", color: "#7c3aed" },
+          },
+        ],
+      });
     mockOrgCreate.mockResolvedValue(ORG);
     mockHouseCreate.mockResolvedValue(HOUSE);
     mockSeasonCreate.mockResolvedValue({ id: "season-0" });
@@ -4857,6 +4899,15 @@ describe("POST /orgs/create", () => {
       organizationId: "org-1",
       houseId: "house-1",
       houseName: "Phoenix",
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "OWNER",
+          houseId: "house-1",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockHouseCreate).toHaveBeenCalledWith({
