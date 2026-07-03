@@ -129,17 +129,30 @@ export async function updateUserProfile(
 }
 
 export async function listOrgMembers(organizationId: string) {
-  return prisma.user.findMany({
-    where: { organizationId },
-    orderBy: { displayName: "asc" },
+  const memberships = await prisma.organizationMembership.findMany({
+    where: { organizationId, isActive: true, archivedAt: null },
+    orderBy: { user: { displayName: "asc" } },
     select: {
       id: true,
-      displayName: true,
       role: true,
       houseId: true,
       house: { select: { name: true, color: true } },
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
     },
   });
+
+  return memberships.map((membership) => ({
+    id: membership.user.id,
+    displayName: membership.user.displayName,
+    role: membership.role,
+    houseId: membership.houseId,
+    house: membership.house,
+  }));
 }
 
 export async function registerUserRoutes(

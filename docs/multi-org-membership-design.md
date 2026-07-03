@@ -158,10 +158,12 @@ This gives the API a membership-aware identity boundary without changing UI beha
 
 ### Phase 3 - Move Admin And Member Reads To Memberships
 
+Status: in progress. `/members` and `/admin/context` now read active membership rows for user role and house assignment while preserving the existing response shapes.
+
 Update reads that currently query `User.organizationId`:
 
-- `/members`
-- admin context user lists
+- `/members` - implemented.
+- admin context user lists - implemented.
 - notification recipient lookups for admins/owners
 - invite activity and role-management candidate lists
 

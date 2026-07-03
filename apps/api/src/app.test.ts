@@ -23,6 +23,9 @@ vi.mock("@housepoints/db", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    organizationMembership: {
+      findMany: vi.fn(),
+    },
     authIdentity: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -86,6 +89,7 @@ import {
 // Typed shorthand helpers
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipFindMany = prisma.organizationMembership.findMany as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockAuthIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
@@ -189,6 +193,7 @@ beforeEach(() => {
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
   mockUserFindMany.mockResolvedValue([]);
+  mockMembershipFindMany.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
@@ -2245,14 +2250,14 @@ describe("POST /admin/context", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
-    expect(mockUserFindMany).not.toHaveBeenCalled();
+    expect(mockMembershipFindMany).not.toHaveBeenCalled();
     expect(mockHouseFindMany).not.toHaveBeenCalled();
     await app.close();
   });
 
   it("allows an admin and scopes organization context to the actor's organization", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
-    mockUserFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([]);
     mockHouseFindMany.mockResolvedValue([]);
     const app = await buildTestApp("auth0|admin");
 
@@ -2284,11 +2289,21 @@ describe("POST /admin/context", () => {
       },
       adminAuditNextCursor: null,
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: "org-secure" },
-      }),
-    );
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
     expect(mockHouseFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { organizationId: "org-secure" },
@@ -2299,13 +2314,15 @@ describe("POST /admin/context", () => {
 
   it("allows an owner and returns the complete organization context", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-owner",
-        displayName: "Olivia",
-        email: "owner@acme.com",
         role: "OWNER",
         houseId: "house-1",
+        user: {
+          id: "user-owner",
+          displayName: "Olivia",
+          email: "owner@acme.com",
+        },
       },
     ]);
     mockHouseFindMany.mockResolvedValue([
@@ -2369,9 +2386,10 @@ describe("POST /admin/context", () => {
       },
       adminAuditNextCursor: null,
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith(
+    expect(mockMembershipFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: "org-1" },
+        where: { organizationId: "org-1", isActive: true, archivedAt: null },
+        orderBy: { user: { displayName: "asc" } },
       }),
     );
     expect(mockHouseFindMany).toHaveBeenCalledWith(
@@ -4029,13 +4047,15 @@ describe("POST /members", () => {
     mockFindUnique.mockResolvedValue(
       makeMember({ organizationId: "org-secure" }),
     );
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-1",
-        displayName: "Alice",
         role: "MEMBER",
         houseId: "house-1",
         house: { name: "Phoenix", color: "#7c3aed" },
+        user: {
+          id: "user-1",
+          displayName: "Alice",
+        },
       },
     ]);
     const app = await buildTestApp();
@@ -4047,11 +4067,32 @@ describe("POST /members", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockUserFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: "org-secure" },
-      }),
-    );
+    expect(res.json()).toEqual([
+      {
+        id: "user-1",
+        displayName: "Alice",
+        role: "MEMBER",
+        houseId: "house-1",
+        houseName: "Phoenix",
+        houseColor: "#7c3aed",
+      },
+    ]);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        id: true,
+        role: true,
+        houseId: true,
+        house: { select: { name: true, color: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
     await app.close();
   });
 });

@@ -32,10 +32,20 @@ export async function loadAdminContextData(organizationId: string) {
     recentStartedSeasons,
     auditEvents,
   ] = await Promise.all([
-    prisma.user.findMany({
-      where: { organizationId },
-      orderBy: { displayName: "asc" },
-      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+    prisma.organizationMembership.findMany({
+      where: { organizationId, isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
     }),
     prisma.house.findMany({
       where: { organizationId },
@@ -86,7 +96,24 @@ export async function loadAdminContextData(organizationId: string) {
       },
     }),
   ]);
-  return { users, houses, recentDeletedPoints, recentInvites, inviteGeneratedCount, inviteUsedCount, activeSeason, activeSeasonDeductionTotals, recentStartedSeasons, auditEvents };
+  return {
+    users: users.map((membership) => ({
+      id: membership.user.id,
+      displayName: membership.user.displayName,
+      email: membership.user.email,
+      role: membership.role,
+      houseId: membership.houseId,
+    })),
+    houses,
+    recentDeletedPoints,
+    recentInvites,
+    inviteGeneratedCount,
+    inviteUsedCount,
+    activeSeason,
+    activeSeasonDeductionTotals,
+    recentStartedSeasons,
+    auditEvents,
+  };
 }
 
 export async function updateOrgSettingsInDb(params: {
