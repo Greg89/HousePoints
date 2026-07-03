@@ -3089,13 +3089,23 @@ describe("POST /admin/users/role", () => {
   });
 
   it("rejects attempts to change an owner role", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeOwner({
-        id: "user-owner-2",
-        displayName: "Second Owner",
-        organizationId: "org-secure",
-      }));
+    const targetOwner = makeOwner({
+      id: "user-owner-2",
+      displayName: "Second Owner",
+      organizationId: "org-secure",
+    });
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-owner-2",
+      userId: "user-owner-2",
+      role: "OWNER",
+      houseId: targetOwner.houseId,
+      user: {
+        id: targetOwner.id,
+        displayName: targetOwner.displayName,
+        email: targetOwner.email,
+      },
+    });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3120,16 +3130,28 @@ describe("POST /admin/users/role", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate.mockResolvedValue({
-      id: "user-target",
-      displayName: "Taylor",
-      email: "taylor@acme.com",
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: targetUser.role,
+      houseId: targetUser.houseId,
+      user: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+      },
+    });
+    mockMembershipUpdate.mockResolvedValue({
       role: "ADMIN",
       houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
     });
+    mockUserUpdate.mockResolvedValue({ id: "user-target" });
     mockMembershipFindMany.mockResolvedValue([
       { user: { id: "user-owner-2" } },
       { user: { id: "user-target" } },
@@ -3144,16 +3166,40 @@ describe("POST /admin/users/role", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        userId: "user-target",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-target" },
+      data: { role: "ADMIN" },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
+    });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-target" },
       data: { role: "ADMIN" },
-      select: {
-        id: true,
-        displayName: true,
-        email: true,
-        role: true,
-        houseId: true,
-      },
+      select: { id: true },
     });
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
@@ -3227,16 +3273,28 @@ describe("POST /admin/users/role", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate.mockResolvedValue({
-      id: "user-target",
-      displayName: "Taylor",
-      email: "taylor@acme.com",
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: targetUser.role,
+      houseId: targetUser.houseId,
+      user: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+      },
+    });
+    mockMembershipUpdate.mockResolvedValue({
       role: "MEMBER",
       houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
     });
+    mockUserUpdate.mockResolvedValue({ id: "user-target" });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3247,16 +3305,19 @@ describe("POST /admin/users/role", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-target" },
+      data: { role: "MEMBER" },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
+    });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-target" },
       data: { role: "MEMBER" },
-      select: {
-        id: true,
-        displayName: true,
-        email: true,
-        role: true,
-        houseId: true,
-      },
+      select: { id: true },
     });
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
@@ -3334,9 +3395,8 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("returns 404 when the target user is outside the owner's organization", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({

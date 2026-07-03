@@ -318,19 +318,65 @@ export async function findUserForRoleChange(targetUserId: string) {
   });
 }
 
+export async function findMembershipForRoleChange(organizationId: string, targetUserId: string) {
+  return prisma.organizationMembership.findFirst({
+    where: {
+      organizationId,
+      userId: targetUserId,
+      isActive: true,
+      archivedAt: null,
+    },
+    select: {
+      id: true,
+      userId: true,
+      role: true,
+      houseId: true,
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+        },
+      },
+    },
+  });
+}
+
 export async function changeUserRoleInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetUser: { id: string; displayName: string; role: string };
+  targetMembership: {
+    id: string;
+    userId: string;
+    role: string;
+    houseId: string | null;
+    user: { id: string; displayName: string; email: string | null };
+  };
   newRole: string;
 }) {
   return prisma.$transaction(async (tx) => {
-    const changedUser = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const changedMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: { role: params.newRole as "MEMBER" | "ADMIN" | "OWNER" },
-      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
     });
+    await tx.user.update({
+      where: { id: params.targetMembership.userId },
+      data: { role: params.newRole as "MEMBER" | "ADMIN" | "OWNER" },
+      select: { id: true },
+    });
+    const changedUser = {
+      id: changedMembership.user.id,
+      displayName: changedMembership.user.displayName,
+      email: changedMembership.user.email,
+      role: changedMembership.role,
+      houseId: changedMembership.houseId,
+    };
     const ownerRecipients = await tx.organizationMembership.findMany({
       where: {
         organizationId: params.organizationId,
@@ -346,8 +392,8 @@ export async function changeUserRoleInDb(params: {
         organizationId: params.organizationId,
         actorUserId: params.actorId,
         eventType: "USER_ROLE_CHANGED",
-        summary: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetUser.role} to ${changedUser.role}.`,
-        metadata: { targetUserId: changedUser.id, targetUserName: changedUser.displayName, previousRole: params.targetUser.role, newRole: changedUser.role },
+        summary: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetMembership.role} to ${changedUser.role}.`,
+        metadata: { targetUserId: changedUser.id, targetUserName: changedUser.displayName, previousRole: params.targetMembership.role, newRole: changedUser.role },
       },
     });
     const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.user.id)]));
@@ -359,7 +405,7 @@ export async function changeUserRoleInDb(params: {
           actorDisplayName: params.actorDisplayName,
           targetUserDisplayName: changedUser.displayName,
           targetUserId: changedUser.id,
-          previousRole: params.targetUser.role,
+          previousRole: params.targetMembership.role,
           newRole: changedUser.role,
         })),
         skipDuplicates: true,
@@ -827,13 +873,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
 
-    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+    const targetMembership = await findMembershipForRoleChange(actor.organizationId, parsed.targetUserId);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
-    if (targetUser.role === "OWNER") {
+    if (targetMembership.role === "OWNER") {
       return reply.status(409).send({
         message: "Owner roles cannot be changed here",
         code: "OWNER_ROLE_IMMUTABLE",
@@ -844,7 +890,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
-      targetUser: { id: targetUser.id, displayName: targetUser.displayName, role: targetUser.role },
+      targetMembership,
       newRole: parsed.role,
     });
 
@@ -852,7 +898,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
       targetUserId: updatedUser.id,
-      previousRole: targetUser.role,
+      previousRole: targetMembership.role,
       newRole: updatedUser.role,
     });
 
