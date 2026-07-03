@@ -24,6 +24,8 @@ The documents in this folder serve three purposes:
 - [Organization settings design](./org-settings-design.md): owner-only organization settings, slug-change safety, and future URL alias planning.
 - [Dashboard slug routes design](./dashboard-slug-routes-design.md): planned `/o/{slug}` dashboard routing behavior and security rules.
 - [Notification system design](./notifications-design.md): durable in-app notifications, account-menu inbox, and toast delivery plan.
+- [Release and E2E automation plan](./release-and-e2e-automation.md): phased release notes, in-app release announcements, and scheduled staging Playwright coverage.
+- [Release process](./release-process.md): current manual GitHub Pages release note flow and commit convention.
 
 ## Tier Detail Notes
 

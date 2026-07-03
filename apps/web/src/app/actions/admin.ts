@@ -13,6 +13,7 @@ import {
   orgSettingsSchema,
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
+  removeOrgMemberResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin } from "./admin-auth";
 
@@ -199,6 +200,62 @@ export async function updateOrgSlug(formData: FormData): Promise<OrgSettingsMuta
   });
 }
 
+export async function transferOwnership(formData: FormData): Promise<RoleChangeResult> {
+  return runServerAction("transferOwnership", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("transferOwnership", requestId);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+
+    if (!targetUserId) {
+      return {
+        ok: false,
+        code: "OWNER_TRANSFER_TARGET_REQUIRED",
+        message: "Choose the member who should become owner.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/owner", requestId, {
+      method: "POST",
+      body: JSON.stringify({ targetUserId }),
+    });
+
+    try {
+      await parseApiResponse(
+        response,
+        adminUserSchema,
+        "Ownership could not be transferred. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    logInfo("web.admin.owner_transferred", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      targetUserId,
+    });
+
+    revalidatePath("/");
+
+    return { ok: true };
+  });
+}
+
 export async function assignUserHouse(formData: FormData): Promise<HouseAssignmentResult> {
   return runServerAction("assignUserHouse", async (context) => {
     const { requestId } = context;
@@ -321,6 +378,62 @@ export async function promoteUserRole(formData: FormData): Promise<RoleChangeRes
       targetUserId,
       role,
     });
+
+    revalidatePath("/");
+
+    return { ok: true };
+  });
+}
+
+export async function removeOrgMember(formData: FormData): Promise<MemberRemovalResult> {
+  return runServerAction("removeOrgMember", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("removeOrgMember", requestId);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+
+    if (!targetUserId) {
+      return {
+        ok: false,
+        code: "ORG_MEMBER_REMOVE_TARGET_REQUIRED",
+        message: "Choose the member to remove.",
+      };
+    }
+
+    const response = await apiFetch("/admin/users/remove", requestId, {
+      method: "POST",
+      body: JSON.stringify({ targetUserId }),
+    });
+
+    try {
+      const removedUser = await parseApiResponse(
+        response,
+        removeOrgMemberResponseSchema,
+        "The member could not be removed. Please try again.",
+      );
+
+      logInfo("web.admin.user_removed", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId: removedUser.id,
+      });
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     revalidatePath("/");
 

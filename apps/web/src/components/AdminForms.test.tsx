@@ -166,6 +166,8 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
+    onRemoveOrgMember: vi.fn().mockResolvedValue({ ok: true }),
+    onTransferOwnership: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSlug: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
     onLoadAdminAudit: vi.fn().mockResolvedValue({
@@ -240,8 +242,8 @@ describe("AdminForms", () => {
     setupAdminForms();
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: /Team/ })).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByText("Manage your team")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByLabelText("Point adjustment activity")).toBeInTheDocument();
     const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
     expect(adjustmentActivity.getByText("Season: Q3 2026")).toBeInTheDocument();
     expect(adjustmentActivity.getByText("Points deducted")).toBeInTheDocument();
@@ -268,17 +270,21 @@ describe("AdminForms", () => {
     const housesTab = screen.getByRole("tab", { name: /Houses/ });
     const seasonsTab = screen.getByRole("tab", { name: /Seasons/ });
     const settingsTab = screen.getByRole("tab", { name: /Settings/ });
+    const rolesTab = screen.getByRole("tab", { name: /Roles/ });
 
     expect(settingsTab).toBeVisible();
     expect(housesTab).toBeVisible();
     expect(seasonsTab).toBeVisible();
+    expect(rolesTab).toBeVisible();
     expect(settingsTab).toBeDisabled();
     expect(housesTab).toBeDisabled();
     expect(seasonsTab).toBeDisabled();
+    expect(rolesTab).toBeDisabled();
     expect(settingsTab).toHaveAttribute("aria-disabled", "true");
     expect(housesTab).toHaveAttribute("aria-disabled", "true");
     expect(seasonsTab).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getAllByText("Owner only")).toHaveLength(3);
+    expect(rolesTab).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getAllByText("Owner only")).toHaveLength(4);
 
     await user.click(settingsTab);
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
@@ -291,6 +297,10 @@ describe("AdminForms", () => {
     await user.click(seasonsTab);
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
+
+    await user.click(rolesTab);
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("form", { name: "Promote member" })).not.toBeInTheDocument();
   });
 
   it("lets owners update organization settings", async () => {
@@ -355,6 +365,47 @@ describe("AdminForms", () => {
     const { toast } = await import("sonner");
     expect(toast.error).toHaveBeenCalledWith("Slug confirmation does not match", {
       description: "Type acme to confirm this change.",
+    });
+  });
+
+  it("lets owners transfer ownership from the Settings section", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
+
+    await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
+    await user.type(transferForm.getByLabelText("Confirm transfer"), "TRANSFER");
+    await user.click(transferForm.getByRole("button", { name: "Transfer ownership" }));
+
+    await screen.findByText("Transfer ownership to Ben Unassigned?");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(props.onTransferOwnership).toHaveBeenCalledOnce());
+    const transferMock = props.onTransferOwnership as ReturnType<typeof vi.fn>;
+    const formData = transferMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-2",
+      confirmation: "TRANSFER",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Ownership transferred", {
+      description: "Ben Unassigned is now the organization owner.",
+    });
+  });
+
+  it("does not submit ownership transfer when confirmation does not match", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
+
+    await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
+    await user.type(transferForm.getByLabelText("Confirm transfer"), "wrong");
+    await user.click(transferForm.getByRole("button", { name: "Transfer ownership" }));
+
+    expect(props.onTransferOwnership).not.toHaveBeenCalled();
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Ownership confirmation does not match", {
+      description: "Type TRANSFER to confirm this change.",
     });
   });
 
@@ -541,7 +592,6 @@ describe("AdminForms", () => {
   });
 
   it("confirms and starts a new season for owners", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
@@ -549,21 +599,18 @@ describe("AdminForms", () => {
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
     await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
 
-    await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Start "Q4 2026" now? This will close Q3 2026 and reset current-season scoring.',
-    );
+    await screen.findByText(/Start .Q4 2026. now\?/);
+    await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
 
+    await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
     const startSeasonMock = props.onStartSeason as ReturnType<typeof vi.fn>;
     const formData = startSeasonMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({ name: "Q4 2026" });
     await screen.findByText(/Current active season:/);
     expect(startSeasonForm.getByText("Q4 2026")).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
   it("shows a safe toast when start-season returns an expected failure", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, props } = setupAdminForms({
       onStartSeason: vi.fn().mockResolvedValue({
         ok: false,
@@ -577,13 +624,15 @@ describe("AdminForms", () => {
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
     await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
 
+    await screen.findByText(/Start .Q4 2026. now\?/);
+    await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
+
     await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
     expect(toast.error).toHaveBeenCalledWith("Failed to start season", {
       description: "The season could not be started. Please try again.",
     });
     expect(startSeasonForm.getByText("Q3 2026")).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
   it("submits rename-season data", async () => {
@@ -762,7 +811,7 @@ describe("AdminForms", () => {
 
   it("submits assignment data from the team setup card", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Members");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
 
     await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
@@ -785,7 +834,7 @@ describe("AdminForms", () => {
 
   it("stacks member assignment controls vertically inside the card", () => {
     setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Members");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
     const memberSelect = assignForm.getByLabelText("Member to assign");
     const houseSelect = assignForm.getByLabelText("House assignment");
@@ -796,43 +845,38 @@ describe("AdminForms", () => {
     expect(assignButton).toHaveClass("w-full");
   });
 
-  it("lets owners promote members to admins from the Team section", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("lets owners promote members to admins from the Roles section", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Roles");
     const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
 
     await user.selectOptions(promoteForm.getByLabelText("Member to promote"), "user-2");
     await user.click(promoteForm.getByRole("button", { name: "Promote to admin" }));
 
-    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
-    expect(confirmSpy).toHaveBeenCalledWith(
-      "Promote Ben Unassigned to admin? They will be able to invite members, assign houses, award points, and delete point awards.",
-    );
+    expect(screen.getByText("Promote Ben Unassigned to admin?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
 
+    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
     const promoteMock = props.onPromoteUser as ReturnType<typeof vi.fn>;
     const formData = promoteMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({
       targetUserId: "user-2",
       role: "ADMIN",
     });
-    confirmSpy.mockRestore();
   });
 
-  it("lets owners remove admin access from the Team section", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("lets owners remove admin access from the Roles section", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Roles");
     const demoteForm = within(screen.getByRole("form", { name: "Remove admin access" }));
 
     await user.selectOptions(demoteForm.getByLabelText("Admin to demote"), "user-1");
     await user.click(demoteForm.getByRole("button", { name: "Remove admin access" }));
 
-    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
-    expect(confirmSpy).toHaveBeenCalledWith(
-      "Remove admin access for Alice Assigned? They will keep their member profile and house assignment.",
-    );
+    expect(screen.getByText("Remove admin access for Alice Assigned?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
 
+    await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
     const roleChangeMock = props.onPromoteUser as ReturnType<typeof vi.fn>;
     const formData = roleChangeMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({
@@ -843,25 +887,54 @@ describe("AdminForms", () => {
     expect(toast.success).toHaveBeenCalledWith("Admin access removed", {
       description: "Alice Assigned is now a member.",
     });
-    confirmSpy.mockRestore();
   });
 
-  it("shows role promotion to admins but keeps it owner-only", () => {
+  it("shows the Roles section as owner-only for admins", () => {
     setupAdminForms({ actorRole: "ADMIN" });
-    switchToManageSection("Team");
-    const roleSection = within(screen.getByLabelText("Role management"));
-    const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
-    const demoteForm = within(screen.getByRole("form", { name: "Remove admin access" }));
+    const rolesTab = screen.getByRole("tab", { name: /Roles/ });
 
-    expect(roleSection.getByText("Owner only")).toBeInTheDocument();
-    expect(promoteForm.getByLabelText("Member to promote")).toBeDisabled();
-    expect(promoteForm.getByRole("button", { name: "Promote to admin" })).toBeDisabled();
-    expect(demoteForm.getByLabelText("Admin to demote")).toBeDisabled();
-    expect(demoteForm.getByRole("button", { name: "Remove admin access" })).toBeDisabled();
+    expect(rolesTab).toBeVisible();
+    expect(rolesTab).toBeDisabled();
+    expect(rolesTab).toHaveAttribute("aria-disabled", "true");
+    expect(rolesTab).toHaveAttribute("aria-selected", "false");
+    expect(screen.queryByRole("form", { name: "Promote member" })).not.toBeInTheDocument();
+  });
+
+  it("lets owners remove non-owner members from the Members section", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Members");
+    const removalForm = within(screen.getByRole("form", { name: "Remove organization member" }));
+
+    await user.selectOptions(removalForm.getByLabelText("Member to remove"), "user-2");
+    await user.click(removalForm.getByRole("button", { name: "Remove member" }));
+
+    expect(screen.getByText("Remove Ben Unassigned from the organization?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
+
+    await waitFor(() => expect(props.onRemoveOrgMember).toHaveBeenCalledOnce());
+    const removeMock = props.onRemoveOrgMember as ReturnType<typeof vi.fn>;
+    const formData = removeMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-2",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Member removed", {
+      description: "Ben Unassigned no longer has access to this organization.",
+    });
+  });
+
+  it("shows member removal to admins but keeps it owner-only", () => {
+    setupAdminForms({ actorRole: "ADMIN" });
+    switchToManageSection("Members");
+    const removalSection = within(screen.getByLabelText("Member removal"));
+    const removalForm = within(screen.getByRole("form", { name: "Remove organization member" }));
+
+    expect(removalSection.getByText("Owner only")).toBeInTheDocument();
+    expect(removalForm.getByLabelText("Member to remove")).toBeDisabled();
+    expect(removalForm.getByRole("button", { name: "Remove member" })).toBeDisabled();
   });
 
   it("shows a safe toast when role promotion returns an expected failure", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, props } = setupAdminForms({
       onPromoteUser: vi.fn().mockResolvedValue({
         ok: false,
@@ -869,18 +942,20 @@ describe("AdminForms", () => {
         message: "The member role could not be updated. Please try again.",
       }),
     });
-    switchToManageSection("Team");
+    switchToManageSection("Roles");
     const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
 
     await user.selectOptions(promoteForm.getByLabelText("Member to promote"), "user-2");
     await user.click(promoteForm.getByRole("button", { name: "Promote to admin" }));
+
+    expect(screen.getByText("Promote Ben Unassigned to admin?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
     expect(toast.error).toHaveBeenCalledWith("Failed to update role", {
       description: "The member role could not be updated. Please try again.",
     });
-    confirmSpy.mockRestore();
   });
 
   it("shows a safe toast when assignment returns an expected failure", async () => {
@@ -891,7 +966,7 @@ describe("AdminForms", () => {
         message: "The user could not be assigned to that house. Please try again.",
       }),
     });
-    switchToManageSection("Team");
+    switchToManageSection("Members");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
 
     await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
@@ -907,7 +982,7 @@ describe("AdminForms", () => {
 
   it("keeps unassigned members visible first in the assignment dropdown", () => {
     setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Members");
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
     const memberSelect = assignForm.getByLabelText("Member to assign") as HTMLSelectElement;
     const groups = Array.from(memberSelect.querySelectorAll("optgroup"));
@@ -925,9 +1000,9 @@ describe("AdminForms", () => {
     expect(assignForm.getByText("1 member needs a house. They appear first in this list.")).toBeInTheDocument();
   });
 
-  it("shows invite generation and use reporting in the Team section", () => {
+  it("shows invite generation and use reporting in the Members section", () => {
     setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Members");
 
     const inviteActivity = within(screen.getByLabelText("Invite activity"));
 
@@ -947,14 +1022,14 @@ describe("AdminForms", () => {
         (action) => action.type !== "INVITE_CREATED" && action.type !== "INVITE_USED",
       ),
     });
-    switchToManageSection("Team");
+    switchToManageSection("Members");
 
     expect(screen.getByText("No invite activity has been recorded yet.")).toBeInTheDocument();
   });
 
   it("shows generated invite links in the invite card", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Team");
+    switchToManageSection("Members");
 
     const inviteCard = within(screen.getByLabelText("Invite member"));
 
@@ -978,7 +1053,7 @@ describe("AdminForms", () => {
         expiresAt: "2099-01-01T00:00:00.000Z",
       }),
     });
-    switchToManageSection("Team");
+    switchToManageSection("Members");
     const inviteCard = within(screen.getByLabelText("Invite member"));
 
     await user.click(
@@ -1000,7 +1075,7 @@ describe("AdminForms", () => {
         message: "An invite could not be generated. Please try again.",
       }),
     });
-    switchToManageSection("Team");
+    switchToManageSection("Members");
 
     const inviteCard = within(screen.getByLabelText("Invite member"));
 

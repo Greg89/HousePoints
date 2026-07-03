@@ -49,6 +49,22 @@ enum AuditEventType {
   ORG_SETTINGS_UPDATED
   USER_HOUSE_ASSIGNED
   USER_ROLE_CHANGED
+  USER_REMOVED_FROM_ORG
+}
+
+enum NotificationType {
+  MEMBER_NEEDS_HOUSE_ASSIGNMENT
+  INVITE_ACCEPTED
+  ROLE_CHANGED
+  SEASON_STARTED
+  POINT_AWARD_RECEIVED
+  POINT_DEDUCTION_RECEIVED
+}
+
+enum NotificationSeverity {
+  INFO
+  ACTION_REQUIRED
+  WARNING
 }
 
 model Organization {
@@ -62,6 +78,7 @@ model Organization {
   seasons      Season[]
   auditEvents  AuditEvent[]
   slugAliases  OrganizationSlugAlias[]
+  notifications Notification[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 }
@@ -131,6 +148,7 @@ model User {
   createdSeasons       Season[]           @relation("CreatedSeasons")
   auditEvents          AuditEvent[]       @relation("AuditEventActor")
   authIdentities        AuthIdentity[]
+  notifications         Notification[]     @relation("NotificationRecipient")
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -217,4 +235,29 @@ model AuditEvent {
 
   @@index([organizationId, createdAt])
   @@index([actorUserId])
+}
+
+model Notification {
+  id              String               @id @default(cuid())
+  organizationId  String
+  recipientUserId String
+  type            NotificationType
+  severity        NotificationSeverity @default(INFO)
+  title           String
+  body            String
+  actionLabel     String?
+  actionHref      String?
+  entityType      String?
+  entityId        String?
+  dedupeKey       String?
+  readAt          DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime             @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipient    User         @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientUserId, dedupeKey])
+  @@index([recipientUserId, readAt, createdAt])
+  @@index([organizationId, type, createdAt])
 }

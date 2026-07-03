@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org deletion, ownership transfer, deeper admin removal rules, domain allow-list joining, dashboard slug route implementation, and true multi-org membership. Owner-only organization display-name and slug updates are implemented in Manage Settings. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), and the planned dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
+Still deferred: org deletion, domain allow-list joining, optional root redirects for dashboard slug routes, and true multi-org membership. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, and member removal are implemented in Manage. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), and the dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
 
 ### How it should work
 
@@ -27,10 +27,10 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - `OWNER` exists.
 - `OWNER` controls organization-level configuration, including houses and seasons.
 - `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
-- `OWNER` can promote members to `ADMIN` and demote admins back to `MEMBER` from Manage Team. Role changes are audited.
+- `OWNER` can promote members to `ADMIN`, demote admins back to `MEMBER`, and remove non-owner users from the organization from Manage Team. Role changes and removals are audited.
 - `OWNER` can rename the organization display name and change the organization slug from Manage Settings. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org deletion, ownership transfer, dashboard slug route implementation, and deeper admin-removal rules are not implemented yet.
+- Org deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
@@ -47,7 +47,7 @@ Still deferred: org deletion, ownership transfer, deeper admin removal rules, do
 - Do we allow a user to leave an org and join another? What happens to their transaction history?
 - Do we need multi-use standing invite links, or is single-use enough for the first production cohort?
 - Do we need an "org discovery" page, or is the invite link the only entry point?
-- What happens to an org if the owner leaves?
+- What final retention and recovery rules do we want for org deletion or archival?
 
 ---
 
@@ -91,7 +91,7 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 
 **Open questions**
 - Should Activity gain a season filter in addition to badges?
-- Should season starts create user-visible announcements beyond the admin audit timeline?
+- Should season starts create user-visible announcements beyond the admin audit timeline? Answered for MVP: yes, owner-started seasons create org-wide informational notifications.
 - Do we need a "season preview" period where the next season is configured before it goes live?
 - Should future season boundaries support scheduled calendar cadence?
 
@@ -148,10 +148,9 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 A durable in-app attention layer for events that users might miss if they are not actively watching the app.
 
 ### Current state
-The app uses local toasts for immediate mutation feedback and has durable audit history for administrative events. It does not yet have per-user notification rows, unread state, or an account-menu notification center.
+The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, settings, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are implemented as org-wide informational notifications created when an owner starts a new season. `POINT_AWARD_RECEIVED` notifications are implemented as targeted informational notifications for the awarded member, with self-awards skipped to avoid inbox noise. `POINT_DEDUCTION_RECEIVED` notifications are implemented as targeted warning notifications for the deducted member. `ROLE_CHANGED` notifications are implemented for owner role-management changes, notifying the changed user plus other owners.
 
-### Proposed first slice
-Start with `MEMBER_NEEDS_HOUSE_ASSIGNMENT`: when a user accepts an invite and lands in the organization without a house, admins and owners get a durable notification plus an active-session toast if they are currently using the app.
+Still deferred: a full notification page, user notification preferences, email delivery, server-sent events or websocket fanout, and additional notification producers such as org setting changes.
 
 The detailed product and technical plan lives in [Notification System Design](./notifications-design.md).
 
@@ -214,10 +213,9 @@ The product supports positive point awards, soft deletion of mistaken awards, fi
 - Add a `Deduct points` admin action with explicit confirmation copy.
 - Activity feed shows deduction rows with a negative delta and `Deducted` badge.
 - Audit shows durable `POINTS_DEDUCTED` events.
-- Direct user notifications are deferred; Activity and Audit are the MVP visibility surfaces.
+- Targeted in-app notifications, Activity, and Audit are the MVP visibility surfaces.
 
 **Open questions**
-- What production usage threshold would justify direct user notifications for deductions?
 - Should owners eventually enable/disable point adjustments per organization?
 - Should targets be limited to rival houses only, or can admins correct points inside their own house?
 - Should deduction reasons use free text, a fixed list, or both?

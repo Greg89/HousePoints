@@ -5,10 +5,10 @@ import {
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub } from "../actor.js";
-import { mapAppUser } from "../app-user.js";
+import { mapAppUser, APP_USER_SELECT } from "../app-user.js";
 import { info, warn } from "../logging.js";
 import type { VerifyIdToken } from "../auth.js";
+import { parseBody, requireActor } from "../route-helpers.js";
 
 function readVerifiedEmailClaim(claims: Record<string, unknown>): string | null {
   return typeof claims.email === "string" && claims.email_verified === true
@@ -68,46 +68,90 @@ async function readVerifiedEmailFromIdToken(input: {
   }
 }
 
+export async function findExistingUser(auth0Sub: string) {
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { userId: true },
+  });
+  return identity
+    ? prisma.user.findUnique({ where: { id: identity.userId }, select: APP_USER_SELECT })
+    : prisma.user.findUnique({ where: { auth0Sub }, select: APP_USER_SELECT });
+}
+
+export async function findUserByVerifiedEmail(email: string) {
+  return prisma.user.findUnique({
+    where: { email },
+    select: APP_USER_SELECT,
+  });
+}
+
+export async function linkIdentityToUser(auth0Sub: string, userId: string) {
+  return prisma.authIdentity.create({
+    data: { providerSubject: auth0Sub, userId },
+  });
+}
+
+export async function checkEmailConflict(email: string) {
+  return prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+}
+
+export async function createBootstrappedUser(params: {
+  auth0Sub: string;
+  email: string | null;
+  displayName: string;
+}) {
+  return prisma.user.create({
+    data: {
+      auth0Sub: params.auth0Sub,
+      email: params.email,
+      displayName: params.displayName,
+      authIdentities: { create: { providerSubject: params.auth0Sub } },
+    },
+    select: APP_USER_SELECT,
+  });
+}
+
+export async function updateUserProfile(
+  actorId: string,
+  update: { displayName?: string; houseThemeEnabled?: boolean },
+) {
+  return prisma.user.update({
+    where: { id: actorId },
+    data: {
+      ...(update.displayName !== undefined ? { displayName: update.displayName } : {}),
+      ...(update.houseThemeEnabled !== undefined ? { houseThemeEnabled: update.houseThemeEnabled } : {}),
+    },
+    select: { id: true, displayName: true, houseThemeEnabled: true },
+  });
+}
+
+export async function listOrgMembers(organizationId: string) {
+  return prisma.user.findMany({
+    where: { organizationId },
+    orderBy: { displayName: "asc" },
+    select: {
+      id: true,
+      displayName: true,
+      role: true,
+      houseId: true,
+      house: { select: { name: true, color: true } },
+    },
+  });
+}
+
 export async function registerUserRoutes(
   app: FastifyInstance,
   options: { verifyIdToken?: VerifyIdToken | null } = {},
 ): Promise<void> {
   app.post("/users/bootstrap", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
-    const parsed = bootstrapUserSchema.safeParse(request.body);
-
-    if (!parsed.success) {
-      warn(request.log, "users.bootstrap.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const userSelect = {
-      id: true,
-      auth0Sub: true,
-      email: true,
-      displayName: true,
-      houseThemeEnabled: true,
-      role: true,
-      organizationId: true,
-      organization: { select: { slug: true } },
-      houseId: true,
-      house: { select: { name: true, color: true } },
-    } as const;
+    const parsed = await parseBody(bootstrapUserSchema, request, reply);
+    if (!parsed) return;
 
     const auth0Sub = request.auth.subject;
-    const existingIdentity = await prisma.authIdentity.findUnique({
-      where: { providerSubject: auth0Sub },
-      select: {
-        user: {
-          select: userSelect,
-        },
-      },
-    });
-    const existing = existingIdentity?.user ?? await prisma.user.findUnique({
-      where: { auth0Sub },
-      select: userSelect,
-    });
+    const existing = await findExistingUser(auth0Sub);
 
     if (existing) {
       info(request.log, "users.bootstrap.loaded", {
@@ -128,21 +172,13 @@ export async function registerUserRoutes(
         verifyIdToken: options.verifyIdToken,
         log: request.log,
       });
-    const emailForStorage = verifiedEmail ?? parsed.data.email ?? null;
+    const emailForStorage = verifiedEmail ?? parsed.email ?? null;
     const existingByEmail = verifiedEmail
-      ? await prisma.user.findUnique({
-          where: { email: verifiedEmail },
-          select: userSelect,
-        })
+      ? await findUserByVerifiedEmail(verifiedEmail)
       : null;
 
     if (existingByEmail) {
-      await prisma.authIdentity.create({
-        data: {
-          providerSubject: auth0Sub,
-          userId: existingByEmail.id,
-        },
-      });
+      await linkIdentityToUser(auth0Sub, existingByEmail.id);
 
       info(request.log, "users.bootstrap.identity_linked", {
         userId: existingByEmail.id,
@@ -154,11 +190,8 @@ export async function registerUserRoutes(
       return { ...mapAppUser(existingByEmail), created: false };
     }
 
-    const conflictingEmailUser = !verifiedEmail && parsed.data.email
-      ? await prisma.user.findUnique({
-          where: { email: parsed.data.email },
-          select: { id: true },
-        })
+    const conflictingEmailUser = !verifiedEmail && parsed.email
+      ? await checkEmailConflict(parsed.email)
       : null;
 
     if (conflictingEmailUser) {
@@ -174,7 +207,7 @@ export async function registerUserRoutes(
 
       warn(request.log, "users.bootstrap.account_link_required", {
         auth0Sub,
-        email: parsed.data.email,
+        email: parsed.email,
       });
       return reply.status(409).send({
         code: "ACCOUNT_LINK_REQUIRED",
@@ -182,19 +215,10 @@ export async function registerUserRoutes(
       });
     }
 
-    // New user has no org yet. They must create or join one next.
-    const createdUser = await prisma.user.create({
-      data: {
-        auth0Sub,
-        email: emailForStorage,
-        displayName: parsed.data.displayName,
-        authIdentities: {
-          create: {
-            providerSubject: auth0Sub,
-          },
-        },
-      },
-      select: userSelect,
+    const createdUser = await createBootstrappedUser({
+      auth0Sub,
+      email: emailForStorage,
+      displayName: parsed.displayName,
     });
 
     info(request.log, "users.bootstrap.created", {
@@ -207,29 +231,15 @@ export async function registerUserRoutes(
   });
 
   app.post("/users/profile", async (request, reply) => {
-    const parsed = updateProfileSchema.safeParse(request.body);
+    const parsed = await parseBody(updateProfileSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "users.profile.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    const updated = await prisma.user.update({
-      where: { id: actor.id },
-      data: {
-        ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
-        ...(parsed.data.houseThemeEnabled !== undefined ? { houseThemeEnabled: parsed.data.houseThemeEnabled } : {}),
-      },
-      select: { id: true, displayName: true, houseThemeEnabled: true },
+    const updated = await updateUserProfile(actor.id, {
+      displayName: parsed.displayName,
+      houseThemeEnabled: parsed.houseThemeEnabled,
     });
 
     info(request.log, "users.profile.updated", {
@@ -242,31 +252,13 @@ export async function registerUserRoutes(
   });
 
   app.post("/members", async (request, reply) => {
-    const parsed = actorScopeSchema.safeParse(request.body);
+    const parsed = await parseBody(actorScopeSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    const members = await prisma.user.findMany({
-      where: { organizationId: actor.organizationId },
-      orderBy: { displayName: "asc" },
-      select: {
-        id: true,
-        displayName: true,
-        role: true,
-        houseId: true,
-        house: { select: { name: true, color: true } },
-      },
-    });
+    const members = await listOrgMembers(actor.organizationId);
 
     return members.map((m) => ({
       id: m.id,

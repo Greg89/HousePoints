@@ -20,6 +20,7 @@ export function InviteJoinCard({
   onJoined,
 }: InviteJoinCardProps) {
   const [isPending, startTransition] = useTransition();
+  const dashboardHref = `/o/${encodeURIComponent(organizationSlug)}`;
 
   function handleJoin() {
     startTransition(async () => {
@@ -39,7 +40,7 @@ export function InviteJoinCard({
         if (onJoined) {
           onJoined();
         } else {
-          window.location.assign("/");
+          window.location.assign(dashboardHref);
         }
       } catch (err) {
         toast.error("Could not join organisation", {
@@ -76,7 +77,7 @@ export function InviteJoinCard({
           {isPending ? "Joining..." : "Join organisation"}
         </button>
         <Link
-          href="/"
+          href={dashboardHref}
           className="mt-4 inline-flex items-center justify-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <WarningCircle size={14} />

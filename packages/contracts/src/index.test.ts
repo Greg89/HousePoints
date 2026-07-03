@@ -20,7 +20,10 @@ import {
   joinInvitePreviewResponseSchema,
   joinInvitePreviewSchema,
   joinOrgSchema,
+  orgRouteContextRequestSchema,
+  orgRouteContextSchema,
   promoteUserSchema,
+  removeOrgMemberSchema,
   renameSeasonSchema,
   seasonCompareRequestSchema,
   seasonComparisonSchema,
@@ -28,6 +31,7 @@ import {
   seasonScopedRequestSchema,
   updateOrgSettingsSchema,
   updateOrgSlugSchema,
+  transferOwnerSchema,
   seasonTransitionSchema,
   memberScoreSchema,
   memberScoresSchema,
@@ -38,6 +42,11 @@ import {
   appUserSchema,
   leaderboardSchema,
   orgMembersSchema,
+  markNotificationsReadSchema,
+  notificationListRequestSchema,
+  notificationMutationResponseSchema,
+  notificationSchema,
+  pagedNotificationsSchema,
   pagedActivityFeedSchema,
   adminAuditActionSchema,
   adminAuditRequestSchema,
@@ -59,16 +68,22 @@ const webConsumedApiEndpoints = [
   "/admin/houses",
   "/admin/org/settings",
   "/admin/org/slug",
+  "/admin/org/owner",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
+  "/admin/users/remove",
   "/admin/users/role",
   "/dashboard/summary",
   "/houses/leaderboard",
   "/members",
+  "/notifications/list",
+  "/notifications/mark-all-read",
+  "/notifications/mark-read",
   "/orgs/create",
   "/orgs/invite",
   "/orgs/join",
   "/orgs/join/preview",
+  "/orgs/route-context",
   "/points/adjust",
   "/points/deduct",
   "/points/delete",
@@ -567,6 +582,10 @@ describe("authenticated request schemas", () => {
       organizationSlug: "acme",
       auth0Sub: "auth0|attacker",
     }],
+    [orgRouteContextRequestSchema, {
+      slug: "acme",
+      actorAuth0Sub: "auth0|attacker",
+    }],
     [promoteUserSchema, {
       targetUserId: "user-1",
       role: "ADMIN",
@@ -575,6 +594,14 @@ describe("authenticated request schemas", () => {
     [promoteUserSchema, {
       targetUserId: "user-1",
       role: "MEMBER",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [transferOwnerSchema, {
+      targetUserId: "user-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [removeOrgMemberSchema, {
+      targetUserId: "user-1",
       actorAuth0Sub: "auth0|attacker",
     }],
     [updateOrgSettingsSchema, {
@@ -1398,6 +1425,32 @@ describe("adminAuditActionSchema", () => {
         delta: "-10",
       },
     });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-9",
+        type: "USER_REMOVED_FROM_ORG",
+        occurredAt: "2026-06-21T14:15:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia removed Ben from the organization.",
+        metadata: {
+          targetUserId: "user-2",
+          targetUserName: "Ben",
+          previousRole: "MEMBER",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-9",
+      type: "USER_REMOVED_FROM_ORG",
+      occurredAt: "2026-06-21T14:15:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia removed Ben from the organization.",
+      metadata: {
+        targetUserId: "user-2",
+        targetUserName: "Ben",
+        previousRole: "MEMBER",
+      },
+    });
   });
 
   it("rejects unknown audit action types", () => {
@@ -1671,6 +1724,151 @@ describe("joinInvitePreviewSchema", () => {
         memberOrganizationSlug: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("orgRouteContextSchema", () => {
+  it("accepts the slug dashboard route context states", () => {
+    expect(orgRouteContextRequestSchema.parse({ slug: "acme" })).toEqual({
+      slug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    })).toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "ALIAS_REDIRECT",
+      requestedSlug: "old-acme",
+      organizationSlug: "acme",
+    })).toEqual({
+      status: "ALIAS_REDIRECT",
+      requestedSlug: "old-acme",
+      organizationSlug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    })).toEqual({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    })).toEqual({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+
+    expect(orgRouteContextSchema.parse({
+      status: "NOT_FOUND",
+      requestedSlug: "missing-org",
+    })).toEqual({
+      status: "NOT_FOUND",
+      requestedSlug: "missing-org",
+    });
+  });
+
+  it("rejects malformed slugs and invalid route states", () => {
+    expect(orgRouteContextRequestSchema.safeParse({ slug: "Acme Corp" }).success).toBe(false);
+    expect(orgRouteContextRequestSchema.safeParse({ slug: "acme", organizationId: "org-1" }).success).toBe(false);
+    expect(orgRouteContextSchema.safeParse({
+      status: "MATCH",
+      requestedSlug: "acme",
+    }).success).toBe(false);
+    expect(orgRouteContextSchema.safeParse({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+    }).success).toBe(false);
+  });
+});
+
+describe("notification schemas", () => {
+  const notification = {
+    id: "notification-1",
+    type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT" as const,
+    severity: "ACTION_REQUIRED" as const,
+    title: "New member needs a house",
+    body: "Casey joined Acme and has not been assigned to a house yet.",
+    actionLabel: "Assign house",
+    actionHref: "/?tab=manage&section=team",
+    entityType: "User",
+    entityId: "user-1",
+    readAt: null,
+    createdAt: "2026-06-30T12:00:00.000Z",
+  };
+
+  it("accepts notification list payloads and responses", () => {
+    expect(notificationListRequestSchema.parse({})).toEqual({
+      limit: 10,
+      unreadOnly: false,
+    });
+    expect(notificationListRequestSchema.parse({
+      cursor: "notification-1",
+      limit: 20,
+      unreadOnly: true,
+    })).toEqual({
+      cursor: "notification-1",
+      limit: 20,
+      unreadOnly: true,
+    });
+
+    expect(notificationSchema.parse(notification)).toEqual(notification);
+    expect(pagedNotificationsSchema.parse({
+      items: [notification],
+      unreadCount: 1,
+      nextCursor: null,
+    })).toEqual({
+      items: [notification],
+      unreadCount: 1,
+      nextCursor: null,
+    });
+  });
+
+  it("accepts mark-read payloads and mutation responses", () => {
+    expect(markNotificationsReadSchema.parse({
+      notificationIds: ["notification-1"],
+    })).toEqual({
+      notificationIds: ["notification-1"],
+    });
+    expect(notificationMutationResponseSchema.parse({ updatedCount: 1 }))
+      .toEqual({ updatedCount: 1 });
+  });
+
+  it("rejects invalid notification shapes", () => {
+    expect(notificationSchema.safeParse({
+      ...notification,
+      type: "BOGUS",
+    }).success).toBe(false);
+    expect(notificationSchema.safeParse({
+      ...notification,
+      severity: "CRITICAL",
+    }).success).toBe(false);
+    expect(markNotificationsReadSchema.safeParse({
+      notificationIds: [],
+    }).success).toBe(false);
+    expect(notificationListRequestSchema.safeParse({
+      limit: 1000,
+    }).success).toBe(false);
   });
 });
 

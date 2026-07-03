@@ -11,6 +11,8 @@ export type ApiLogEvent =
   | "api.shutdown_failed"
   | "auth.token_missing"
   | "auth.token_invalid"
+  | "auth.actor_not_found"
+  | "owner.forbidden"
   | "request.received"
   | "request.completed"
   | "request.validation_failed"
@@ -32,11 +34,17 @@ export type ApiLogEvent =
   | "admin.house.created"
   | "admin.org.slug_taken"
   | "admin.org.slug_updated"
+  | "admin.org.owner_transferred"
   | "admin.org.settings_updated"
   | "admin.point_adjustments.loaded"
   | "admin.user.house_assigned"
+  | "admin.user.removed_from_org"
   | "admin.user.role_changed"
   | "leaderboard.fetched"
+  | "notifications.actor_not_found"
+  | "notifications.loaded"
+  | "notifications.marked_all_read"
+  | "notifications.marked_read"
   | "dashboard.summary.loaded"
   | "seasons.active_missing"
   | "seasons.compare.loaded"
@@ -81,7 +89,12 @@ export type ApiLogEvent =
   | "orgs.join.organization_mismatch"
   | "orgs.join.already_in_org"
   | "orgs.join.account_link_required"
-  | "orgs.join.success";
+  | "orgs.join.success"
+  | "orgs.route_context.alias_redirect"
+  | "orgs.route_context.different_org"
+  | "orgs.route_context.match"
+  | "orgs.route_context.no_actor_org"
+  | "orgs.route_context.not_found";
 
 type ApiLogger = {
   logger: FastifyBaseLogger;

@@ -49,6 +49,12 @@ vi.mock("@housepoints/db", () => ({
       create: vi.fn(),
       findMany: vi.fn(),
     },
+    notification: {
+      count: vi.fn(),
+      createMany: vi.fn(),
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
     season: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -103,6 +109,10 @@ const mockOrgSlugAliasCreate = prisma.organizationSlugAlias.create as ReturnType
 const mockOrgSlugAliasUpdateMany = prisma.organizationSlugAlias.updateMany as ReturnType<typeof vi.fn>;
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
 const mockAuditEventFindMany = prisma.auditEvent.findMany as ReturnType<typeof vi.fn>;
+const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.fn>;
+const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
+const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
+const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
@@ -178,6 +188,7 @@ beforeEach(() => {
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
+  mockUserFindMany.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
@@ -186,6 +197,10 @@ beforeEach(() => {
   mockSeasonFindMany.mockResolvedValue([]);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
+  mockNotificationCount.mockResolvedValue(0);
+  mockNotificationCreateMany.mockResolvedValue({ count: 0 });
+  mockNotificationFindMany.mockResolvedValue([]);
+  mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
   mockTransaction.mockImplementation(
     async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
   );
@@ -652,7 +667,7 @@ describe("POST /points/adjust", () => {
     await app.close();
   });
 
-  it("awards points and returns 200 with the transaction id and trait", async () => {
+  it("awards points, notifies the recipient, and returns 201 with the transaction id and trait", async () => {
     const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
@@ -698,6 +713,58 @@ describe("POST /points/adjust", () => {
         }),
       }),
     );
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [{
+        organizationId: "org-1",
+        recipientUserId: "user-1",
+        type: "POINT_AWARD_RECEIVED",
+        severity: "INFO",
+        title: "Points awarded",
+        body: "Bob awarded you 15 points for Technical Excellence.",
+        actionLabel: "View activity",
+        actionHref: "/?tab=activity",
+        entityType: "PointTransaction",
+        entityId: "tx-abc",
+        dedupeKey: "point-award-received:org-1:tx-abc",
+      }],
+      skipDuplicates: true,
+    });
+    await app.close();
+  });
+
+  it("does not create a recipient notification for self-awards", async () => {
+    const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
+    mockFindUnique
+      .mockResolvedValueOnce(actor)
+      .mockResolvedValueOnce(actor);
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxCreate.mockResolvedValue({
+      id: "tx-self",
+      organizationId: "org-1",
+      seasonId: "season-active",
+      actorUserId: "user-2",
+      targetUserId: "user-2",
+      targetHouseId: "house-1",
+      type: "AWARD",
+      delta: 5,
+      reason: "Kept the build green",
+      trait: "RELIABILITY",
+      createdAt: new Date(),
+    });
+    const app = await buildTestApp("auth0|admin");
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-2",
+        delta: 5,
+        reason: "Kept the build green",
+        trait: "RELIABILITY",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().id).toBe("tx-self");
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -755,6 +822,7 @@ describe("POST /points/deduct", () => {
     });
     expect(mockFindUnique).not.toHaveBeenCalled();
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -770,6 +838,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe("VALIDATION_ERROR");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -786,6 +855,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -802,6 +872,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -818,6 +889,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_HOUSE_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -836,6 +908,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -854,6 +927,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("CROSS_ORGANIZATION_TARGET");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -872,6 +946,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(422);
     expect(res.json().code).toBe("TARGET_USER_UNASSIGNED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -890,6 +965,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("SAME_HOUSE_TARGET");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -909,6 +985,7 @@ describe("POST /points/deduct", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -944,6 +1021,7 @@ describe("POST /points/deduct", () => {
     );
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -982,6 +1060,7 @@ describe("POST /points/deduct", () => {
     );
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockTxCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1036,6 +1115,22 @@ describe("POST /points/deduct", () => {
           reason: "Duplicate award correction",
         },
       },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [{
+        organizationId: "org-1",
+        recipientUserId: "user-1",
+        type: "POINT_DEDUCTION_RECEIVED",
+        severity: "WARNING",
+        title: "Points deducted",
+        body: "Bob deducted 10 points from you. Reason: Duplicate award correction.",
+        actionLabel: "View activity",
+        actionHref: "/?tab=activity",
+        entityType: "PointTransaction",
+        entityId: "tx-deduction",
+        dedupeKey: "point-deduction-received:org-1:tx-deduction",
+      }],
+      skipDuplicates: true,
     });
     await app.close();
   });
@@ -1667,6 +1762,12 @@ describe("POST /seasons/start", () => {
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-owner" },
+      { id: "user-admin" },
+      { id: "user-member" },
+    ]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 3 });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -1718,6 +1819,56 @@ describe("POST /seasons/start", () => {
         },
       },
     });
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-owner",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Olivia started Q4 2026. House standings and leaderboards now use the new season.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-next",
+          dedupeKey: "season-started:org-secure:season-next",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-admin",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Olivia started Q4 2026. House standings and leaderboards now use the new season.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-next",
+          dedupeKey: "season-started:org-secure:season-next",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-member",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Olivia started Q4 2026. House standings and leaderboards now use the new season.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-next",
+          dedupeKey: "season-started:org-secure:season-next",
+        },
+      ],
+      skipDuplicates: true,
+    });
     expect(res.json()).toEqual({
       previousSeason: {
         id: "season-active",
@@ -1750,6 +1901,7 @@ describe("POST /seasons/start", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1766,6 +1918,7 @@ describe("POST /seasons/start", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -1783,6 +1936,44 @@ describe("POST /seasons/start", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ACTIVE_SEASON_REQUIRED");
     expect(mockSeasonCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("skips season-start notification creation when the organization has no recipients", async () => {
+    const nextSeason = {
+      id: "season-next",
+      name: "Q4 2026",
+      startsAt: new Date("2026-08-01T12:00:00.000Z"),
+      endsAt: null,
+      isActive: true,
+    };
+    const closedSeason = {
+      ...ACTIVE_SEASON,
+      endsAt: new Date("2026-08-01T12:00:00.000Z"),
+      isActive: false,
+    };
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonUpdate.mockResolvedValue(closedSeason);
+    mockSeasonCreate.mockResolvedValue(nextSeason);
+    mockUserFindMany.mockResolvedValue([]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/start",
+      payload: { name: "Q4 2026" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 });
@@ -2607,6 +2798,7 @@ describe("POST /admin/users/assign-house", () => {
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2622,6 +2814,7 @@ describe("POST /admin/users/assign-house", () => {
       payload: { targetUserId: "user-999", targetHouseId: "house-1" },
     });
     expect(res.statusCode).toBe(404);
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2648,10 +2841,11 @@ describe("POST /admin/users/assign-house", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("TARGET_HOUSE_NOT_FOUND");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("assigns a user to a house and returns the updated user summary", async () => {
+  it("assigns a user to a house, writes audit history, and resolves matching assignment notifications", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: "user-1",
@@ -2668,6 +2862,7 @@ describe("POST /admin/users/assign-house", () => {
       displayName: "Alice",
       houseId: "house-1",
     });
+    mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -2703,6 +2898,19 @@ describe("POST /admin/users/assign-house", () => {
           targetHouseId: "house-1",
           targetHouseName: "Phoenix",
         },
+      },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+        entityType: "User",
+        entityId: "user-1",
+        archivedAt: null,
+      },
+      data: {
+        readAt: expect.any(Date),
+        archivedAt: expect.any(Date),
       },
     });
     await app.close();
@@ -2783,6 +2991,7 @@ describe("POST /admin/users/role", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("OWNER_REQUIRED");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2801,6 +3010,7 @@ describe("POST /admin/users/role", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -2823,10 +3033,11 @@ describe("POST /admin/users/role", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("OWNER_ROLE_IMMUTABLE");
     expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("allows an owner to promote a member to admin and writes an audit event", async () => {
+  it("allows an owner to promote a member to admin, writes audit, and notifies the target plus other owners", async () => {
     const targetUser = makeMember({
       id: "user-target",
       displayName: "Taylor",
@@ -2845,6 +3056,10 @@ describe("POST /admin/users/role", () => {
       role: "ADMIN",
       houseId: "house-1",
     });
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-owner-2" },
+      { id: "user-target" },
+    ]);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -2879,6 +3094,43 @@ describe("POST /admin/users/role", () => {
           newRole: "ADMIN",
         },
       },
+    });
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        role: "OWNER",
+        id: { not: "user-owner" },
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-target",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Taylor from MEMBER to ADMIN.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-target",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-owner-2",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Taylor from MEMBER to ADMIN.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-target",
+        },
+      ],
+      skipDuplicates: true,
     });
     expect(res.json()).toEqual({
       id: "user-target",
@@ -2944,12 +3196,336 @@ describe("POST /admin/users/role", () => {
         },
       },
     });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [{
+        organizationId: "org-secure",
+        recipientUserId: "user-target",
+        type: "ROLE_CHANGED",
+        severity: "INFO",
+        title: "Role changed",
+        body: "Olivia changed Taylor from ADMIN to MEMBER.",
+        actionLabel: "View team",
+        actionHref: "/?tab=manage&section=team",
+        entityType: "User",
+        entityId: "user-target",
+      }],
+      skipDuplicates: true,
+    });
     expect(res.json()).toEqual({
       id: "user-target",
       displayName: "Taylor",
       email: "taylor@acme.com",
       role: "MEMBER",
       houseId: "house-1",
+    });
+    await app.close();
+  });
+});
+
+describe("POST /admin/org/owner", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects transferring ownership to self", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-owner" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OWNER_TRANSFER_SELF");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when the target user is outside the owner's organization", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-other" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects transferring ownership to another owner", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({
+        id: "user-owner-2",
+        displayName: "Second Owner",
+        organizationId: "org-secure",
+      }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-owner-2" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("TARGET_ALREADY_OWNER");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to transfer ownership, demotes the actor to admin, writes audit, and notifies both users", async () => {
+    const targetUser = makeAdmin({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "ADMIN" as const,
+      organizationId: "org-secure",
+      houseId: "house-1",
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(targetUser);
+    mockUserUpdate
+      .mockResolvedValueOnce({ id: "user-owner" })
+      .mockResolvedValueOnce({
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+        role: "OWNER",
+        houseId: "house-1",
+      });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/owner",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenNthCalledWith(1, {
+      where: { id: "user-owner" },
+      data: { role: "ADMIN" },
+      select: { id: true },
+    });
+    expect(mockUserUpdate).toHaveBeenNthCalledWith(2, {
+      where: { id: "user-target" },
+      data: { role: "OWNER" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+        role: true,
+        houseId: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "USER_ROLE_CHANGED",
+        summary: "Olivia transferred ownership to Taylor.",
+        metadata: {
+          previousOwnerId: "user-owner",
+          previousOwnerName: "Olivia",
+          newOwnerId: "user-target",
+          newOwnerName: "Taylor",
+          previousRole: "ADMIN",
+          newRole: "OWNER",
+        },
+      },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-target",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Taylor from ADMIN to OWNER.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-target",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-owner",
+          type: "ROLE_CHANGED",
+          severity: "INFO",
+          title: "Role changed",
+          body: "Olivia changed Olivia from OWNER to ADMIN.",
+          actionLabel: "View team",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-owner",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor",
+      email: "taylor@acme.com",
+      role: "OWNER",
+      houseId: "house-1",
+    });
+    await app.close();
+  });
+});
+
+describe("POST /admin/users/remove", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects owner self-removal", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-owner" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ORG_MEMBER_REMOVE_SELF");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when target user is outside the owner's organization", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-other" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects removing another owner", async () => {
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({
+        id: "user-owner-2",
+        displayName: "Second Owner",
+        organizationId: "org-secure",
+      }));
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-owner-2" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("OWNER_REMOVE_FORBIDDEN");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("removes a member from the organization, clears org-scoped fields, archives notifications, and writes audit", async () => {
+    const targetUser = makeMember({
+      id: "user-target",
+      displayName: "Taylor",
+      role: "ADMIN" as const,
+      organizationId: "org-secure",
+      houseId: "house-1",
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(targetUser);
+    mockUserUpdate.mockResolvedValue({
+      id: "user-target",
+      displayName: "Taylor",
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/remove",
+      payload: { targetUserId: "user-target" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-target" },
+      data: {
+        organizationId: null,
+        houseId: null,
+        role: "MEMBER",
+      },
+      select: { id: true, displayName: true },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledTimes(2);
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-owner",
+        eventType: "USER_REMOVED_FROM_ORG",
+        summary: "Olivia removed Taylor from the organization.",
+        metadata: {
+          targetUserId: "user-target",
+          targetUserName: "Taylor",
+          previousRole: "ADMIN",
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor",
     });
     await app.close();
   });
@@ -4022,6 +4598,7 @@ describe("POST /orgs/join/preview", () => {
   const invite = {
     id: "invite-1",
     organizationId: "org-1",
+    organization: { name: "Acme Corp" },
     expiresAt: new Date("2099-01-01T00:00:00Z"),
     usedAt: null,
   };
@@ -4168,6 +4745,178 @@ describe("POST /orgs/join/preview", () => {
   });
 });
 
+describe("POST /orgs/route-context", () => {
+  const resolvedSlug = {
+    organizationId: "org-1",
+    matchedSlug: "acme",
+    currentSlug: "acme",
+    isPrimary: true,
+    organization: {
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+    },
+  };
+
+  it("returns MATCH for the actor's current organization slug", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    expect(mockResolveOrganizationSlug).toHaveBeenCalledWith(prisma, "acme");
+    await app.close();
+  });
+
+  it("returns ALIAS_REDIRECT for an old slug owned by the actor's organization", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      matchedSlug: "old-acme",
+      isPrimary: false,
+    });
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "old-acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "ALIAS_REDIRECT",
+      requestedSlug: "old-acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns NOT_FOUND for an unknown slug without exposing organization data", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(null);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-1",
+        organization: {
+          name: "Acme Corp",
+          slug: "acme",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "not-real" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "NOT_FOUND",
+      requestedSlug: "not-real",
+    });
+    await app.close();
+  });
+
+  it("returns NO_ACTOR_ORG for signed-in users who have not joined an organization", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns DIFFERENT_ORG when the requested slug belongs to another organization", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "DIFFERENT_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      actorOrganizationSlug: "other-org",
+      actorOrganizationName: "Other Org",
+    });
+    await app.close();
+  });
+
+  it("rejects malformed slug requests before resolving aliases", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "Acme Corp" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockResolveOrganizationSlug).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /orgs/join", () => {
   const payload = {
     displayName: "Alice",
@@ -4177,6 +4926,7 @@ describe("POST /orgs/join", () => {
   const invite = {
     id: "invite-1",
     organizationId: "org-1",
+    organization: { name: "Acme Corp" },
     expiresAt: new Date("2099-01-01T00:00:00Z"),
     usedAt: null,
   };
@@ -4268,6 +5018,11 @@ describe("POST /orgs/join", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockFindUnique.mockResolvedValue(null);
     mockCreate.mockResolvedValue(joinedUser);
+    mockUserFindMany.mockResolvedValue([
+      { id: "admin-1" },
+      { id: "owner-1" },
+    ]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 2 });
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
     const app = await buildTestApp();
 
@@ -4308,6 +5063,118 @@ describe("POST /orgs/join", () => {
         },
       },
     });
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        role: { in: ["ADMIN", "OWNER"] },
+        id: { not: "user-1" },
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-1",
+          recipientUserId: "admin-1",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          severity: "ACTION_REQUIRED",
+          title: "New member needs a house",
+          body: "Alice joined Acme Corp and has not been assigned to a house yet.",
+          actionLabel: "Assign house",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-1",
+          dedupeKey: "member-needs-house-assignment:org-1:user-1",
+        },
+        {
+          organizationId: "org-1",
+          recipientUserId: "owner-1",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          severity: "ACTION_REQUIRED",
+          title: "New member needs a house",
+          body: "Alice joined Acme Corp and has not been assigned to a house yet.",
+          actionLabel: "Assign house",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-1",
+          dedupeKey: "member-needs-house-assignment:org-1:user-1",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(JSON.stringify(mockNotificationCreateMany.mock.calls)).not.toContain("single-use-token");
+    await app.close();
+  });
+
+  it("does not create assignment notifications when the joined user already has a house", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(makeMember({
+      email: "alice@example.com",
+      houseId: "house-1",
+      house: { name: "Phoenix", color: "#7c3aed" },
+    }));
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockUserFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("skips notification creation when no admin or owner recipients exist", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    mockUserFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        role: { in: ["ADMIN", "OWNER"] },
+        id: { not: "user-1" },
+      },
+      select: { id: true },
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("uses skipDuplicates so assignment notifications are idempotent", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue(null);
+    mockCreate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    mockUserFindMany.mockResolvedValue([{ id: "admin-1" }]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 0 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      skipDuplicates: true,
+    }));
     await app.close();
   });
 
@@ -4396,6 +5263,245 @@ describe("POST /orgs/join", () => {
       responses.find((response) => response.statusCode === 409)?.json().code,
     ).toBe("INVITE_USED");
     expect(mockInviteUpdateMany).toHaveBeenCalledTimes(2);
+    await app.close();
+  });
+});
+
+describe("POST /notifications/list", () => {
+  it("returns the current actor's notifications with unread count and pagination", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockNotificationFindMany.mockResolvedValue([
+      {
+        id: "notification-3",
+        type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+        severity: "ACTION_REQUIRED",
+        title: "New member needs a house",
+        body: "Casey joined and has not been assigned to a house yet.",
+        actionLabel: "Assign house",
+        actionHref: "/?tab=manage&section=team",
+        entityType: "User",
+        entityId: "user-casey",
+        readAt: null,
+        createdAt: new Date("2026-06-30T12:02:00.000Z"),
+      },
+      {
+        id: "notification-2",
+        type: "SEASON_STARTED",
+        severity: "INFO",
+        title: "Season started",
+        body: "Season 1 is now active.",
+        actionLabel: "View overview",
+        actionHref: "/",
+        entityType: "Season",
+        entityId: "season-1",
+        readAt: new Date("2026-06-30T12:01:00.000Z"),
+        createdAt: new Date("2026-06-30T12:01:00.000Z"),
+      },
+      {
+        id: "notification-1",
+        type: "INVITE_ACCEPTED",
+        severity: "INFO",
+        title: "Invite accepted",
+        body: "Alice joined with an invite link.",
+        actionLabel: null,
+        actionHref: null,
+        entityType: "OrgInvite",
+        entityId: "invite-1",
+        readAt: null,
+        createdAt: new Date("2026-06-30T12:00:00.000Z"),
+      },
+    ]);
+    mockNotificationCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/list",
+      payload: {
+        cursor: "notification-4",
+        limit: 2,
+        unreadOnly: true,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      items: [
+        {
+          id: "notification-3",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          severity: "ACTION_REQUIRED",
+          title: "New member needs a house",
+          body: "Casey joined and has not been assigned to a house yet.",
+          actionLabel: "Assign house",
+          actionHref: "/?tab=manage&section=team",
+          entityType: "User",
+          entityId: "user-casey",
+          readAt: null,
+          createdAt: "2026-06-30T12:02:00.000Z",
+        },
+        {
+          id: "notification-2",
+          type: "SEASON_STARTED",
+          severity: "INFO",
+          title: "Season started",
+          body: "Season 1 is now active.",
+          actionLabel: "View overview",
+          actionHref: "/",
+          entityType: "Season",
+          entityId: "season-1",
+          readAt: "2026-06-30T12:01:00.000Z",
+          createdAt: "2026-06-30T12:01:00.000Z",
+        },
+      ],
+      unreadCount: 2,
+      nextCursor: "notification-2",
+    });
+    expect(mockNotificationFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: null,
+      },
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      take: 3,
+      cursor: { id: "notification-4" },
+      skip: 1,
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        title: true,
+        body: true,
+        actionLabel: true,
+        actionHref: true,
+        entityType: true,
+        entityId: true,
+        readAt: true,
+        createdAt: true,
+      },
+    });
+    expect(mockNotificationCount).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: null,
+      },
+    });
+    await app.close();
+  });
+
+  it("rejects malformed list requests before reading notifications", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/list",
+      payload: { limit: 1000 },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockNotificationFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /notifications/mark-read", () => {
+  it("marks only unread notifications belonging to the current actor", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/mark-read",
+      payload: {
+        notificationIds: ["notification-1", "notification-2"],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updatedCount: 2 });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["notification-1", "notification-2"] },
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: null,
+      },
+      data: {
+        readAt: expect.any(Date),
+      },
+    });
+    await app.close();
+  });
+
+  it("rejects empty notification id lists", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/mark-read",
+      payload: { notificationIds: [] },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /notifications/mark-all-read", () => {
+  it("marks all unread notifications for the current actor", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockNotificationUpdateMany.mockResolvedValue({ count: 3 });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/mark-all-read",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updatedCount: 3 });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-owner",
+        archivedAt: null,
+        readAt: null,
+      },
+      data: {
+        readAt: expect.any(Date),
+      },
+    });
+    await app.close();
+  });
+
+  it("requires an actor mapped to an organization", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp("auth0|missing");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/mark-all-read",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 });

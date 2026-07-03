@@ -108,11 +108,20 @@ The integration suite intentionally asserts that invalid operations fail. Prisma
 
 **Scope:** Critical happy path only, not exhaustive.
 
-**Status:** Implemented as an opt-in staging/local harness.
+**Status:** Implemented as an opt-in staging/local harness and scheduled staging monitor.
 
 Prerequisite: a seeded test database, test Auth0 tenant or staging environment, and a test user that belongs to an organization with at least one assignable target member.
 
-Implemented test path:
+Implemented E2E paths:
+
+Read-only dashboard smoke:
+
+1. Login flow - visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard.
+2. Dashboard shell - confirm the welcome state and Award Points action render.
+3. Core tabs - switch through Overview, Activity, and Leaderboard.
+4. Manage tab - if the staging user has elevated access, confirm the Manage section navigation renders.
+
+Mutating happy path:
 
 1. Login flow - visit `/`, get redirected to Auth0, sign in with test credentials, land on dashboard.
 2. Award points - click Award Points, select a target member, enter amount and reason, submit, and confirm the award succeeds.
@@ -130,3 +139,31 @@ npm run test:e2e
 ```
 
 The test is skipped when required environment variables are missing so normal unit-test and build gates remain stable without Auth0 credentials.
+
+Scheduled staging coverage now runs through `.github/workflows/e2e-staging.yml`. The workflow can be started manually with `workflow_dispatch` and also runs on a weekday cron schedule from the default branch. It uses the `staging` GitHub Environment for E2E secrets, validates required configuration before running, installs Chromium through Playwright, and uploads the Playwright HTML report plus trace/test results as workflow artifacts.
+
+Required GitHub Environment secrets for `staging`:
+
+- `E2E_BASE_URL`
+- `E2E_USER_EMAIL`
+- `E2E_USER_PASSWORD`
+- `E2E_TARGET_MEMBER`
+
+The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).
+
+---
+
+## 4.6 Release Notes Publishing
+
+**Scope:** Manual release-note publishing to GitHub Pages as the first release communication slice.
+
+**Status:** Implemented as a manual GitHub Actions workflow.
+
+The `Publish Release Notes` workflow publishes the static `site` directory to GitHub Pages. This gives the project a stable public release-notes location before semantic release automation or in-app release notifications are introduced.
+
+Current release assets:
+
+- `.github/workflows/publish-release-notes.yml` - manual Pages deployment workflow.
+- `site/releases/index.html` - public release history.
+- `site/releases/template.html` - release note template.
+- `docs/release-process.md` - release note flow and Conventional Commit convention.

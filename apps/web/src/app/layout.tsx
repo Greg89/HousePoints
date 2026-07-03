@@ -18,7 +18,18 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <ClientErrorReporter />
-        <Toaster position="bottom-right" richColors />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            classNames: {
+              toast: "rounded-2xl border bg-card text-card-foreground shadow-xl shadow-primary/10",
+              title: "font-semibold text-foreground",
+              description: "text-muted-foreground",
+              actionButton: "rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground",
+              cancelButton: "rounded-full border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground",
+            },
+          }}
+        />
       </body>
     </html>
   );

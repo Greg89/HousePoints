@@ -1,30 +1,27 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import {
   adjustPointsSchema,
   activityFeedRequestSchema,
   deletePointTransactionSchema,
   deductPointsSchema,
   seasonScopedRequestSchema,
-  type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole } from "../actor.js";
 import { info, warn } from "../logging.js";
-import { resolveSeasonScope, SeasonScopeError } from "../season-scope.js";
+import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
+import { buildPointAwardNotificationData, buildPointDeductionNotificationData } from "../notifications.js";
 
-export function mapActivityItem(tx: {
-  id: string;
-  actor: { displayName: string };
-  targetUser: { displayName: string } | null;
-  targetHouse: { name: string; color: string };
-  type: PointTransactionType;
-  delta: number;
-  reason: string;
-  trait: Trait | null;
-  createdAt: Date;
-  season?: { id: string; name: string; isActive: boolean } | null;
-}) {
+export const ACTIVITY_ITEM_SELECT = {
+  id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+  actor: { select: { displayName: true } },
+  targetUser: { select: { displayName: true } },
+  targetHouse: { select: { name: true, color: true } },
+  season: { select: { id: true, name: true, isActive: true } },
+} as const;
+
+export function mapActivityItem(tx: Prisma.PointTransactionGetPayload<{ select: typeof ACTIVITY_ITEM_SELECT }>) {
   return {
     id: tx.id,
     actorName: tx.actor.displayName,
@@ -46,21 +43,17 @@ export function mapActivityItem(tx: {
   };
 }
 
-export function mapDeletedPoint(tx: {
-  id: string;
-  actor: { displayName: string };
-  targetUser: { displayName: string } | null;
-  targetHouse: { name: string; color: string };
-  type: PointTransactionType;
-  delta: number;
-  reason: string;
-  trait: Trait | null;
-  createdAt: Date;
-  deletedAt: Date | null;
-  deletedBy: { displayName: string } | null;
-  deletionReason: string | null;
-  season?: { id: string; name: string; isActive: boolean } | null;
-}) {
+export const DELETED_POINT_SELECT = {
+  id: true, type: true, delta: true, reason: true, trait: true,
+  createdAt: true, deletedAt: true, deletionReason: true,
+  actor: { select: { displayName: true } },
+  targetUser: { select: { displayName: true } },
+  targetHouse: { select: { name: true, color: true } },
+  deletedBy: { select: { displayName: true } },
+  season: { select: { id: true, name: true, isActive: true } },
+} as const;
+
+export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: typeof DELETED_POINT_SELECT }>) {
   return {
     ...mapActivityItem(tx),
     deletedAt: (tx.deletedAt ?? tx.createdAt).toISOString(),
@@ -73,39 +66,254 @@ type PointRouteOptions = {
   pointAdjustmentsEnabled: boolean;
 };
 
+export async function findTargetUser(targetUserId: string) {
+  return prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, organizationId: true, houseId: true, displayName: true },
+  });
+}
+
+export async function createPointAward(params: {
+  organizationId: string;
+  seasonId: string;
+  actorId: string;
+  actorDisplayName: string;
+  targetUserId: string;
+  targetUserDisplayName: string;
+  targetHouseId: string;
+  delta: number;
+  reason: string;
+  trait: Trait;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const award = await tx.pointTransaction.create({
+      data: {
+        organizationId: params.organizationId,
+        seasonId: params.seasonId,
+        actorUserId: params.actorId,
+        targetUserId: params.targetUserId,
+        targetHouseId: params.targetHouseId,
+        type: "AWARD",
+        delta: params.delta,
+        reason: params.reason,
+        trait: params.trait,
+      },
+    });
+
+    if (params.targetUserId !== params.actorId) {
+      await tx.notification.createMany({
+        data: [buildPointAwardNotificationData({
+          organizationId: params.organizationId,
+          recipientUserId: params.targetUserId,
+          actorDisplayName: params.actorDisplayName,
+          delta: params.delta,
+          trait: params.trait,
+          transactionId: award.id,
+        })],
+        skipDuplicates: true,
+      });
+    }
+
+    return award;
+  });
+}
+
+export async function checkDeductionCooldowns(params: {
+  organizationId: string;
+  seasonId: string;
+  actorHouseId: string;
+  targetUserId: string;
+}) {
+  const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  return Promise.all([
+    prisma.pointTransaction.findFirst({
+      where: {
+        organizationId: params.organizationId,
+        seasonId: params.seasonId,
+        type: "DEDUCTION",
+        createdAt: { gte: cooldownWindowStartsAt },
+        actor: { houseId: params.actorHouseId },
+      },
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.pointTransaction.findFirst({
+      where: {
+        organizationId: params.organizationId,
+        seasonId: params.seasonId,
+        type: "DEDUCTION",
+        targetUserId: params.targetUserId,
+        createdAt: { gte: cooldownWindowStartsAt },
+      },
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+}
+
+export async function createPointDeduction(params: {
+  organizationId: string;
+  seasonId: string;
+  seasonName: string;
+  actorId: string;
+  actorDisplayName: string;
+  targetUserId: string;
+  targetUserDisplayName: string;
+  targetHouseId: string;
+  reason: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const deduction = await tx.pointTransaction.create({
+      data: {
+        organizationId: params.organizationId,
+        seasonId: params.seasonId,
+        actorUserId: params.actorId,
+        targetUserId: params.targetUserId,
+        targetHouseId: params.targetHouseId,
+        type: "DEDUCTION",
+        delta: -10,
+        reason: params.reason,
+        trait: null,
+      },
+      select: { id: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "POINTS_DEDUCTED",
+        summary: `${params.actorDisplayName} deducted 10 points from ${params.targetUserDisplayName}.`,
+        metadata: {
+          transactionId: deduction.id,
+          targetUserId: params.targetUserId,
+          targetUserName: params.targetUserDisplayName,
+          targetHouseId: params.targetHouseId,
+          seasonId: params.seasonId,
+          seasonName: params.seasonName,
+          delta: -10,
+          reason: params.reason,
+        },
+      },
+    });
+
+    await tx.notification.createMany({
+      data: [buildPointDeductionNotificationData({
+        organizationId: params.organizationId,
+        recipientUserId: params.targetUserId,
+        actorDisplayName: params.actorDisplayName,
+        reason: params.reason,
+        transactionId: deduction.id,
+      })],
+      skipDuplicates: true,
+    });
+
+    return deduction;
+  });
+}
+
+export async function getUserScoresByMember(organizationId: string, seasonId: string) {
+  return prisma.pointTransaction.groupBy({
+    by: ["targetUserId"],
+    where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
+    _sum: { delta: true },
+    orderBy: { _sum: { delta: "desc" } },
+  });
+}
+
+export async function listTransactions(params: {
+  organizationId: string;
+  limit: number;
+  cursor?: string;
+}) {
+  const transactions = await prisma.pointTransaction.findMany({
+    where: { organizationId: params.organizationId, deletedAt: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: params.limit + 1,
+    ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+    select: ACTIVITY_ITEM_SELECT,
+  });
+  return {
+    items: transactions.slice(0, params.limit),
+    hasNextPage: transactions.length > params.limit,
+  };
+}
+
+export async function findTransactionForDeletion(transactionId: string) {
+  return prisma.pointTransaction.findUnique({
+    where: { id: transactionId },
+    select: { id: true, organizationId: true, deletedAt: true },
+  });
+}
+
+export async function softDeleteTransaction(params: {
+  transactionId: string;
+  actorId: string;
+  actorDisplayName: string;
+  organizationId: string;
+  deletionReason: string | null;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const point = await tx.pointTransaction.update({
+      where: { id: params.transactionId },
+      data: {
+        deletedAt: new Date(),
+        deletedByUserId: params.actorId,
+        deletionReason: params.deletionReason,
+      },
+      select: {
+        id: true, type: true, delta: true, reason: true, trait: true,
+        targetUserId: true, targetHouseId: true, createdAt: true,
+        deletedAt: true, deletionReason: true,
+        actor: { select: { displayName: true } },
+        targetUser: { select: { displayName: true } },
+        targetHouse: { select: { name: true, color: true } },
+        deletedBy: { select: { displayName: true } },
+        season: { select: { id: true, name: true, isActive: true } },
+      },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "POINT_DELETED",
+        summary: `${params.actorDisplayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
+        metadata: {
+          transactionId: point.id,
+          targetUserId: point.targetUserId,
+          targetUserName: point.targetUser?.displayName ?? null,
+          targetHouseId: point.targetHouseId,
+          targetHouseName: point.targetHouse.name,
+          delta: point.delta,
+          trait: point.trait,
+          awardReason: point.reason,
+          deletionReason: params.deletionReason,
+        },
+      },
+    });
+
+    return point;
+  });
+}
+
 export async function registerPointRoutes(
   app: FastifyInstance,
   options: PointRouteOptions,
 ): Promise<void> {
   app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
-    const parsed = adjustPointsSchema.safeParse(request.body);
+    const parsed = await parseBody(adjustPointsSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {
-        targetUserId: parsed.data.targetUserId,
-        delta: parsed.data.delta,
-      });
-      return reply.status(403).send({
-        message: "Signed-in user is not mapped to an internal account",
-        code: "ACTOR_NOT_MAPPED",
-      });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
     if (!actor.houseId) {
       warn(request.log, "points.actor_house_unassigned", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
-        targetUserId: parsed.data.targetUserId,
-        delta: parsed.data.delta,
+        targetUserId: parsed.targetUserId,
+        delta: parsed.delta,
       });
       return reply.status(403).send({
         message: "Signed-in user must be assigned to a house before awarding points",
@@ -113,18 +321,14 @@ export async function registerPointRoutes(
       });
     }
 
-    // Resolve the target user and derive their house
-    const targetUser = await prisma.user.findUnique({
-      where: { id: parsed.data.targetUserId },
-      select: { id: true, organizationId: true, houseId: true, displayName: true },
-    });
+    const targetUser = await findTargetUser(parsed.targetUserId);
 
     if (!targetUser || targetUser.organizationId !== actor.organizationId) {
       warn(request.log, "points.cross_organization_target", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
         actorOrganizationId: actor.organizationId,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(403).send({
         message: "Target user is outside your organization",
@@ -143,35 +347,21 @@ export async function registerPointRoutes(
       });
     }
 
-    let activeSeason;
-    try {
-      activeSeason = await resolveSeasonScope(actor);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, "points.active_season_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-        });
-        return reply.status(err.statusCode).send({
-          message: "An active season is required before points can be awarded",
-          code: err.code,
-        });
-      }
-      throw err;
-    }
+    const targetHouseId = targetUser.houseId;
+    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
+    if (!activeSeason) return;
 
-    const transaction = await prisma.pointTransaction.create({
-      data: {
-        organizationId: actor.organizationId,
-        seasonId: activeSeason.id,
-        actorUserId: actor.id,
-        targetUserId: targetUser.id,
-        targetHouseId: targetUser.houseId,
-        type: "AWARD",
-        delta: parsed.data.delta,
-        reason: parsed.data.reason,
-        trait: parsed.data.trait,
-      },
+    const transaction = await createPointAward({
+      organizationId: actor.organizationId,
+      seasonId: activeSeason.id,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      targetUserId: targetUser.id,
+      targetUserDisplayName: targetUser.displayName,
+      targetHouseId,
+      delta: parsed.delta,
+      reason: parsed.reason,
+      trait: parsed.trait,
     });
 
     info(request.log, "points.adjusted", {
@@ -196,40 +386,17 @@ export async function registerPointRoutes(
       });
     }
 
-    const parsed = deductPointsSchema.safeParse(request.body);
+    const parsed = await parseBody(deductPointsSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.deduct.actor_not_found", {
-        targetUserId: parsed.data.targetUserId,
-      });
-      return reply.status(403).send({
-        message: "Signed-in user is not mapped to an internal account",
-        code: "ACTOR_NOT_MAPPED",
-      });
-    }
-
-    if (!isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {
-        actorUserId: actor.id,
-        targetUserId: parsed.data.targetUserId,
-      });
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
     if (!actor.houseId) {
       warn(request.log, "points.deduct.actor_house_required", {
         actorUserId: actor.id,
         actorAuth0Sub: actor.auth0Sub,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(403).send({
         message: "Signed-in user must be assigned to a house before deducting points",
@@ -237,16 +404,13 @@ export async function registerPointRoutes(
       });
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id: parsed.data.targetUserId },
-      select: { id: true, organizationId: true, houseId: true, displayName: true },
-    });
+    const targetUser = await findTargetUser(parsed.targetUserId);
 
     if (!targetUser) {
       warn(request.log, "points.deduct.target_user_not_found", {
         actorUserId: actor.id,
         actorOrganizationId: actor.organizationId,
-        targetUserId: parsed.data.targetUserId,
+        targetUserId: parsed.targetUserId,
       });
       return reply.status(404).send({
         message: "Target user was not found",
@@ -291,50 +455,15 @@ export async function registerPointRoutes(
     }
 
     const targetHouseId = targetUser.houseId;
-    let activeSeason;
-    try {
-      activeSeason = await resolveSeasonScope(actor);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, "points.deduct.active_season_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-        });
-        return reply.status(err.statusCode).send({
-          message: "An active season is required before points can be deducted",
-          code: err.code,
-        });
-      }
-      throw err;
-    }
+    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
+    if (!activeSeason) return;
 
-    const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [recentHouseDeduction, recentTargetDeduction] = await Promise.all([
-      prisma.pointTransaction.findFirst({
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: activeSeason.id,
-          type: "DEDUCTION",
-          createdAt: { gte: cooldownWindowStartsAt },
-          actor: {
-            houseId: actor.houseId,
-          },
-        },
-        select: { id: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.pointTransaction.findFirst({
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: activeSeason.id,
-          type: "DEDUCTION",
-          targetUserId: targetUser.id,
-          createdAt: { gte: cooldownWindowStartsAt },
-        },
-        select: { id: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+    const [recentHouseDeduction, recentTargetDeduction] = await checkDeductionCooldowns({
+      organizationId: actor.organizationId,
+      seasonId: activeSeason.id,
+      actorHouseId: actor.houseId,
+      targetUserId: targetUser.id,
+    });
 
     if (recentHouseDeduction) {
       warn(request.log, "points.deduct.cooldown_active", {
@@ -366,42 +495,16 @@ export async function registerPointRoutes(
       });
     }
 
-    const transaction = await prisma.$transaction(async (tx) => {
-      const deduction = await tx.pointTransaction.create({
-        data: {
-          organizationId: actor.organizationId,
-          seasonId: activeSeason.id,
-          actorUserId: actor.id,
-          targetUserId: targetUser.id,
-          targetHouseId,
-          type: "DEDUCTION",
-          delta: -10,
-          reason: parsed.data.reason,
-          trait: null,
-        },
-        select: { id: true },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorUserId: actor.id,
-          eventType: "POINTS_DEDUCTED",
-          summary: `${actor.displayName} deducted 10 points from ${targetUser.displayName}.`,
-          metadata: {
-            transactionId: deduction.id,
-            targetUserId: targetUser.id,
-            targetUserName: targetUser.displayName,
-            targetHouseId,
-            seasonId: activeSeason.id,
-            seasonName: activeSeason.name,
-            delta: -10,
-            reason: parsed.data.reason,
-          },
-        },
-      });
-
-      return deduction;
+    const transaction = await createPointDeduction({
+      organizationId: actor.organizationId,
+      seasonId: activeSeason.id,
+      seasonName: activeSeason.name,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      targetUserId: targetUser.id,
+      targetUserDisplayName: targetUser.displayName,
+      targetHouseId,
+      reason: parsed.reason,
     });
 
     info(request.log, "points.deducted", {
@@ -418,46 +521,16 @@ export async function registerPointRoutes(
   });
 
   app.post("/users/scores", async (request, reply) => {
-    const parsed = seasonScopedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
+    const season = await resolveSeasonOrReject(actor, parsed.seasonId, request, reply);
+    if (!season) return;
 
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    let season;
-    try {
-      season = await resolveSeasonScope(actor, parsed.data.seasonId);
-    } catch (err) {
-      if (err instanceof SeasonScopeError) {
-        warn(request.log, err.code === "SEASON_NOT_FOUND" ? "seasons.not_found" : "seasons.active_missing", {
-          actorUserId: actor.id,
-          organizationId: actor.organizationId,
-          seasonId: parsed.data.seasonId,
-        });
-        return reply.status(err.statusCode).send({ message: err.message, code: err.code });
-      }
-      throw err;
-    }
-
-    const grouped = await prisma.pointTransaction.groupBy({
-      by: ["targetUserId"],
-      where: {
-        organizationId: actor.organizationId,
-        seasonId: season.id,
-        deletedAt: null,
-        targetUserId: { not: null },
-      },
-      _sum: { delta: true },
-      orderBy: { _sum: { delta: "desc" } },
-    });
+    const grouped = await getUserScoresByMember(actor.organizationId, season.id);
 
     return grouped.map((row) => ({
       memberId: row.targetUserId as string,
@@ -466,44 +539,18 @@ export async function registerPointRoutes(
   });
 
   app.post("/transactions/recent", async (request, reply) => {
-    const parsed = activityFeedRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(activityFeedRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    const transactions = await prisma.pointTransaction.findMany({
-      where: { organizationId: actor.organizationId, deletedAt: null },
-      orderBy: [
-        { createdAt: "desc" },
-        { id: "desc" },
-      ],
-      take: parsed.data.limit + 1,
-      ...(parsed.data.cursor ? { cursor: { id: parsed.data.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        type: true,
-        delta: true,
-        reason: true,
-        trait: true,
-        createdAt: true,
-        actor: { select: { displayName: true } },
-        targetUser: { select: { displayName: true } },
-        targetHouse: { select: { name: true, color: true } },
-        season: { select: { id: true, name: true, isActive: true } },
-      },
+    const { items, hasNextPage } = await listTransactions({
+      organizationId: actor.organizationId,
+      limit: parsed.limit,
+      cursor: parsed.cursor,
     });
-
-    const items = transactions.slice(0, parsed.data.limit);
-    const nextCursor = transactions.length > parsed.data.limit ? items.at(-1)?.id ?? null : null;
+    const nextCursor = hasNextPage ? items.at(-1)?.id ?? null : null;
 
     return {
       items: items.map(mapActivityItem),
@@ -512,34 +559,19 @@ export async function registerPointRoutes(
   });
 
   app.post("/points/delete", async (request, reply) => {
-    const parsed = deletePointTransactionSchema.safeParse(request.body);
+    const parsed = await parseBody(deletePointTransactionSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", { issues: parsed.error.issues });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isAdminRole(actor.role)) {
-      warn(request.log, "admin.forbidden", {});
-      return reply.status(403).send({ message: "Admin access required", code: "ADMIN_REQUIRED" });
-    }
-
-    const existing = await prisma.pointTransaction.findUnique({
-      where: { id: parsed.data.transactionId },
-      select: {
-        id: true,
-        organizationId: true,
-        deletedAt: true,
-      },
-    });
+    const existing = await findTransactionForDeletion(parsed.transactionId);
 
     if (!existing || existing.organizationId !== actor.organizationId) {
       warn(request.log, "points.delete.not_found", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
-        transactionId: parsed.data.transactionId,
+        transactionId: parsed.transactionId,
       });
       return reply.status(404).send({ message: "Point transaction not found", code: "POINT_TRANSACTION_NOT_FOUND" });
     }
@@ -553,55 +585,13 @@ export async function registerPointRoutes(
       return reply.status(409).send({ message: "Point transaction is already deleted", code: "POINT_TRANSACTION_ALREADY_DELETED" });
     }
 
-    const deletionReason = parsed.data.reason?.trim() || null;
-    const deletedPoint = await prisma.$transaction(async (tx) => {
-      const point = await tx.pointTransaction.update({
-        where: { id: existing.id },
-        data: {
-          deletedAt: new Date(),
-          deletedByUserId: actor.id,
-          deletionReason,
-        },
-        select: {
-          id: true,
-          type: true,
-          delta: true,
-          reason: true,
-          trait: true,
-          targetUserId: true,
-          targetHouseId: true,
-          createdAt: true,
-          deletedAt: true,
-          deletionReason: true,
-          actor: { select: { displayName: true } },
-          targetUser: { select: { displayName: true } },
-          targetHouse: { select: { name: true, color: true } },
-          deletedBy: { select: { displayName: true } },
-          season: { select: { id: true, name: true, isActive: true } },
-        },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorUserId: actor.id,
-          eventType: "POINT_DELETED",
-          summary: `${actor.displayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
-          metadata: {
-            transactionId: point.id,
-            targetUserId: point.targetUserId,
-            targetUserName: point.targetUser?.displayName ?? null,
-            targetHouseId: point.targetHouseId,
-            targetHouseName: point.targetHouse.name,
-            delta: point.delta,
-            trait: point.trait,
-            awardReason: point.reason,
-            deletionReason,
-          },
-        },
-      });
-
-      return point;
+    const deletionReason = parsed.reason?.trim() || null;
+    const deletedPoint = await softDeleteTransaction({
+      transactionId: existing.id,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      organizationId: actor.organizationId,
+      deletionReason,
     });
 
     info(request.log, "points.deleted", {

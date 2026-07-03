@@ -1,0 +1,72 @@
+# Second Refactor Pass
+
+Review date: July 1, 2026
+
+## Purpose
+
+This pass addresses structural debt identified after the first refactor pass was closed. The first pass fixed security and reliability blockers. This pass fixes the internal code quality issues that will slow down every new feature if left unaddressed: handler bloat, repeated boilerplate, scattered notification logic, and a contracts file that is outgrowing a single module.
+
+No behavior changes are in scope. Every phase must leave the full quality gate green before work continues.
+
+## Quality Gate
+
+A unit of work is complete only when all of the following pass cleanly:
+
+- `npm run lint`
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+
+Database-backed integration tests (`npm run test:integration`) run in CI against a PostgreSQL service and are verified on each phase completion.
+
+## Documents
+
+1. [Findings](./01-findings.md) documents the eight structural issues this pass addresses and their impact.
+2. [Execution Plan](./02-execution-plan.md) defines the phased order, the scope of each phase, and the commit slices within each phase.
+3. [Acceptance Criteria](./03-acceptance-criteria.md) defines what must be true before feature development resumes.
+
+## Progress Snapshot
+
+Last updated: July 1, 2026
+
+**Phase 1 - COMPLETE.** All quality gates green.
+
+- ✅ Slice 1a: `getUserOrgContextBySub` moved to `actor.ts`, private copy removed from `orgs.ts`
+- ✅ Slice 1b: `route-helpers.ts` created with `parseBody`, `requireActor`, `requireAdminActor`, `requireOwnerActor`, `resolveSeasonOrReject`
+- ✅ Helpers applied to all 7 route files: `notifications.ts`, `users.ts`, `dashboard.ts`, `points.ts`, `seasons.ts`, `admin.ts`, `orgs.ts`
+- ✅ Unit tests for `route-helpers.ts` (16 tests covering all 5 helpers, including null-return paths)
+- ✅ Added `"auth.actor_not_found"` and `"owner.forbidden"` to `ApiLogEvent`
+
+**Phase 3 - COMPLETE.** All quality gates green.
+
+- ✅ Slice 3a: `apps/api/src/notifications.ts` created with 5 exported factory functions (`buildPointAwardNotificationData`, `buildPointDeductionNotificationData`, `buildSeasonStartedNotificationData`, `buildRoleChangedNotificationData`, `buildMemberNeedsAssignmentNotificationData`)
+- ✅ All inline `notification.createMany` calls with hardcoded string templates replaced with factory calls in `points.ts`, `seasons.ts`, `admin.ts`, `orgs.ts`
+- ✅ `createMemberNeedsHouseAssignmentNotifications` removed from `orgs.ts`
+- ✅ 23 unit tests in `notifications.test.ts`
+
+- ✅ Slice 2a: `notifications.ts` — 3 exported service functions (`listNotifications`, `markNotificationsRead`, `markAllNotificationsRead`)
+- ✅ Slice 2a: `users.ts` — 7 exported service functions + `userSelect` hoisted to module scope
+- ✅ Slice 2b: `dashboard.ts` — 2 exported service functions (`loadLeaderboard`, `loadDashboardSummaryData`)
+- ✅ Slice 2b: `seasons.ts` — 7 exported service functions (`loadSeasonsForOrg`, `loadSeasonCompareData`, `loadSeasonCompareDetails`, `loadContributorNames`, `startSeasonTransaction`, `findSeasonForOrg`, `renameSeasonInDb`)
+- ✅ Slice 2c: `points.ts` — 8 exported service functions; all 5 handlers updated with zero inline `prisma.*` calls
+- ✅ Slice 2d: `admin.ts` — 10 exported service functions; all 8 handlers updated; `buildRecentAdminActions` and `buildPointAdjustmentStats` exported with 13 unit tests in `admin.test.ts`
+- ✅ Slice 2e: `orgs.ts` — 5 exported service functions (`checkOrgCreatePreconditions`, `createOrgInDb`, `createOrgInviteInDb`, `loadJoinPreviewInDb`, `joinOrgInDb`); all 4 handlers updated
+
+**Phase 2 - COMPLETE.** All quality gates green.
+
+**Phase 4 - COMPLETE.** All quality gates green.
+
+- ✅ `packages/contracts/src/index.ts` replaced with 9-line pure re-export barrel
+- ✅ Domain schema files created: `shared.ts`, `point-schemas.ts`, `user-schemas.ts`, `season-schemas.ts`, `dashboard-schemas.ts`, `admin-schemas.ts`, `notification-schemas.ts`, `org-schemas.ts`, `api-contracts.ts`
+- ✅ No consumer import paths changed
+
+**Phase 5 - COMPLETE.** All quality gates green.
+
+- ✅ `mapAppUser` in `app-user.ts`: exported `APP_USER_SELECT`; parameter type is now `Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>`
+- ✅ `mapActivityItem` and `mapDeletedPoint` in `routes/points.ts`: exported `ACTIVITY_ITEM_SELECT` and `DELETED_POINT_SELECT`; parameter types derived from `Prisma.PointTransactionGetPayload`
+- ✅ `mapNotification` in `routes/notifications.ts`: `NOTIFICATION_SELECT` const added; `NotificationRecord` manual type removed; parameter type is `Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>`
+- ✅ `APP_USER_SELECT` now used in all three call sites (`users.ts`, `orgs.ts` ×2); `DELETED_POINT_SELECT` shared with `admin.ts` query
+
+## Overall Pass: COMPLETE
+
+All five phases are complete and all acceptance criteria are met. Feature development may resume.

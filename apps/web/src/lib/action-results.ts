@@ -13,9 +13,13 @@ export type DeductPointsResult = MutationResult;
 export type HouseAssignmentResult = MutationResult;
 export type HouseMutationResult = MutationResult;
 export type JoinOrgResult = MutationResult;
+export type MemberRemovalResult = MutationResult;
 export type OrgSettingsMutationResult = MutationResult;
 export type ProfileUpdateResult = MutationResult;
 export type RoleChangeResult = MutationResult;
+export type NotificationMutationResult =
+  | { ok: true; updatedCount: number }
+  | Extract<MutationResult, { ok: false }>;
 export type RenameSeasonResult<Season> =
   | { ok: true; season: Season }
   | Extract<MutationResult, { ok: false }>;

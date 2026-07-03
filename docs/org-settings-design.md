@@ -20,7 +20,7 @@ The first settings slice is implemented:
 - Old slugs stay reserved through `OrganizationSlugAlias`.
 - New invites return a slug-bearing join path while the token remains the one-time secure credential.
 
-Today, the slug is mostly identity metadata. It is stored uniquely, returned in app/user/admin context, shown in Settings, used during organization creation to prevent duplicates, and included in newly generated invite links. Invite joining is based on single-use token hashes and the invite's `organizationId`; slugged invite routes provide context and canonical redirects but do not replace token authority. The app does not currently route dashboards by `/:orgSlug`. The recommended dashboard route behavior is captured in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
+Today, the slug is identity and routing metadata. It is stored uniquely, returned in app/user/admin context, shown in Settings, used during organization creation to prevent duplicates, included in newly generated invite links, and accepted by the dashboard route at `/o/{slug}`. Invite joining is based on single-use token hashes and the invite's `organizationId`; slugged invite routes provide context and canonical redirects but do not replace token authority. Dashboard slug routing is captured in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
 
 Product direction has shifted toward making the slug more visible in URLs and invite links. That means slug history should be treated as durable routing metadata before the app exposes slug-based entry points.
 
@@ -44,10 +44,10 @@ Implemented product behavior:
 
 ## Slug Change Risk
 
-Changing a slug is low-risk in the current app shape because:
+Changing a slug is controlled in the current app shape because:
 
-- Dashboard routes are not slug-based.
-- Invite tokens are not slug-scoped in the URL or join payload.
+- Dashboard and invite URLs resolve through slug aliases and redirect to the current slug.
+- Invite tokens are not slug-scoped in the join payload.
 - Membership, points, houses, seasons, and audit records all reference `organizationId`.
 
 Changing a slug becomes higher-risk if we later add:
@@ -140,7 +140,7 @@ Recommended URL shape:
 
 | Use | Shape | Notes |
 |---|---|---|
-| Organization landing/dashboard | `/o/{slug}` | Specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md); not implemented yet. |
+| Organization landing/dashboard | `/o/{slug}` | Implemented as an authenticated dashboard entry point and preferred by dashboard navigation. |
 | Invite link | `/o/{slug}/join/{token}` | Slug is context and user trust; token remains the secret credential. |
 | Old slug redirect | `/o/{oldSlug}` -> `/o/{currentSlug}` | Uses alias lookup. |
 
@@ -158,12 +158,15 @@ Security notes:
 This design does not include:
 
 - Organization deletion or archival.
-- Ownership transfer.
 - Multi-org membership.
 - Public org discovery.
 - Domain allow-list joining.
 
 Those should each get their own small design pass before implementation.
+
+Related org administration now implemented outside this slug-specific design:
+
+- Organization ownership transfer is available as an owner-only Manage Settings action. The acting owner becomes an admin, the selected member becomes owner, and the change is audited as a role-change event.
 
 ---
 
@@ -209,4 +212,4 @@ Suggested order:
 2. Add owner-only slug change using the existing `Organization.slug` field plus alias reservation checks. Implemented.
 3. Update invite generation to present slug-bearing invite URLs while keeping token-hash join security. Implemented.
 4. Add slug-based landing/join routes that resolve aliases and redirect old slugs to the current slug. Implemented for invite join links.
-5. Add slug-based dashboard routes at `/o/{slug}`. Specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md); implementation remains future work.
+5. Add slug-based dashboard routes at `/o/{slug}`. Implemented with canonical dashboard navigation. Optional root redirects remain follow-up work.

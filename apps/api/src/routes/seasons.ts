@@ -6,9 +6,11 @@ import {
   seasonCompareRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isOwnerRole } from "../actor.js";
+import type { ActorRecord } from "../actor.js";
+import { SeasonScopeError, mapSeason } from "../season-scope.js";
+import { parseBody, requireActor, requireOwnerActor } from "../route-helpers.js";
 import { info, warn } from "../logging.js";
-import { mapSeason, SeasonScopeError } from "../season-scope.js";
+import { buildSeasonStartedNotificationData } from "../notifications.js";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -77,39 +79,149 @@ function buildRanks(
   return new Map(ranked.map((house, index) => [house.id, index + 1]));
 }
 
-export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/seasons/context", async (request, reply) => {
-    const parsed = actorScopeSchema.safeParse(request.body);
+export async function loadSeasonsForOrg(organizationId: string) {
+  return prisma.season.findMany({
+    where: { organizationId },
+    orderBy: { startsAt: "desc" },
+    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+  });
+}
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
+export async function loadSeasonCompareData(
+  organizationId: string,
+  seasonIds: string[],
+) {
+  return prisma.season.findMany({
+    where: { id: { in: seasonIds }, organizationId },
+    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+  });
+}
+
+export async function loadSeasonCompareDetails(
+  organizationId: string,
+  seasonIds: string[],
+) {
+  const [houses, houseTotals, contributorTotals] = await Promise.all([
+    prisma.house.findMany({
+      where: { organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["seasonId", "targetHouseId"],
+      where: { organizationId, seasonId: { in: seasonIds }, deletedAt: null },
+      _sum: { delta: true },
+      _count: { _all: true },
+    }),
+    prisma.pointTransaction.groupBy({
+      by: ["seasonId", "targetHouseId", "targetUserId"],
+      where: { organizationId, seasonId: { in: seasonIds }, deletedAt: null, targetUserId: { not: null } },
+      _sum: { delta: true },
+    }),
+  ]);
+  return { houses, houseTotals, contributorTotals };
+}
+
+export async function loadContributorNames(
+  userIds: string[],
+  organizationId: string,
+) {
+  if (!userIds.length) return [];
+  return prisma.user.findMany({
+    where: { id: { in: userIds }, organizationId },
+    select: { id: true, displayName: true },
+  });
+}
+
+export async function startSeasonTransaction(actor: ActorRecord, seasonName: string) {
+  return prisma.$transaction(async (tx) => {
+    const currentSeason = await tx.season.findFirst({
+      where: { organizationId: actor.organizationId, isActive: true },
+      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    });
+
+    if (!currentSeason) {
+      throw new SeasonScopeError(409, "ACTIVE_SEASON_REQUIRED", "An active season is required");
     }
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    const seasons = await prisma.season.findMany({
-      where: {
+    const now = new Date();
+    const previousSeason = await tx.season.update({
+      where: { id: currentSeason.id },
+      data: { isActive: false, endsAt: now },
+      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    });
+    const activeSeason = await tx.season.create({
+      data: {
         organizationId: actor.organizationId,
-      },
-      orderBy: {
-        startsAt: "desc",
-      },
-      select: {
-        id: true,
-        name: true,
-        startsAt: true,
-        endsAt: true,
+        name: seasonName,
+        startsAt: now,
         isActive: true,
+        createdById: actor.id,
+      },
+      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorUserId: actor.id,
+        eventType: "SEASON_STARTED",
+        summary: `${actor.displayName} started ${activeSeason.name}.`,
+        metadata: {
+          seasonId: activeSeason.id,
+          seasonName: activeSeason.name,
+          previousSeasonId: previousSeason.id,
+          previousSeasonName: previousSeason.name,
+        },
       },
     });
+
+    const notificationRecipients = await tx.user.findMany({
+      where: { organizationId: actor.organizationId },
+      select: { id: true },
+    });
+
+    if (notificationRecipients.length > 0) {
+      await tx.notification.createMany({
+        data: notificationRecipients.map((recipient) => buildSeasonStartedNotificationData({
+          organizationId: actor.organizationId,
+          recipientId: recipient.id,
+          actorDisplayName: actor.displayName,
+          seasonName: activeSeason.name,
+          seasonId: activeSeason.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return { previousSeason, activeSeason };
+  });
+}
+
+export async function findSeasonForOrg(seasonId: string, organizationId: string) {
+  return prisma.season.findFirst({
+    where: { id: seasonId, organizationId },
+    select: { id: true },
+  });
+}
+
+export async function renameSeasonInDb(seasonId: string, name: string) {
+  return prisma.season.update({
+    where: { id: seasonId },
+    data: { name },
+    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+  });
+}
+
+export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> {
+  app.post("/seasons/context", async (request, reply) => {
+    const parsed = await parseBody(actorScopeSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
+
+    const seasons = await loadSeasonsForOrg(actor.organizationId);
     const activeSeason = seasons.find((season) => season.isActive);
 
     if (!activeSeason) {
@@ -136,77 +248,32 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.post("/seasons/compare", async (request, reply) => {
-    const parsed = seasonCompareRequestSchema.safeParse(request.body);
+    const parsed = await parseBody(seasonCompareRequestSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor) {
-      warn(request.log, "points.actor_not_found", {});
-      return reply.status(403).send({ message: "Actor is not mapped", code: "ACTOR_NOT_MAPPED" });
-    }
-
-    const requestedSeasonIds = [parsed.data.fromSeasonId, parsed.data.toSeasonId];
-    const seasons = await prisma.season.findMany({
-      where: {
-        id: { in: requestedSeasonIds },
-        organizationId: actor.organizationId,
-      },
-      select: {
-        id: true,
-        name: true,
-        startsAt: true,
-        endsAt: true,
-        isActive: true,
-      },
-    });
+    const requestedSeasonIds = [parsed.fromSeasonId, parsed.toSeasonId];
+    const seasons = await loadSeasonCompareData(actor.organizationId, requestedSeasonIds);
     const seasonsById = new Map(seasons.map((season) => [season.id, season]));
-    const fromSeason = seasonsById.get(parsed.data.fromSeasonId);
-    const toSeason = seasonsById.get(parsed.data.toSeasonId);
+    const fromSeason = seasonsById.get(parsed.fromSeasonId);
+    const toSeason = seasonsById.get(parsed.toSeasonId);
 
     if (!fromSeason || !toSeason) {
       warn(request.log, "seasons.not_found", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
-        fromSeasonId: parsed.data.fromSeasonId,
-        toSeasonId: parsed.data.toSeasonId,
+        fromSeasonId: parsed.fromSeasonId,
+        toSeasonId: parsed.toSeasonId,
       });
       return reply.status(404).send({ message: "Season not found", code: "SEASON_NOT_FOUND" });
     }
 
-    const [houses, houseTotals, contributorTotals] = await Promise.all([
-      prisma.house.findMany({
-        where: { organizationId: actor.organizationId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, color: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["seasonId", "targetHouseId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: { in: requestedSeasonIds },
-          deletedAt: null,
-        },
-        _sum: { delta: true },
-        _count: { _all: true },
-      }),
-      prisma.pointTransaction.groupBy({
-        by: ["seasonId", "targetHouseId", "targetUserId"],
-        where: {
-          organizationId: actor.organizationId,
-          seasonId: { in: requestedSeasonIds },
-          deletedAt: null,
-          targetUserId: { not: null },
-        },
-        _sum: { delta: true },
-      }),
-    ]);
+    const { houses, houseTotals, contributorTotals } = await loadSeasonCompareDetails(
+      actor.organizationId,
+      requestedSeasonIds,
+    );
 
     const userIds = [
       ...new Set(
@@ -215,15 +282,7 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
           .filter((userId): userId is string => Boolean(userId)),
       ),
     ];
-    const users = userIds.length
-      ? await prisma.user.findMany({
-          where: {
-            id: { in: userIds },
-            organizationId: actor.organizationId,
-          },
-          select: { id: true, displayName: true },
-        })
-      : [];
+    const users = await loadContributorNames(userIds, actor.organizationId);
     const userNamesById = new Map(users.map((user) => [user.id, user.displayName]));
 
     const totalsBySeasonHouse = new Map<string, { points: number; transactions: number }>();
@@ -323,94 +382,14 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.post("/seasons/start", async (request, reply) => {
-    const parsed = createSeasonSchema.safeParse(request.body);
+    const parsed = await parseBody(createSeasonSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
-
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isOwnerRole(actor.role)) {
-      warn(request.log, "seasons.start.forbidden", {});
-      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
-    }
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
 
     try {
-      const transition = await prisma.$transaction(async (tx) => {
-        const currentSeason = await tx.season.findFirst({
-          where: {
-            organizationId: actor.organizationId,
-            isActive: true,
-          },
-          select: {
-            id: true,
-            name: true,
-            startsAt: true,
-            endsAt: true,
-            isActive: true,
-          },
-        });
-
-        if (!currentSeason) {
-          throw new SeasonScopeError(409, "ACTIVE_SEASON_REQUIRED", "An active season is required");
-        }
-
-        const now = new Date();
-        const previousSeason = await tx.season.update({
-          where: { id: currentSeason.id },
-          data: {
-            isActive: false,
-            endsAt: now,
-          },
-          select: {
-            id: true,
-            name: true,
-            startsAt: true,
-            endsAt: true,
-            isActive: true,
-          },
-        });
-        const activeSeason = await tx.season.create({
-          data: {
-            organizationId: actor.organizationId,
-            name: parsed.data.name,
-            startsAt: now,
-            isActive: true,
-            createdById: actor.id,
-          },
-          select: {
-            id: true,
-            name: true,
-            startsAt: true,
-            endsAt: true,
-            isActive: true,
-          },
-        });
-
-        await tx.auditEvent.create({
-          data: {
-            organizationId: actor.organizationId,
-            actorUserId: actor.id,
-            eventType: "SEASON_STARTED",
-            summary: `${actor.displayName} started ${activeSeason.name}.`,
-            metadata: {
-              seasonId: activeSeason.id,
-              seasonName: activeSeason.name,
-              previousSeasonId: previousSeason.id,
-              previousSeasonName: previousSeason.name,
-            },
-          },
-        });
-
-        return {
-          previousSeason,
-          activeSeason,
-        };
-      });
+      const transition = await startSeasonTransaction(actor, parsed.name);
 
       info(request.log, "seasons.started", {
         actorUserId: actor.id,
@@ -436,7 +415,7 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
         warn(request.log, "seasons.name_conflict", {
           actorUserId: actor.id,
           organizationId: actor.organizationId,
-          seasonName: parsed.data.name,
+          seasonName: parsed.name,
         });
         return reply.status(409).send({
           message: "A season with that name already exists",
@@ -449,51 +428,25 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.post("/seasons/rename", async (request, reply) => {
-    const parsed = renameSeasonSchema.safeParse(request.body);
+    const parsed = await parseBody(renameSeasonSchema, request, reply);
+    if (!parsed) return;
 
-    if (!parsed.success) {
-      warn(request.log, "request.validation_failed", {
-        issues: parsed.error.issues,
-      });
-      return reply.status(400).send({ code: "VALIDATION_ERROR", message: "Validation failed", errors: parsed.error.flatten() });
-    }
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
 
-    const actor = await getActorBySub(request.auth.subject);
-
-    if (!actor || !isOwnerRole(actor.role)) {
-      warn(request.log, "seasons.rename.forbidden", {});
-      return reply.status(403).send({ message: "Owner access required", code: "OWNER_REQUIRED" });
-    }
-
-    const season = await prisma.season.findFirst({
-      where: {
-        id: parsed.data.seasonId,
-        organizationId: actor.organizationId,
-      },
-      select: { id: true },
-    });
+    const season = await findSeasonForOrg(parsed.seasonId, actor.organizationId);
 
     if (!season) {
       warn(request.log, "seasons.not_found", {
         actorUserId: actor.id,
         organizationId: actor.organizationId,
-        seasonId: parsed.data.seasonId,
+        seasonId: parsed.seasonId,
       });
       return reply.status(404).send({ message: "Season not found", code: "SEASON_NOT_FOUND" });
     }
 
     try {
-      const updatedSeason = await prisma.season.update({
-        where: { id: season.id },
-        data: { name: parsed.data.name },
-        select: {
-          id: true,
-          name: true,
-          startsAt: true,
-          endsAt: true,
-          isActive: true,
-        },
-      });
+      const updatedSeason = await renameSeasonInDb(season.id, parsed.name);
 
       info(request.log, "seasons.renamed", {
         actorUserId: actor.id,
@@ -507,8 +460,8 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
         warn(request.log, "seasons.name_conflict", {
           actorUserId: actor.id,
           organizationId: actor.organizationId,
-          seasonId: parsed.data.seasonId,
-          seasonName: parsed.data.name,
+          seasonId: parsed.seasonId,
+          seasonName: parsed.name,
         });
         return reply.status(409).send({
           message: "A season with that name already exists",

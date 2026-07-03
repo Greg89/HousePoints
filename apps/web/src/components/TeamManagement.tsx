@@ -3,7 +3,7 @@ import {
   Check,
   Copy,
   LinkSimple,
-  ShieldCheck,
+  UserMinus,
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import type { AdminAuditAction, InviteStats, UserRole } from "@housepoints/contr
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
-  RoleChangeResult,
+  MemberRemovalResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 
@@ -25,7 +25,7 @@ interface TeamManagementProps {
   inviteStats: InviteStats;
   actorRole: UserRole;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
-  onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
+  onRemoveOrgMember: (formData: FormData) => Promise<MemberRemovalResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
 }
 
@@ -51,23 +51,26 @@ export function TeamManagement({
   inviteStats,
   actorRole,
   onAssignHouse,
-  onPromoteUser,
+  onRemoveOrgMember,
   onCreateInvite,
 }: TeamManagementProps) {
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
-  const [rolePending, startRoleChange] = useTransition();
+  const [removePending, startRemove] = useTransition();
   const [inviteJoinPath, setInviteJoinPath] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const inviteUrl = inviteJoinPath ? formatInviteUrl(inviteJoinPath) : null;
   const unassignedCount = unassignedUsers.length;
   const inviteActions = recentAdminActions.filter(
     (action) => action.type === "INVITE_CREATED" || action.type === "INVITE_USED",
   );
   const isOwner = actorRole === "OWNER";
-  const promotionCandidates = users.filter((user) => user.role === "MEMBER");
-  const demotionCandidates = users.filter((user) => user.role === "ADMIN");
+  const removalCandidates = users.filter((user) => user.role !== "OWNER");
+  const pendingRemovalName = pendingRemovalId
+    ? (users.find((u) => u.id === pendingRemovalId)?.displayName ?? "this member")
+    : null;
 
   function handleAssign(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -121,74 +124,38 @@ export function TeamManagement({
     });
   }
 
-  function handlePromote(e: FormEvent<HTMLFormElement>) {
+  function handleRemoveMember(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!isOwner) return;
-
     const formData = new FormData(e.currentTarget);
     const targetUserId = String(formData.get("targetUserId") ?? "");
-    const userName = users.find((user) => user.id === targetUserId)?.displayName ?? "this member";
-    const form = e.currentTarget;
-    const confirmed = window.confirm(
-      `Promote ${userName} to admin? They will be able to invite members, assign houses, award points, and delete point awards.`,
-    );
-
-    if (!confirmed) return;
-
-    startRoleChange(async () => {
-      try {
-        const result = await onPromoteUser(formData);
-
-        if (!result.ok) {
-          toast.error("Failed to update role", {
-            description: result.message,
-          });
-          return;
-        }
-
-        toast.success("Member promoted", {
-          description: `${userName} is now an admin.`,
-        });
-        form.reset();
-      } catch (err) {
-        toast.error("Failed to update role", {
-          description: err instanceof Error ? err.message : "Something went wrong",
-        });
-      }
-    });
+    if (!targetUserId) return;
+    setPendingRemovalId(targetUserId);
   }
 
-  function handleDemote(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!isOwner) return;
-
-    const formData = new FormData(e.currentTarget);
-    const targetUserId = String(formData.get("targetUserId") ?? "");
-    const userName = users.find((user) => user.id === targetUserId)?.displayName ?? "this admin";
-    const form = e.currentTarget;
-    const confirmed = window.confirm(
-      `Remove admin access for ${userName}? They will keep their member profile and house assignment.`,
-    );
-
-    if (!confirmed) return;
-
-    startRoleChange(async () => {
+  function confirmRemoval() {
+    if (!pendingRemovalId) return;
+    const userId = pendingRemovalId;
+    const userName = users.find((u) => u.id === userId)?.displayName ?? "this member";
+    setPendingRemovalId(null);
+    const formData = new FormData();
+    formData.set("targetUserId", userId);
+    startRemove(async () => {
       try {
-        const result = await onPromoteUser(formData);
+        const result = await onRemoveOrgMember(formData);
 
         if (!result.ok) {
-          toast.error("Failed to update role", {
+          toast.error("Failed to remove member", {
             description: result.message,
           });
           return;
         }
 
-        toast.success("Admin access removed", {
-          description: `${userName} is now a member.`,
+        toast.success("Member removed", {
+          description: `${userName} no longer has access to this organization.`,
         });
-        form.reset();
       } catch (err) {
-        toast.error("Failed to update role", {
+        toast.error("Failed to remove member", {
           description: err instanceof Error ? err.message : "Something went wrong",
         });
       }
@@ -205,13 +172,13 @@ export function TeamManagement({
   return (
     <section className="space-y-6">
       <div>
-        <h4 className="font-display text-lg font-semibold">Team Setup</h4>
+        <h4 className="font-display text-lg font-semibold">Members</h4>
         <p className="text-sm text-muted-foreground">
-          Bring new members in and place them into the right house.
+          Bring new members in, place them into a house, and manage existing access.
         </p>
       </div>
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.8fr)_minmax(18rem,0.8fr)]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         <form
           aria-label="Assign user to house"
           onSubmit={handleAssign}
@@ -332,90 +299,83 @@ export function TeamManagement({
             </button>
           )}
         </section>
-
-        <section
-          aria-label="Role management"
-          className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5"
-        >
-          <div>
-            <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
-              <span className="flex items-center gap-2">
-                <ShieldCheck size={16} />
-                Role Management
-              </span>
-              {!isOwner ? (
-                <span className="rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Owner only
-                </span>
-              ) : null}
-            </h5>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Promote trusted members to admin or remove admin access when responsibilities change.
-            </p>
-          </div>
-          <div className="grid gap-4">
-            <form aria-label="Promote member" onSubmit={handlePromote} className="grid gap-3">
-              <input type="hidden" name="role" value="ADMIN" />
-              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-                Member
-                <select
-                  name="targetUserId"
-                  aria-label="Member to promote"
-                  className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
-                  required
-                  defaultValue=""
-                  disabled={!isOwner || promotionCandidates.length === 0}
-                >
-                  <option value="" disabled>
-                    {promotionCandidates.length > 0 ? "Select member..." : "No members eligible"}
-                  </option>
-                  {promotionCandidates.map((user) => (
-                    <option key={user.id} value={user.id}>{user.displayName}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="submit"
-                disabled={!isOwner || rolePending || promotionCandidates.length === 0}
-                className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-              >
-                {rolePending ? "Updating..." : "Promote to admin"}
-              </button>
-            </form>
-            <form aria-label="Remove admin access" onSubmit={handleDemote} className="grid gap-3 border-t pt-4">
-              <input type="hidden" name="role" value="MEMBER" />
-              <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
-                Admin
-                <select
-                  name="targetUserId"
-                  aria-label="Admin to demote"
-                  className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
-                  required
-                  defaultValue=""
-                  disabled={!isOwner || demotionCandidates.length === 0}
-                >
-                  <option value="" disabled>
-                    {demotionCandidates.length > 0 ? "Select admin..." : "No admins eligible"}
-                  </option>
-                  {demotionCandidates.map((user) => (
-                    <option key={user.id} value={user.id}>{user.displayName}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="submit"
-                disabled={!isOwner || rolePending || demotionCandidates.length === 0}
-                className="h-10 rounded-lg border px-4 text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-50"
-              >
-                {rolePending ? "Updating..." : "Remove admin access"}
-              </button>
-            </form>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Admins can manage member and points workflows. Owners keep org-level configuration.
-          </p>
-        </section>
       </div>
+
+      <section
+        aria-label="Member removal"
+        className="grid max-w-2xl content-start gap-4 rounded-xl border bg-card p-5"
+      >
+        <div>
+          <h5 className="flex items-center justify-between gap-3 text-sm font-semibold">
+            <span className="flex items-center gap-2">
+              <UserMinus size={16} />
+              Remove Member
+            </span>
+            {!isOwner ? (
+              <span className="rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                Owner only
+              </span>
+            ) : null}
+          </h5>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Remove a member from this organization without deleting their account or historical point records.
+          </p>
+        </div>
+        <form aria-label="Remove organization member" onSubmit={handleRemoveMember} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+            Member
+            <select
+              name="targetUserId"
+              aria-label="Member to remove"
+              className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none disabled:opacity-60"
+              required
+              defaultValue=""
+              disabled={!isOwner || removalCandidates.length === 0}
+            >
+              <option value="" disabled>
+                {removalCandidates.length > 0 ? "Select member..." : "No members eligible"}
+              </option>
+              {removalCandidates.map((user) => (
+                <option key={user.id} value={user.id}>{user.displayName} ({user.role.toLowerCase()})</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={!isOwner || removePending || removalCandidates.length === 0}
+            className="h-10 rounded-lg border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+          >
+            {removePending ? "Removing..." : "Remove member"}
+          </button>
+        </form>
+        {pendingRemovalName ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+            <p className="text-sm font-semibold text-destructive">
+              Remove {pendingRemovalName} from the organization?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Their account will keep existing history, but they will lose access until invited again.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={confirmRemoval}
+                disabled={removePending}
+                className="h-8 rounded-lg bg-destructive px-3 text-xs font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              >
+                Confirm removal
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingRemovalId(null)}
+                className="h-8 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <section className="rounded-xl border bg-card p-5" aria-label="Invite activity">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

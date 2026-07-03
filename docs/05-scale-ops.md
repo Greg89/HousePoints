@@ -4,7 +4,9 @@ Prepares the system for growth and multi-team use.
 
 ---
 
-## 5.1 DB backups [todo]
+## 5.1 DB backups [done]
+
+**Status:** Covered operationally through Railway Postgres point-in-time recovery (PITR).
 
 **Problem:** Railway Postgres has no automatic backup configured out of the box on the free/hobby plan.
 
@@ -12,11 +14,13 @@ Prepares the system for growth and multi-team use.
 - **Railway Pro** - enables point-in-time recovery automatically
 - **pg_dump via cron** - a small Railway cron service runs `pg_dump` nightly and uploads to S3 / Cloudflare R2
 
-For an internal team app the simplest approach is upgrading to Railway Pro and enabling the built-in backup.
+For an internal team app the simplest approach is enabling Railway's built-in PITR/backups. Cost should be monitored after enabling, but no application code is required.
 
 ---
 
-## 5.2 Staging environment [todo]
+## 5.2 Staging environment [done]
+
+**Status:** Implemented operationally. The Railway staging environment exists and is linked to the `develop` branch.
 
 **Goal:** Test migrations and new features against real data shapes without risking production.
 
@@ -32,9 +36,11 @@ For an internal team app the simplest approach is upgrading to Railway Pro and e
 
 ---
 
-## 5.3 Connection pooling [todo]
+## 5.3 Connection pooling [done]
 
 **Problem:** Each API process opens a direct `pg` pool to Postgres. At low traffic this is fine, but under load (or with multiple API replicas) connection count grows linearly.
+
+**Implemented first step:** The shared Prisma/Postgres client caps the direct `pg` pool with `DATABASE_POOL_MAX`, defaulting to `5` connections per process. This is a conservative low-effort pool cap, not a replacement for PgBouncer or Prisma Accelerate if traffic later grows.
 
 **Options:**
 
@@ -44,7 +50,7 @@ For an internal team app the simplest approach is upgrading to Railway Pro and e
 | PgBouncer sidecar on Railway | Medium | Transaction-mode pooling, requires `pgbouncer` service |
 | Prisma Accelerate | Low | Drop-in replacement for the adapter, adds connection pooling + query caching |
 
-**Recommended first step:** Set `max: 5` in the `Pool` constructor in `packages/db/src/client.ts` - low effort, immediate reduction.
+**Current setting:** Leave `DATABASE_POOL_MAX` unset to use the default of `5`, or set it explicitly per Railway environment if staging or production needs different tuning.
 
 ---
 
@@ -66,15 +72,15 @@ For an internal team app the simplest approach is upgrading to Railway Pro and e
 
 ## 5.5 Org settings, owner transfer, deeper admin removal, and org deletion [doing]
 
-The app supports creating and joining organizations. The first org settings slice is implemented: owners can update the organization display name from Manage Settings, and the change is audited. Broader organization administration remains future work.
+The app supports creating and joining organizations. Owners can update organization settings from Manage Settings, and sensitive changes are audited. Broader organization administration remains future work.
 
 Deferred sub-features:
 
 - Rename organization display name. Implemented for owners in Manage Settings.
-- Change organization slug safely. Alias/reservation support and owner-only slug changes are implemented; slug-bearing invite URLs are the next slice. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
-- Transfer owner role.
+- Change organization slug safely. Alias/reservation support, owner-only slug changes, slug-bearing invite URLs, and slug-based dashboard routes are implemented. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
+- Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
-- Remove users from an organization.
+- Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
 - Delete or archive an organization.
 
 ---

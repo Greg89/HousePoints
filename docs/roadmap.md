@@ -64,7 +64,8 @@ Each tier has its own file with detailed task breakdowns.
 | 4.2 | Fastify integration tests via `app.inject` | [done] |
 | 4.3 | GitHub Actions workflow: install, generate, lint, type-check, test, coverage, build | [done] |
 | 4.4 | Database-backed integration tests in CI | [done] |
-| 4.5 | Playwright e2e: login -> award points -> see score update | [done] |
+| 4.5 | Playwright e2e: login -> award points -> see score update, with scheduled staging workflow | [done] |
+| 4.6 | Manual GitHub Pages release notes publishing | [done] |
 
 ---
 
@@ -73,9 +74,9 @@ Each tier has its own file with detailed task breakdowns.
 
 | # | Task | Status |
 |---|------|--------|
-| 5.1 | DB backups configured in Railway | [todo] |
-| 5.2 | Staging environment (Railway environments) | [todo] |
-| 5.3 | Connection pooling via PgBouncer or Prisma Accelerate | [todo] |
+| 5.1 | DB backups configured in Railway | [done] |
+| 5.2 | Staging environment (Railway environments) | [done] |
+| 5.3 | Connection pooling via capped direct Postgres pool | [done] |
 | 5.4 | Self-serve org creation and single-use invite joining | [done] |
 | 5.5 | Org settings, owner transfer, admin removal, and org deletion | [doing] |
 | 5.6 | Multi-org membership model | [todo] |

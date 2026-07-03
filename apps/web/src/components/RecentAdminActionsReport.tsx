@@ -1,4 +1,14 @@
-import { Buildings, Calendar, LinkSimple, ShieldCheck, TrendDown, Trash, UserPlus, UserSwitch } from "@phosphor-icons/react";
+import {
+  Buildings,
+  Calendar,
+  LinkSimple,
+  ShieldCheck,
+  TrendDown,
+  Trash,
+  UserMinus,
+  UserPlus,
+  UserSwitch,
+} from "@phosphor-icons/react";
 import { useMemo, useState, useTransition } from "react";
 import type { AdminAuditAction, PagedAdminAuditActions } from "@housepoints/contracts";
 
@@ -22,6 +32,7 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   POINTS_DEDUCTED: "Points deducted",
   USER_HOUSE_ASSIGNED: "House assigned",
   USER_ROLE_CHANGED: "Role changed",
+  USER_REMOVED_FROM_ORG: "Member removed",
 };
 
 const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
@@ -33,6 +44,7 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   POINTS_DEDUCTED: TrendDown,
   USER_HOUSE_ASSIGNED: UserSwitch,
   USER_ROLE_CHANGED: ShieldCheck,
+  USER_REMOVED_FROM_ORG: UserMinus,
 };
 
 const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
@@ -40,6 +52,7 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "POINT_DELETED", label: "Point deletions" },
   { value: "POINTS_DEDUCTED", label: "Point deductions" },
   { value: "USER_ROLE_CHANGED", label: "Role changes" },
+  { value: "USER_REMOVED_FROM_ORG", label: "Member removals" },
   { value: "USER_HOUSE_ASSIGNED", label: "House assignments" },
   { value: "ORG_SETTINGS_UPDATED", label: "Organization updates" },
   { value: "INVITE_CREATED", label: "Invites created" },

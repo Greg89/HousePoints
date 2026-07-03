@@ -1,0 +1,53 @@
+name: Publish Release Notes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Package static release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify release notes site
+        run: |
+          test -d site || (echo "site/ directory is missing" && exit 1)
+          test -f site/index.html || (echo "site/index.html is missing" && exit 1)
+          test -f site/releases/index.html || (echo "site/releases/index.html is missing" && exit 1)
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - name: Upload release notes site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    name: Deploy release notes to Pages
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

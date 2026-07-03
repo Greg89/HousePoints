@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import * as Tabs from "@radix-ui/react-tabs";
 import {
   CaretDown,
@@ -11,11 +13,11 @@ import {
   ChartBar,
   Star,
   MinusCircle,
-  SignOut,
-  User,
   Wrench,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
+import { AccountMenu } from "./AccountMenu";
+import { NotificationPoller } from "./NotificationPoller";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
@@ -23,7 +25,7 @@ import { OverviewReports } from "./OverviewReports";
 import { SeasonComparisonReport } from "./SeasonComparisonReport";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import { DeductPointsDialog } from "./DeductPointsDialog";
-import type { AwardPointsResult, DeductPointsResult, DeletePointResult } from "@/lib/action-results";
+import type { AwardPointsResult, DeductPointsResult, DeletePointResult, NotificationMutationResult } from "@/lib/action-results";
 import { resolveHouseThemeStyle } from "@/lib/house-theme";
 import type {
   DashboardSummary,
@@ -32,6 +34,7 @@ import type {
   ActivityItem,
   MemberScore,
   PagedActivityFeed,
+  PagedNotifications,
   SeasonComparison,
   SeasonContext,
   Trait,
@@ -46,6 +49,7 @@ interface DashboardShellProps {
     houseColor: string | null;
     houseThemeEnabled: boolean;
     role: "MEMBER" | "ADMIN" | "OWNER";
+    organizationSlug: string | null;
   };
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];
@@ -63,9 +67,14 @@ interface DashboardShellProps {
   }>;
   initialSeasonComparison?: SeasonComparison | null;
   onCompareSeasons?: (fromSeasonId: string, toSeasonId: string) => Promise<SeasonComparison>;
+  notifications: PagedNotifications;
+  onRefreshNotifications: () => Promise<PagedNotifications>;
+  onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
+  onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
+  dashboardHref: string;
   loginUrl: string;
   logoutUrl: string;
   showSeasonOverviewCard?: boolean;
@@ -79,6 +88,8 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"] | "manage";
+const BASE_TAB_IDS = new Set<TabId>(["overview", "activity", "leaderboard"]);
+type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const dateFormatter = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -122,6 +133,34 @@ function getSeasonTiming(season: SeasonContext["activeSeason"], now = new Date()
   };
 }
 
+function getTabFromSearchParams(searchParams: ReadableSearchParams, canManage: boolean): TabId | null {
+  const requestedTab = searchParams.get("tab");
+
+  if (requestedTab === "manage" && canManage) {
+    return "manage";
+  }
+
+  if (requestedTab && BASE_TAB_IDS.has(requestedTab as TabId)) {
+    return requestedTab as TabId;
+  }
+
+  return null;
+}
+
+function syncTabToUrl(tab: TabId, searchParams: ReadableSearchParams) {
+  const nextParams = new URLSearchParams(searchParams.toString());
+
+  if (tab === "overview") {
+    nextParams.delete("tab");
+  } else {
+    nextParams.set("tab", tab);
+  }
+
+  const nextQuery = nextParams.toString();
+  const nextUrl = nextQuery ? `?${nextQuery}` : window.location.pathname;
+  window.history.pushState(null, "", nextUrl);
+}
+
 export function DashboardShell({
   session,
   leaderboard,
@@ -135,18 +174,25 @@ export function DashboardShell({
   onSeasonChange,
   initialSeasonComparison = null,
   onCompareSeasons,
+  notifications,
+  onRefreshNotifications,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
   onAward,
   onDeduct,
   onDeletePoint,
+  dashboardHref,
   logoutUrl,
   showSeasonOverviewCard = false,
   adminSection,
 }: DashboardShellProps) {
   const [awardOpen, setAwardOpen] = useState(false);
   const [deductOpen, setDeductOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const searchParams = useSearchParams();
+  const [selectedTab, setSelectedTab] = useState<TabId>("overview");
   const [selectedHouseId, setSelectedHouseId] = useState<string | null>(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(dashboardSummary.selectedSeason.id);
+  const [currentNotifications, setCurrentNotifications] = useState(notifications);
   const [scopedLeaderboard, setScopedLeaderboard] = useState(leaderboard);
   const [scopedDashboardSummary, setScopedDashboardSummary] = useState(dashboardSummary);
   const [scopedMemberPoints, setScopedMemberPoints] = useState(memberPoints);
@@ -154,9 +200,11 @@ export function DashboardShell({
   const [seasonMenuOpen, setSeasonMenuOpen] = useState(false);
   const [isSeasonPending, startSeasonTransition] = useTransition();
   const seasonMenuRef = useRef<HTMLDivElement>(null);
-  const visibleTabs = adminSection
+  const canManageTab = Boolean(adminSection);
+  const visibleTabs = canManageTab
     ? [...TABS, { id: "manage" as const, label: "Manage", icon: Wrench }]
     : TABS;
+  const activeTab = getTabFromSearchParams(searchParams, canManageTab) ?? selectedTab;
   const selectedSeason = useMemo(
     () => seasonContext.seasons.find((season) => season.id === selectedSeasonId) ?? seasonContext.activeSeason,
     [seasonContext.activeSeason, seasonContext.seasons, selectedSeasonId],
@@ -231,7 +279,8 @@ export function DashboardShell({
       setSelectedHouseId(null);
     }
 
-    setActiveTab(nextActiveTab);
+    setSelectedTab(nextActiveTab);
+    syncTabToUrl(nextActiveTab, searchParams);
   }
 
   return (
@@ -239,9 +288,9 @@ export function DashboardShell({
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <h1 className="font-display text-xl font-bold tracking-wide text-primary">
+          <Link href={dashboardHref} className="font-display text-xl font-bold tracking-wide text-primary">
             House Points
-          </h1>
+          </Link>
           <div className="flex items-center gap-3">
             {/* Current house badge */}
             {session.houseName && (
@@ -281,23 +330,24 @@ export function DashboardShell({
                 Deduct Points
               </motion.button>
             ) : null}
-            {/* User / logout */}
-            <div className="flex items-center gap-1">
-              <a
-                href="/settings"
-                className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors"
-                aria-label="Profile settings"
-              >
-                <User size={16} className="text-primary" />
-              </a>
-              <a
-                href={logoutUrl}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                aria-label="Sign out"
-              >
-                <SignOut size={18} />
-              </a>
-            </div>
+            <AccountMenu
+              session={{
+                userName: session.userName,
+                role: session.role,
+              }}
+              dashboardHref={dashboardHref}
+              notifications={currentNotifications}
+              onNotificationsChange={setCurrentNotifications}
+              onMarkNotificationRead={onMarkNotificationRead}
+              onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+              logoutUrl={logoutUrl}
+            />
+            <NotificationPoller
+              notifications={currentNotifications}
+              onNotificationsChange={setCurrentNotifications}
+              onRefreshNotifications={onRefreshNotifications}
+              dashboardHref={dashboardHref}
+            />
           </div>
         </div>
       </header>
@@ -479,7 +529,11 @@ export function DashboardShell({
               <OverviewReports
                 dashboardSummary={displayedDashboardSummary}
                 selectedHouse={selectedHouse}
-                onShowActivity={() => setActiveTab("activity")}
+                onShowActivity={() => {
+                  setSelectedTab("activity");
+                  setSelectedHouseId(null);
+                  syncTabToUrl("activity", searchParams);
+                }}
               />
             </div>
             {onCompareSeasons ? (
