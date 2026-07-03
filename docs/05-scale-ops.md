@@ -89,6 +89,8 @@ Deferred sub-features:
 
 Current users belong to one organization through `User.organizationId`. That is enough for the first production shape, but it does not support one person switching between multiple organizations.
 
+Design status: the staged migration plan lives in [Multi-Org Membership Design](./multi-org-membership-design.md). The recommended first implementation slice is adding and backfilling `OrganizationMembership` without changing application behavior.
+
 Future approach:
 
 1. Add an `OrganizationMembership` join table with role and house assignment per organization.
