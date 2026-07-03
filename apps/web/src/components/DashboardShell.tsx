@@ -38,6 +38,7 @@ import type {
   SeasonComparison,
   SeasonContext,
   Trait,
+  AppUserOrganizationContext,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -50,6 +51,7 @@ interface DashboardShellProps {
     houseThemeEnabled: boolean;
     role: "MEMBER" | "ADMIN" | "OWNER";
     organizationSlug: string | null;
+    organizationContexts: AppUserOrganizationContext[];
   };
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];

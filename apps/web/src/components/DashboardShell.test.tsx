@@ -185,6 +185,18 @@ const baseProps = {
     houseThemeEnabled: false,
     role: "MEMBER" as const,
     organizationSlug: "acme",
+    organizationContexts: [
+      {
+        organizationId: "org-1",
+        organizationName: "Acme Corp",
+        organizationSlug: "acme",
+        role: "MEMBER" as const,
+        houseId: "house-1",
+        houseName: "Slytherin",
+        houseColor: "#22c55e",
+        isCurrent: true,
+      },
+    ],
   },
   leaderboard: [
     {

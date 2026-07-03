@@ -56,6 +56,7 @@ const actor = {
   houseId: "house-1",
   houseName: "Slytherin",
   houseColor: "#22c55e",
+  organizationContexts: [],
   created: false,
 };
 

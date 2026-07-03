@@ -2,7 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { updateProfileResponseSchema, type UserRole } from "@housepoints/contracts";
+import {
+  updateProfileResponseSchema,
+  type AppUserOrganizationContext,
+  type UserRole,
+} from "@housepoints/contracts";
 import {
   ApiResponseError,
   apiFetch,
@@ -25,6 +29,7 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   houseId?: string | null;
   houseName?: string | null;
   houseColor?: string | null;
+  organizationContexts?: AppUserOrganizationContext[];
   houseThemeEnabled?: boolean;
   role?: UserRole;
   needsOrg?: boolean;
@@ -76,6 +81,7 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     houseId: mapping.houseId,
     houseName: mapping.houseName,
     houseColor: mapping.houseColor,
+    organizationContexts: mapping.organizationContexts,
     houseThemeEnabled: mapping.houseThemeEnabled,
     role: mapping.role,
     needsOrg: !mapping.organizationId,

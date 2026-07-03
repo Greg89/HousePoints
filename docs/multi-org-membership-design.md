@@ -195,9 +195,9 @@ At the end of this phase, `User.organizationId`, `User.role`, and `User.houseId`
 
 ### Phase 5 - Web Active Org UX
 
-Status: in progress. Bootstrap responses now include active organization membership contexts while keeping the existing current-org fields for compatibility during the migration.
+Status: in progress. Bootstrap responses and the web session summary now include active organization membership contexts while keeping the existing current-org fields for compatibility during the migration.
 
-- Add org membership context to bootstrap/profile responses - bootstrap implemented; profile update responses still return the active profile shape.
+- Add org membership context to bootstrap/profile responses - bootstrap and session summary implemented; profile update responses still return the focused profile-update shape.
 - Keep `/o/{slug}` as the canonical dashboard path.
 - Add an org switcher only after the backend supports active memberships reliably.
 - Decide whether `/` redirects to the last active org or the first active membership.

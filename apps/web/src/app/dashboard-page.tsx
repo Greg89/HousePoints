@@ -179,6 +179,7 @@ export async function renderDashboardPage(route: string) {
         houseThemeEnabled: Boolean(session.houseThemeEnabled),
         role: session.role ?? "MEMBER",
         organizationSlug: session.organizationSlug ?? null,
+        organizationContexts: session.organizationContexts ?? [],
       }}
       leaderboard={leaderboard}
       members={members}
