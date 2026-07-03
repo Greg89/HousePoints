@@ -1,4 +1,4 @@
-import { useState, useTransition, type FormEvent } from "react";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Calendar, PencilSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
@@ -27,22 +27,25 @@ export function SeasonManagement({
   const [seasonList, setSeasonList] = useState(seasons);
   const [currentSeason, setCurrentSeason] = useState(activeSeason);
   const [renameSeasonId, setRenameSeasonId] = useState(activeSeason.id);
+  const [pendingStartName, setPendingStartName] = useState<string | null>(null);
+  const startFormRef = useRef<HTMLFormElement>(null);
   const canManageSeasons = actorRole === "OWNER";
 
   function handleStartSeason(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canManageSeasons) return;
-
     const formData = new FormData(e.currentTarget);
     const name = String(formData.get("name") ?? "").trim();
-    const form = e.currentTarget;
+    if (!name) return;
+    setPendingStartName(name);
+  }
 
-    const confirmed = window.confirm(
-      `Start "${name}" now? This will close ${currentSeason.name} and reset current-season scoring.`,
-    );
-
-    if (!confirmed) return;
-
+  function confirmStartSeason() {
+    if (!pendingStartName) return;
+    const name = pendingStartName;
+    setPendingStartName(null);
+    const formData = new FormData();
+    formData.set("name", name);
     startStartSeason(async () => {
       try {
         const result = await onStartSeason(formData);
@@ -67,7 +70,7 @@ export function SeasonManagement({
           ),
         ]);
         toast.success("Season started", { description: transition.activeSeason.name });
-        form.reset();
+        startFormRef.current?.reset();
       } catch (err) {
         toast.error("Failed to start season", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -122,6 +125,7 @@ export function SeasonManagement({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <form
+          ref={startFormRef}
           aria-label="Start season"
           onSubmit={handleStartSeason}
           className="grid gap-3 rounded-xl border p-5 bg-card"
@@ -140,7 +144,7 @@ export function SeasonManagement({
             required
             minLength={2}
             maxLength={80}
-            disabled={!canManageSeasons}
+            disabled={!canManageSeasons || startSeasonPending}
           />
           {!canManageSeasons ? (
             <p className="text-xs text-muted-foreground">
@@ -151,13 +155,41 @@ export function SeasonManagement({
               Starting a season immediately closes the current active season.
             </p>
           )}
-          <button
-            type="submit"
-            disabled={startSeasonPending || !canManageSeasons}
-            className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {startSeasonPending ? "Starting..." : "Start season"}
-          </button>
+          {pendingStartName ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-semibold text-amber-900">
+                Start &ldquo;{pendingStartName}&rdquo; now?
+              </p>
+              <p className="text-xs text-amber-700">
+                This will close {currentSeason.name} and reset current-season scoring.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmStartSeason}
+                  disabled={startSeasonPending}
+                  className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingStartName(null)}
+                  className="h-8 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-muted"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={startSeasonPending || !canManageSeasons}
+              className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {startSeasonPending ? "Starting..." : "Start season"}
+            </button>
+          )}
         </form>
 
         <form
