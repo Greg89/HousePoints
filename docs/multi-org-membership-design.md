@@ -182,12 +182,12 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now prefers active memberships before legacy fallback. Create org now creates an owner membership and no longer blocks users who already belong to another organization. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
+Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now prefers active memberships before legacy fallback. Create org now creates an owner membership and no longer blocks users who already belong to another organization. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, then reloads the user after membership writes so the response includes current membership contexts. House assignment now validates the target user through active membership, updates `OrganizationMembership.houseId`, and shadow-writes legacy `User.houseId` for compatibility during the migration. Admin promotion/demotion and ownership transfer now validate targets through active membership, update `OrganizationMembership.role`, and shadow-write legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
 
 Update workflows:
 
 - Create org: create global user if needed, then create owner membership - implemented with legacy current-org shadow write.
-- Join org: allow joining another org by creating or reactivating membership instead of returning `ALREADY_IN_ORG` - implemented with legacy current-org shadow write.
+- Join org: allow joining another org by creating or reactivating membership instead of returning `ALREADY_IN_ORG` - implemented with legacy current-org shadow write and post-membership response reload.
 - Assign house: update membership `houseId` - implemented with legacy `User.houseId` shadow write.
 - Promote/demote: update membership `role` - implemented with legacy `User.role` shadow write.
 - Transfer ownership: update membership roles - implemented with legacy `User.role` shadow writes.

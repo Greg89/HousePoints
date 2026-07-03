@@ -307,7 +307,7 @@ export async function joinOrgInDb(params: {
       throw new InviteJoinError(409, "ALREADY_IN_ORG", "You are already a member of this organisation.", invite.id);
     }
 
-    const user = existingUser
+    const userIdentity = existingUser
       ? await tx.user.update({
           where: { id: existingUser.id },
           data: {
@@ -323,7 +323,7 @@ export async function joinOrgInDb(params: {
               },
             },
           },
-          select: APP_USER_SELECT,
+          select: { id: true, displayName: true, houseId: true },
         })
       : await tx.user.create({
           data: {
@@ -333,7 +333,7 @@ export async function joinOrgInDb(params: {
             organizationId: invite.organizationId,
             authIdentities: { create: { providerSubject: params.auth0Sub } },
           },
-          select: APP_USER_SELECT,
+          select: { id: true, displayName: true, houseId: true },
         });
 
     if (existingMembership) {
@@ -351,7 +351,7 @@ export async function joinOrgInDb(params: {
       await tx.organizationMembership.create({
         data: {
           organizationId: invite.organizationId,
-          userId: user.id,
+          userId: userIdentity.id,
           role: "MEMBER",
           houseId: null,
         },
@@ -361,7 +361,7 @@ export async function joinOrgInDb(params: {
 
     const claim = await tx.orgInvite.updateMany({
       where: { id: invite.id, usedAt: null, expiresAt: { gt: params.claimedAt } },
-      data: { usedAt: params.claimedAt, usedById: user.id },
+      data: { usedAt: params.claimedAt, usedById: userIdentity.id },
     });
     if (claim.count !== 1) {
       throw new InviteJoinError(409, "INVITE_USED", "This invite link has already been used.", invite.id);
@@ -370,20 +370,20 @@ export async function joinOrgInDb(params: {
     await tx.auditEvent.create({
       data: {
         organizationId: invite.organizationId,
-        actorUserId: user.id,
+        actorUserId: userIdentity.id,
         eventType: "INVITE_USED",
-        summary: `${user.displayName} joined with an invite link.`,
-        metadata: { inviteId: invite.id, usedById: user.id, usedByName: user.displayName },
+        summary: `${userIdentity.displayName} joined with an invite link.`,
+        metadata: { inviteId: invite.id, usedById: userIdentity.id, usedByName: userIdentity.displayName },
       },
     });
 
     let notificationCount = 0;
-    if (!user.houseId) {
+    if (!userIdentity.houseId) {
       const notificationRecipients = await tx.organizationMembership.findMany({
         where: {
           organizationId: invite.organizationId,
           role: { in: ["ADMIN", "OWNER"] },
-          userId: { not: user.id },
+          userId: { not: userIdentity.id },
           isActive: true,
           archivedAt: null,
         },
@@ -394,14 +394,22 @@ export async function joinOrgInDb(params: {
           data: notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
             organizationId: invite.organizationId,
             recipientId: recipient.user.id,
-            joinedUserName: user.displayName,
+            joinedUserName: userIdentity.displayName,
             organizationName: invite.organization?.name ?? "the organization",
-            joinedUserId: user.id,
+            joinedUserId: userIdentity.id,
           })),
           skipDuplicates: true,
         });
         notificationCount = created.count;
       }
+    }
+
+    const user = await tx.user.findUnique({
+      where: { id: userIdentity.id },
+      select: APP_USER_SELECT,
+    });
+    if (!user) {
+      throw new Error("Joined user could not be reloaded.");
     }
 
     return {

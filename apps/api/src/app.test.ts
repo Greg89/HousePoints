@@ -5574,7 +5574,21 @@ describe("POST /orgs/join", () => {
   it("updates membership and claims the invite in one transaction", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
-    mockFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        ...joinedUser,
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "MEMBER",
+            houseId: null,
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: null,
+          },
+        ],
+      });
     mockCreate.mockResolvedValue(joinedUser);
     mockMembershipFindMany.mockResolvedValue([
       { user: { id: "admin-1" } },
@@ -5595,6 +5609,14 @@ describe("POST /orgs/join", () => {
       organizationId: "org-1",
       houseId: null,
       created: true,
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "MEMBER",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockInviteUpdateMany).toHaveBeenCalledWith({
@@ -5677,12 +5699,16 @@ describe("POST /orgs/join", () => {
 
   it("does not create assignment notifications when the joined user already has a house", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
-    mockFindUnique.mockResolvedValue(null);
-    mockCreate.mockResolvedValue(makeMember({
+    const housedUser = makeMember({
       email: "alice@example.com",
       houseId: "house-1",
       house: { name: "Phoenix", color: "#7c3aed" },
-    }));
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(housedUser);
+    mockCreate.mockResolvedValue(housedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
     const app = await buildTestApp();
 
@@ -5701,7 +5727,10 @@ describe("POST /orgs/join", () => {
 
   it("skips notification creation when no admin or owner recipients exist", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
-    mockFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(joinedUser);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
     mockMembershipFindMany.mockResolvedValue([]);
@@ -5730,7 +5759,10 @@ describe("POST /orgs/join", () => {
 
   it("uses skipDuplicates so assignment notifications are idempotent", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
-    mockFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(joinedUser);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
     mockMembershipFindMany.mockResolvedValue([{ user: { id: "admin-1" } }]);
