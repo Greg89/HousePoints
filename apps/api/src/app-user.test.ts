@@ -170,6 +170,12 @@ describe("mapAppUser", () => {
         ],
       }),
     ).toEqual(expect.objectContaining({
+      role: "ADMIN",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
       organizationContexts: [
         expect.objectContaining({ organizationId: "org-1", isCurrent: true }),
         expect.objectContaining({ organizationId: "org-2", isCurrent: false }),
@@ -208,6 +214,12 @@ describe("mapAppUser", () => {
         ],
       }),
     ).toEqual(expect.objectContaining({
+      role: "ADMIN",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
       organizationContexts: [
         expect.objectContaining({ organizationId: "org-1", isCurrent: true }),
         expect.objectContaining({ organizationId: "org-2", isCurrent: false }),

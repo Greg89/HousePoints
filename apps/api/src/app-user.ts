@@ -34,6 +34,9 @@ export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER
       ?.organizationId ??
     activeMemberships[0]?.organizationId ??
     user.organizationId;
+  const currentMembership =
+    activeMemberships.find((membership) => membership.organizationId === currentOrganizationId) ??
+    null;
 
   const organizationContexts = activeMemberships.map((membership) => ({
     organizationId: membership.organizationId,
@@ -69,12 +72,12 @@ export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER
     email: user.email,
     displayName: user.displayName,
     houseThemeEnabled: user.houseThemeEnabled,
-    role: user.role,
-    organizationId: user.organizationId,
-    organizationSlug: user.organization?.slug ?? null,
-    houseId: user.houseId,
-    houseName: user.house?.name ?? null,
-    houseColor: user.house?.color ?? null,
+    role: currentMembership?.role ?? user.role,
+    organizationId: currentMembership?.organizationId ?? user.organizationId,
+    organizationSlug: currentMembership?.organization.slug ?? user.organization?.slug ?? null,
+    houseId: currentMembership?.houseId ?? user.houseId,
+    houseName: currentMembership?.house?.name ?? user.house?.name ?? null,
+    houseColor: currentMembership?.house?.color ?? user.house?.color ?? null,
     organizationContexts,
   };
 }
