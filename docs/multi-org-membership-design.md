@@ -197,9 +197,9 @@ At the end of this phase, `User.organizationId`, `User.role`, and `User.houseId`
 
 ### Phase 5 - Web Active Org UX
 
-Status: in progress. Bootstrap responses and the web session summary now include active organization membership contexts while keeping the existing current-org fields for compatibility during the migration. Route org-context fallback now prefers active memberships before legacy current-org fields. The account menu now exposes a URL-based organization switcher when the user belongs to more than one active organization. The root route redirects assigned users to their scoped `/o/{slug}` dashboard using active membership context before legacy current-org slug fallback.
+Status: in progress. Bootstrap responses and the web session summary now include active organization membership contexts while keeping the existing current-org fields for compatibility during the migration. Bootstrap organization contexts mark a current active membership even when the legacy current-org shadow is empty or stale. Route org-context fallback now prefers active memberships before legacy current-org fields. The account menu now exposes a URL-based organization switcher when the user belongs to more than one active organization. The root route redirects assigned users to their scoped `/o/{slug}` dashboard using active membership context before legacy current-org slug fallback.
 
-- Add org membership context to bootstrap/profile responses - bootstrap and session summary implemented; profile update responses still return the focused profile-update shape.
+- Add org membership context to bootstrap/profile responses - bootstrap and session summary implemented with active current-membership fallback; profile update responses still return the focused profile-update shape.
 - Keep `/o/{slug}` as the canonical dashboard path.
 - Add an org switcher only after the backend supports active memberships reliably - initial account-menu switcher implemented using `/o/{slug}` links.
 - Decide whether `/` redirects to the last active org or the first active membership - root redirects now prefer the current active membership, then the first active membership, then the legacy current-org shadow slug while persisted org preference remains a future slice.

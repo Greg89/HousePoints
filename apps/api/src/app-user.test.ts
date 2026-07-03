@@ -139,6 +139,82 @@ describe("mapAppUser", () => {
     }));
   });
 
+  it("marks the first active membership current when the legacy organization shadow is empty", () => {
+    expect(
+      mapAppUser({
+        id: "user-1",
+        auth0Sub: "auth0|user-1",
+        email: "alice@example.com",
+        displayName: "Alice",
+        houseThemeEnabled: false,
+        role: "MEMBER",
+        houseId: null,
+        organizationId: null,
+        organization: null,
+        house: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "house-1",
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: { name: "Phoenix", color: "#7c3aed" },
+          },
+          {
+            organizationId: "org-2",
+            role: "MEMBER",
+            houseId: null,
+            organization: { name: "Beta Org", slug: "beta" },
+            house: null,
+          },
+        ],
+      }),
+    ).toEqual(expect.objectContaining({
+      organizationContexts: [
+        expect.objectContaining({ organizationId: "org-1", isCurrent: true }),
+        expect.objectContaining({ organizationId: "org-2", isCurrent: false }),
+      ],
+    }));
+  });
+
+  it("marks the first active membership current when the legacy organization shadow is stale", () => {
+    expect(
+      mapAppUser({
+        id: "user-1",
+        auth0Sub: "auth0|user-1",
+        email: "alice@example.com",
+        displayName: "Alice",
+        houseThemeEnabled: false,
+        role: "MEMBER",
+        houseId: null,
+        organizationId: "org-stale",
+        organization: null,
+        house: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "house-1",
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: { name: "Phoenix", color: "#7c3aed" },
+          },
+          {
+            organizationId: "org-2",
+            role: "MEMBER",
+            houseId: null,
+            organization: { name: "Beta Org", slug: "beta" },
+            house: null,
+          },
+        ],
+      }),
+    ).toEqual(expect.objectContaining({
+      organizationContexts: [
+        expect.objectContaining({ organizationId: "org-1", isCurrent: true }),
+        expect.objectContaining({ organizationId: "org-2", isCurrent: false }),
+      ],
+    }));
+  });
+
   it("adds the current legacy organization context when memberships are not selected yet", () => {
     expect(
       mapAppUser({
