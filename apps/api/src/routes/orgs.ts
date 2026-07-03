@@ -13,7 +13,7 @@ import {
   prisma,
   resolveOrganizationSlug,
 } from "@housepoints/db";
-import { getUserOrgContextBySub } from "../actor.js";
+import { getUserRouteOrgContextBySub } from "../actor.js";
 import { mapAppUser, APP_USER_SELECT } from "../app-user.js";
 import { info, warn, type ApiLogEvent } from "../logging.js";
 import { parseBody, requireAdminActor } from "../route-helpers.js";
@@ -426,19 +426,43 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed) return;
 
     const requestedSlug = parsed.slug;
-    const [resolvedSlug, actorOrg] = await Promise.all([
-      resolveOrganizationSlug(prisma, requestedSlug),
-      getUserOrgContextBySub(request.auth.subject),
-    ]);
+    const resolvedSlug = await resolveOrganizationSlug(prisma, requestedSlug);
 
     if (!resolvedSlug) {
       info(request.log, "orgs.route_context.not_found", {
         requestedSlug,
-        actorOrganizationId: actorOrg?.organizationId ?? null,
       });
       return reply.status(200).send({
         status: "NOT_FOUND",
         requestedSlug,
+      });
+    }
+
+    const actorOrg = await getUserRouteOrgContextBySub(request.auth.subject, resolvedSlug.organizationId);
+    const requestedMembership = actorOrg?.requestedMembership ?? null;
+
+    if (requestedMembership) {
+      if (resolvedSlug.currentSlug !== requestedSlug) {
+        info(request.log, "orgs.route_context.alias_redirect", {
+          requestedSlug,
+          organizationId: resolvedSlug.organizationId,
+          organizationSlug: resolvedSlug.currentSlug,
+        });
+        return reply.status(200).send({
+          status: "ALIAS_REDIRECT",
+          requestedSlug,
+          organizationSlug: resolvedSlug.currentSlug,
+        });
+      }
+
+      info(request.log, "orgs.route_context.match", {
+        requestedSlug,
+        organizationId: resolvedSlug.organizationId,
+      });
+      return reply.status(200).send({
+        status: "MATCH",
+        requestedSlug,
+        organizationSlug: resolvedSlug.currentSlug,
       });
     }
 

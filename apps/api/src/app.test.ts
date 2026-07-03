@@ -5122,6 +5122,43 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
+  it("returns MATCH when an active membership exists even if the legacy current organization differs", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
   it("returns ALIAS_REDIRECT for an old slug owned by the actor's organization", async () => {
     mockResolveOrganizationSlug.mockResolvedValue({
       ...resolvedSlug,

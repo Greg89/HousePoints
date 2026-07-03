@@ -112,6 +112,10 @@ export type UserOrgContext = {
   organizationSlug: string | null;
 };
 
+export type UserRouteOrgContext = UserOrgContext & {
+  requestedMembership: UserOrgContext | null;
+};
+
 /**
  * Resolves a user's organization context by Auth0 subject.
  * Returns null if the user does not exist. Returns an object with null org
@@ -146,5 +150,65 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
     organizationId: user.organizationId,
     organizationName: user.organization?.name ?? null,
     organizationSlug: user.organization?.slug ?? null,
+  };
+}
+
+export async function getUserRouteOrgContextBySub(
+  auth0Sub: string,
+  requestedOrganizationId: string,
+): Promise<UserRouteOrgContext | null> {
+  const userSelect = {
+    organizationId: true,
+    organization: {
+      select: {
+        name: true,
+        slug: true,
+      },
+    },
+    memberships: {
+      where: {
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        organizationId: true,
+        organization: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
+      },
+    },
+  } as const;
+
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { user: { select: userSelect } },
+  });
+  const user = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: userSelect,
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  const requestedMembership = (user.memberships ?? []).find(
+    (membership) => membership.organizationId === requestedOrganizationId,
+  );
+
+  return {
+    organizationId: user.organizationId,
+    organizationName: user.organization?.name ?? null,
+    organizationSlug: user.organization?.slug ?? null,
+    requestedMembership: requestedMembership
+      ? {
+          organizationId: requestedMembership.organizationId,
+          organizationName: requestedMembership.organization.name,
+          organizationSlug: requestedMembership.organization.slug,
+        }
+      : null,
   };
 }
