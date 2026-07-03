@@ -26,6 +26,7 @@ vi.mock("@housepoints/db", () => ({
     organizationMembership: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
     },
     authIdentity: {
@@ -93,6 +94,7 @@ const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
 const mockMembershipFindFirst = prisma.organizationMembership.findFirst as ReturnType<typeof vi.fn>;
 const mockMembershipFindMany = prisma.organizationMembership.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipCreate = prisma.organizationMembership.create as ReturnType<typeof vi.fn>;
 const mockMembershipUpdate = prisma.organizationMembership.update as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
@@ -4665,13 +4667,23 @@ describe("POST /orgs/create", () => {
     await app.close();
   });
 
-  it("returns ALREADY_IN_ORG before starting setup when identity already belongs to an organization", async () => {
+  it("allows an existing org member to create another organization", async () => {
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         organizationId: "org-existing",
       },
     });
+    mockOrgCreate.mockResolvedValue(ORG);
+    mockHouseCreate.mockResolvedValue(HOUSE);
+    mockSeasonCreate.mockResolvedValue({ id: "season-0" });
+    mockUserUpdate.mockResolvedValue(
+      makeMember({
+        role: "OWNER",
+        email: "alice@example.com",
+        organization: { name: "Acme Corp", slug: "acme" },
+      }),
+    );
     const app = await buildTestApp("auth0|member");
 
     const res = await app.inject({
@@ -4680,11 +4692,32 @@ describe("POST /orgs/create", () => {
       payload,
     });
 
-    expect(res.statusCode).toBe(409);
-    expect(res.json().code).toBe("ALREADY_IN_ORG");
-    expect(mockTransaction).not.toHaveBeenCalled();
-    expect(mockOrgCreate).not.toHaveBeenCalled();
-    expect(mockHouseCreate).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      role: "OWNER",
+      organizationId: "org-1",
+      houseId: "house-1",
+    });
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "user-1" },
+        data: expect.objectContaining({
+          organizationId: "org-1",
+          houseId: "house-1",
+          role: "OWNER",
+        }),
+      }),
+    );
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "OWNER",
+        houseId: "house-1",
+      },
+      select: { id: true },
+    });
     await app.close();
   });
 
@@ -4740,6 +4773,15 @@ describe("POST /orgs/create", () => {
         }),
       }),
     );
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "OWNER",
+        houseId: "house-1",
+      },
+      select: { id: true },
+    });
     expect(mockSeasonCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",

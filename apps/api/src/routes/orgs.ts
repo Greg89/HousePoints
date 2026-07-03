@@ -116,6 +116,16 @@ export async function createOrgInDb(params: {
           select: APP_USER_SELECT,
         });
 
+    await tx.organizationMembership.create({
+      data: {
+        organizationId: org.id,
+        userId: user.id,
+        role: "OWNER",
+        houseId: house.id,
+      },
+      select: { id: true },
+    });
+
     const season = await tx.season.create({
       data: {
         organizationId: org.id,
@@ -448,11 +458,6 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const { existingUser, conflictingEmailUser } = await checkOrgCreatePreconditions(auth0Sub, email);
-    if (existingUser?.organizationId) {
-      warn(request.log, "orgs.create.already_in_org", { auth0Sub, existingOrgId: existingUser.organizationId });
-      return reply.status(409).send({ code: "ALREADY_IN_ORG", message: "You are already a member of an organisation." });
-    }
-
     if (conflictingEmailUser) {
       warn(request.log, "orgs.create.account_link_required", { auth0Sub, email });
       return reply.status(409).send({
