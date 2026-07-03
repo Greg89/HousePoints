@@ -150,3 +150,20 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_TARGET_MEMBER`
 
 The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).
+
+---
+
+## 4.6 Release Notes Publishing
+
+**Scope:** Manual release-note publishing to GitHub Pages as the first release communication slice.
+
+**Status:** Implemented as a manual GitHub Actions workflow.
+
+The `Publish Release Notes` workflow publishes the static `site` directory to GitHub Pages. This gives the project a stable public release-notes location before semantic release automation or in-app release notifications are introduced.
+
+Current release assets:
+
+- `.github/workflows/publish-release-notes.yml` - manual Pages deployment workflow.
+- `site/releases/index.html` - public release history.
+- `site/releases/template.html` - release note template.
+- `docs/release-process.md` - release note flow and Conventional Commit convention.

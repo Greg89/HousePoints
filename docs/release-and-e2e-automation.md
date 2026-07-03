@@ -20,13 +20,14 @@ These tracks should stay separate at first. Release communication touches produc
 
 ### Phase A1 - Generated Release Notes
 
-Recommended direction:
+Implemented first slice:
 
 - Adopt Conventional Commits for release intent.
-- Generate a GitHub Release with a version, date, commit range, and categorized notes.
-- Publish the same notes to a static GitHub Pages location such as `/releases`.
+- Publish static release notes to GitHub Pages from the `site` directory.
+- Keep a release note template under `site/releases/template.html`.
+- Run the `Publish Release Notes` workflow manually while the project is still before semantic automation.
 
-This gives the project a durable public release history without notifying users inside the app yet.
+Future A1 automation can generate GitHub Releases and static release pages from the same release metadata. The current manual version gives the project a durable public release history without notifying users inside the app yet.
 
 ### Phase A2 - In-App Release Records
 
@@ -133,7 +134,7 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 
 | Phase | Status | Notes |
 |---|---|---|
-| A1 - Generated release notes | Deferred | Needs Conventional Commit/release tooling decision. |
+| A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold and workflow added; semantic generation deferred. |
 | A2 - In-app release records | Deferred | Required before in-app release broadcasts. |
 | A3 - Production notification broadcast | Deferred | Should be app-owned, not direct DB writes from CI. |
 | A4 - What's new UX | Deferred | Depends on release records. |

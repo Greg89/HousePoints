@@ -65,6 +65,7 @@ Each tier has its own file with detailed task breakdowns.
 | 4.3 | GitHub Actions workflow: install, generate, lint, type-check, test, coverage, build | [done] |
 | 4.4 | Database-backed integration tests in CI | [done] |
 | 4.5 | Playwright e2e: login -> award points -> see score update, with scheduled staging workflow | [done] |
+| 4.6 | Manual GitHub Pages release notes publishing | [done] |
 
 ---
 
