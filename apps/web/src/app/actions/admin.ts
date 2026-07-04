@@ -311,7 +311,7 @@ export async function archiveOrganization(formData: FormData): Promise<ArchiveOr
     revalidatePath("/");
     revalidatePath(`/o/${actor.organizationSlug}`);
 
-    return { ok: true };
+    return { ok: true, redirectTo: `/o/${encodeURIComponent(actor.organizationSlug)}` };
   });
 }
 

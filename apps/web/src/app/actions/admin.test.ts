@@ -602,7 +602,10 @@ describe("archiveOrganization", () => {
     const formData = new FormData();
     formData.set("confirmation", "acme");
 
-    await expect(archiveOrganization(formData)).resolves.toEqual({ ok: true });
+    await expect(archiveOrganization(formData)).resolves.toEqual({
+      ok: true,
+      redirectTo: "/o/acme",
+    });
 
     expect(runServerActionMock).toHaveBeenCalledWith("archiveOrganization", expect.any(Function));
     expect(getActorMappingForAdminMock).toHaveBeenCalledWith("archiveOrganization", "request-1");

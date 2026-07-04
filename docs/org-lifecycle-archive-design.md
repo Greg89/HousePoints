@@ -141,7 +141,7 @@ Recommended first UI:
 - Manage Settings gets a danger-zone card visible to owners. [done]
 - The card says "Archive organization" rather than "Delete organization".
 - Confirmation requires typing the current organization slug.
-- Success redirects the user to an org switcher/onboarding state or a neutral archived confirmation page.
+- Success redirects the user to an org switcher/onboarding state or a neutral archived confirmation page. [done]
 
 Archived org access:
 

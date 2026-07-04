@@ -1,4 +1,5 @@
 import { useState, useTransition, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Buildings, Crown, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { OrgSettings } from "@housepoints/contracts";
@@ -22,6 +23,7 @@ export function OrgSettingsManagement({
   onUpdateOrgSettings,
   onArchiveOrganization,
 }: OrgSettingsManagementProps) {
+  const router = useRouter();
   const [isNamePending, startNameTransition] = useTransition();
   const [isSlugPending, startSlugTransition] = useTransition();
   const [isOwnerPending, startOwnerTransition] = useTransition();
@@ -178,10 +180,11 @@ export function OrgSettingsManagement({
         }
 
         toast.success("Organization archived", {
-          description: "This organization is no longer available to members.",
+          description: "Opening the archived organization page.",
         });
         form.reset();
         setArchiveConfirmation("");
+        router.replace(result.redirectTo);
       } catch (err) {
         toast.error("Failed to archive organization", {
           description: err instanceof Error ? err.message : "Something went wrong",

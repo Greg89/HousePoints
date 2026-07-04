@@ -11,6 +11,14 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const routerReplaceMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: routerReplaceMock,
+  }),
+}));
+
 const users = [
   { id: "user-1", displayName: "Alice Assigned", email: "alice@example.com", role: "ADMIN" as const, houseId: "house-1" },
   { id: "user-2", displayName: "Ben Unassigned", email: "ben@example.com", role: "MEMBER" as const, houseId: null },
@@ -170,7 +178,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onTransferOwnership: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSlug: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
-    onArchiveOrganization: vi.fn().mockResolvedValue({ ok: true }),
+    onArchiveOrganization: vi.fn().mockResolvedValue({ ok: true, redirectTo: "/o/acme" }),
     onLoadAdminAudit: vi.fn().mockResolvedValue({
       items: recentAdminActions,
       nextCursor: null,
@@ -416,8 +424,9 @@ describe("AdminForms", () => {
     });
     const { toast } = await import("sonner");
     expect(toast.success).toHaveBeenCalledWith("Organization archived", {
-      description: "This organization is no longer available to members.",
+      description: "Opening the archived organization page.",
     });
+    expect(routerReplaceMock).toHaveBeenCalledWith("/o/acme");
   });
 
   it("shows a safe toast when organization archive fails", async () => {

@@ -81,14 +81,13 @@ Deferred sub-features:
 - Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
-- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, archive actions are audited, archived organization routes render a neutral archived-state page instead of the dashboard, and owners can launch the archive action from the Manage Settings danger zone with slug confirmation.
+- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, archive actions are audited, archived organization routes render a neutral archived-state page instead of the dashboard, and owners can launch the archive action from the Manage Settings danger zone with slug confirmation. Successful archives now send the owner to that neutral archived-state page.
 
 Recommended remaining order:
 
-1. Add owner-facing post-archive redirect/copy polish after the archive action completes.
-2. Continue release automation phase 2.
-3. Expand staging E2E coverage for owner and admin flows.
-4. Return to product work with existing-member create-new-org support.
+1. Continue release automation phase 2.
+2. Expand staging E2E coverage for owner and admin flows.
+3. Return to product work with existing-member create-new-org support.
 
 ---
 
