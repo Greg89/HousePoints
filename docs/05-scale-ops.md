@@ -85,9 +85,8 @@ Deferred sub-features:
 
 Recommended remaining order:
 
-1. Finish release automation phase 2 by wiring the release-record endpoint into the release workflow.
-2. Expand staging E2E coverage for owner and admin flows.
-3. Return to product work with existing-member create-new-org support.
+1. Expand staging E2E coverage for owner and admin flows.
+2. Return to product work with existing-member create-new-org support.
 
 ---
 

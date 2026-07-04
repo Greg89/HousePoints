@@ -2,6 +2,33 @@ name: Publish Release Notes
 
 on:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version to record in the app, for example v1.2.3 or 2026.07.04"
+        required: true
+        type: string
+      release_title:
+        description: "Short release title for the in-app release record"
+        required: true
+        type: string
+      release_summary:
+        description: "Short user-facing summary for the in-app release record"
+        required: true
+        type: string
+      release_notes_path:
+        description: "Path under site/ for the release note page"
+        required: true
+        default: "releases/index.html"
+        type: string
+      released_at:
+        description: "Optional ISO timestamp. Defaults to workflow run time."
+        required: false
+        type: string
+      record_release:
+        description: "Record this release in the HousePoints app after Pages deploys"
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -28,6 +55,14 @@ jobs:
           test -f site/index.html || (echo "site/index.html is missing" && exit 1)
           test -f site/releases/index.html || (echo "site/releases/index.html is missing" && exit 1)
 
+      - name: Verify selected release note
+        if: ${{ inputs.record_release }}
+        env:
+          RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
+        run: |
+          RELEASE_NOTES_FILE="site/${RELEASE_NOTES_PATH#/}"
+          test -f "$RELEASE_NOTES_FILE" || (echo "$RELEASE_NOTES_FILE is missing" && exit 1)
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
         with:
@@ -51,3 +86,72 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Prepare release record payload
+        if: ${{ inputs.record_release }}
+        env:
+          RELEASE_RECORD_API_BASE_URL: ${{ vars.RELEASE_RECORD_API_BASE_URL }}
+          RELEASE_AUTOMATION_SECRET: ${{ secrets.RELEASE_AUTOMATION_SECRET }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
+          RELEASE_SUMMARY: ${{ inputs.release_summary }}
+          RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
+          RELEASED_AT: ${{ inputs.released_at }}
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const required = [
+            "RELEASE_RECORD_API_BASE_URL",
+            "RELEASE_AUTOMATION_SECRET",
+            "RELEASE_VERSION",
+            "RELEASE_TITLE",
+            "RELEASE_SUMMARY",
+            "RELEASE_NOTES_PATH",
+            "PAGES_URL",
+          ];
+
+          for (const name of required) {
+            if (!process.env[name]?.trim()) {
+              console.error(`${name} is required`);
+              process.exit(1);
+            }
+          }
+
+          const apiBaseUrl = process.env.RELEASE_RECORD_API_BASE_URL.trim().replace(/\/+$/, "");
+          const releaseNotesPath = process.env.RELEASE_NOTES_PATH.trim().replace(/^\/+/, "");
+          const pagesUrl = process.env.PAGES_URL.trim().endsWith("/")
+            ? process.env.PAGES_URL.trim()
+            : `${process.env.PAGES_URL.trim()}/`;
+          const releaseNotesUrl = new URL(releaseNotesPath, pagesUrl).toString();
+          const releasedAt = process.env.RELEASED_AT?.trim() || new Date().toISOString();
+
+          if (Number.isNaN(Date.parse(releasedAt))) {
+            console.error("released_at must be a valid ISO timestamp when provided");
+            process.exit(1);
+          }
+
+          const payload = {
+            version: process.env.RELEASE_VERSION.trim(),
+            title: process.env.RELEASE_TITLE.trim(),
+            summary: process.env.RELEASE_SUMMARY.trim(),
+            releaseNotesUrl,
+            releasedAt,
+          };
+
+          fs.writeFileSync("release-record-payload.json", `${JSON.stringify(payload)}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `RELEASE_RECORD_URL=${apiBaseUrl}/system/releases/record\n`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Release record URL: ${releaseNotesUrl}\n`);
+          NODE
+
+      - name: Record release in app
+        if: ${{ inputs.record_release }}
+        env:
+          RELEASE_AUTOMATION_SECRET: ${{ secrets.RELEASE_AUTOMATION_SECRET }}
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --request POST "$RELEASE_RECORD_URL" \
+            --header "content-type: application/json" \
+            --header "x-housepoints-release-secret: $RELEASE_AUTOMATION_SECRET" \
+            --data @release-record-payload.json

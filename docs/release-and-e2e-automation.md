@@ -33,7 +33,7 @@ Automation scaffolding is staged under `tools/release/`. The committed `template
 
 ### Phase A2 - In-App Release Records
 
-Status: first slice implemented.
+Status: workflow handoff implemented; broadcast deferred.
 
 Add an app-owned release record instead of having CI write notification rows directly.
 
@@ -49,7 +49,12 @@ Implemented model:
   - `broadcastAt`
   - `createdAt`
 
-The first API surface is `POST /system/releases/record`. It is protected by `RELEASE_AUTOMATION_SECRET`, upserts by `version`, and returns the stored release announcement. This gives CI a safe idempotent handoff point for release metadata without notifying users.
+The first API surface is `POST /system/releases/record`. It is protected by `RELEASE_AUTOMATION_SECRET`, upserts by `version`, and returns the stored release announcement. The `Publish Release Notes` workflow calls this endpoint after GitHub Pages deploys successfully, using the deployed Pages URL plus the selected release note path.
+
+Required workflow configuration:
+
+- `RELEASE_AUTOMATION_SECRET` as a GitHub secret, matching the API environment variable.
+- `RELEASE_RECORD_API_BASE_URL` as a GitHub variable, pointing to the public API base URL.
 
 The app should own the release business rules, including duplicate prevention and notification fanout. Notification fanout remains deferred to Phase A3.
 
@@ -141,7 +146,7 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | Phase | Status | Notes |
 |---|---|---|
 | A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold, workflow, and future generator template added; semantic generation deferred. |
-| A2 - In-app release records | In progress | `ReleaseAnnouncement` model and secret-protected record endpoint implemented; broadcast remains deferred. |
+| A2 - In-app release records | Implemented | `ReleaseAnnouncement` model, secret-protected record endpoint, and workflow handoff implemented; broadcast remains deferred. |
 | A3 - Production notification broadcast | Deferred | Should be app-owned, not direct DB writes from CI. |
 | A4 - What's new UX | Deferred | Depends on release records. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |

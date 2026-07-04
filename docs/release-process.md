@@ -18,7 +18,9 @@ Per release:
 1. Update the static release notes under `site/releases/`.
 2. Commit the release note changes with the application release changes or in a small follow-up commit.
 3. Run the `Publish Release Notes` GitHub Actions workflow manually.
-4. Confirm the GitHub Pages deployment URL in the workflow summary.
+4. Enter the release metadata requested by the workflow.
+5. Confirm the GitHub Pages deployment URL in the workflow summary.
+6. Confirm the API logs include `releases.recorded`.
 
 The workflow publishes the `site` directory as the Pages artifact. The static site currently includes:
 
@@ -95,6 +97,22 @@ GitHub Actions should trigger app behavior for user notifications. It should not
 ## Release Record Endpoint
 
 `POST /system/releases/record` creates or updates an app-owned release announcement. The endpoint is intentionally separate from notification broadcast so release metadata can be rehearsed before production users are notified.
+
+The `Publish Release Notes` workflow now records release metadata after GitHub Pages deploys successfully. This keeps the public release note URL stable before the app stores it.
+
+Required GitHub repository configuration:
+
+- Secret: `RELEASE_AUTOMATION_SECRET` - same value configured on the API service.
+- Variable: `RELEASE_RECORD_API_BASE_URL` - public API base URL, without the endpoint path, for example `https://housepoints-api-production.up.railway.app`.
+
+Manual workflow inputs:
+
+- `release_version` - durable release identifier, for example `v1.2.3` or `2026.07.04`.
+- `release_title` - short title for the app-owned release record.
+- `release_summary` - short user-facing summary.
+- `release_notes_path` - path under `site/`, for example `releases/2026-07-03-ci-release-automation.html`.
+- `released_at` - optional ISO timestamp. If empty, the workflow run time is used.
+- `record_release` - leave enabled for normal release publishing; disable only when testing Pages publishing without touching the app.
 
 Required header:
 
