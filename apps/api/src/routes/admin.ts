@@ -4,6 +4,7 @@ import { buildRoleChangedNotificationData } from "../notifications.js";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
+  archiveOrgSchema,
   actorScopeSchema,
   assignUserHouseSchema,
   createHouseSchema,
@@ -326,6 +327,43 @@ export async function findMembershipForRoleChange(organizationId: string, target
         },
       },
     },
+  });
+}
+
+export async function archiveOrganizationInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  organizationName: string;
+  organizationSlug: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const archivedAt = new Date();
+    const archivedAtIso = archivedAt.toISOString();
+    const organization = await tx.organization.update({
+      where: { id: params.organizationId },
+      data: {
+        archivedAt,
+        archivedById: params.actorId,
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "ORG_ARCHIVED",
+        summary: `${params.actorDisplayName} archived ${params.organizationName}.`,
+        metadata: {
+          organizationName: params.organizationName,
+          organizationSlug: params.organizationSlug,
+          archivedAt: archivedAtIso,
+        },
+      },
+    });
+
+    return { ...organization, archivedAt };
   });
 }
 
@@ -748,6 +786,34 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return newOwner;
+  });
+
+  app.post("/admin/org/archive", async (request, reply) => {
+    const parsed = await parseBody(archiveOrgSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    const archivedOrganization = await archiveOrganizationInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      organizationName: actor.organizationName,
+      organizationSlug: actor.organizationSlug,
+    });
+
+    info(request.log, "admin.org.archived", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      organizationSlug: actor.organizationSlug,
+      archivedAt: archivedOrganization.archivedAt.toISOString(),
+    });
+
+    return {
+      ...archivedOrganization,
+      archivedAt: archivedOrganization.archivedAt.toISOString(),
+    };
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {

@@ -34,6 +34,7 @@ export type ApiLogEvent =
   | "admin.house.created"
   | "admin.org.slug_taken"
   | "admin.org.slug_updated"
+  | "admin.org.archived"
   | "admin.org.owner_transferred"
   | "admin.org.settings_updated"
   | "admin.point_adjustments.loaded"

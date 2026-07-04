@@ -43,6 +43,7 @@ enum PointTransactionType {
 enum AuditEventType {
   INVITE_CREATED
   INVITE_USED
+  ORG_ARCHIVED
   POINT_DELETED
   POINTS_DEDUCTED
   SEASON_STARTED
@@ -71,6 +72,8 @@ model Organization {
   id           String             @id @default(cuid())
   name         String
   slug         String             @unique
+  archivedAt   DateTime?
+  archivedById String?
   memberships  OrganizationMembership[]
   houses       House[]
   transactions PointTransaction[]
@@ -79,8 +82,12 @@ model Organization {
   auditEvents  AuditEvent[]
   slugAliases  OrganizationSlugAlias[]
   notifications Notification[]
+  archivedBy    User?              @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
+
+  @@index([archivedAt])
+  @@index([archivedById])
 }
 
 model OrganizationSlugAlias {
@@ -140,6 +147,7 @@ model User {
   deletedPointTransactions PointTransaction[] @relation("DeletedPointTransactions")
   createdInvites       OrgInvite[]        @relation("CreatedInvites")
   usedInvite           OrgInvite[]        @relation("UsedInvites")
+  archivedOrganizations Organization[]    @relation("ArchivedOrganizations")
   createdSeasons       Season[]           @relation("CreatedSeasons")
   auditEvents          AuditEvent[]       @relation("AuditEventActor")
   authIdentities        AuthIdentity[]

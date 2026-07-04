@@ -15,6 +15,13 @@ describe("mapAppUser", () => {
       role: true,
       houseId: true,
     }));
+    expect(APP_USER_SELECT.memberships.where).toEqual({
+      isActive: true,
+      archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
+    });
   });
 
   it("maps organization and house summaries for an assigned user", () => {

@@ -11,6 +11,9 @@ export const APP_USER_SELECT = {
     where: {
       isActive: true,
       archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
     },
     orderBy: { organization: { name: "asc" } },
     select: {

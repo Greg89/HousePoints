@@ -17,6 +17,8 @@ import {
   removeOrgMemberSchema,
   transferOwnerSchema,
   adminUserSchema,
+  archiveOrgResponseSchema,
+  archiveOrgSchema,
 } from "./admin-schemas.js";
 import {
   dashboardSummarySchema,
@@ -88,6 +90,7 @@ export const apiContracts = {
   "/admin/org/settings": defineContract(updateOrgSettingsSchema, orgSettingsSchema),
   "/admin/org/slug": defineContract(updateOrgSlugSchema, orgSettingsSchema),
   "/admin/org/owner": defineContract(transferOwnerSchema, adminUserSchema),
+  "/admin/org/archive": defineContract(archiveOrgSchema, archiveOrgResponseSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,

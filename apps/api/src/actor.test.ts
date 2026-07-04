@@ -30,6 +30,9 @@ const actorUserSelect = {
     where: {
       isActive: true,
       archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
     },
     select: {
       id: true,
@@ -51,6 +54,9 @@ const orgContextUserSelect = {
     where: {
       isActive: true,
       archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
     },
     select: {
       organizationId: true,

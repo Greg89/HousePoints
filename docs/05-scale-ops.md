@@ -81,12 +81,12 @@ Deferred sub-features:
 - Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
-- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md).
+- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The first data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, and archive actions are audited.
 
 Recommended remaining order:
 
-1. Implement owner-only organization archive as a reversible lifecycle state.
-2. Polish Manage Settings around owner transfer, member removal implications, and lifecycle danger-zone copy.
+1. Add archived-state web handling for `/o/{slug}`.
+2. Add Manage Settings lifecycle danger-zone UI with owner-only archive confirmation.
 3. Continue release automation phase 2.
 4. Expand staging E2E coverage for owner and admin flows.
 5. Return to product work with existing-member create-new-org support.

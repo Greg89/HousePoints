@@ -29,6 +29,9 @@ const actorUserSelect = {
     where: {
       isActive: true,
       archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
     },
     select: {
       id: true,
@@ -104,6 +107,9 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
       where: {
         isActive: true,
         archivedAt: null,
+        organization: {
+          archivedAt: null,
+        },
       },
       select: {
         organizationId: true,
@@ -223,6 +229,9 @@ export async function getUserRouteOrgContextBySub(
       where: {
         isActive: true,
         archivedAt: null,
+        organization: {
+          archivedAt: null,
+        },
       },
       select: {
         organizationId: true,

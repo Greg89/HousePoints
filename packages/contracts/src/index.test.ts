@@ -50,6 +50,8 @@ import {
   pagedActivityFeedSchema,
   adminAuditActionSchema,
   adminAuditRequestSchema,
+  archiveOrgResponseSchema,
+  archiveOrgSchema,
   adminContextSchema,
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
@@ -69,6 +71,7 @@ const webConsumedApiEndpoints = [
   "/admin/org/settings",
   "/admin/org/slug",
   "/admin/org/owner",
+  "/admin/org/archive",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
   "/admin/users/remove",
@@ -598,6 +601,9 @@ describe("authenticated request schemas", () => {
     }],
     [transferOwnerSchema, {
       targetUserId: "user-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [archiveOrgSchema, {
       actorAuth0Sub: "auth0|attacker",
     }],
     [removeOrgMemberSchema, {
@@ -1463,6 +1469,32 @@ describe("adminAuditActionSchema", () => {
         previousRole: "MEMBER",
       },
     });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-10",
+        type: "ORG_ARCHIVED",
+        occurredAt: "2026-06-21T15:00:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia archived Acme Corp.",
+        metadata: {
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          archivedAt: "2026-06-21T15:00:00.000Z",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-10",
+      type: "ORG_ARCHIVED",
+      occurredAt: "2026-06-21T15:00:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia archived Acme Corp.",
+      metadata: {
+        organizationName: "Acme Corp",
+        organizationSlug: "acme",
+        archivedAt: "2026-06-21T15:00:00.000Z",
+      },
+    });
   });
 
   it("rejects unknown audit action types", () => {
@@ -1484,12 +1516,12 @@ describe("adminAuditRequestSchema", () => {
     expect(adminAuditRequestSchema.parse({})).toEqual({ limit: 10 });
     expect(
       adminAuditRequestSchema.parse({
-        type: "POINTS_DEDUCTED",
+        type: "ORG_ARCHIVED",
         cursor: "audit-1",
         limit: 25,
       }),
     ).toEqual({
-      type: "POINTS_DEDUCTED",
+      type: "ORG_ARCHIVED",
       cursor: "audit-1",
       limit: 25,
     });
@@ -1615,6 +1647,32 @@ describe("updateOrgSlugSchema", () => {
     expect(updateOrgSlugSchema.safeParse({ slug: "Acme Corp" }).success).toBe(false);
     expect(updateOrgSlugSchema.safeParse({ slug: "-acme" }).success).toBe(false);
     expect(updateOrgSlugSchema.safeParse({ slug: "acme-" }).success).toBe(false);
+  });
+});
+
+describe("archiveOrgSchema", () => {
+  it("accepts an empty archive request", () => {
+    expect(archiveOrgSchema.parse({})).toEqual({});
+  });
+
+  it("rejects archive request fields until a reason workflow exists", () => {
+    expect(archiveOrgSchema.safeParse({ reason: "closing" }).success).toBe(false);
+  });
+
+  it("accepts archived organization responses", () => {
+    expect(
+      archiveOrgResponseSchema.parse({
+        id: "org-1",
+        name: "Acme Corp",
+        slug: "acme",
+        archivedAt: "2026-07-04T17:30:00.000Z",
+      }),
+    ).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+    });
   });
 });
 

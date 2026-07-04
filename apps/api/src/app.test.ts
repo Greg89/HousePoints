@@ -3743,6 +3743,91 @@ describe("POST /admin/org/owner", () => {
   });
 });
 
+describe("POST /admin/org/archive", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/archive",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects unknown archive request fields", async () => {
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/archive",
+      payload: { reason: "closing this organization" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to archive the organization and writes an audit event", async () => {
+    const archivedAt = new Date("2026-07-04T17:30:00.000Z");
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockOrgUpdate.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt,
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/archive",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockOrgUpdate).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      data: {
+        archivedAt: expect.any(Date),
+        archivedById: "user-owner",
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "ORG_ARCHIVED",
+        summary: "Olivia archived Acme Corp.",
+        metadata: {
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          archivedAt: expect.any(String),
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: expect.stringMatching(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+      ),
+    });
+    await app.close();
+  });
+});
+
 describe("POST /admin/users/remove", () => {
   it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());

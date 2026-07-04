@@ -23,13 +23,16 @@ Implemented:
 - Owners can promote/demote members and remove non-owner users from an organization.
 - Removed members keep their global `User` row; only the org membership is archived.
 - Audit history preserves org-scoped administrative events.
+- `Organization.archivedAt` and `Organization.archivedById` are available for archive state.
+- Normal actor/app-user resolution ignores memberships whose organization is archived.
+- Owners can archive their active organization through `POST /admin/org/archive`; the API writes an `ORG_ARCHIVED` audit event.
 
 Not implemented:
 
-- Organization archive.
 - Organization restore.
 - Hard delete.
 - Owner-facing organization lifecycle UI.
+- Archived-state web routing for `/o/{slug}`.
 
 ---
 
@@ -171,9 +174,9 @@ Notifications are optional for the first slice. A later slice can notify all act
 
 ## Rollout Plan
 
-1. Add schema fields and audit event types.
-2. Update actor/org route resolution to consistently reject archived orgs for normal app actions.
-3. Add owner-only archive API with tests.
+1. Add schema fields and audit event types. [done]
+2. Update actor/org route resolution to consistently reject archived orgs for normal app actions. [done]
+3. Add owner-only archive API with tests. [done]
 4. Add archived-state web handling for `/o/{slug}`.
 5. Add Manage Settings danger-zone UI.
 6. Add restore path only after archive behavior is proven.
