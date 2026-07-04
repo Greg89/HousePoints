@@ -482,7 +482,6 @@ export async function removeOrgMemberInDb(params: {
   actorDisplayName: string;
   targetMembership: {
     id: string;
-    userId: string;
     role: string;
     user: { id: string; displayName: string };
   };
@@ -500,15 +499,6 @@ export async function removeOrgMemberInDb(params: {
       select: {
         user: { select: { id: true, displayName: true } },
       },
-    });
-    const removedUser = await tx.user.update({
-      where: { id: params.targetMembership.userId },
-      data: {
-        organizationId: null,
-        houseId: null,
-        role: "MEMBER",
-      },
-      select: { id: true, displayName: true },
     });
 
     await tx.notification.updateMany({
@@ -545,7 +535,7 @@ export async function removeOrgMemberInDb(params: {
       },
     });
 
-    return removedUser;
+    return removedMembership.user;
   });
 }
 

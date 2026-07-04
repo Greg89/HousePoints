@@ -3813,7 +3813,7 @@ describe("POST /admin/users/remove", () => {
     await app.close();
   });
 
-  it("removes a member from the organization, clears org-scoped fields, archives notifications, and writes audit", async () => {
+  it("removes a member from the organization, archives notifications, and writes audit", async () => {
     const targetUser = makeMember({
       id: "user-target",
       displayName: "Taylor",
@@ -3839,10 +3839,6 @@ describe("POST /admin/users/remove", () => {
         displayName: "Taylor",
       },
     });
-    mockUserUpdate.mockResolvedValue({
-      id: "user-target",
-      displayName: "Taylor",
-    });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3865,15 +3861,7 @@ describe("POST /admin/users/remove", () => {
         user: { select: { id: true, displayName: true } },
       },
     });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-target" },
-      data: {
-        organizationId: null,
-        houseId: null,
-        role: "MEMBER",
-      },
-      select: { id: true, displayName: true },
-    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockNotificationUpdateMany).toHaveBeenCalledTimes(2);
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
