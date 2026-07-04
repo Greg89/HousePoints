@@ -213,7 +213,7 @@ Status: not started. Runtime reads and writes are ready for schema-removal plann
 Readiness notes:
 
 - API and web top-level user fields such as `role`, `organizationId`, `organizationSlug`, `houseId`, `houseName`, and `houseColor` are compatibility aliases derived from the active membership context. They are no longer legacy shadow reads, but the contract still exposes them.
-- API tests still have fixture helpers that can synthesize memberships from legacy-like fixture fields. Clean those helpers before schema removal so tests fail loudly if code regresses to user-level org shadows.
+- API test user fixtures now create default memberships from explicit membership fixture defaults and overrides instead of synthesizing memberships from legacy-like user fields.
 - Prisma still owns `User.organizationId`, `User.role`, and `User.houseId` until a dedicated migration removes them.
 
 Before dropping columns:
@@ -223,7 +223,7 @@ Before dropping columns:
 - remove `User.houseId`;
 - decide whether top-level contract fields remain as active-org aliases or move consumers fully to `organizationContexts`;
 - update contracts to stop exposing legacy global role/org/house fields except through active membership context;
-- replace legacy-derived test fixtures with explicit membership fixture builders;
+- replace legacy-derived test fixtures with explicit membership fixture builders - implemented for the shared API user fixture helpers;
 - remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, actor and app-user lookups no longer select legacy org/role/house shadows, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, create-org and invite-join no longer read or write legacy current-org shadows, house assignment no longer writes legacy `User.houseId`, promote/demote and ownership transfer no longer write legacy `User.role`, member removal no longer clears legacy user org fields, benchmark seeding no longer writes legacy user org fields, and org-context helpers no longer select legacy org shadow fields.
 - run a final code search for direct `User.organizationId`, `User.role`, `User.houseId`, `user.organizationId`, `user.role`, and `user.houseId` dependencies.
 

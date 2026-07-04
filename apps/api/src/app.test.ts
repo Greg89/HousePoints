@@ -1,10 +1,10 @@
-﻿/**
- * API integration tests using Fastify's app.inject() â€” no real network or DB.
+/**
+ * API integration tests using Fastify's app.inject() - no real network or DB.
  * Prisma is mocked per test so we control exactly what the DB "returns".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// â”€â”€ Mock @housepoints/db before importing anything that uses it â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Mock @housepoints/db before importing anything that uses it.
 vi.mock("@housepoints/db", () => ({
   createPrimaryOrganizationSlugAlias: vi.fn(),
   isOrganizationSlugReserved: vi.fn(),
@@ -78,7 +78,7 @@ vi.mock("@housepoints/db", () => ({
   },
 }));
 
-// â”€â”€ Also mock dotenv/config (no .env file needed in CI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Also mock dotenv/config (no .env file needed in CI).
 vi.mock("dotenv/config", () => ({}));
 
 import { buildApp } from "./app";
@@ -136,7 +136,7 @@ const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
-// â”€â”€ Shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Shared fixtures.
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
 const HOUSE = { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null, organizationId: "org-1" };
 const ACTIVE_SEASON = {
@@ -154,30 +154,37 @@ const SEASON_ZERO = {
   isActive: false,
 };
 
+type TestUserRole = "MEMBER" | "ADMIN" | "OWNER";
+
+type TestMembershipOverrides = {
+  id?: string;
+  organizationId?: string;
+  role?: TestUserRole;
+  houseId?: string | null;
+  organization?: { name: string; slug: string };
+  house?: { name: string; color: string } | null;
+};
+
+const makeUserMembership = (userId: string, overrides: TestMembershipOverrides = {}) => ({
+  id: `membership-${userId}`,
+  organizationId: "org-1",
+  role: "MEMBER" as TestUserRole,
+  houseId: "house-1",
+  organization: { name: "Acme Corp", slug: "acme" },
+  house: { name: "Phoenix", color: "#7c3aed" },
+  ...overrides,
+});
+
 /** Full user shape returned by prisma.user.findUnique (matches select in app.ts) */
 const withDefaultMembership = <T extends {
   id: string;
-  role: "MEMBER" | "ADMIN" | "OWNER";
-  houseId: string | null;
-  organizationId: string | null;
-  organization: { name: string; slug: string } | null;
   memberships?: unknown[];
-}>(user: T): T & { memberships: unknown[] } => ({
+}>(user: T, membershipOverrides: TestMembershipOverrides | null = {}): T & { memberships: unknown[] } => ({
   ...user,
-  memberships: user.memberships ?? (user.organizationId && user.organization
-    ? [
-        {
-          id: `membership-${user.id}`,
-          organizationId: user.organizationId,
-          role: user.role,
-          houseId: user.houseId,
-          organization: user.organization,
-        },
-      ]
-    : []),
+  memberships: user.memberships ?? (membershipOverrides === null ? [] : [makeUserMembership(user.id, membershipOverrides)]),
 });
 
-const makeMember = (overrides = {}) => withDefaultMembership({
+const makeMember = (overrides = {}, membershipOverrides: TestMembershipOverrides | null = {}) => withDefaultMembership({
   id: "user-1",
   auth0Sub: "auth0|member",
   email: "member@acme.com",
@@ -189,9 +196,9 @@ const makeMember = (overrides = {}) => withDefaultMembership({
   organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
-});
+}, membershipOverrides === null ? null : { role: "MEMBER", ...membershipOverrides });
 
-const makeAdmin = (overrides = {}) => withDefaultMembership({
+const makeAdmin = (overrides = {}, membershipOverrides: TestMembershipOverrides | null = {}) => withDefaultMembership({
   id: "user-2",
   auth0Sub: "auth0|admin",
   email: "admin@acme.com",
@@ -203,9 +210,9 @@ const makeAdmin = (overrides = {}) => withDefaultMembership({
   organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
-});
+}, membershipOverrides === null ? null : { role: "ADMIN", ...membershipOverrides });
 
-const makeOwner = (overrides = {}) => withDefaultMembership({
+const makeOwner = (overrides = {}, membershipOverrides: TestMembershipOverrides | null = {}) => withDefaultMembership({
   id: "user-owner",
   auth0Sub: "auth0|owner",
   email: "owner@acme.com",
@@ -217,7 +224,7 @@ const makeOwner = (overrides = {}) => withDefaultMembership({
   organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
-});
+}, membershipOverrides === null ? null : { role: "OWNER", ...membershipOverrides });
 
 const makeTargetMembership = (overrides = {}) => ({
   userId: "user-1",
@@ -297,7 +304,7 @@ async function buildTestApp(
   return app;
 }
 
-// â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Tests.
 
 describe("GET /health", () => {
   it("returns 200 { ok: true }", async () => {
@@ -674,7 +681,7 @@ describe("POST /points/adjust", () => {
   it("returns 403 when target user is from a different org", async () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
-      .mockResolvedValueOnce(makeMember({ organizationId: "org-OTHER" })); // target user
+      .mockResolvedValueOnce(makeMember({}, { organizationId: "org-OTHER" })); // target user
     const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
@@ -950,7 +957,7 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 403 ACTOR_HOUSE_REQUIRED when actor is not assigned to a house", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ houseId: null }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { houseId: null }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -988,7 +995,7 @@ describe("POST /points/deduct", () => {
   it("returns 403 CROSS_ORGANIZATION_TARGET when target is outside the actor organization", async () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())
-      .mockResolvedValueOnce(makeMember({ organizationId: "org-other", houseId: "house-2" }));
+      .mockResolvedValueOnce(makeMember({}, { organizationId: "org-other", houseId: "house-2" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -1336,7 +1343,7 @@ describe("POST /points/delete", () => {
   });
 
   it("does not reveal transactions from another organization", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockTxFindUnique.mockResolvedValue({
       id: "tx-1",
       organizationId: "org-other",
@@ -1382,7 +1389,7 @@ describe("POST /points/delete", () => {
 
 describe("POST /seasons/context", () => {
   it("returns active season and historical seasons for the actor's organization", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([ACTIVE_SEASON, SEASON_ZERO]);
     const app = await buildTestApp();
 
@@ -1461,7 +1468,7 @@ describe("POST /seasons/compare", () => {
   };
 
   it("compares house rank, points, velocity, and top contributors across two seasons", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([fromSeason, toSeason]);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-2", name: "Ember", color: "#ef4444" },
@@ -1717,7 +1724,7 @@ describe("POST /seasons/compare", () => {
   });
 
   it("rejects cross-organization or unknown season IDs", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([fromSeason]);
     const app = await buildTestApp();
 
@@ -1773,7 +1780,7 @@ describe("POST /seasons/compare", () => {
         };
       }),
     );
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([fromSeason, toSeason]);
     mockHouseFindMany.mockResolvedValue(houses);
     mockTxGroupBy
@@ -1843,7 +1850,7 @@ describe("POST /seasons/start", () => {
       endsAt: new Date("2026-08-01T12:00:00.000Z"),
       isActive: false,
     };
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
@@ -1976,7 +1983,7 @@ describe("POST /seasons/start", () => {
   });
 
   it("rejects admins when starting a season", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -2040,7 +2047,7 @@ describe("POST /seasons/start", () => {
       endsAt: new Date("2026-08-01T12:00:00.000Z"),
       isActive: false,
     };
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
@@ -2070,7 +2077,7 @@ describe("POST /seasons/start", () => {
 describe("POST /seasons/rename", () => {
   it("allows an owner to rename a season in their organization", async () => {
     const renamedSeason = { ...ACTIVE_SEASON, name: "Summer 2026" };
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue({ id: "season-active" });
     mockSeasonUpdate.mockResolvedValue(renamedSeason);
     const app = await buildTestApp("auth0|owner");
@@ -2107,7 +2114,7 @@ describe("POST /seasons/rename", () => {
   });
 
   it("rejects cross-organization or unknown season IDs when renaming", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp("auth0|owner");
 
@@ -2124,7 +2131,7 @@ describe("POST /seasons/rename", () => {
   });
 
   it("rejects admins when renaming a season", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -2144,7 +2151,7 @@ describe("POST /seasons/rename", () => {
 describe("POST /houses/leaderboard", () => {
   it("scopes leaderboard houses to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockHouseFindMany.mockResolvedValue([
@@ -2243,7 +2250,7 @@ describe("POST /houses/leaderboard", () => {
 
   it("uses a requested historical season for house standings", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockHouseFindMany.mockResolvedValue([
@@ -2356,7 +2363,7 @@ describe("POST /admin/context", () => {
   });
 
   it("allows an admin and scopes organization context to the actor's organization", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockMembershipFindMany.mockResolvedValue([]);
     mockHouseFindMany.mockResolvedValue([]);
     const app = await buildTestApp("auth0|admin");
@@ -2413,7 +2420,7 @@ describe("POST /admin/context", () => {
   });
 
   it("builds team management users from active memberships instead of legacy user organization fields", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindMany.mockResolvedValue([
       {
         role: "MEMBER",
@@ -2760,7 +2767,7 @@ describe("POST /admin/point-adjustments/stats", () => {
   });
 
   it("returns active-season point adjustment reporting by default", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
@@ -2827,7 +2834,7 @@ describe("POST /admin/point-adjustments/stats", () => {
   });
 
   it("uses a requested historical season for point adjustment reporting", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
@@ -2894,7 +2901,7 @@ describe("POST /admin/audit", () => {
   });
 
   it("returns filtered paged audit history scoped to the actor's organization", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockAuditEventFindMany.mockResolvedValue([
       {
         id: "audit-delete-1",
@@ -3003,7 +3010,7 @@ describe("POST /admin/users/assign-house", () => {
   });
 
   it("returns 404 when target house belongs to another organization", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeAdmin({ organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-1" }));
     mockMembershipFindFirst.mockResolvedValueOnce({
       id: "membership-1",
       userId: "user-1",
@@ -3244,7 +3251,7 @@ describe("POST /admin/users/role", () => {
 
   it("returns 404 when the target user is outside the owner's organization", async () => {
     mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }))
       .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
     const app = await buildTestApp("auth0|owner");
 
@@ -3267,7 +3274,7 @@ describe("POST /admin/users/role", () => {
       displayName: "Second Owner",
       organizationId: "org-secure",
     });
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst.mockResolvedValueOnce({
       id: "membership-owner-2",
       userId: "user-owner-2",
@@ -3303,7 +3310,7 @@ describe("POST /admin/users/role", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst.mockResolvedValueOnce({
       id: "membership-target",
       userId: "user-target",
@@ -3441,7 +3448,7 @@ describe("POST /admin/users/role", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst.mockResolvedValueOnce({
       id: "membership-target",
       userId: "user-target",
@@ -3541,7 +3548,7 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("rejects transferring ownership to self", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3558,7 +3565,7 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("returns 404 when the target user is outside the owner's organization", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst
       .mockResolvedValueOnce({
         id: "membership-owner",
@@ -3584,7 +3591,7 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("rejects transferring ownership to another owner", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst
       .mockResolvedValueOnce({
         id: "membership-owner",
@@ -3624,7 +3631,7 @@ describe("POST /admin/org/owner", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst
       .mockResolvedValueOnce({
         id: "membership-owner",
@@ -3754,7 +3761,7 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("rejects owner self-removal", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3770,7 +3777,7 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("returns 404 when target user is outside the owner's organization", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst.mockResolvedValueOnce(null);
     const app = await buildTestApp("auth0|owner");
 
@@ -3787,7 +3794,7 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("rejects removing another owner", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst.mockResolvedValueOnce({
       id: "membership-owner-2",
       userId: "user-owner-2",
@@ -3821,7 +3828,7 @@ describe("POST /admin/users/remove", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique.mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindFirst.mockResolvedValueOnce({
       id: "membership-target",
       userId: "user-target",
@@ -4230,7 +4237,7 @@ describe("POST /transactions/recent", () => {
   });
 
   it("returns current-season point adjustment reporting by house", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockUserFindMany.mockResolvedValue([]);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
@@ -4298,7 +4305,7 @@ describe("POST /transactions/recent", () => {
 describe("POST /users/scores", () => {
   it("scopes member scores to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxGroupBy.mockResolvedValue([
@@ -4327,7 +4334,7 @@ describe("POST /users/scores", () => {
   });
 
   it("uses a requested historical season for member scores", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockTxGroupBy.mockResolvedValue([
       { targetUserId: "user-1", _sum: { delta: 12 } },
@@ -4360,7 +4367,7 @@ describe("POST /users/scores", () => {
   });
 
   it("rejects cross-organization or unknown season IDs for member scores", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp();
 
@@ -4380,7 +4387,7 @@ describe("POST /users/scores", () => {
 describe("POST /members", () => {
   it("scopes member reads to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockMembershipFindMany.mockResolvedValue([
       {
@@ -4682,7 +4689,7 @@ describe("POST /dashboard/summary", () => {
   });
 
   it("uses a requested historical season for reporting summary", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockHouseFindMany.mockResolvedValue([
       HOUSE,
@@ -5024,7 +5031,7 @@ describe("POST /orgs/invite", () => {
 
   it("allows an admin to create a single-use invite for their organization", async () => {
     const expiresAt = new Date("2099-01-01T00:00:00.000Z");
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockInviteCreate.mockResolvedValue({
       id: "invite-1",
       expiresAt,
