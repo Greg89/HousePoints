@@ -215,6 +215,7 @@ Readiness notes:
 - API and web top-level user fields such as `role`, `organizationId`, `organizationSlug`, `houseId`, `houseName`, and `houseColor` are compatibility aliases derived from the active membership context. They are no longer legacy shadow reads, but the contract still exposes them.
 - Web session and admin authorization code now resolve the active organization context through one shared helper, so top-level user aliases are fallback compatibility fields rather than the primary source for current-org state.
 - API test user fixtures now create default memberships from explicit membership fixture defaults and overrides instead of synthesizing memberships from legacy-like user fields.
+- App-user mapping tests now guard against reintroducing legacy user-level org, role, or house fields into the bootstrap/profile select.
 - Prisma still owns `User.organizationId`, `User.role`, and `User.houseId` until a dedicated migration removes them.
 
 Before dropping columns:

@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { mapAppUser } from "./app-user";
+import { APP_USER_SELECT, mapAppUser } from "./app-user";
 
 describe("mapAppUser", () => {
+  it("does not select legacy user-level organization, role, or house shadows", () => {
+    expect(APP_USER_SELECT).not.toEqual(expect.objectContaining({
+      organizationId: expect.anything(),
+      role: expect.anything(),
+      houseId: expect.anything(),
+      organization: expect.anything(),
+      house: expect.anything(),
+    }));
+    expect(APP_USER_SELECT.memberships.select).toEqual(expect.objectContaining({
+      organizationId: true,
+      role: true,
+      houseId: true,
+    }));
+  });
+
   it("maps organization and house summaries for an assigned user", () => {
     expect(
       mapAppUser({
