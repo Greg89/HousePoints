@@ -30,7 +30,7 @@ export const APP_USER_SELECT = {
 
 export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>) {
   const activeMemberships = user.memberships ?? [];
-  const currentMembership = pickPreferredMembership(activeMemberships, user.organizationId);
+  const currentMembership = pickPreferredMembership(activeMemberships);
   const hasActiveMemberships = activeMemberships.length > 0;
   const currentOrganizationId = currentMembership?.organizationId ?? user.organizationId;
 

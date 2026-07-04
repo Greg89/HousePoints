@@ -227,6 +227,50 @@ describe("mapAppUser", () => {
     }));
   });
 
+  it("marks the first active membership current when the legacy organization shadow matches another membership", () => {
+    expect(
+      mapAppUser({
+        id: "user-1",
+        auth0Sub: "auth0|user-1",
+        email: "alice@example.com",
+        displayName: "Alice",
+        houseThemeEnabled: false,
+        role: "MEMBER",
+        houseId: "legacy-house",
+        organizationId: "org-2",
+        organization: { name: "Beta Org", slug: "beta" },
+        house: { name: "Legacy House", color: "#111111" },
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "house-1",
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: { name: "Phoenix", color: "#7c3aed" },
+          },
+          {
+            organizationId: "org-2",
+            role: "OWNER",
+            houseId: "house-2",
+            organization: { name: "Beta Org", slug: "beta" },
+            house: { name: "Dragon", color: "#ef4444" },
+          },
+        ],
+      }),
+    ).toEqual(expect.objectContaining({
+      role: "ADMIN",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
+      organizationContexts: [
+        expect.objectContaining({ organizationId: "org-1", isCurrent: true }),
+        expect.objectContaining({ organizationId: "org-2", isCurrent: false }),
+      ],
+    }));
+  });
+
   it("does not add stale legacy organization context when active memberships exist", () => {
     expect(
       mapAppUser({

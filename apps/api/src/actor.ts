@@ -168,7 +168,7 @@ type PreferredMembershipSource = {
 };
 
 function resolvePreferredMembership(user: PreferredMembershipSource) {
-  return pickPreferredMembership(user.memberships, user.organizationId);
+  return pickPreferredMembership(user.memberships);
 }
 
 function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
