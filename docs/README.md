@@ -22,6 +22,7 @@ The documents in this folder serve three purposes:
 - [Upcoming features](./upcoming-features.md): unscheduled product concepts and open design questions.
 - [Seasons design plan](./seasons-design.md): proposed product and technical plan for season-scoped scoring.
 - [Organization settings design](./org-settings-design.md): owner-only organization settings, slug-change safety, and future URL alias planning.
+- [Organization lifecycle and archive design](./org-lifecycle-archive-design.md): owner-only org archive/restore rules and hard-delete non-goals.
 - [Dashboard slug routes design](./dashboard-slug-routes-design.md): planned `/o/{slug}` dashboard routing behavior and security rules.
 - [Notification system design](./notifications-design.md): durable in-app notifications, account-menu inbox, and toast delivery plan.
 - [Multi-org membership design](./multi-org-membership-design.md): staged migration from single `User.organizationId` membership to membership-scoped org access.
