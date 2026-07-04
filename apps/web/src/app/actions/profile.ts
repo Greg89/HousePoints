@@ -15,6 +15,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { readActiveOrganizationSlug } from "@/lib/active-organization";
+import { resolveActiveAppUserMapping } from "@/lib/active-user-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import type { ProfileUpdateResult } from "@/lib/action-results";
 import { logInfo, logWarn } from "@/lib/logging";
@@ -61,20 +62,10 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
 
   const mapping = await getCurrentUserForRequest(requestId);
   const activeOrganizationSlug = await readActiveOrganizationSlug();
-  const activeOrganizationContext =
-    mapping.organizationContexts.find((context) => context.organizationSlug === activeOrganizationSlug) ??
-    mapping.organizationContexts.find((context) => context.isCurrent) ??
-    mapping.organizationContexts[0] ??
-    null;
-  const organizationId = activeOrganizationContext
-    ? activeOrganizationContext.organizationId
-    : mapping.organizationId;
-  const organizationSlug = activeOrganizationContext
-    ? activeOrganizationContext.organizationSlug
-    : mapping.organizationSlug;
-  const houseId = activeOrganizationContext
-    ? activeOrganizationContext.houseId
-    : mapping.houseId;
+  const activeMapping = resolveActiveAppUserMapping(mapping, activeOrganizationSlug);
+  const organizationId = activeMapping.organizationId;
+  const organizationSlug = activeMapping.organizationSlug;
+  const houseId = activeMapping.houseId;
 
   logInfo("web.session.read", {
     requestId,
@@ -95,15 +86,11 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     organizationId,
     organizationSlug,
     houseId,
-    houseName: activeOrganizationContext
-      ? activeOrganizationContext.houseName
-      : mapping.houseName,
-    houseColor: activeOrganizationContext
-      ? activeOrganizationContext.houseColor
-      : mapping.houseColor,
+    houseName: activeMapping.houseName,
+    houseColor: activeMapping.houseColor,
     organizationContexts: mapping.organizationContexts,
     houseThemeEnabled: mapping.houseThemeEnabled,
-    role: activeOrganizationContext ? activeOrganizationContext.role : mapping.role,
+    role: activeMapping.role,
     needsOrg: !organizationId,
     needsHouseAssignment: !!organizationId && !houseId,
   };

@@ -1,4 +1,5 @@
 import { readActiveOrganizationSlug } from "@/lib/active-organization";
+import { resolveActiveAppUserMapping } from "@/lib/active-user-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import { logWarn } from "@/lib/logging";
 
@@ -28,23 +29,5 @@ export function resolveActiveActorMapping(
   mapping: CurrentUserMapping,
   activeOrganizationSlug?: string | null,
 ): CurrentUserMapping {
-  const activeOrganizationContext =
-    mapping.organizationContexts.find((context) => context.organizationSlug === activeOrganizationSlug) ??
-    mapping.organizationContexts.find((context) => context.isCurrent) ??
-    mapping.organizationContexts[0] ??
-    null;
-
-  if (!activeOrganizationContext) {
-    return mapping;
-  }
-
-  return {
-    ...mapping,
-    role: activeOrganizationContext.role,
-    organizationId: activeOrganizationContext.organizationId,
-    organizationSlug: activeOrganizationContext.organizationSlug,
-    houseId: activeOrganizationContext.houseId,
-    houseName: activeOrganizationContext.houseName,
-    houseColor: activeOrganizationContext.houseColor,
-  };
+  return resolveActiveAppUserMapping(mapping, activeOrganizationSlug);
 }
