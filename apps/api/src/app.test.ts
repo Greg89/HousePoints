@@ -61,6 +61,9 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
+    releaseAnnouncement: {
+      upsert: vi.fn(),
+    },
     season: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -123,6 +126,7 @@ const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.
 const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
 const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
+const mockReleaseAnnouncementUpsert = prisma.releaseAnnouncement.upsert as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
@@ -266,6 +270,18 @@ beforeEach(() => {
   mockNotificationCreateMany.mockResolvedValue({ count: 0 });
   mockNotificationFindMany.mockResolvedValue([]);
   mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
+  mockReleaseAnnouncementUpsert.mockResolvedValue({
+    id: "release-1",
+    version: "v1.2.3",
+    title: "Release notes automation",
+    summary: "Adds app-owned release records.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+    releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+    broadcastAt: null,
+    createdAt: new Date("2026-07-04T18:01:00.000Z"),
+    updatedAt: new Date("2026-07-04T18:02:00.000Z"),
+  });
+  delete process.env.RELEASE_AUTOMATION_SECRET;
   mockTransaction.mockImplementation(
     async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
   );
@@ -316,6 +332,136 @@ describe("GET /health", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
     expect(app.server.listening).toBe(false);
+    await app.close();
+  });
+});
+
+describe("POST /system/releases/record", () => {
+  const releasePayload = {
+    version: "v1.2.3",
+    title: "Release notes automation",
+    summary: "Adds app-owned release records.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+    releasedAt: "2026-07-04T18:00:00.000Z",
+  };
+
+  it("records release metadata when the automation secret matches", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: releasePayload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "release-1",
+      ...releasePayload,
+      broadcastAt: null,
+      createdAt: "2026-07-04T18:01:00.000Z",
+      updatedAt: "2026-07-04T18:02:00.000Z",
+    });
+    expect(mockReleaseAnnouncementUpsert).toHaveBeenCalledWith({
+      where: { version: "v1.2.3" },
+      create: {
+        version: "v1.2.3",
+        title: "Release notes automation",
+        summary: "Adds app-owned release records.",
+        releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+        releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+      },
+      update: {
+        title: "Release notes automation",
+        summary: "Adds app-owned release records.",
+        releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+        releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+      },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        summary: true,
+        releaseNotesUrl: true,
+        releasedAt: true,
+        broadcastAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await app.close();
+  });
+
+  it("fails closed when release automation is not configured", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: releasePayload,
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      code: "RELEASE_AUTOMATION_NOT_CONFIGURED",
+    });
+    expect(mockReleaseAnnouncementUpsert).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects invalid release automation secrets", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "wrong-secret-value",
+      },
+      payload: releasePayload,
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      code: "INVALID_RELEASE_AUTOMATION_SECRET",
+    });
+    expect(mockReleaseAnnouncementUpsert).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("validates release metadata before writing", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: {
+        ...releasePayload,
+        releaseNotesUrl: "not-a-url",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    expect(mockReleaseAnnouncementUpsert).not.toHaveBeenCalled();
+
     await app.close();
   });
 });
@@ -441,7 +587,7 @@ describe("CORS", () => {
     );
     expect(res.headers["access-control-allow-methods"]).toContain("POST");
     expect(res.headers["access-control-allow-headers"]).toBe(
-      "authorization, content-type, x-request-id, x-auth0-id-token",
+      "authorization, content-type, x-request-id, x-auth0-id-token, x-housepoints-release-secret",
     );
     await app.close();
   });

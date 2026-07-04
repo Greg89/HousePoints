@@ -48,3 +48,21 @@ export function parseBooleanFlag(value: string | undefined): boolean {
 export function readPointAdjustmentsEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.POINT_ADJUSTMENTS_ENABLED);
 }
+
+export function parseReleaseAutomationSecret(value: string | undefined): string {
+  const secret = value?.trim();
+
+  if (!secret) {
+    throw new Error("RELEASE_AUTOMATION_SECRET must be configured");
+  }
+
+  if (secret.length < 16) {
+    throw new Error("RELEASE_AUTOMATION_SECRET must be at least 16 characters");
+  }
+
+  return secret;
+}
+
+export function readReleaseAutomationSecretFromEnv(): string {
+  return parseReleaseAutomationSecret(process.env.RELEASE_AUTOMATION_SECRET);
+}

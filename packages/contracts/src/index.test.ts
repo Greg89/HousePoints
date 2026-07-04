@@ -47,6 +47,8 @@ import {
   notificationMutationResponseSchema,
   notificationSchema,
   pagedNotificationsSchema,
+  createReleaseAnnouncementSchema,
+  releaseAnnouncementSchema,
   pagedActivityFeedSchema,
   adminAuditActionSchema,
   adminAuditRequestSchema,
@@ -82,6 +84,7 @@ const webConsumedApiEndpoints = [
   "/notifications/list",
   "/notifications/mark-all-read",
   "/notifications/mark-read",
+  "/system/releases/record",
   "/orgs/create",
   "/orgs/invite",
   "/orgs/join",
@@ -2027,6 +2030,52 @@ describe("updateProfileResponseSchema", () => {
         organizationContexts: [],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("release announcement schemas", () => {
+  const release = {
+    id: "release-1",
+    version: "v1.2.3",
+    title: "Release notes automation",
+    summary: "Adds app-owned release records.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+    releasedAt: "2026-07-04T18:00:00.000Z",
+    broadcastAt: null,
+    createdAt: "2026-07-04T18:01:00.000Z",
+    updatedAt: "2026-07-04T18:02:00.000Z",
+  };
+
+  it("accepts release record requests and responses", () => {
+    expect(createReleaseAnnouncementSchema.parse({
+      version: " v1.2.3 ",
+      title: " Release notes automation ",
+      summary: " Adds app-owned release records. ",
+      releaseNotesUrl: " https://example.com/releases/v1.2.3.html ",
+      releasedAt: "2026-07-04T18:00:00.000Z",
+    })).toEqual({
+      version: "v1.2.3",
+      title: "Release notes automation",
+      summary: "Adds app-owned release records.",
+      releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+      releasedAt: "2026-07-04T18:00:00.000Z",
+    });
+
+    expect(releaseAnnouncementSchema.parse(release)).toEqual(release);
+  });
+
+  it("rejects invalid release record shapes", () => {
+    expect(createReleaseAnnouncementSchema.safeParse({
+      version: "v1.2.3",
+      title: "Release notes automation",
+      summary: "Adds app-owned release records.",
+      releaseNotesUrl: "not-a-url",
+      releasedAt: "2026-07-04T18:00:00.000Z",
+    }).success).toBe(false);
+    expect(releaseAnnouncementSchema.safeParse({
+      ...release,
+      broadcastAt: "not-a-date",
+    }).success).toBe(false);
   });
 });
 

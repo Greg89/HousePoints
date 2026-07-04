@@ -87,10 +87,28 @@ Staging E2E workflow
 1. Generate release notes from Conventional Commits.
 2. Create GitHub Releases for production tags.
 3. Publish generated release notes to GitHub Pages.
-4. Create app-owned release records.
+4. Create app-owned release records. First slice implemented through `POST /system/releases/record`, protected by `RELEASE_AUTOMATION_SECRET`.
 5. Broadcast in-app release notifications after production deploys and health checks pass.
 
 GitHub Actions should trigger app behavior for user notifications. It should not write release notifications directly into the production database.
+
+## Release Record Endpoint
+
+`POST /system/releases/record` creates or updates an app-owned release announcement. The endpoint is intentionally separate from notification broadcast so release metadata can be rehearsed before production users are notified.
+
+Required header:
+
+- `x-housepoints-release-secret`: must match `RELEASE_AUTOMATION_SECRET`.
+
+Required JSON body:
+
+- `version`
+- `title`
+- `summary`
+- `releaseNotesUrl`
+- `releasedAt`
+
+The endpoint upserts by `version`, which makes workflow retries safe. It does not create user notifications.
 
 ## Future Semantic Release Shape
 

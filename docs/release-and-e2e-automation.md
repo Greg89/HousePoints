@@ -33,9 +33,11 @@ Automation scaffolding is staged under `tools/release/`. The committed `template
 
 ### Phase A2 - In-App Release Records
 
+Status: first slice implemented.
+
 Add an app-owned release record instead of having CI write notification rows directly.
 
-Suggested model:
+Implemented model:
 
 - `ReleaseAnnouncement`
   - `id`
@@ -47,7 +49,9 @@ Suggested model:
   - `broadcastAt`
   - `createdAt`
 
-The app should own the release business rules, including duplicate prevention and notification fanout.
+The first API surface is `POST /system/releases/record`. It is protected by `RELEASE_AUTOMATION_SECRET`, upserts by `version`, and returns the stored release announcement. This gives CI a safe idempotent handoff point for release metadata without notifying users.
+
+The app should own the release business rules, including duplicate prevention and notification fanout. Notification fanout remains deferred to Phase A3.
 
 ### Phase A3 - Production Notification Broadcast
 
@@ -137,7 +141,7 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | Phase | Status | Notes |
 |---|---|---|
 | A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold, workflow, and future generator template added; semantic generation deferred. |
-| A2 - In-app release records | Deferred | Required before in-app release broadcasts. |
+| A2 - In-app release records | In progress | `ReleaseAnnouncement` model and secret-protected record endpoint implemented; broadcast remains deferred. |
 | A3 - Production notification broadcast | Deferred | Should be app-owned, not direct DB writes from CI. |
 | A4 - What's new UX | Deferred | Depends on release records. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |

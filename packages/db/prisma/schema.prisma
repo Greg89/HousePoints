@@ -283,3 +283,18 @@ model Notification {
   @@index([recipientUserId, readAt, createdAt])
   @@index([organizationId, type, createdAt])
 }
+
+model ReleaseAnnouncement {
+  id              String    @id @default(cuid())
+  version         String    @unique
+  title           String
+  summary         String
+  releaseNotesUrl String
+  releasedAt      DateTime
+  broadcastAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([releasedAt])
+  @@index([broadcastAt])
+}

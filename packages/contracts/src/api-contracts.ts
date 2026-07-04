@@ -68,6 +68,10 @@ import {
   renameSeasonSchema,
   seasonSchema,
 } from "./season-schemas.js";
+import {
+  createReleaseAnnouncementSchema,
+  releaseAnnouncementSchema,
+} from "./release-schemas.js";
 
 type ApiContract = {
   request: z.ZodType;
@@ -113,6 +117,7 @@ export const apiContracts = {
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),
   "/notifications/mark-all-read": defineContract(actorScopeSchema, notificationMutationResponseSchema),
   "/notifications/mark-read": defineContract(markNotificationsReadSchema, notificationMutationResponseSchema),
+  "/system/releases/record": defineContract(createReleaseAnnouncementSchema, releaseAnnouncementSchema),
   "/orgs/create": defineContract(createOrgSchema, appUserSchema),
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),
   "/orgs/join/preview": defineContract(joinInvitePreviewSchema, joinInvitePreviewResponseSchema),

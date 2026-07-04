@@ -6,7 +6,7 @@ import {
 import { error, info, warn } from "./logging.js";
 
 export function isPublicRoute(routeUrl: string | undefined): boolean {
-  return routeUrl === "/health";
+  return routeUrl === "/health" || routeUrl === "/system/releases/record";
 }
 
 export function registerAuthenticationHook(
