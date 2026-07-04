@@ -163,7 +163,7 @@ type BundleSample = {
 
 type BenchmarkMember = {
   id: string;
-  houseId: string | null;
+  membershipHouseId: string | null;
 };
 
 function percentile(values: number[], percentileValue: number): number {
@@ -255,7 +255,7 @@ async function createScenario(
     },
   });
 
-  const members: BenchmarkMember[] = [{ id: owner.id, houseId: houses[0]?.id ?? null }];
+  const members: BenchmarkMember[] = [{ id: owner.id, membershipHouseId: houses[0]?.id ?? null }];
   const remainingMembers = Math.max(0, config.memberCount - 1);
 
   for (let index = 0; index < remainingMembers; index += 1) {
@@ -282,14 +282,14 @@ async function createScenario(
         houseId: house?.id,
       },
     });
-    members.push({ id: member.id, houseId: house?.id ?? null });
+    members.push({ id: member.id, membershipHouseId: house?.id ?? null });
   }
 
   if (config.transactionCount > 0) {
     await prisma.pointTransaction.createMany({
       data: Array.from({ length: config.transactionCount }, (_, index) => {
         const targetUser = members[index % members.length] ?? owner;
-        const targetHouseId = targetUser.houseId ?? houses[0]?.id;
+        const targetHouseId = targetUser.membershipHouseId ?? houses[0]?.id;
 
         if (!targetHouseId) {
           throw new Error("Benchmark scenario requires at least one house");
