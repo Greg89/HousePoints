@@ -11,6 +11,7 @@ export type ResolvedOrganizationSlug = {
     id: string;
     name: string;
     slug: string;
+    archivedAt: Date | null;
   };
 };
 
@@ -64,6 +65,7 @@ export async function resolveOrganizationSlug(
           id: true,
           name: true,
           slug: true,
+          archivedAt: true,
         },
       },
     },

@@ -131,6 +131,25 @@ describe("OrganizationDashboardPage", () => {
     expect(renderDashboardPageMock).not.toHaveBeenCalled();
   });
 
+  it("shows an archived organization state instead of rendering the dashboard", async () => {
+    readOrgRouteContextMock.mockResolvedValue({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+    });
+
+    render(await renderPage("acme"));
+
+    expect(screen.getByRole("heading", { name: "This organization is archived" })).toBeInTheDocument();
+    expect(screen.getByText(/Acme Corp has been archived/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute("href", "/auth/logout");
+    expect(readActiveOrganizationSlugMock).not.toHaveBeenCalled();
+    expect(renderDashboardPageMock).not.toHaveBeenCalled();
+  });
+
   it("prompts signed-out users to log in with a return path", async () => {
     readOrgRouteContextMock.mockRejectedValue(
       new WebAuthenticationError("SESSION_MISSING", "You must be logged in"),

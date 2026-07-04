@@ -5184,6 +5184,7 @@ describe("POST /orgs/join/preview", () => {
       id: "org-1",
       name: "Acme Corp",
       slug: "acme",
+      archivedAt: null,
     },
   };
 
@@ -5525,6 +5526,50 @@ describe("POST /orgs/route-context", () => {
       status: "ALIAS_REDIRECT",
       requestedSlug: "old-acme",
       organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns ARCHIVED for members of an archived organization", async () => {
+    const archivedAt = new Date("2026-07-04T17:30:00.000Z");
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      organization: {
+        ...resolvedSlug.organization,
+        archivedAt,
+      },
+    });
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+              archivedAt,
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
     });
     await app.close();
   });

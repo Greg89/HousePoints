@@ -26,13 +26,13 @@ Implemented:
 - `Organization.archivedAt` and `Organization.archivedById` are available for archive state.
 - Normal actor/app-user resolution ignores memberships whose organization is archived.
 - Owners can archive their active organization through `POST /admin/org/archive`; the API writes an `ORG_ARCHIVED` audit event.
+- Archived `/o/{slug}` routes render an archived-state page for members instead of the dashboard.
 
 Not implemented:
 
 - Organization restore.
 - Hard delete.
 - Owner-facing organization lifecycle UI.
-- Archived-state web routing for `/o/{slug}`.
 
 ---
 
@@ -177,7 +177,7 @@ Notifications are optional for the first slice. A later slice can notify all act
 1. Add schema fields and audit event types. [done]
 2. Update actor/org route resolution to consistently reject archived orgs for normal app actions. [done]
 3. Add owner-only archive API with tests. [done]
-4. Add archived-state web handling for `/o/{slug}`.
+4. Add archived-state web handling for `/o/{slug}`. [done]
 5. Add Manage Settings danger-zone UI.
 6. Add restore path only after archive behavior is proven.
 7. Leave hard delete as operator-only future work.

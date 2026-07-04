@@ -584,6 +584,47 @@ describe("getUserRouteOrgContextBySub", () => {
         organizationId: "org-2",
         organizationName: "Second Org",
         organizationSlug: "second-org",
+        organizationArchivedAt: null,
+      },
+    });
+  });
+
+  it("returns archived requested membership without selecting it as the active fallback organization", async () => {
+    const archivedAt = new Date("2026-07-04T17:30:00.000Z");
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Archived Org",
+              slug: "archived-org",
+              archivedAt,
+            },
+          },
+          {
+            organizationId: "org-2",
+            organization: {
+              name: "Active Org",
+              slug: "active-org",
+              archivedAt: null,
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getUserRouteOrgContextBySub("auth0|member", "org-1")).resolves.toEqual({
+      organizationId: "org-2",
+      organizationName: "Active Org",
+      organizationSlug: "active-org",
+      requestedMembership: {
+        organizationId: "org-1",
+        organizationName: "Archived Org",
+        organizationSlug: "archived-org",
+        organizationArchivedAt: archivedAt,
       },
     });
   });

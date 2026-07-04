@@ -1838,6 +1838,20 @@ describe("orgRouteContextSchema", () => {
     });
 
     expect(orgRouteContextSchema.parse({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+    })).toEqual({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+    });
+
+    expect(orgRouteContextSchema.parse({
       status: "NO_ACTOR_ORG",
       requestedSlug: "acme",
       organizationSlug: "acme",

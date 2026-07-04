@@ -91,8 +91,15 @@ export type UserOrgContext = {
   organizationSlug: string | null;
 };
 
+export type UserRouteMembershipContext = {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationArchivedAt: Date | null;
+};
+
 export type UserRouteOrgContext = UserOrgContext & {
-  requestedMembership: UserOrgContext | null;
+  requestedMembership: UserRouteMembershipContext | null;
 };
 
 /**
@@ -142,7 +149,7 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
 type PreferredOrgContextSource = {
   memberships?: Array<{
     organizationId: string;
-    organization: { name: string; slug: string };
+    organization: { name: string; slug: string; archivedAt?: Date | null };
   }>;
 };
 
@@ -161,7 +168,9 @@ function resolvePreferredMembership(user: PreferredMembershipSource) {
 }
 
 function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
-  const preferredMembership = user.memberships?.[0] ?? null;
+  const preferredMembership = user.memberships?.find(
+    (membership) => !membership.organization.archivedAt,
+  ) ?? null;
 
   if (preferredMembership) {
     return {
@@ -229,9 +238,6 @@ export async function getUserRouteOrgContextBySub(
       where: {
         isActive: true,
         archivedAt: null,
-        organization: {
-          archivedAt: null,
-        },
       },
       select: {
         organizationId: true,
@@ -239,6 +245,7 @@ export async function getUserRouteOrgContextBySub(
           select: {
             name: true,
             slug: true,
+            archivedAt: true,
           },
         },
       },
@@ -269,6 +276,7 @@ export async function getUserRouteOrgContextBySub(
           organizationId: requestedMembership.organizationId,
           organizationName: requestedMembership.organization.name,
           organizationSlug: requestedMembership.organization.slug,
+          organizationArchivedAt: requestedMembership.organization.archivedAt ?? null,
         }
       : null,
   };

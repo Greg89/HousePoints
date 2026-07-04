@@ -66,6 +66,19 @@ async function renderOrganizationDashboardPage(slug: string, route: string) {
     );
   }
 
+  if (routeContext.status === "ARCHIVED") {
+    return (
+      <SlugRouteMessage
+        title="This organization is archived"
+        description={`${routeContext.organizationName} has been archived. Historical records are preserved, but the dashboard is no longer available for normal activity.`}
+        actionHref="/"
+        actionLabel="Go home"
+        secondaryHref="/auth/logout"
+        secondaryLabel="Sign out"
+      />
+    );
+  }
+
   if (routeContext.status === "MATCH") {
     const activeOrganizationSlug = await readActiveOrganizationSlug();
     if (activeOrganizationSlug !== routeContext.organizationSlug) {

@@ -453,6 +453,23 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      if (requestedMembership.organizationArchivedAt) {
+        const archivedAt = requestedMembership.organizationArchivedAt.toISOString();
+        info(request.log, "orgs.route_context.archived", {
+          requestedSlug,
+          organizationId: resolvedSlug.organizationId,
+          organizationSlug: resolvedSlug.currentSlug,
+          archivedAt,
+        });
+        return reply.status(200).send({
+          status: "ARCHIVED",
+          requestedSlug,
+          organizationSlug: resolvedSlug.currentSlug,
+          organizationName: requestedMembership.organizationName,
+          archivedAt,
+        });
+      }
+
       info(request.log, "orgs.route_context.match", {
         requestedSlug,
         organizationId: resolvedSlug.organizationId,
