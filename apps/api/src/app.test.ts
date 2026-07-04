@@ -4808,7 +4808,6 @@ describe("POST /orgs/create", () => {
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
-        organizationId: "org-existing",
       },
     });
     mockOrgCreate.mockResolvedValue(ORG);
@@ -4864,10 +4863,10 @@ describe("POST /orgs/create", () => {
     expect(mockUserUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "user-1" },
-        data: expect.objectContaining({
-          organizationId: "org-1",
-          houseId: "house-1",
-          role: "OWNER",
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
         }),
       }),
     );
@@ -4887,7 +4886,6 @@ describe("POST /orgs/create", () => {
     mockFindUnique
       .mockResolvedValueOnce({
         id: "user-1",
-        organizationId: null,
       })
       .mockResolvedValueOnce({
         ...makeMember({
@@ -4954,10 +4952,10 @@ describe("POST /orgs/create", () => {
     });
     expect(mockUserUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          organizationId: "org-1",
-          houseId: "house-1",
-          role: "OWNER",
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
         }),
       }),
     );
@@ -4986,7 +4984,6 @@ describe("POST /orgs/create", () => {
   it("returns an error when the atomic setup transaction fails", async () => {
     mockFindUnique.mockResolvedValue({
       id: "user-1",
-      organizationId: null,
     });
     mockTransaction.mockRejectedValue(new Error("transaction failed"));
     const app = await buildTestApp("auth0|member");

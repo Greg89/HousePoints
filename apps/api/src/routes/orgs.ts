@@ -50,11 +50,11 @@ class InviteJoinError extends Error {
 export async function checkOrgCreatePreconditions(auth0Sub: string, email?: string | null) {
   const existingIdentity = await prisma.authIdentity.findUnique({
     where: { providerSubject: auth0Sub },
-    select: { user: { select: { id: true, organizationId: true } } },
+    select: { user: { select: { id: true } } },
   });
   const existingUser = existingIdentity?.user ?? await prisma.user.findUnique({
     where: { auth0Sub },
-    select: { id: true, organizationId: true },
+    select: { id: true },
   });
   const conflictingEmailUser = !existingUser && email
     ? await prisma.user.findUnique({ where: { email }, select: { id: true } })
@@ -70,7 +70,7 @@ export async function createOrgInDb(params: {
   orgSlug: string;
   firstHouseName: string;
   firstHouseColor: string;
-  existingUser: { id: string; organizationId: string | null } | null;
+  existingUser: { id: string } | null;
 }) {
   return prisma.$transaction(async (tx) => {
     const org = await tx.organization.create({
@@ -89,9 +89,6 @@ export async function createOrgInDb(params: {
       ? await tx.user.update({
           where: { id: params.existingUser.id },
           data: {
-            organizationId: org.id,
-            houseId: house.id,
-            role: "OWNER",
             displayName: params.displayName,
             email: params.email ?? null,
             authIdentities: {
@@ -108,9 +105,6 @@ export async function createOrgInDb(params: {
             auth0Sub: params.auth0Sub,
             email: params.email,
             displayName: params.displayName,
-            organizationId: org.id,
-            houseId: house.id,
-            role: "OWNER",
             authIdentities: { create: { providerSubject: params.auth0Sub } },
           },
           select: { id: true },
