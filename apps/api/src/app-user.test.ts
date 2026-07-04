@@ -316,7 +316,7 @@ describe("mapAppUser", () => {
     }));
   });
 
-  it("adds the current legacy organization context only when no memberships are selected yet", () => {
+  it("ignores legacy organization fields when no active memberships exist", () => {
     expect(
       mapAppUser({
         id: "user-1",
@@ -332,18 +332,13 @@ describe("mapAppUser", () => {
         memberships: [],
       }),
     ).toEqual(expect.objectContaining({
-      organizationContexts: [
-        {
-          organizationId: "org-1",
-          organizationName: "Acme Corp",
-          organizationSlug: "acme",
-          role: "OWNER",
-          houseId: "house-1",
-          houseName: "Phoenix",
-          houseColor: "#7c3aed",
-          isCurrent: true,
-        },
-      ],
+      role: "MEMBER",
+      organizationId: null,
+      organizationSlug: null,
+      houseId: null,
+      houseName: null,
+      houseColor: null,
+      organizationContexts: [],
     }));
   });
 });

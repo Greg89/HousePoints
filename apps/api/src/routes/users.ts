@@ -167,13 +167,14 @@ export async function registerUserRoutes(
     const existing = await findExistingUser(auth0Sub);
 
     if (existing) {
+      const mappedExisting = mapAppUser(existing);
       info(request.log, "users.bootstrap.loaded", {
         userId: existing.id,
         auth0Sub: existing.auth0Sub,
-        organizationId: existing.organizationId,
-        hasHouse: Boolean(existing.houseId),
+        organizationId: mappedExisting.organizationId,
+        hasHouse: Boolean(mappedExisting.houseId),
       });
-      return { ...mapAppUser(existing), created: false };
+      return { ...mappedExisting, created: false };
     }
 
     const idToken = readIdTokenHeader(request.headers["x-auth0-id-token"]);
@@ -192,15 +193,16 @@ export async function registerUserRoutes(
 
     if (existingByEmail) {
       await linkIdentityToUser(auth0Sub, existingByEmail.id);
+      const mappedExistingByEmail = mapAppUser(existingByEmail);
 
       info(request.log, "users.bootstrap.identity_linked", {
         userId: existingByEmail.id,
         auth0Sub,
         email: existingByEmail.email,
-        organizationId: existingByEmail.organizationId,
+        organizationId: mappedExistingByEmail.organizationId,
       });
 
-      return { ...mapAppUser(existingByEmail), created: false };
+      return { ...mappedExistingByEmail, created: false };
     }
 
     const conflictingEmailUser = !verifiedEmail && parsed.email

@@ -7,11 +7,6 @@ export const APP_USER_SELECT = {
   email: true,
   displayName: true,
   houseThemeEnabled: true,
-  role: true,
-  organizationId: true,
-  organization: { select: { name: true, slug: true } },
-  houseId: true,
-  house: { select: { name: true, color: true } },
   memberships: {
     where: {
       isActive: true,
@@ -31,8 +26,7 @@ export const APP_USER_SELECT = {
 export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>) {
   const activeMemberships = user.memberships ?? [];
   const currentMembership = pickPreferredMembership(activeMemberships);
-  const hasActiveMemberships = activeMemberships.length > 0;
-  const currentOrganizationId = currentMembership?.organizationId ?? user.organizationId;
+  const currentOrganizationId = currentMembership?.organizationId ?? null;
 
   const organizationContexts = activeMemberships.map((membership) => ({
     organizationId: membership.organizationId,
@@ -45,36 +39,18 @@ export function mapAppUser(user: Prisma.UserGetPayload<{ select: typeof APP_USER
     isCurrent: membership.organizationId === currentOrganizationId,
   }));
 
-  if (
-    !hasActiveMemberships &&
-    user.organizationId &&
-    user.organization &&
-    !organizationContexts.some((context) => context.organizationId === user.organizationId)
-  ) {
-    organizationContexts.push({
-      organizationId: user.organizationId,
-      organizationName: user.organization.name,
-      organizationSlug: user.organization.slug,
-      role: user.role,
-      houseId: user.houseId,
-      houseName: user.house?.name ?? null,
-      houseColor: user.house?.color ?? null,
-      isCurrent: true,
-    });
-  }
-
   return {
     id: user.id,
     auth0Sub: user.auth0Sub,
     email: user.email,
     displayName: user.displayName,
     houseThemeEnabled: user.houseThemeEnabled,
-    role: currentMembership?.role ?? (hasActiveMemberships ? "MEMBER" : user.role),
-    organizationId: currentMembership?.organizationId ?? (hasActiveMemberships ? null : user.organizationId),
-    organizationSlug: currentMembership?.organization.slug ?? (hasActiveMemberships ? null : user.organization?.slug ?? null),
-    houseId: currentMembership?.houseId ?? (hasActiveMemberships ? null : user.houseId),
-    houseName: currentMembership?.house?.name ?? (hasActiveMemberships ? null : user.house?.name ?? null),
-    houseColor: currentMembership?.house?.color ?? (hasActiveMemberships ? null : user.house?.color ?? null),
+    role: currentMembership?.role ?? "MEMBER",
+    organizationId: currentMembership?.organizationId ?? null,
+    organizationSlug: currentMembership?.organization.slug ?? null,
+    houseId: currentMembership?.houseId ?? null,
+    houseName: currentMembership?.house?.name ?? null,
+    houseColor: currentMembership?.house?.color ?? null,
     organizationContexts,
   };
 }
