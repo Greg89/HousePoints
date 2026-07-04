@@ -208,7 +208,7 @@ Status: complete for the first multi-org UX slice. Bootstrap responses and the w
 
 ### Phase 6 - Remove Legacy User Org Fields
 
-Status: not started. Runtime reads and writes are ready for schema-removal planning, but the app still has deliberate compatibility surfaces that should be resolved before the migration.
+Status: complete for the schema-removal slice. Runtime reads and writes use active memberships, web session/admin flows derive active organization state from membership contexts, and the legacy user org/role/house columns have a removal migration.
 
 Readiness notes:
 
@@ -218,13 +218,13 @@ Readiness notes:
 - App-user mapping tests now guard against reintroducing legacy user-level org, role, or house fields into the bootstrap/profile select.
 - Prisma schema now removes `User.organizationId`, `User.role`, and `User.houseId`; migration `20260704170000_drop_legacy_user_org_fields` drops the legacy columns after the membership backfill has run.
 
-Before dropping columns:
+Completed before dropping columns:
 
 - remove `User.organizationId` - migration added;
 - remove `User.role` - migration added;
 - remove `User.houseId` - migration added;
 - decide whether top-level contract fields remain as active-org aliases or move consumers fully to `organizationContexts` - current direction is to keep them temporarily as active-org aliases while web consumers centralize active-context derivation;
-- update contracts to stop exposing legacy global role/org/house fields except through active membership context;
+- update contracts to stop exposing legacy global role/org/house fields except through active membership context - top-level fields remain temporary active-org aliases;
 - replace legacy-derived test fixtures with explicit membership fixture builders - implemented for the shared API user fixture helpers;
 - remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, actor and app-user lookups no longer select legacy org/role/house shadows, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, create-org and invite-join no longer read or write legacy current-org shadows, house assignment no longer writes legacy `User.houseId`, promote/demote and ownership transfer no longer write legacy `User.role`, member removal no longer clears legacy user org fields, benchmark seeding no longer writes legacy user org fields, and org-context helpers no longer select legacy org shadow fields.
 - run a final code search for direct `User.organizationId`, `User.role`, `User.houseId`, `user.organizationId`, `user.role`, and `user.houseId` dependencies.

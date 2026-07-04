@@ -85,7 +85,7 @@ Deferred sub-features:
 
 ---
 
-## 5.6 Multi-org membership model [doing]
+## 5.6 Multi-org membership model [done]
 
 Users now belong to organizations through `OrganizationMembership`, with role and house assignment scoped per organization. The legacy `User.organizationId`, `User.role`, and `User.houseId` fields have a removal migration after the membership backfill and read/write migration.
 
