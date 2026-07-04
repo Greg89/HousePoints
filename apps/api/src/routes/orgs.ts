@@ -285,11 +285,11 @@ export async function joinOrgInDb(params: {
 
     const existingIdentity = await tx.authIdentity.findUnique({
       where: { providerSubject: params.auth0Sub },
-      select: { user: { select: { id: true, organizationId: true } } },
+      select: { user: { select: { id: true } } },
     });
     const existingUser = existingIdentity?.user ?? await tx.user.findUnique({
       where: { auth0Sub: params.auth0Sub },
-      select: { id: true, organizationId: true },
+      select: { id: true },
     });
 
     const conflictingEmailUser = !existingUser && params.email
@@ -313,9 +313,6 @@ export async function joinOrgInDb(params: {
       ? await tx.user.update({
           where: { id: existingUser.id },
           data: {
-            organizationId: invite.organizationId,
-            houseId: null,
-            role: "MEMBER",
             displayName: params.displayName,
             email: params.email ?? undefined,
             authIdentities: {
@@ -325,17 +322,16 @@ export async function joinOrgInDb(params: {
               },
             },
           },
-          select: { id: true, displayName: true, houseId: true },
+          select: { id: true, displayName: true },
         })
       : await tx.user.create({
           data: {
             auth0Sub: params.auth0Sub,
             email: params.email ?? null,
             displayName: params.displayName,
-            organizationId: invite.organizationId,
             authIdentities: { create: { providerSubject: params.auth0Sub } },
           },
-          select: { id: true, displayName: true, houseId: true },
+          select: { id: true, displayName: true },
         });
 
     if (existingMembership) {
@@ -380,30 +376,28 @@ export async function joinOrgInDb(params: {
     });
 
     let notificationCount = 0;
-    if (!userIdentity.houseId) {
-      const notificationRecipients = await tx.organizationMembership.findMany({
-        where: {
+    const notificationRecipients = await tx.organizationMembership.findMany({
+      where: {
+        organizationId: invite.organizationId,
+        role: { in: ["ADMIN", "OWNER"] },
+        userId: { not: userIdentity.id },
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
+    });
+    if (notificationRecipients.length > 0) {
+      const created = await tx.notification.createMany({
+        data: notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
           organizationId: invite.organizationId,
-          role: { in: ["ADMIN", "OWNER"] },
-          userId: { not: userIdentity.id },
-          isActive: true,
-          archivedAt: null,
-        },
-        select: { user: { select: { id: true } } },
+          recipientId: recipient.user.id,
+          joinedUserName: userIdentity.displayName,
+          organizationName: invite.organization?.name ?? "the organization",
+          joinedUserId: userIdentity.id,
+        })),
+        skipDuplicates: true,
       });
-      if (notificationRecipients.length > 0) {
-        const created = await tx.notification.createMany({
-          data: notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
-            organizationId: invite.organizationId,
-            recipientId: recipient.user.id,
-            joinedUserName: userIdentity.displayName,
-            organizationName: invite.organization?.name ?? "the organization",
-            joinedUserId: userIdentity.id,
-          })),
-          skipDuplicates: true,
-        });
-        notificationCount = created.count;
-      }
+      notificationCount = created.count;
     }
 
     const user = await tx.user.findUnique({

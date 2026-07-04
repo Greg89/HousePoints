@@ -5743,6 +5743,15 @@ describe("POST /orgs/join", () => {
       },
       select: { id: true },
     });
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
+        }),
+      }),
+    );
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",
@@ -5801,7 +5810,7 @@ describe("POST /orgs/join", () => {
     await app.close();
   });
 
-  it("does not create assignment notifications when the joined user already has a house", async () => {
+  it("ignores stale legacy house assignment when deciding join notifications", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     const housedUser = makeMember({
       email: "alice@example.com",
@@ -5814,6 +5823,8 @@ describe("POST /orgs/join", () => {
       .mockResolvedValueOnce(housedUser);
     mockCreate.mockResolvedValue(housedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    mockMembershipFindMany.mockResolvedValue([{ user: { id: "admin-1" } }]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 1 });
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -5823,9 +5834,27 @@ describe("POST /orgs/join", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
-    expect(mockUserFindMany).not.toHaveBeenCalled();
-    expect(mockMembershipFindMany).not.toHaveBeenCalled();
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        role: { in: ["ADMIN", "OWNER"] },
+        userId: { not: "user-1" },
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          recipientUserId: "admin-1",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          entityId: "user-1",
+        }),
+      ],
+      skipDuplicates: true,
+    }));
     await app.close();
   });
 
@@ -5928,10 +5957,10 @@ describe("POST /orgs/join", () => {
     expect(mockUserUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "user-1" },
-        data: expect.objectContaining({
-          organizationId: "org-1",
-          houseId: null,
-          role: "MEMBER",
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
         }),
       }),
     );
