@@ -109,13 +109,6 @@ export type UserRouteOrgContext = UserOrgContext & {
  */
 export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgContext | null> {
   const userSelect = {
-    organizationId: true,
-    organization: {
-      select: {
-        name: true,
-        slug: true,
-      },
-    },
     memberships: {
       where: {
         isActive: true,
@@ -236,13 +229,6 @@ export async function getUserRouteOrgContextBySub(
   requestedOrganizationId: string,
 ): Promise<UserRouteOrgContext | null> {
   const userSelect = {
-    organizationId: true,
-    organization: {
-      select: {
-        name: true,
-        slug: true,
-      },
-    },
     memberships: {
       where: {
         isActive: true,

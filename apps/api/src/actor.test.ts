@@ -56,13 +56,6 @@ const actorUserSelect = {
 };
 
 const orgContextUserSelect = {
-  organizationId: true,
-  organization: {
-    select: {
-      name: true,
-      slug: true,
-    },
-  },
   memberships: {
     where: {
       isActive: true,
