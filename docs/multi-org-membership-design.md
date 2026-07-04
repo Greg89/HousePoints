@@ -147,10 +147,10 @@ Verification:
 
 ### Phase 2 - Dual-Read Actor Resolution
 
-Status: implemented. Actor resolution now uses the active membership fallback path even when the legacy current-org shadow is empty or stale.
+Status: implemented. Actor resolution now uses active memberships even when the legacy current-org shadow is empty or stale, and actor lookups no longer select legacy current-org shadow fields.
 
 - Update `getActorBySub` to prefer `OrganizationMembership` when it exists.
-- Fall back to legacy fields for safety.
+- Return no actor when no active membership exists.
 - Add `membershipId` to `ActorRecord`.
 - Keep response contracts unchanged.
 
@@ -212,7 +212,7 @@ Only after production has run safely with membership reads/writes:
 - remove `User.role`;
 - remove `User.houseId`;
 - update contracts to stop exposing legacy global role/org/house fields except through active membership context;
-- remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, create-org and invite-join no longer read or write legacy current-org shadows, house assignment no longer writes legacy `User.houseId`, promote/demote and ownership transfer no longer write legacy `User.role`, member removal no longer clears legacy user org fields, and org-context helpers no longer select legacy org shadow fields.
+- remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, actor lookups no longer select legacy org/role/house shadows, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, create-org and invite-join no longer read or write legacy current-org shadows, house assignment no longer writes legacy `User.houseId`, promote/demote and ownership transfer no longer write legacy `User.role`, member removal no longer clears legacy user org fields, and org-context helpers no longer select legacy org shadow fields.
 
 ## Endpoint Behavior Changes
 

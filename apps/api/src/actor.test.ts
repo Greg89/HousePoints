@@ -26,15 +26,6 @@ const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const actorUserSelect = {
   id: true,
   displayName: true,
-  role: true,
-  houseId: true,
-  organizationId: true,
-  organization: {
-    select: {
-      name: true,
-      slug: true,
-    },
-  },
   memberships: {
     where: {
       isActive: true,

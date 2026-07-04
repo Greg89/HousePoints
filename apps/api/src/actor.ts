@@ -25,15 +25,6 @@ export function isOwnerRole(role: UserRole): boolean {
 const actorUserSelect = {
   id: true,
   displayName: true,
-  role: true,
-  houseId: true,
-  organizationId: true,
-  organization: {
-    select: {
-      name: true,
-      slug: true,
-    },
-  },
   memberships: {
     where: {
       isActive: true,
@@ -150,7 +141,6 @@ type PreferredOrgContextSource = {
 };
 
 type PreferredMembershipSource = {
-  organizationId: string | null;
   memberships?: Array<{
     id: string;
     organizationId: string;
