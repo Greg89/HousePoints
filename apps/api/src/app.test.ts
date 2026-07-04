@@ -3054,7 +3054,6 @@ describe("POST /admin/users/assign-house", () => {
         displayName: "Alice",
       },
     });
-    mockUserUpdate.mockResolvedValue({ id: "user-1" });
     mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
     const app = await buildTestApp("auth0|admin");
 
@@ -3079,7 +3078,6 @@ describe("POST /admin/users/assign-house", () => {
       },
       select: {
         id: true,
-        userId: true,
         user: { select: { id: true, displayName: true } },
       },
     });
@@ -3091,11 +3089,7 @@ describe("POST /admin/users/assign-house", () => {
         user: { select: { id: true, displayName: true } },
       },
     });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-1" },
-      data: { houseId: "house-1" },
-      select: { id: true },
-    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",

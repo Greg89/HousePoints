@@ -250,7 +250,6 @@ export async function findAssignmentTargets(
       },
       select: {
         id: true,
-        userId: true,
         user: { select: { id: true, displayName: true } },
       },
     }),
@@ -265,7 +264,7 @@ export async function assignUserToHouseInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetMembership: { id: string; userId: string; user: { id: string; displayName: string } };
+  targetMembership: { id: string; user: { id: string; displayName: string } };
   targetHouse: { id: string; name: string };
 }) {
   return prisma.$transaction(async (tx) => {
@@ -276,11 +275,6 @@ export async function assignUserToHouseInDb(params: {
         houseId: true,
         user: { select: { id: true, displayName: true } },
       },
-    });
-    await tx.user.update({
-      where: { id: params.targetMembership.userId },
-      data: { houseId: params.targetHouse.id },
-      select: { id: true },
     });
     const assignedUser = {
       id: assignedMembership.user.id,
