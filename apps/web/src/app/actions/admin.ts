@@ -8,6 +8,7 @@ import {
   adminUserSchema,
   adminHouseSchema,
   assignUserHouseResponseSchema,
+  archiveOrgResponseSchema,
   deletedPointSchema,
   inviteLinkSchema,
   orgSettingsSchema,
@@ -23,7 +24,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { ArchiveOrganizationResult, CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin, resolveActiveActorMapping } from "./admin-auth";
 
@@ -251,6 +252,64 @@ export async function transferOwnership(formData: FormData): Promise<RoleChangeR
     });
 
     revalidatePath("/");
+
+    return { ok: true };
+  });
+}
+
+export async function archiveOrganization(formData: FormData): Promise<ArchiveOrganizationResult> {
+  return runServerAction("archiveOrganization", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("archiveOrganization", requestId);
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+    if (confirmation !== actor.organizationSlug) {
+      return {
+        ok: false,
+        code: "ORG_ARCHIVE_CONFIRMATION_MISMATCH",
+        message: "Type the current organization slug to archive this organization.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/archive", requestId, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    try {
+      const archivedOrganization = await parseApiResponse(
+        response,
+        archiveOrgResponseSchema,
+        "The organization could not be archived. Please try again.",
+      );
+
+      logInfo("web.admin.org_archived", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationSlug: archivedOrganization.slug,
+        archivedAt: archivedOrganization.archivedAt,
+      });
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationSlug: actor.organizationSlug,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    revalidatePath("/");
+    revalidatePath(`/o/${actor.organizationSlug}`);
 
     return { ok: true };
   });

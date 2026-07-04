@@ -16,6 +16,7 @@ import {
 import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
+  ArchiveOrganizationResult,
   HouseAssignmentResult,
   HouseMutationResult,
   MemberRemovalResult,
@@ -52,6 +53,7 @@ interface AdminFormsProps {
   onTransferOwnership: (formData: FormData) => Promise<RoleChangeResult>;
   onUpdateOrgSlug: (formData: FormData) => Promise<OrgSettingsMutationResult>;
   onUpdateOrgSettings: (formData: FormData) => Promise<OrgSettingsMutationResult>;
+  onArchiveOrganization: (formData: FormData) => Promise<ArchiveOrganizationResult>;
   onLoadAdminAudit: (
     type?: AdminAuditAction["type"],
     cursor?: string,
@@ -138,6 +140,7 @@ export function AdminForms({
   onTransferOwnership,
   onUpdateOrgSlug,
   onUpdateOrgSettings,
+  onArchiveOrganization,
   onLoadAdminAudit,
   onLoadPointAdjustmentStats,
   onCreateInvite,
@@ -285,6 +288,7 @@ export function AdminForms({
               onTransferOwnership={onTransferOwnership}
               onUpdateOrgSlug={onUpdateOrgSlug}
               onUpdateOrgSettings={onUpdateOrgSettings}
+              onArchiveOrganization={onArchiveOrganization}
             />
           ) : null}
 

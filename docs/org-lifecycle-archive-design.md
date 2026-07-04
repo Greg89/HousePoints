@@ -138,7 +138,7 @@ Authorization rule:
 
 Recommended first UI:
 
-- Manage Settings gets a danger-zone card visible to owners.
+- Manage Settings gets a danger-zone card visible to owners. [done]
 - The card says "Archive organization" rather than "Delete organization".
 - Confirmation requires typing the current organization slug.
 - Success redirects the user to an org switcher/onboarding state or a neutral archived confirmation page.
@@ -178,7 +178,7 @@ Notifications are optional for the first slice. A later slice can notify all act
 2. Update actor/org route resolution to consistently reject archived orgs for normal app actions. [done]
 3. Add owner-only archive API with tests. [done]
 4. Add archived-state web handling for `/o/{slug}`. [done]
-5. Add Manage Settings danger-zone UI.
+5. Add Manage Settings danger-zone UI. [done]
 6. Add restore path only after archive behavior is proven.
 7. Leave hard delete as operator-only future work.
 

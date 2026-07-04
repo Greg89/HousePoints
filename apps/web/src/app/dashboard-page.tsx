@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import {
   assignUserHouse,
+  archiveOrganization,
   createHouse,
   createInviteLink,
   deletePointTransaction,
@@ -168,6 +169,7 @@ export async function renderDashboardPage(route: string) {
       onTransferOwnership={transferOwnership}
       onUpdateOrgSlug={updateOrgSlug}
       onUpdateOrgSettings={updateOrgSettings}
+      onArchiveOrganization={archiveOrganization}
       onLoadAdminAudit={readAdminAuditPage}
       onLoadPointAdjustmentStats={readPointAdjustmentStats}
       onCreateInvite={createInviteLink}

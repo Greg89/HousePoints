@@ -2,7 +2,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Buildings, Crown, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { OrgSettings } from "@housepoints/contracts";
-import type { OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { ArchiveOrganizationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import type { AdminUser } from "./AdminManageTypes";
 
 interface OrgSettingsManagementProps {
@@ -11,6 +11,7 @@ interface OrgSettingsManagementProps {
   onTransferOwnership: (formData: FormData) => Promise<RoleChangeResult>;
   onUpdateOrgSlug: (formData: FormData) => Promise<OrgSettingsMutationResult>;
   onUpdateOrgSettings: (formData: FormData) => Promise<OrgSettingsMutationResult>;
+  onArchiveOrganization: (formData: FormData) => Promise<ArchiveOrganizationResult>;
 }
 
 export function OrgSettingsManagement({
@@ -19,12 +20,16 @@ export function OrgSettingsManagement({
   onTransferOwnership,
   onUpdateOrgSlug,
   onUpdateOrgSettings,
+  onArchiveOrganization,
 }: OrgSettingsManagementProps) {
   const [isNamePending, startNameTransition] = useTransition();
   const [isSlugPending, startSlugTransition] = useTransition();
   const [isOwnerPending, startOwnerTransition] = useTransition();
+  const [isArchivePending, startArchiveTransition] = useTransition();
   const [pendingTransferId, setPendingTransferId] = useState<string | null>(null);
+  const [archiveConfirmation, setArchiveConfirmation] = useState("");
   const ownerCandidates = users.filter((user) => user.role !== "OWNER");
+  const canArchive = archiveConfirmation.trim() === organization.slug;
   const pendingTransferName = pendingTransferId
     ? (users.find((u) => u.id === pendingTransferId)?.displayName ?? null)
     : null;
@@ -142,6 +147,43 @@ export function OrgSettingsManagement({
         });
       } catch (err) {
         toast.error("Failed to transfer ownership", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
+  function handleArchiveSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+    if (confirmation !== organization.slug) {
+      toast.error("Archive confirmation does not match", {
+        description: `Type ${organization.slug} to archive this organization.`,
+      });
+      return;
+    }
+
+    startArchiveTransition(async () => {
+      try {
+        const result = await onArchiveOrganization(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to archive organization", {
+            description: result.message,
+          });
+          return;
+        }
+
+        toast.success("Organization archived", {
+          description: "This organization is no longer available to members.",
+        });
+        form.reset();
+        setArchiveConfirmation("");
+      } catch (err) {
+        toast.error("Failed to archive organization", {
           description: err instanceof Error ? err.message : "Something went wrong",
         });
       }
@@ -365,6 +407,54 @@ export function OrgSettingsManagement({
               {isOwnerPending ? "Transferring..." : "Transfer ownership"}
             </button>
           )}
+        </form>
+
+        <form
+          aria-label="Archive organization"
+          onSubmit={handleArchiveSubmit}
+          className="grid gap-4 rounded-xl border border-destructive/30 bg-card p-4"
+        >
+          <div>
+            <h5 className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <Warning size={16} />
+              Archive Organization
+            </h5>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Archive this organization for every member. Historical records stay preserved, but the
+              organization will no longer appear as an active workspace.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-muted-foreground">
+            This is a soft delete. Data is retained for audit and future recovery work, but users
+            cannot continue using the archived organization.
+          </div>
+
+          <div className="grid gap-1.5">
+            <label htmlFor="organization-archive-confirmation" className="text-xs font-semibold text-muted-foreground">
+              Confirm archive
+            </label>
+            <input
+              id="organization-archive-confirmation"
+              name="confirmation"
+              value={archiveConfirmation}
+              onChange={(event) => setArchiveConfirmation(event.target.value)}
+              placeholder={organization.slug}
+              required
+              className="h-10 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+            />
+            <span className="text-xs font-normal text-muted-foreground">
+              Type <span className="font-mono">{organization.slug}</span> to confirm.
+            </span>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isArchivePending || !canArchive}
+            className="h-10 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+          >
+            {isArchivePending ? "Archiving..." : "Archive organization"}
+          </button>
         </form>
       </div>
     </section>
