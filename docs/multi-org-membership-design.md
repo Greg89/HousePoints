@@ -216,13 +216,13 @@ Readiness notes:
 - Web session and admin authorization code now resolve the active organization context through one shared helper, so top-level user aliases are fallback compatibility fields rather than the primary source for current-org state.
 - API test user fixtures now create default memberships from explicit membership fixture defaults and overrides instead of synthesizing memberships from legacy-like user fields.
 - App-user mapping tests now guard against reintroducing legacy user-level org, role, or house fields into the bootstrap/profile select.
-- Prisma still owns `User.organizationId`, `User.role`, and `User.houseId` until a dedicated migration removes them.
+- Prisma schema now removes `User.organizationId`, `User.role`, and `User.houseId`; migration `20260704170000_drop_legacy_user_org_fields` drops the legacy columns after the membership backfill has run.
 
 Before dropping columns:
 
-- remove `User.organizationId`;
-- remove `User.role`;
-- remove `User.houseId`;
+- remove `User.organizationId` - migration added;
+- remove `User.role` - migration added;
+- remove `User.houseId` - migration added;
 - decide whether top-level contract fields remain as active-org aliases or move consumers fully to `organizationContexts` - current direction is to keep them temporarily as active-org aliases while web consumers centralize active-context derivation;
 - update contracts to stop exposing legacy global role/org/house fields except through active membership context;
 - replace legacy-derived test fixtures with explicit membership fixture builders - implemented for the shared API user fixture helpers;

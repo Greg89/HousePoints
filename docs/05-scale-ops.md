@@ -85,19 +85,19 @@ Deferred sub-features:
 
 ---
 
-## 5.6 Multi-org membership model [todo]
+## 5.6 Multi-org membership model [doing]
 
-Current users belong to one organization through `User.organizationId`. That is enough for the first production shape, but it does not support one person switching between multiple organizations.
+Users now belong to organizations through `OrganizationMembership`, with role and house assignment scoped per organization. The legacy `User.organizationId`, `User.role`, and `User.houseId` fields have a removal migration after the membership backfill and read/write migration.
 
-Design status: the staged migration plan lives in [Multi-Org Membership Design](./multi-org-membership-design.md). The recommended first implementation slice is adding and backfilling `OrganizationMembership` without changing application behavior.
+Design status: the staged migration plan lives in [Multi-Org Membership Design](./multi-org-membership-design.md). Runtime reads and writes use active memberships, the web resolves active organization state through membership contexts, and the schema-removal migration is in place.
 
-Future approach:
+Implemented approach:
 
-1. Add an `OrganizationMembership` join table with role and house assignment per organization.
-2. Move role and house assignment out of `User` and into membership scope.
+1. Add and backfill `OrganizationMembership`.
+2. Move role and house assignment reads/writes out of `User` and into membership scope.
 3. Add active-organization selection in the web session.
 4. Update actor resolution to return a membership-scoped actor.
-5. Backfill existing users into one membership each before switching reads.
+5. Remove legacy user org, role, and house fields after the backfill and compatibility guards are in place.
 
 ---
 
