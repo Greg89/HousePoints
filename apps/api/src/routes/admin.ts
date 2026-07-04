@@ -399,10 +399,9 @@ export async function changeUserRoleInDb(params: {
 export async function transferOwnershipInDb(params: {
   organizationId: string;
   actor: { id: string; displayName: string };
-  actorMembership: { id: string; userId: string };
+  actorMembership: { id: string };
   targetMembership: {
     id: string;
-    userId: string;
     role: string;
     houseId: string | null;
     user: { id: string; displayName: string; email: string | null };
@@ -423,16 +422,6 @@ export async function transferOwnershipInDb(params: {
         houseId: true,
         user: { select: { id: true, displayName: true, email: true } },
       },
-    });
-    await tx.user.update({
-      where: { id: params.actorMembership.userId },
-      data: { role: "ADMIN" },
-      select: { id: true },
-    });
-    await tx.user.update({
-      where: { id: params.targetMembership.userId },
-      data: { role: "OWNER" },
-      select: { id: true },
     });
     const newOwner = {
       id: newOwnerMembership.user.id,

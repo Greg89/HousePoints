@@ -3655,9 +3655,6 @@ describe("POST /admin/org/owner", () => {
           email: "taylor@acme.com",
         },
       });
-    mockUserUpdate
-      .mockResolvedValueOnce({ id: "user-owner" })
-      .mockResolvedValueOnce({ id: "user-target" });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3682,16 +3679,7 @@ describe("POST /admin/org/owner", () => {
         user: { select: { id: true, displayName: true, email: true } },
       },
     });
-    expect(mockUserUpdate).toHaveBeenNthCalledWith(1, {
-      where: { id: "user-owner" },
-      data: { role: "ADMIN" },
-      select: { id: true },
-    });
-    expect(mockUserUpdate).toHaveBeenNthCalledWith(2, {
-      where: { id: "user-target" },
-      data: { role: "OWNER" },
-      select: { id: true },
-    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-secure",

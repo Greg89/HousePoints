@@ -182,7 +182,7 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now uses active memberships without legacy current-org fallback. Create org now creates an owner membership, no longer blocks users who already belong to another organization, and reloads the user after membership writes so the response includes current membership contexts. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, then reloads the user after membership writes so the response includes current membership contexts. House assignment now validates the target user through active membership and updates only `OrganizationMembership.houseId`. Admin promotion/demotion now validates targets through active membership and updates only `OrganizationMembership.role`. Ownership transfer validates targets through active membership, updates `OrganizationMembership.role`, and shadow-writes legacy `User.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
+Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now uses active memberships without legacy current-org fallback. Create org now creates an owner membership, no longer blocks users who already belong to another organization, and reloads the user after membership writes so the response includes current membership contexts. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, then reloads the user after membership writes so the response includes current membership contexts. House assignment now validates the target user through active membership and updates only `OrganizationMembership.houseId`. Admin promotion/demotion and ownership transfer now validate targets through active membership and update only `OrganizationMembership.role`. Member removal now archives the active membership and shadow-clears legacy user org fields.
 
 Update workflows:
 
@@ -190,7 +190,7 @@ Update workflows:
 - Join org: allow joining another org by creating or reactivating membership instead of returning `ALREADY_IN_ORG` - implemented with legacy current-org shadow write and post-membership response reload.
 - Assign house: update membership `houseId` - implemented without legacy `User.houseId` shadow write.
 - Promote/demote: update membership `role` - implemented without legacy `User.role` shadow write.
-- Transfer ownership: update membership roles - implemented with legacy `User.role` shadow writes.
+- Transfer ownership: update membership roles - implemented without legacy `User.role` shadow writes.
 - Remove member: archive membership and archive relevant notifications - implemented with legacy `User` org-field shadow clear.
 
 At the end of this phase, `User.organizationId`, `User.role`, and `User.houseId` are legacy shadows only.
@@ -212,7 +212,7 @@ Only after production has run safely with membership reads/writes:
 - remove `User.role`;
 - remove `User.houseId`;
 - update contracts to stop exposing legacy global role/org/house fields except through active membership context;
-- remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, house assignment no longer writes legacy `User.houseId`, promote/demote no longer writes legacy `User.role`, and org-context helpers no longer select legacy org shadow fields.
+- remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, house assignment no longer writes legacy `User.houseId`, promote/demote and ownership transfer no longer write legacy `User.role`, and org-context helpers no longer select legacy org shadow fields.
 
 ## Endpoint Behavior Changes
 
