@@ -182,7 +182,7 @@ Response shape can stay the same:
 
 ### Phase 4 - Move Membership Mutations
 
-Status: in progress. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now uses active memberships without legacy current-org fallback. Create org now creates an owner membership, no longer blocks users who already belong to another organization, reloads the user after membership writes so the response includes current membership contexts, and does not read or write legacy current-org shadows. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, reloads the user after membership writes so the response includes current membership contexts, and does not read or write legacy current-org shadows. House assignment now validates the target user through active membership and updates only `OrganizationMembership.houseId`. Admin promotion/demotion and ownership transfer now validate targets through active membership and update only `OrganizationMembership.role`. Member removal now archives the active membership and related notifications without clearing legacy user org fields.
+Status: complete. Invite preview now determines membership status from active memberships instead of legacy current-org shadows, and dashboard route-context now uses active memberships without legacy current-org fallback. Create org now creates an owner membership, no longer blocks users who already belong to another organization, reloads the user after membership writes so the response includes current membership contexts, and does not read or write legacy current-org shadows. Invite join now creates or reactivates a membership for the invite organization instead of blocking users who belong to another organization, reloads the user after membership writes so the response includes current membership contexts, and does not read or write legacy current-org shadows. House assignment now validates the target user through active membership and updates only `OrganizationMembership.houseId`. Admin promotion/demotion and ownership transfer now validate targets through active membership and update only `OrganizationMembership.role`. Member removal now archives the active membership and related notifications without clearing legacy user org fields.
 
 Update workflows:
 
@@ -193,7 +193,7 @@ Update workflows:
 - Transfer ownership: update membership roles - implemented without legacy `User.role` shadow writes.
 - Remove member: archive membership and archive relevant notifications - implemented without legacy `User` org-field shadow clear.
 
-At the end of this phase, `User.organizationId`, `User.role`, and `User.houseId` are legacy shadows only.
+At the end of this phase, `User.organizationId`, `User.role`, and `User.houseId` are legacy schema fields only. Runtime org, role, and house behavior is handled through active memberships.
 
 Benchmark fixtures have also been moved to the membership model so dashboard baseline runs create global users plus `OrganizationMembership` rows instead of writing legacy user org/role/house shadows.
 
@@ -208,13 +208,24 @@ Status: complete for the first multi-org UX slice. Bootstrap responses and the w
 
 ### Phase 6 - Remove Legacy User Org Fields
 
-Only after production has run safely with membership reads/writes:
+Status: not started. Runtime reads and writes are ready for schema-removal planning, but the app still has deliberate compatibility surfaces that should be resolved before the migration.
+
+Readiness notes:
+
+- API and web top-level user fields such as `role`, `organizationId`, `organizationSlug`, `houseId`, `houseName`, and `houseColor` are compatibility aliases derived from the active membership context. They are no longer legacy shadow reads, but the contract still exposes them.
+- API tests still have fixture helpers that can synthesize memberships from legacy-like fixture fields. Clean those helpers before schema removal so tests fail loudly if code regresses to user-level org shadows.
+- Prisma still owns `User.organizationId`, `User.role`, and `User.houseId` until a dedicated migration removes them.
+
+Before dropping columns:
 
 - remove `User.organizationId`;
 - remove `User.role`;
 - remove `User.houseId`;
+- decide whether top-level contract fields remain as active-org aliases or move consumers fully to `organizationContexts`;
 - update contracts to stop exposing legacy global role/org/house fields except through active membership context;
+- replace legacy-derived test fixtures with explicit membership fixture builders;
 - remove fallback paths from actor resolution - scoped and default actor resolution now require active memberships, actor and app-user lookups no longer select legacy org/role/house shadows, default preferred membership selection no longer consults legacy current-org shadows, app-user mapping no longer falls back to legacy org/role/house shadows, create-org and invite-join no longer read or write legacy current-org shadows, house assignment no longer writes legacy `User.houseId`, promote/demote and ownership transfer no longer write legacy `User.role`, member removal no longer clears legacy user org fields, benchmark seeding no longer writes legacy user org fields, and org-context helpers no longer select legacy org shadow fields.
+- run a final code search for direct `User.organizationId`, `User.role`, `User.houseId`, `user.organizationId`, `user.role`, and `user.houseId` dependencies.
 
 ## Endpoint Behavior Changes
 
