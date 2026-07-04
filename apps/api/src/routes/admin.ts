@@ -335,7 +335,6 @@ export async function changeUserRoleInDb(params: {
   actorDisplayName: string;
   targetMembership: {
     id: string;
-    userId: string;
     role: string;
     houseId: string | null;
     user: { id: string; displayName: string; email: string | null };
@@ -351,11 +350,6 @@ export async function changeUserRoleInDb(params: {
         houseId: true,
         user: { select: { id: true, displayName: true, email: true } },
       },
-    });
-    await tx.user.update({
-      where: { id: params.targetMembership.userId },
-      data: { role: params.newRole as "MEMBER" | "ADMIN" | "OWNER" },
-      select: { id: true },
     });
     const changedUser = {
       id: changedMembership.user.id,

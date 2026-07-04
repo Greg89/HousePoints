@@ -3324,7 +3324,6 @@ describe("POST /admin/users/role", () => {
         email: "taylor@acme.com",
       },
     });
-    mockUserUpdate.mockResolvedValue({ id: "user-target" });
     mockMembershipFindMany.mockResolvedValue([
       { user: { id: "user-owner-2" } },
       { user: { id: "user-target" } },
@@ -3369,11 +3368,7 @@ describe("POST /admin/users/role", () => {
         user: { select: { id: true, displayName: true, email: true } },
       },
     });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-target" },
-      data: { role: "ADMIN" },
-      select: { id: true },
-    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-secure",
@@ -3467,7 +3462,6 @@ describe("POST /admin/users/role", () => {
         email: "taylor@acme.com",
       },
     });
-    mockUserUpdate.mockResolvedValue({ id: "user-target" });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3487,11 +3481,7 @@ describe("POST /admin/users/role", () => {
         user: { select: { id: true, displayName: true, email: true } },
       },
     });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-target" },
-      data: { role: "MEMBER" },
-      select: { id: true },
-    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-secure",
