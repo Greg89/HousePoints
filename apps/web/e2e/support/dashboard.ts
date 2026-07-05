@@ -3,12 +3,14 @@ import { expect, type Page } from "@playwright/test";
 export async function expectDashboardReady(page: Page) {
   await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
 
-  await Promise.race([
+  await Promise.any([
     page.getByText(/welcome back/i).waitFor({ state: "visible", timeout: 30_000 }),
     page.getByText(/waiting for assignment/i).waitFor({ state: "visible", timeout: 30_000 }),
     page.getByText(/create organisation/i).waitFor({ state: "visible", timeout: 30_000 }),
     page.getByText(/something went wrong/i).waitFor({ state: "visible", timeout: 30_000 }),
-  ]);
+  ]).catch(async () => {
+    throw new Error(await buildDashboardTimeoutMessage(page));
+  });
 
   if (await page.getByText(/waiting for assignment/i).isVisible().catch(() => false)) {
     throw new Error(
@@ -27,4 +29,17 @@ export async function expectDashboardReady(page: Page) {
   }
 
   await expect(page.getByText(/welcome back/i)).toBeVisible();
+}
+
+async function buildDashboardTimeoutMessage(page: Page) {
+  const title = await page.title().catch(() => "unknown");
+  const bodyText = await page.locator("body").innerText({ timeout: 1_000 }).catch(() => "");
+  const preview = bodyText.replace(/\s+/g, " ").trim().slice(0, 500) || "empty body";
+
+  return [
+    "E2E user did not reach a recognized dashboard state within 30 seconds.",
+    `Current URL: ${page.url()}`,
+    `Page title: ${title}`,
+    `Body preview: ${preview}`,
+  ].join("\n");
 }
