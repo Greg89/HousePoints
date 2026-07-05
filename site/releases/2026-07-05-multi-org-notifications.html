@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HousePoints Multi-Organization and Notifications Release Notes</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">Released 2026-07-05</p>
+        <h1>Multi-Organization Support and In-App Notifications</h1>
+        <p class="summary">
+          HousePoints now supports users belonging to more than one organization,
+          with clearer organization switching, account settings, durable in-app
+          notifications, and release announcements.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          <ul class="section-list">
+            <li>Added multi-organization support for users who belong to more than one organization.</li>
+            <li>Added organization switching from the account menu.</li>
+            <li>Added account settings with a dedicated organization area.</li>
+            <li>Added durable in-app notifications in the account menu.</li>
+            <li>Added release announcement notifications for future product updates.</li>
+            <li>Added a persistent What's New link to the public release notes.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>What's New</h2>
+          <ul class="section-list">
+            <li>Dashboard data, notifications, houses, members, points, and reports now follow the selected organization.</li>
+            <li>Users can create another organization from their account settings.</li>
+            <li>The account menu now keeps organization switching, notifications, release notes, account settings, and sign out in one place.</li>
+            <li>The account menu now behaves better on smaller screens by keeping footer actions reachable.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li>Release notes are published through GitHub Pages from the committed <code>site</code> directory.</li>
+            <li>Release announcements are recorded in the app before notifications are broadcast.</li>
+            <li>In-app release notifications should be broadcast only after production health is verified.</li>
+            <li>The production web app uses <code>APP_RELEASE_NOTES_URL</code> for the persistent What's New link.</li>
+            <li>The production API and GitHub Actions share <code>RELEASE_AUTOMATION_SECRET</code> for release record and broadcast automation.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          <ul class="section-list">
+            <li>CI validation passed.</li>
+            <li>Production deployment completed.</li>
+            <li>Multi-organization switching tested in production.</li>
+            <li>Account menu notifications tested in production.</li>
+            <li>Release notes publishing and release-record automation tested through GitHub Actions.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
