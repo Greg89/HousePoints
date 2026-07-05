@@ -142,6 +142,7 @@ export async function renderDashboardPage(route: string) {
   const dashboardHref = session.organizationSlug
     ? `/o/${encodeURIComponent(session.organizationSlug)}`
     : "/";
+  const releaseNotesUrl = readReleaseNotesUrl(requestId, route);
 
   const adminSection = adminContext === ADMIN_CONTEXT_FAILED ? (
     <AdminUnavailablePanel />
@@ -211,10 +212,43 @@ export async function renderDashboardPage(route: string) {
       dashboardHref={dashboardHref}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
+      releaseNotesUrl={releaseNotesUrl}
       showSeasonOverviewCard={showSeasonOverviewCard}
       adminSection={adminSection}
     />
   );
+}
+
+function readReleaseNotesUrl(requestId: string, route: string) {
+  const rawUrl = process.env.APP_RELEASE_NOTES_URL?.trim();
+
+  if (!rawUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+
+    if (url.protocol !== "https:") {
+      logWarn("web.release_notes_url.invalid", {
+        requestId,
+        route,
+        reason: "non_https_protocol",
+      });
+      return null;
+    }
+
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    logWarn("web.release_notes_url.invalid", {
+      requestId,
+      route,
+      reason: "invalid_url",
+    });
+    return null;
+  }
 }
 
 async function readNotificationsForDashboard(

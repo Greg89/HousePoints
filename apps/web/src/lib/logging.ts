@@ -25,6 +25,7 @@ export type WebLogEvent =
   | "web.client.error_reported"
   | "web.client.error_report_rejected"
   | "web.request.failed"
+  | "web.release_notes_url.invalid"
   | "web.auth.not_configured"
   | "web.auth.session_missing"
   | "web.auth.access_token_expired"

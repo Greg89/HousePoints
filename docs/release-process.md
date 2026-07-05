@@ -108,6 +108,10 @@ Required GitHub repository configuration:
 - Secret: `RELEASE_AUTOMATION_SECRET` - same value configured on the API service.
 - Variable: `RELEASE_RECORD_API_BASE_URL` - public API base URL, without the endpoint path, for example `https://housepoints-api-production.up.railway.app`.
 
+Required Railway web configuration for the account-menu release link:
+
+- `APP_RELEASE_NOTES_URL` - public `https://` URL for the release history page, for example the GitHub Pages `/releases/` URL. When set, the account menu shows a persistent "What's New" link.
+
 Manual workflow inputs:
 
 - `release_version` - durable release identifier, for example `v1.2.3` or `2026.07.04`.

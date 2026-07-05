@@ -79,6 +79,7 @@ interface DashboardShellProps {
   dashboardHref: string;
   loginUrl: string;
   logoutUrl: string;
+  releaseNotesUrl?: string | null;
   showSeasonOverviewCard?: boolean;
   adminSection?: React.ReactNode;
 }
@@ -185,6 +186,7 @@ export function DashboardShell({
   onDeletePoint,
   dashboardHref,
   logoutUrl,
+  releaseNotesUrl,
   showSeasonOverviewCard = false,
   adminSection,
 }: DashboardShellProps) {
@@ -343,6 +345,7 @@ export function DashboardShell({
               onNotificationsChange={setCurrentNotifications}
               onMarkNotificationRead={onMarkNotificationRead}
               onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+              releaseNotesUrl={releaseNotesUrl}
               logoutUrl={logoutUrl}
             />
             <NotificationPoller

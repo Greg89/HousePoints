@@ -7,6 +7,7 @@ import {
   Check,
   ArrowSquareOut,
   Gear,
+  Megaphone,
   SignOut,
   User,
 } from "@phosphor-icons/react";
@@ -25,6 +26,7 @@ type AccountMenuProps = {
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   dashboardHref: string;
+  releaseNotesUrl?: string | null;
   logoutUrl: string;
 };
 
@@ -42,6 +44,7 @@ export function AccountMenu({
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   dashboardHref,
+  releaseNotesUrl,
   logoutUrl,
 }: AccountMenuProps) {
   const router = useRouter();
@@ -270,7 +273,20 @@ export function AccountMenu({
             )}
           </section>
 
-          <div className="grid grid-cols-2 gap-2 border-t bg-muted/20 p-3">
+          <div className="space-y-2 border-t bg-muted/20 p-3">
+            {isExternalHttpsHref(releaseNotesUrl ?? null) ? (
+              <a
+                href={releaseNotesUrl ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
+              >
+                <Megaphone size={16} aria-hidden="true" />
+                What&apos;s New
+                <ArrowSquareOut size={13} aria-hidden="true" />
+              </a>
+            ) : null}
+            <div className="grid grid-cols-2 gap-2">
             <a
               href="/settings"
               className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
@@ -285,6 +301,7 @@ export function AccountMenu({
               <SignOut size={16} aria-hidden="true" />
               Sign out
             </a>
+            </div>
           </div>
         </div>
       ) : null}

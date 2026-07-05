@@ -134,6 +134,19 @@ describe("AccountMenu", () => {
     expect(within(dialog).getByRole("button", { name: /assign house/i })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/settings");
     expect(within(dialog).getByRole("link", { name: /sign out/i })).toHaveAttribute("href", "/auth/logout");
+    expect(within(dialog).queryByRole("link", { name: /what's new/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a persistent What's New link when release notes are configured", async () => {
+    const user = userEvent.setup();
+    render(<AccountMenuHarness releaseNotesUrl="https://housepoints.example/releases/" />);
+
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+
+    expect(screen.getByRole("link", { name: /what's new/i })).toHaveAttribute(
+      "href",
+      "https://housepoints.example/releases/",
+    );
   });
 
   it("shows organization switch links when the user belongs to multiple organizations", async () => {
