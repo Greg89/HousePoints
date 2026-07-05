@@ -54,6 +54,8 @@ The staging E2E organization should contain:
 
 The mutating happy-path test intentionally creates point activity. The staging organization should tolerate this accumulated history. If that history becomes noisy, add a reset or cleanup job before making scheduled E2E failures block releases.
 
+The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. Multi-organization switching and the What's New link are asserted only when those controls are visible in the target environment, so staging can enable those product surfaces without adding new required secrets.
+
 ## Future Actor Expansion
 
 The next E2E expansion should add dedicated owner and admin actors instead of reusing one broad account for every permission level.
