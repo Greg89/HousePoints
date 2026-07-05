@@ -120,7 +120,11 @@ Optional manual input:
 
 ### Phase B2 - Test Data Contract
 
-Define a stable staging test organization:
+Status: first slice implemented.
+
+The staging test data contract is documented in [Staging E2E Test Data Contract](./staging-e2e-test-data-contract.md), and the Playwright specs share a single environment contract module under `apps/web/e2e/support/config.ts`.
+
+Current contract:
 
 - one owner/admin test user for scripted login;
 - at least one target member in a different account;
@@ -160,5 +164,5 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A3 - Production notification broadcast | Implemented | Secret-protected broadcast endpoint and manual workflow handoff implemented. |
 | A4 - What's new UX | In progress | Release notifications link to public release notes from the account menu; persistent What's New entry remains deferred. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
-| B2 - Test data contract | Deferred | Needs stable staging account/org setup. |
+| B2 - Test data contract | In progress | First staging data contract documented and centralized in Playwright config helpers; dedicated owner/admin/member actors remain future work. |
 | B3 - E2E coverage expansion | In progress | Read-only dashboard smoke coverage added. |

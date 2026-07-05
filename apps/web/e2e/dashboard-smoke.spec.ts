@@ -1,13 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { missingRequiredEnv, signInIfNeeded } from "./support/auth";
+import { missingRequiredEnv, requiredDashboardSmokeEnv } from "./support/config";
+import { signInIfNeeded } from "./support/auth";
 
-const requiredEnv = [
-  "E2E_BASE_URL",
-  "E2E_USER_EMAIL",
-  "E2E_USER_PASSWORD",
-] as const;
-
-const missingEnv = missingRequiredEnv(requiredEnv);
+const missingEnv = missingRequiredEnv(requiredDashboardSmokeEnv);
 
 test.skip(
   missingEnv.length > 0,

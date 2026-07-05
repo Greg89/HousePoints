@@ -27,6 +27,7 @@ The documents in this folder serve three purposes:
 - [Notification system design](./notifications-design.md): durable in-app notifications, account-menu inbox, and toast delivery plan.
 - [Multi-org membership design](./multi-org-membership-design.md): staged migration from single `User.organizationId` membership to membership-scoped org access.
 - [Release and E2E automation plan](./release-and-e2e-automation.md): phased release notes, in-app release announcements, and scheduled staging Playwright coverage.
+- [Staging E2E test data contract](./staging-e2e-test-data-contract.md): required staging users, org state, and GitHub Environment secrets for Playwright runs.
 - [Release process](./release-process.md): current manual GitHub Pages release note flow and commit convention.
 
 ## Tier Detail Notes

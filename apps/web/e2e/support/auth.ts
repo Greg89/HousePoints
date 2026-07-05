@@ -1,8 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-
-export function missingRequiredEnv(names: readonly string[]) {
-  return names.filter((name) => !process.env[name]);
-}
+import { readE2EUserCredentials } from "./config";
 
 export function exactNamePattern(value: string) {
   return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
@@ -17,15 +14,17 @@ export async function signInIfNeeded(page: Page) {
 }
 
 async function completeAuth0Login(page: Page) {
+  const credentials = readE2EUserCredentials();
+
   await fillFirstVisible(
     page,
     'input[name="username"], input[name="email"], input[type="email"]',
-    process.env.E2E_USER_EMAIL!,
+    credentials.email,
   );
   await fillFirstVisible(
     page,
     'input[name="password"], input[type="password"]',
-    process.env.E2E_USER_PASSWORD!,
+    credentials.password,
   );
   await page.getByRole("button", { name: /^(continue|log in|sign in)$/i }).click();
 }
