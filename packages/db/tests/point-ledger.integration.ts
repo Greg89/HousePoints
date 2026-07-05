@@ -208,6 +208,7 @@ async function run() {
       id: organization.id,
       name: organization.name,
       slug: organization.slug,
+      archivedAt: null,
     },
   });
 
@@ -239,6 +240,7 @@ async function run() {
   assert.equal(resolvedOldSlug?.matchedSlug, oldAlias.slug);
   assert.equal(resolvedOldSlug?.currentSlug, organization.slug);
   assert.equal(resolvedOldSlug?.isPrimary, false);
+  assert.equal(resolvedOldSlug?.organization.archivedAt, null);
 
   await assert.rejects(
     () =>
