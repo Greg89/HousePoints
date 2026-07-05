@@ -57,6 +57,57 @@ jobs:
             exit 1
           fi
 
+          node - <<'NODE'
+          const rawBaseUrl = process.env.E2E_BASE_URL?.trim();
+          let baseUrl;
+          try {
+            baseUrl = new URL(rawBaseUrl);
+          } catch {
+            console.error("E2E_BASE_URL must be an absolute URL, for example https://housepointsweb-beta.up.railway.app");
+            process.exit(1);
+          }
+
+          if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
+            console.error("E2E_BASE_URL must use the http or https protocol.");
+            process.exit(1);
+          }
+
+          const rawOrgSlug = process.env.E2E_ORG_SLUG?.trim();
+          const startPath = rawOrgSlug ? `/o/${encodeURIComponent(rawOrgSlug)}` : "/";
+          const targetUrl = new URL(startPath, baseUrl);
+          console.log(`E2E base URL: ${baseUrl.origin}`);
+          console.log(`E2E org slug configured: ${rawOrgSlug ? "yes" : "no"}`);
+          console.log(`E2E start URL: ${targetUrl.href}`);
+          NODE
+
+      - name: Probe staging target
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const baseUrl = new URL(process.env.E2E_BASE_URL.trim());
+          const rawOrgSlug = process.env.E2E_ORG_SLUG?.trim();
+          const startPath = rawOrgSlug ? `/o/${encodeURIComponent(rawOrgSlug)}` : "/";
+          const targetUrl = new URL(startPath, baseUrl);
+
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 30000);
+
+          try {
+            const response = await fetch(targetUrl, {
+              method: "GET",
+              redirect: "manual",
+              signal: controller.signal,
+            });
+            console.log(`E2E target probe status: ${response.status}`);
+            console.log(`E2E target probe location: ${response.headers.get("location") ?? "(none)"}`);
+          } catch (error) {
+            console.error(`E2E target probe failed: ${error instanceof Error ? error.message : String(error)}`);
+            process.exit(1);
+          } finally {
+            clearTimeout(timeout);
+          }
+          NODE
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
