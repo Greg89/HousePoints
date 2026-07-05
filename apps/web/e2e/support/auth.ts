@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { readE2EUserCredentials } from "./config";
+import { getE2EDiagnostics } from "./navigation";
 
 export function exactNamePattern(value: string) {
   return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
@@ -46,5 +47,16 @@ function assertNotChromeErrorPage(page: Page, checkpoint: string) {
     return;
   }
 
-  throw new Error(`Browser reached Chrome's internal error page ${checkpoint}. Current URL: ${page.url()}`);
+  const diagnostics = getE2EDiagnostics(page);
+  const lines = [
+    `Browser reached Chrome's internal error page ${checkpoint}.`,
+    `Current URL: ${page.url()}`,
+  ];
+
+  if (diagnostics.length > 0) {
+    lines.push("Navigation diagnostics:");
+    lines.push(...diagnostics.slice(-15));
+  }
+
+  throw new Error(lines.join("\n"));
 }

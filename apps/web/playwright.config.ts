@@ -26,6 +26,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: readBaseURL(),
+    screenshot: "only-on-failure",
     trace: "on-first-retry",
   },
   projects: [

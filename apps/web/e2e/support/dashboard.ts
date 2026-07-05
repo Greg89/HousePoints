@@ -1,5 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
+import { getE2EDiagnostics } from "./navigation";
+
 export async function expectDashboardReady(page: Page) {
   await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
 
@@ -37,9 +39,23 @@ async function buildDashboardTimeoutMessage(page: Page) {
   const preview = bodyText.replace(/\s+/g, " ").trim().slice(0, 500) || "empty body";
 
   return [
+    ...buildDashboardTimeoutLines(page, title, preview),
+  ].join("\n");
+}
+
+function buildDashboardTimeoutLines(page: Page, title: string, preview: string) {
+  const lines = [
     "E2E user did not reach a recognized dashboard state within 30 seconds.",
     `Current URL: ${page.url()}`,
     `Page title: ${title}`,
     `Body preview: ${preview}`,
-  ].join("\n");
+  ];
+
+  const diagnostics = getE2EDiagnostics(page);
+  if (diagnostics.length > 0) {
+    lines.push("Navigation diagnostics:");
+    lines.push(...diagnostics.slice(-15));
+  }
+
+  return lines;
 }
