@@ -129,12 +129,11 @@ describe("AccountMenu", () => {
     expect(dialog).toHaveTextContent("Admin");
     expect(dialog).toHaveTextContent("Acme Corp");
     expect(within(dialog).queryByRole("region", { name: /switch organization/i })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("region", { name: /organization actions/i })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: /create organisation/i })).toHaveAttribute("href", "/orgs/new");
+    expect(within(dialog).queryByRole("link", { name: /create organisation/i })).not.toBeInTheDocument();
     expect(within(dialog).getByText("New member needs a house")).toBeInTheDocument();
     expect(within(dialog).getByText("Action required")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /assign house/i })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/settings");
+    expect(within(dialog).getByRole("link", { name: /account/i })).toHaveAttribute("href", "/settings");
     expect(within(dialog).getByRole("link", { name: /sign out/i })).toHaveAttribute("href", "/auth/logout");
     expect(within(dialog).queryByRole("link", { name: /what's new/i })).not.toBeInTheDocument();
   });
@@ -180,7 +179,7 @@ describe("AccountMenu", () => {
     expect(within(switcher).getByText("Acme Corp")).toBeInTheDocument();
     expect(within(switcher).getByText("Current")).toBeInTheDocument();
     expect(within(switcher).getByRole("link", { name: /beta org/i })).toHaveAttribute("href", "/o/beta/switch");
-    expect(within(switcher).getByRole("link", { name: /create organisation/i })).toHaveAttribute("href", "/orgs/new");
+    expect(within(switcher).queryByRole("link", { name: /create organisation/i })).not.toBeInTheDocument();
   });
 
   it("marks an action notification read before navigating", async () => {

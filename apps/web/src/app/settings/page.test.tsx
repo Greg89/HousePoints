@@ -1,0 +1,67 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { redirect } from "next/navigation";
+import { readSessionSummary } from "@/app/actions/profile";
+import SettingsPage from "./page";
+
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
+
+vi.mock("@/app/actions/profile", () => ({
+  readSessionSummary: vi.fn(),
+  updateDisplayName: vi.fn(),
+  updateHouseThemePreference: vi.fn(),
+}));
+
+vi.mock("@/components/DisplayNameForm", () => ({
+  DisplayNameForm: ({ currentName }: { currentName: string }) => (
+    <div data-testid="display-name-form">{currentName}</div>
+  ),
+}));
+
+vi.mock("@/components/HouseThemeToggleForm", () => ({
+  HouseThemeToggleForm: () => <div data-testid="house-theme-toggle" />,
+}));
+
+const readSessionSummaryMock = vi.mocked(readSessionSummary);
+const redirectMock = vi.mocked(redirect);
+
+describe("SettingsPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders account profile settings and the create organization entry point", async () => {
+    readSessionSummaryMock.mockResolvedValue({
+      isAuthenticated: true,
+      userName: "User One",
+      userEmail: "user@example.com",
+      role: "ADMIN",
+      organizationSlug: "acme",
+      houseName: "Blue House",
+      houseColor: "#2563eb",
+      houseThemeEnabled: false,
+    });
+
+    render(await SettingsPage());
+
+    expect(screen.getByRole("heading", { name: "Account" })).toBeInTheDocument();
+    expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("display-name-form")).toHaveTextContent("User One");
+    expect(screen.getByRole("heading", { name: "Organisations" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create organisation" })).toHaveAttribute("href", "/orgs/new");
+  });
+
+  it("redirects unauthenticated users to login", async () => {
+    readSessionSummaryMock.mockResolvedValue({
+      isAuthenticated: false,
+    });
+
+    await expect(SettingsPage()).rejects.toThrow("NEXT_REDIRECT:/auth/login");
+
+    expect(redirectMock).toHaveBeenCalledWith("/auth/login");
+  });
+});

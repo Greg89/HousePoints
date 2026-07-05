@@ -216,8 +216,8 @@ Implemented first slice:
 
 **Allow an existing member of one organization to create another organization.**
 
-The account menu now exposes a create-organization action for signed-in members, reuses the first-org setup form, and switches the user into the newly created organization after setup. Follow-up product hardening should define:
+Account now exposes a create-organization action for signed-in members, reuses the first-org setup form, and switches the user into the newly created organization after setup. Follow-up product hardening should define:
 
-- how the account menu/org switcher presents the new org;
+- how Account and the org switcher present the new org;
 - whether owner onboarding should guide first-house setup differently for second orgs;
 - how release notes and E2E smoke tests cover the multi-org create/switch flow.

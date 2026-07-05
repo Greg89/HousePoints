@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
+import { ArrowLeft, Buildings } from "@phosphor-icons/react/dist/ssr";
 import { readSessionSummary, updateDisplayName, updateHouseThemePreference } from "@/app/actions/profile";
 import { DisplayNameForm } from "@/components/DisplayNameForm";
 import { HouseThemeToggleForm } from "@/components/HouseThemeToggleForm";
@@ -9,7 +9,7 @@ import { resolveHouseThemeStyle } from "@/lib/house-theme";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Settings – HousePoints",
+  title: "Account - HousePoints",
 };
 
 export default async function SettingsPage() {
@@ -41,9 +41,9 @@ export default async function SettingsPage() {
 
       <main className="max-w-lg mx-auto px-4 py-12">
         <div className="mb-8">
-          <h1 className="font-display text-3xl font-semibold">Profile Settings</h1>
+          <h1 className="font-display text-3xl font-semibold">Account</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Update your display name and account preferences.
+            Update your profile, preferences, and organisation-level entry points.
           </p>
         </div>
 
@@ -118,6 +118,28 @@ export default async function SettingsPage() {
             </>
           )}
         </div>
+
+        <section className="mt-6 rounded-xl border bg-card p-6">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Buildings size={20} aria-hidden="true" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Organisations
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Create another organisation when you need a separate team space. You will be switched into it after setup.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/orgs/new"
+            className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Create organisation
+          </Link>
+        </section>
 
         {/* Sign out */}
         <div className="mt-6 text-center">
