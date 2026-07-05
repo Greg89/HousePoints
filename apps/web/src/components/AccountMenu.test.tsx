@@ -114,6 +114,7 @@ describe("AccountMenu", () => {
     await user.click(screen.getByRole("button", { name: /account menu/i }));
 
     expect(screen.getByRole("dialog", { name: /account and notifications/i })).toBeVisible();
+    expect(screen.getByRole("dialog", { name: /account and notifications/i })).toHaveClass("max-h-[calc(100dvh-7rem)]");
     expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /mark all read/i })).toBeDisabled();
   });

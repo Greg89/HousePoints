@@ -196,9 +196,9 @@ export function AccountMenu({
         <div
           role="dialog"
           aria-label="Account and notifications"
-          className="absolute right-0 z-40 mt-3 w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
+          className="absolute right-0 z-40 mt-3 flex max-h-[calc(100dvh-7rem)] w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
         >
-          <div className="border-b p-4">
+          <div className="shrink-0 border-b p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Signed in
             </p>
@@ -211,85 +211,87 @@ export function AccountMenu({
             ) : null}
           </div>
 
-          {canSwitchOrganizations ? (
-            <section
-              className="border-b bg-muted/10 p-3"
-              aria-label="Switch organization"
-            >
-              <div className="mb-2 px-1">
-                <h2 className="text-sm font-bold">Switch organization</h2>
-                <p className="text-xs text-muted-foreground">
-                  Notifications and dashboard data follow the selected organization.
-                </p>
-              </div>
-              <div className="space-y-2">
-                {visibleOrganizationContexts.map((context) => (
-                  <OrganizationSwitchLink
-                    key={context.organizationId}
-                    context={context}
-                  />
-                ))}
-                {hiddenOrganizationCount > 0 ? (
-                  <a
-                    href="/settings#organisations"
-                    className="flex w-full items-center justify-center rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
-                  >
-                    View all organisations ({hiddenOrganizationCount} more)
-                  </a>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
-
-          <section className="max-h-96 overflow-y-auto p-3" aria-label="Notifications">
-            <div className="mb-2 flex items-center justify-between gap-3 px-1">
-              <div>
-                <h2 className="text-sm font-bold">Notifications</h2>
-                <p className="text-xs text-muted-foreground">
-                  {hasUnread ? `${notifications.unreadCount} unread` : "All caught up"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                disabled={!hasUnread || isPending}
-                className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {canSwitchOrganizations ? (
+              <section
+                className="border-b bg-muted/10 p-3"
+                aria-label="Switch organization"
               >
-                Mark all read
-              </button>
-            </div>
-
-            {error ? (
-              <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {error}
-              </p>
+                <div className="mb-2 px-1">
+                  <h2 className="text-sm font-bold">Switch organization</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Notifications and dashboard data follow the selected organization.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {visibleOrganizationContexts.map((context) => (
+                    <OrganizationSwitchLink
+                      key={context.organizationId}
+                      context={context}
+                    />
+                  ))}
+                  {hiddenOrganizationCount > 0 ? (
+                    <a
+                      href="/settings#organisations"
+                      className="flex w-full items-center justify-center rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
+                    >
+                      View all organisations ({hiddenOrganizationCount} more)
+                    </a>
+                  ) : null}
+                </div>
+              </section>
             ) : null}
 
-            {notifications.items.length === 0 ? (
-              <div className="rounded-xl border border-dashed p-5 text-center">
-                <Check size={24} className="mx-auto text-primary" aria-hidden="true" />
-                <p className="mt-2 text-sm font-semibold">You&apos;re all caught up.</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Notifications that need attention will show up here.
-                </p>
+            <section className="p-3" aria-label="Notifications">
+              <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <h2 className="text-sm font-bold">Notifications</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {hasUnread ? `${notifications.unreadCount} unread` : "All caught up"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  disabled={!hasUnread || isPending}
+                  className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Mark all read
+                </button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {notifications.items.map((notification) => (
-                  <NotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    dashboardHref={dashboardHref}
-                    disabled={isPending}
-                    onMarkRead={handleMarkRead}
-                    onOpenAction={handleOpenAction}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
 
-          <div className="space-y-2 border-t bg-muted/20 p-3">
+              {error ? (
+                <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {error}
+                </p>
+              ) : null}
+
+              {notifications.items.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-5 text-center">
+                  <Check size={24} className="mx-auto text-primary" aria-hidden="true" />
+                  <p className="mt-2 text-sm font-semibold">You&apos;re all caught up.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Notifications that need attention will show up here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {notifications.items.map((notification) => (
+                    <NotificationCard
+                      key={notification.id}
+                      notification={notification}
+                      dashboardHref={dashboardHref}
+                      disabled={isPending}
+                      onMarkRead={handleMarkRead}
+                      onOpenAction={handleOpenAction}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          <div className="shrink-0 space-y-2 border-t bg-muted/20 p-3">
             {isExternalHttpsHref(releaseNotesUrl ?? null) ? (
               <a
                 href={releaseNotesUrl ?? undefined}
