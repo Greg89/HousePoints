@@ -149,6 +149,10 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_USER_PASSWORD`
 - `E2E_TARGET_MEMBER`
 
+Optional GitHub Environment variable for `staging`:
+
+- `E2E_ORG_SLUG` - routes tests directly to `/o/{slug}` when the E2E account belongs to more than one organization.
+
 The current required secrets are intentionally limited to the tests that exist today. Future owner/admin/member actors should be added only when those tests are implemented.
 
 The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).

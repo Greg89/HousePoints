@@ -33,6 +33,14 @@ Required staging state:
 - The target member has a house assignment.
 - The target member should remain active and should not be removed from the organization.
 
+### Optional Organization Scope
+
+GitHub Environment variable:
+
+- `E2E_ORG_SLUG`
+
+When set, Playwright starts from `/o/{E2E_ORG_SLUG}` instead of `/`. Use this when the E2E account belongs to more than one organization so the scheduled run always targets the known-good staging E2E organization.
+
 ## Current Required Organization State
 
 The staging E2E organization should contain:
@@ -74,6 +82,7 @@ $env:E2E_BASE_URL = "https://your-staging-web-url"
 $env:E2E_USER_EMAIL = "test-admin@example.com"
 $env:E2E_USER_PASSWORD = "test-password"
 $env:E2E_TARGET_MEMBER = "Stable Target Member"
+$env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
 ```
 
