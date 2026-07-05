@@ -5607,8 +5607,6 @@ describe("POST /orgs/join/preview", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             organizationId: "org-1",
@@ -5634,20 +5632,31 @@ describe("POST /orgs/join/preview", () => {
       memberOrganizationName: "Acme Corp",
       memberOrganizationSlug: "acme",
     });
+    expect(mockAuthIdentityFindUnique).toHaveBeenCalledWith(expect.objectContaining({
+      select: {
+        user: {
+          select: {
+            id: true,
+            memberships: {
+              where: { isActive: true, archivedAt: null },
+              select: {
+                organizationId: true,
+                organization: { select: { name: true, slug: true } },
+              },
+            },
+          },
+        },
+      },
+    }));
     expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("uses active memberships over the legacy current organization shadow", async () => {
+  it("uses active memberships to detect same-organization users", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-other",
-        organization: {
-          name: "Other Org",
-          slug: "other-org",
-        },
         memberships: [
           {
             organizationId: "org-1",
@@ -5682,8 +5691,6 @@ describe("POST /orgs/join/preview", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             organizationId: "org-other",
@@ -5713,16 +5720,11 @@ describe("POST /orgs/join/preview", () => {
     await app.close();
   });
 
-  it("ignores stale legacy organization shadows when no active memberships exist", async () => {
+  it("reports no membership when no active memberships exist", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-other",
-        organization: {
-          name: "Other Org",
-          slug: "other-org",
-        },
         memberships: [],
       },
     });
