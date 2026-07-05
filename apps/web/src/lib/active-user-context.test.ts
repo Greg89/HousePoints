@@ -66,7 +66,9 @@ describe("resolveActiveOrganizationContext", () => {
 
 describe("resolveActiveAppUserMapping", () => {
   it("applies active membership fields over compatibility aliases", () => {
-    expect(resolveActiveAppUserMapping(mapping, "beta")).toMatchObject({
+    const resolved = resolveActiveAppUserMapping(mapping, "beta");
+
+    expect(resolved).toMatchObject({
       role: "OWNER",
       organizationId: "org-2",
       organizationSlug: "beta",
@@ -74,6 +76,10 @@ describe("resolveActiveAppUserMapping", () => {
       houseName: null,
       houseColor: null,
     });
+    expect(resolved.organizationContexts).toEqual([
+      expect.objectContaining({ organizationId: "org-1", isCurrent: false }),
+      expect.objectContaining({ organizationId: "org-2", isCurrent: true }),
+    ]);
   });
 
   it("keeps compatibility aliases when no membership context exists", () => {

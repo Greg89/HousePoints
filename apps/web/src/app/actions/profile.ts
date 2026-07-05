@@ -88,7 +88,7 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     houseId,
     houseName: activeMapping.houseName,
     houseColor: activeMapping.houseColor,
-    organizationContexts: mapping.organizationContexts,
+    organizationContexts: activeMapping.organizationContexts,
     houseThemeEnabled: mapping.houseThemeEnabled,
     role: activeMapping.role,
     needsOrg: !organizationId,

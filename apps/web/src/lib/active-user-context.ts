@@ -32,5 +32,23 @@ export function resolveActiveAppUserMapping<T extends AppUser>(
     houseId: activeOrganizationContext.houseId,
     houseName: activeOrganizationContext.houseName,
     houseColor: activeOrganizationContext.houseColor,
+    organizationContexts: normalizeCurrentOrganizationContexts(
+      mapping.organizationContexts,
+      activeOrganizationContext.organizationId,
+    ),
   };
+}
+
+export function normalizeCurrentOrganizationContexts(
+  organizationContexts: AppUserOrganizationContext[],
+  activeOrganizationId?: string | null,
+): AppUserOrganizationContext[] {
+  if (!activeOrganizationId) {
+    return organizationContexts;
+  }
+
+  return organizationContexts.map((context) => ({
+    ...context,
+    isCurrent: context.organizationId === activeOrganizationId,
+  }));
 }

@@ -188,6 +188,10 @@ describe("readSessionSummary", () => {
       organizationSlug: "beta",
       houseId: null,
       role: "ADMIN",
+      organizationContexts: [
+        expect.objectContaining({ organizationId: "org-1", isCurrent: false }),
+        expect.objectContaining({ organizationId: "org-2", isCurrent: true }),
+      ],
       needsHouseAssignment: true,
     });
   });
