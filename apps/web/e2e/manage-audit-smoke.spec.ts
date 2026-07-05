@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { missingRequiredEnv, requiredDashboardSmokeEnv } from "./support/config";
+import { missingRequiredEnv, readE2EAdminCredentials, requiredDashboardSmokeEnv } from "./support/config";
 import { signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
 import { gotoE2EStart } from "./support/navigation";
@@ -12,8 +12,11 @@ test.skip(
 );
 
 test("admin audit history is reachable and filterable", async ({ page }) => {
+  const adminCredentials = readE2EAdminCredentials();
+  test.skip(!adminCredentials, "Missing optional E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD credentials.");
+
   await gotoE2EStart(page);
-  await signInIfNeeded(page);
+  await signInIfNeeded(page, adminCredentials);
 
   await expectDashboardReady(page);
 

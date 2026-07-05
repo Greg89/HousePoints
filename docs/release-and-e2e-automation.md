@@ -126,7 +126,8 @@ The staging test data contract is documented in [Staging E2E Test Data Contract]
 
 Current contract:
 
-- one owner/admin test user for scripted login;
+- one member test user for scripted login;
+- optional admin credentials for elevated Manage/Audit smoke coverage;
 - at least one target member in a different account;
 - at least one house assignment for both users;
 - feature flags set to the same values expected in staging.

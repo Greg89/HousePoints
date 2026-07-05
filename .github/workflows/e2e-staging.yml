@@ -28,6 +28,8 @@ jobs:
       E2E_BASE_URL: ${{ github.event.inputs.base_url || secrets.E2E_BASE_URL }}
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
       E2E_TARGET_MEMBER: ${{ secrets.E2E_TARGET_MEMBER }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
 

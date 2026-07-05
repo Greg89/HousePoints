@@ -18,7 +18,21 @@ Required staging state:
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
 - The user has a house assignment so the dashboard renders the normal member experience.
-- The user can award points to the configured target member. Today this means the user should be an `ADMIN` or `OWNER`.
+- The user can award points to the configured target member. Members can award points, so elevated access is not required for this user.
+
+### Optional Admin E2E User
+
+GitHub Environment secrets:
+
+- `E2E_ADMIN_EMAIL`
+- `E2E_ADMIN_PASSWORD`
+
+Required staging state when configured:
+
+- The user can authenticate through the staging Auth0 application.
+- The user belongs to the staging E2E organization.
+- The user has an `ADMIN` or `OWNER` role so Manage and Audit are visible.
+- The user has a house assignment so the dashboard renders normally.
 
 ### Target Member
 
@@ -56,7 +70,7 @@ The mutating happy-path test intentionally creates point activity. The staging o
 
 The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. Multi-organization switching and the What's New link are asserted only when those controls are visible in the target environment, so staging can enable those product surfaces without adding new required secrets.
 
-The read-only Manage Audit smoke test expects the primary E2E user to have elevated access so the Manage tab is visible. The current primary user already needs elevated access for the award-points happy path, so this does not add another required actor yet.
+The read-only Manage Audit smoke test uses `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` when they are configured. If those optional secrets are missing, that spec skips cleanly while the member-level smoke and happy-path tests continue to run.
 
 ## Future Actor Expansion
 

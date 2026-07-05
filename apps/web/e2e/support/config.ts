@@ -22,6 +22,17 @@ export function readE2EUserCredentials() {
   };
 }
 
+export function readE2EAdminCredentials() {
+  const email = process.env.E2E_ADMIN_EMAIL?.trim();
+  const password = process.env.E2E_ADMIN_PASSWORD?.trim();
+
+  if (!email || !password) {
+    return null;
+  }
+
+  return { email, password };
+}
+
 export function readTargetMemberName() {
   return process.env.E2E_TARGET_MEMBER!;
 }
