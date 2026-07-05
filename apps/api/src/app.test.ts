@@ -2576,7 +2576,7 @@ describe("POST /admin/context", () => {
     await app.close();
   });
 
-  it("builds team management users from active memberships instead of legacy user organization fields", async () => {
+  it("builds team management users from active memberships", async () => {
     mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockMembershipFindMany.mockResolvedValue([
       {
@@ -5789,11 +5789,6 @@ describe("POST /orgs/route-context", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-1",
-        organization: {
-          name: "Acme Corp",
-          slug: "acme",
-        },
         memberships: [
           {
             organizationId: "org-1",
@@ -5823,15 +5818,10 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
-  it("returns MATCH when an active membership exists even if the legacy current organization differs", async () => {
+  it("returns MATCH when an active membership exists", async () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-other",
-        organization: {
-          name: "Other Org",
-          slug: "other-org",
-        },
         memberships: [
           {
             organizationId: "org-1",
@@ -5868,11 +5858,6 @@ describe("POST /orgs/route-context", () => {
     });
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-1",
-        organization: {
-          name: "Acme Corp",
-          slug: "acme",
-        },
         memberships: [
           {
             organizationId: "org-1",
@@ -5912,8 +5897,6 @@ describe("POST /orgs/route-context", () => {
     });
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             organizationId: "org-1",
@@ -5949,11 +5932,6 @@ describe("POST /orgs/route-context", () => {
     mockResolveOrganizationSlug.mockResolvedValue(null);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-1",
-        organization: {
-          name: "Acme Corp",
-          slug: "acme",
-        },
         memberships: [
           {
             organizationId: "org-1",
@@ -5985,36 +5963,6 @@ describe("POST /orgs/route-context", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
-      },
-    });
-    const app = await buildTestApp();
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/orgs/route-context",
-      payload: { slug: "acme" },
-    });
-
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
-      status: "NO_ACTOR_ORG",
-      requestedSlug: "acme",
-      organizationSlug: "acme",
-    });
-    await app.close();
-  });
-
-  it("returns NO_ACTOR_ORG when only legacy org fields exist", async () => {
-    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
-    mockAuthIdentityFindUnique.mockResolvedValue({
-      user: {
-        organizationId: "org-other",
-        organization: {
-          name: "Other Org",
-          slug: "other-org",
-        },
         memberships: [],
       },
     });
@@ -6035,12 +5983,34 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
-  it("returns DIFFERENT_ORG from active memberships when the legacy current organization is empty", async () => {
+  it("returns NO_ACTOR_ORG when no active memberships exist", async () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
+        memberships: [],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns DIFFERENT_ORG from active memberships", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
         memberships: [
           {
             organizationId: "org-other",

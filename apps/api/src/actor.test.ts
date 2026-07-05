@@ -96,13 +96,6 @@ describe("getActorBySub", () => {
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "MEMBER",
-        houseId: "legacy-house",
-        organizationId: "org-1",
-        organization: {
-          name: "Legacy Acme",
-          slug: "legacy-acme",
-        },
         memberships: [
           {
             id: "membership-1",
@@ -141,18 +134,11 @@ describe("getActorBySub", () => {
     expect(mockFindUnique).not.toHaveBeenCalled();
   });
 
-  it("falls back to the legacy user subject while identities are backfilled", async () => {
+  it("falls back to the user auth0 subject while identities are backfilled", async () => {
     mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
       displayName: "Member User",
-      role: "MEMBER",
-      houseId: "house-1",
-      organizationId: "org-1",
-      organization: {
-        name: "Acme Corp",
-        slug: "acme",
-      },
       memberships: [
         {
           id: "membership-1",
@@ -185,18 +171,11 @@ describe("getActorBySub", () => {
     });
   });
 
-  it("returns null when no active membership exists even if legacy org fields are present", async () => {
+  it("returns null when no active membership exists", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "MEMBER",
-        houseId: "house-1",
-        organizationId: "org-1",
-        organization: {
-          name: "Acme Corp",
-          slug: "acme",
-        },
         memberships: [],
       },
     });
@@ -204,15 +183,11 @@ describe("getActorBySub", () => {
     await expect(getActorBySub("auth0|member")).resolves.toBeNull();
   });
 
-  it("uses the first active membership when the legacy organization shadow is empty", async () => {
+  it("uses the first active membership", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "MEMBER",
-        houseId: null,
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             id: "membership-1",
@@ -241,15 +216,11 @@ describe("getActorBySub", () => {
     });
   });
 
-  it("uses the first active membership when the legacy organization shadow is stale", async () => {
+  it("uses the first active membership when only one membership exists", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "MEMBER",
-        houseId: null,
-        organizationId: "org-stale",
-        organization: null,
         memberships: [
           {
             id: "membership-1",
@@ -278,18 +249,11 @@ describe("getActorBySub", () => {
     });
   });
 
-  it("uses the first active membership when the legacy organization shadow matches another membership", async () => {
+  it("uses the preferred active membership when multiple memberships exist", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "MEMBER",
-        houseId: null,
-        organizationId: "org-2",
-        organization: {
-          name: "Beta Org",
-          slug: "beta",
-        },
         memberships: [
           {
             id: "membership-1",
@@ -340,10 +304,6 @@ describe("getActorBySub", () => {
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "MEMBER",
-        houseId: null,
-        organizationId: null,
-        organization: null,
         memberships: [],
       },
     });
@@ -362,13 +322,6 @@ describe("getActorBySubForOrganizationSlug", () => {
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "OWNER",
-        houseId: "legacy-house",
-        organizationId: "org-1",
-        organization: {
-          name: "Legacy Acme",
-          slug: "legacy-acme",
-        },
         memberships: [
           {
             id: "membership-1",
@@ -412,13 +365,6 @@ describe("getActorBySubForOrganizationSlug", () => {
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "OWNER",
-        houseId: "legacy-house",
-        organizationId: "org-1",
-        organization: {
-          name: "Legacy Acme",
-          slug: "legacy-acme",
-        },
         memberships: [
           {
             id: "membership-1",
@@ -437,18 +383,11 @@ describe("getActorBySubForOrganizationSlug", () => {
     await expect(getActorBySubForOrganizationSlug("auth0|member", "beta")).resolves.toBeNull();
   });
 
-  it("does not fall back to legacy user org fields for scoped API calls", async () => {
+  it("does not resolve scoped API calls without a matching membership", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
-        role: "OWNER",
-        houseId: "legacy-house",
-        organizationId: "org-legacy",
-        organization: {
-          name: "Legacy Acme",
-          slug: "legacy-acme",
-        },
         memberships: [],
       },
     });
@@ -464,11 +403,9 @@ describe("getUserOrgContextBySub", () => {
     vi.resetAllMocks();
   });
 
-  it("returns the active membership context when the legacy current organization shadow is empty", async () => {
+  it("returns the active membership context", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             organizationId: "org-1",
@@ -494,14 +431,9 @@ describe("getUserOrgContextBySub", () => {
     expect(mockFindUnique).not.toHaveBeenCalled();
   });
 
-  it("uses the first active membership without consulting the legacy current organization shadow", async () => {
+  it("uses the first active membership", async () => {
     mockIdentityFindUnique.mockResolvedValue(null);
     mockFindUnique.mockResolvedValue({
-      organizationId: "org-2",
-      organization: {
-        name: "Legacy Org",
-        slug: "legacy-org",
-      },
       memberships: [
         {
           organizationId: "org-1",
@@ -530,11 +462,6 @@ describe("getUserOrgContextBySub", () => {
   it("returns empty org fields when no active membership exists", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-legacy",
-        organization: {
-          name: "Legacy Org",
-          slug: "legacy-org",
-        },
         memberships: [],
       },
     });
@@ -552,11 +479,9 @@ describe("getUserRouteOrgContextBySub", () => {
     vi.resetAllMocks();
   });
 
-  it("returns requested membership plus an active fallback organization when the legacy shadow is empty", async () => {
+  it("returns requested membership plus an active fallback organization", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             organizationId: "org-1",
@@ -593,8 +518,6 @@ describe("getUserRouteOrgContextBySub", () => {
     const archivedAt = new Date("2026-07-04T17:30:00.000Z");
     mockIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: null,
-        organization: null,
         memberships: [
           {
             organizationId: "org-1",
