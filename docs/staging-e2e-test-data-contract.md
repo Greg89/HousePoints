@@ -33,13 +33,13 @@ Required staging state:
 - The target member has a house assignment.
 - The target member should remain active and should not be removed from the organization.
 
-### Optional Organization Scope
+### Organization Scope
 
-GitHub Environment variable:
+GitHub Environment secret:
 
 - `E2E_ORG_SLUG`
 
-When set, Playwright starts from `/o/{E2E_ORG_SLUG}` instead of `/`. Use this when the E2E account belongs to more than one organization so the scheduled run always targets the known-good staging E2E organization.
+Playwright starts from `/o/{E2E_ORG_SLUG}` instead of `/`. The scheduled staging workflow requires this value so the E2E account always targets the known-good staging E2E organization, especially when the account belongs to more than one organization.
 
 ## Current Required Organization State
 

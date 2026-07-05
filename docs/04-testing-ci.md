@@ -135,6 +135,7 @@ $env:E2E_BASE_URL = "https://your-staging-web-url"
 $env:E2E_USER_EMAIL = "test-user@example.com"
 $env:E2E_USER_PASSWORD = "test-user-password"
 $env:E2E_TARGET_MEMBER = "Target Member Name"
+$env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
 ```
 
@@ -148,10 +149,9 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 - `E2E_TARGET_MEMBER`
+- `E2E_ORG_SLUG`
 
-Optional GitHub Environment variable for `staging`:
-
-- `E2E_ORG_SLUG` - routes tests directly to `/o/{slug}` when the E2E account belongs to more than one organization.
+`E2E_ORG_SLUG` routes tests directly to `/o/{slug}`. The scheduled staging workflow requires it so the test account always lands in the known-good E2E organization.
 
 The current required secrets are intentionally limited to the tests that exist today. Future owner/admin/member actors should be added only when those tests are implemented.
 

@@ -113,6 +113,7 @@ Required staging environment secrets:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 - `E2E_TARGET_MEMBER`
+- `E2E_ORG_SLUG`
 
 Optional manual input:
 
