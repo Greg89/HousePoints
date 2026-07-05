@@ -56,6 +56,11 @@ export function AccountMenu({
   const hasUnread = notifications.unreadCount > 0;
   const currentOrganization = session.organizationContexts.find((context) => context.isCurrent) ?? null;
   const canSwitchOrganizations = session.organizationContexts.length > 1;
+  const visibleOrganizationContexts = getVisibleOrganizationContexts(session.organizationContexts);
+  const hiddenOrganizationCount = Math.max(
+    0,
+    session.organizationContexts.length - visibleOrganizationContexts.length,
+  );
 
   useEffect(() => {
     if (!open) {
@@ -218,12 +223,20 @@ export function AccountMenu({
                 </p>
               </div>
               <div className="space-y-2">
-                {session.organizationContexts.map((context) => (
+                {visibleOrganizationContexts.map((context) => (
                   <OrganizationSwitchLink
                     key={context.organizationId}
                     context={context}
                   />
                 ))}
+                {hiddenOrganizationCount > 0 ? (
+                  <a
+                    href="/settings#organisations"
+                    className="flex w-full items-center justify-center rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
+                  >
+                    View all organisations ({hiddenOrganizationCount} more)
+                  </a>
+                ) : null}
               </div>
             </section>
           ) : null}
@@ -350,6 +363,13 @@ function OrganizationSwitchLink({ context }: { context: AppUserOrganizationConte
       {content}
     </a>
   );
+}
+
+function getVisibleOrganizationContexts(contexts: AppUserOrganizationContext[]) {
+  const current = contexts.find((context) => context.isCurrent);
+  const others = contexts.filter((context) => !context.isCurrent);
+
+  return (current ? [current, ...others] : contexts).slice(0, 2);
 }
 
 function NotificationCard({

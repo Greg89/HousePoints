@@ -182,6 +182,54 @@ describe("AccountMenu", () => {
     expect(within(switcher).queryByRole("link", { name: /create organisation/i })).not.toBeInTheDocument();
   });
 
+  it("limits organization switch rows and links to the full account organization list", async () => {
+    const user = userEvent.setup();
+    render(
+      <AccountMenuHarness
+        session={{
+          ...baseProps.session,
+          organizationContexts: [
+            {
+              ...baseProps.session.organizationContexts[0],
+              isCurrent: false,
+            },
+            {
+              organizationId: "org-2",
+              organizationName: "Beta Org",
+              organizationSlug: "beta",
+              role: "OWNER",
+              houseId: null,
+              houseName: null,
+              houseColor: null,
+              isCurrent: true,
+            },
+            {
+              organizationId: "org-3",
+              organizationName: "Gamma Org",
+              organizationSlug: "gamma",
+              role: "MEMBER",
+              houseId: null,
+              houseName: null,
+              houseColor: null,
+              isCurrent: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+
+    const switcher = screen.getByRole("region", { name: /switch organization/i });
+    expect(within(switcher).getByText("Beta Org")).toBeInTheDocument();
+    expect(within(switcher).getByText("Acme Corp")).toBeInTheDocument();
+    expect(within(switcher).queryByText("Gamma Org")).not.toBeInTheDocument();
+    expect(within(switcher).getByRole("link", { name: /view all organisations \(1 more\)/i })).toHaveAttribute(
+      "href",
+      "/settings#organisations",
+    );
+  });
+
   it("marks an action notification read before navigating", async () => {
     const user = userEvent.setup();
     const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));

@@ -44,14 +44,44 @@ describe("SettingsPage", () => {
       houseName: "Blue House",
       houseColor: "#2563eb",
       houseThemeEnabled: false,
+      organizationContexts: [
+        {
+          organizationId: "org-1",
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          role: "ADMIN",
+          houseId: "house-1",
+          houseName: "Blue House",
+          houseColor: "#2563eb",
+          isCurrent: true,
+        },
+        {
+          organizationId: "org-2",
+          organizationName: "Beta Org",
+          organizationSlug: "beta",
+          role: "OWNER",
+          houseId: null,
+          houseName: null,
+          houseColor: null,
+          isCurrent: false,
+        },
+      ],
     });
 
     render(await SettingsPage());
 
     expect(screen.getByRole("heading", { name: "Account" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Account settings sections" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "#profile");
+    expect(screen.getByRole("link", { name: /organisations/i })).toHaveAttribute("href", "#organisations");
+    expect(screen.getByRole("link", { name: /preferences/i })).toHaveAttribute("href", "#preferences");
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
     expect(screen.getByTestId("display-name-form")).toHaveTextContent("User One");
     expect(screen.getByRole("heading", { name: "Organisations" })).toBeInTheDocument();
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.getByText("Beta Org")).toBeInTheDocument();
+    expect(screen.getByText("Current")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /beta org/i })).toHaveAttribute("href", "/o/beta/switch");
     expect(screen.getByRole("link", { name: "Create organisation" })).toHaveAttribute("href", "/orgs/new");
   });
 
