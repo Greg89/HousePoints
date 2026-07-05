@@ -19,8 +19,11 @@ Per release:
 2. Commit the release note changes with the application release changes or in a small follow-up commit.
 3. Run the `Publish Release Notes` GitHub Actions workflow manually.
 4. Enter the release metadata requested by the workflow.
-5. Confirm the GitHub Pages deployment URL in the workflow summary.
-6. Confirm the API logs include `releases.recorded`.
+5. Leave `broadcast_release` disabled until the production deploy is healthy and you are ready to notify users.
+6. Confirm the GitHub Pages deployment URL in the workflow summary.
+7. Confirm the API logs include `releases.recorded`.
+8. Rerun the workflow with the same release version and `broadcast_release` enabled when you are ready to notify users, or enable it on the first run only after production health is already verified.
+9. Confirm the API logs include `releases.broadcasted`.
 
 The workflow publishes the `site` directory as the Pages artifact. The static site currently includes:
 
@@ -113,6 +116,7 @@ Manual workflow inputs:
 - `release_notes_path` - path under `site/`, for example `releases/2026-07-03-ci-release-automation.html`.
 - `released_at` - optional ISO timestamp. If empty, the workflow run time is used.
 - `record_release` - leave enabled for normal release publishing; disable only when testing Pages publishing without touching the app.
+- `broadcast_release` - leave disabled while rehearsing release notes; enable only when active users should receive an in-app release notification.
 
 Required header:
 
@@ -148,6 +152,16 @@ Behavior:
 - Returns the stored release, notification count, and `alreadyBroadcast`.
 
 For the multi-org beta release, record the release first, verify the row exists, then broadcast the same `version` after the production deploy is healthy.
+
+The `Publish Release Notes` workflow can perform the broadcast through the `broadcast_release` input. When enabled, it calls `POST /system/releases/broadcast` after the Pages deploy completes and after the release record job either succeeds or is intentionally skipped. This keeps the broadcast action visible in GitHub Actions history without requiring a local `curl` command.
+
+Recommended multi-org beta sequence:
+
+1. Publish release notes with `record_release=true` and `broadcast_release=false`.
+2. Verify the `ReleaseAnnouncement` row and production health.
+3. Rerun the workflow with the same `release_version`; keep `record_release=true` for idempotent metadata refresh or set it to `false` if the record should not be touched.
+4. Set `broadcast_release=true`.
+5. Verify the workflow response and the `releases.broadcasted` log event.
 
 ## Future Semantic Release Shape
 

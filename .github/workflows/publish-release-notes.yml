@@ -29,6 +29,11 @@ on:
         required: true
         default: true
         type: boolean
+      broadcast_release:
+        description: "Broadcast this recorded release to active users after Pages deploys"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -163,3 +168,61 @@ jobs:
             --header "content-type: application/json" \
             --header "x-housepoints-release-secret: $RELEASE_AUTOMATION_SECRET" \
             --data @release-record-payload.json
+
+  broadcast:
+    name: Broadcast release notification
+    runs-on: ubuntu-latest
+    needs:
+      - deploy
+      - record
+    if: >-
+      ${{
+        always()
+        && inputs.broadcast_release
+        && needs.deploy.result == 'success'
+        && (needs.record.result == 'success' || needs.record.result == 'skipped')
+      }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Prepare release broadcast payload
+        env:
+          RELEASE_RECORD_API_BASE_URL: ${{ vars.RELEASE_RECORD_API_BASE_URL }}
+          RELEASE_AUTOMATION_SECRET: ${{ secrets.RELEASE_AUTOMATION_SECRET }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const required = [
+            "RELEASE_RECORD_API_BASE_URL",
+            "RELEASE_AUTOMATION_SECRET",
+            "RELEASE_VERSION",
+          ];
+
+          for (const name of required) {
+            if (!process.env[name]?.trim()) {
+              console.error(`${name} is required`);
+              process.exit(1);
+            }
+          }
+
+          const apiBaseUrl = process.env.RELEASE_RECORD_API_BASE_URL.trim().replace(/\/+$/, "");
+          const payload = {
+            version: process.env.RELEASE_VERSION.trim(),
+          };
+
+          fs.writeFileSync("release-broadcast-payload.json", `${JSON.stringify(payload)}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `RELEASE_BROADCAST_URL=${apiBaseUrl}/system/releases/broadcast\n`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Release broadcast version: ${payload.version}\n`);
+          NODE
+
+      - name: Broadcast release notification
+        env:
+          RELEASE_AUTOMATION_SECRET: ${{ secrets.RELEASE_AUTOMATION_SECRET }}
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --request POST "$RELEASE_BROADCAST_URL" \
+            --header "content-type: application/json" \
+            --header "x-housepoints-release-secret: $RELEASE_AUTOMATION_SECRET" \
+            --data @release-broadcast-payload.json

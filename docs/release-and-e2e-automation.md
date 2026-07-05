@@ -78,6 +78,8 @@ The API should:
 
 The first implementation accepts a release `version`, uses the same `RELEASE_AUTOMATION_SECRET` as release recording, and creates idempotent `RELEASE_ANNOUNCEMENT` notifications with dedupe keys scoped by release version and organization. The endpoint returns the release, the number of notifications inserted, and whether the release had already been broadcast.
 
+The `Publish Release Notes` workflow includes an explicit `broadcast_release` input. Leave it disabled while rehearsing release notes and enable it only after production health is verified.
+
 Do not allow GitHub Actions to write directly to the production database. CI should trigger app behavior; the app should enforce product rules.
 
 ### Phase A4 - User-Facing What's New
@@ -151,7 +153,7 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 |---|---|---|
 | A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold, workflow, and future generator template added; semantic generation deferred. |
 | A2 - In-app release records | Implemented | `ReleaseAnnouncement` model, secret-protected record endpoint, and workflow handoff implemented; broadcast remains deferred. |
-| A3 - Production notification broadcast | In progress | Secret-protected broadcast endpoint implemented; workflow automation and What's New UX deferred. |
+| A3 - Production notification broadcast | In progress | Secret-protected broadcast endpoint and manual workflow handoff implemented; What's New UX deferred. |
 | A4 - What's new UX | Deferred | Depends on release records. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
 | B2 - Test data contract | Deferred | Needs stable staging account/org setup. |
