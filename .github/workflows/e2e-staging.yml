@@ -29,7 +29,7 @@ jobs:
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       E2E_TARGET_MEMBER: ${{ secrets.E2E_TARGET_MEMBER }}
-      E2E_ORG_SLUG: ${{ vars.E2E_ORG_SLUG }}
+      E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
 
     steps:
       - uses: actions/checkout@v7
@@ -75,9 +75,12 @@ jobs:
           const rawOrgSlug = process.env.E2E_ORG_SLUG?.trim();
           const startPath = rawOrgSlug ? `/o/${encodeURIComponent(rawOrgSlug)}` : "/";
           const targetUrl = new URL(startPath, baseUrl);
-          console.log(`E2E base URL: ${baseUrl.origin}`);
+          console.log(`E2E base protocol: ${baseUrl.protocol}`);
+          console.log(`E2E base host: ${baseUrl.host}`);
+          console.log(`E2E base pathname: ${baseUrl.pathname}`);
           console.log(`E2E org slug configured: ${rawOrgSlug ? "yes" : "no"}`);
-          console.log(`E2E start URL: ${targetUrl.href}`);
+          console.log(`E2E start pathname: ${targetUrl.pathname}`);
+          console.log(`E2E start host: ${targetUrl.host}`);
           NODE
 
       - name: Probe staging target
@@ -98,6 +101,8 @@ jobs:
               redirect: "manual",
               signal: controller.signal,
             });
+            console.log(`E2E target probe host: ${targetUrl.host}`);
+            console.log(`E2E target probe pathname: ${targetUrl.pathname}`);
             console.log(`E2E target probe status: ${response.status}`);
             console.log(`E2E target probe location: ${response.headers.get("location") ?? "(none)"}`);
           } catch (error) {
