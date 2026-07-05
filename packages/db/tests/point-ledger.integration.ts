@@ -78,8 +78,6 @@ async function createLedgerFixture() {
       auth0Sub: `auth0|${runId}-actor`,
       email: `${runId}-actor@example.com`,
       displayName: "Integration Actor",
-      organizationId: organization.id,
-      houseId: house.id,
     },
   });
   created.userIds.push(actor.id);
@@ -89,8 +87,6 @@ async function createLedgerFixture() {
       auth0Sub: `auth0|${runId}-target`,
       email: `${runId}-target@example.com`,
       displayName: "Integration Target",
-      organizationId: organization.id,
-      houseId: house.id,
     },
   });
   created.userIds.push(target.id);
@@ -177,7 +173,6 @@ async function run() {
       auth0Sub: `auth0|${runId}-unassigned`,
       email: `${runId}-unassigned@example.com`,
       displayName: "Integration Unassigned",
-      organizationId: organization.id,
     },
   });
   created.userIds.push(unassignedMember.id);
