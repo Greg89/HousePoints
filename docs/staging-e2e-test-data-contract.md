@@ -56,6 +56,8 @@ The mutating happy-path test intentionally creates point activity. The staging o
 
 The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. Multi-organization switching and the What's New link are asserted only when those controls are visible in the target environment, so staging can enable those product surfaces without adding new required secrets.
 
+The read-only Manage Audit smoke test expects the primary E2E user to have elevated access so the Manage tab is visible. The current primary user already needs elevated access for the award-points happy path, so this does not add another required actor yet.
+
 ## Future Actor Expansion
 
 The next E2E expansion should add dedicated owner and admin actors instead of reusing one broad account for every permission level.

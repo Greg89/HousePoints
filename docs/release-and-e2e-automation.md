@@ -142,7 +142,7 @@ Grow the suite slowly:
 3. Team: generate invite, assign house, promote/demote admin.
 4. Seasons: switch historical season and verify reports/standings update.
 5. Notifications: receive, preview, mark read.
-6. Manage Audit: filter and paginate audit history.
+6. Manage Audit: filter and paginate audit history. First read-only filter smoke is implemented; pagination remains future coverage.
 
 Each added E2E path should be stable against real Auth0 and staging timing. Prefer fewer high-value tests over a broad brittle suite.
 
@@ -165,4 +165,4 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
 | B2 - Test data contract | In progress | First staging data contract documented and centralized in Playwright config helpers; dedicated owner/admin/member actors remain future work. |
-| B3 - E2E coverage expansion | In progress | Read-only dashboard and account-menu smoke coverage added. |
+| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, and Manage Audit smoke coverage added. |
