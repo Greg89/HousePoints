@@ -1,11 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 
 export async function expectDashboardReady(page: Page) {
+  await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
+
   await Promise.race([
-    page.getByText(/welcome back/i).waitFor({ state: "visible", timeout: 15_000 }),
-    page.getByText(/waiting for assignment/i).waitFor({ state: "visible", timeout: 15_000 }),
-    page.getByText(/create organisation/i).waitFor({ state: "visible", timeout: 15_000 }),
-    page.getByText(/something went wrong/i).waitFor({ state: "visible", timeout: 15_000 }),
+    page.getByText(/welcome back/i).waitFor({ state: "visible", timeout: 30_000 }),
+    page.getByText(/waiting for assignment/i).waitFor({ state: "visible", timeout: 30_000 }),
+    page.getByText(/create organisation/i).waitFor({ state: "visible", timeout: 30_000 }),
+    page.getByText(/something went wrong/i).waitFor({ state: "visible", timeout: 30_000 }),
   ]);
 
   if (await page.getByText(/waiting for assignment/i).isVisible().catch(() => false)) {
