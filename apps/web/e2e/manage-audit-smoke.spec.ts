@@ -16,7 +16,7 @@ test("admin audit history is reachable and filterable", async ({ page }) => {
   test.skip(!adminCredentials, "Missing optional E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD credentials.");
 
   await gotoE2EStart(page);
-  await signInIfNeeded(page, adminCredentials);
+  await signInIfNeeded(page, adminCredentials ?? undefined);
 
   await expectDashboardReady(page);
 
