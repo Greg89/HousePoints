@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { missingRequiredEnv, readE2EStartPath, requiredDashboardSmokeEnv } from "./support/config";
+import { missingRequiredEnv, requiredDashboardSmokeEnv } from "./support/config";
 import { signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
+import { gotoE2EStart } from "./support/navigation";
 
 const missingEnv = missingRequiredEnv(requiredDashboardSmokeEnv);
 
@@ -11,7 +12,7 @@ test.skip(
 );
 
 test("login and navigate the core dashboard tabs", async ({ page }) => {
-  await page.goto(readE2EStartPath());
+  await gotoE2EStart(page);
   await signInIfNeeded(page);
 
   await expectDashboardReady(page);
