@@ -15,7 +15,10 @@ export async function GET(
   { params }: SwitchOrganizationRouteContext,
 ) {
   const { slug } = await params;
-  const destination = new URL(`/o/${encodeURIComponent(slug)}`, request.url);
+  const destination = new URL(
+    `/o/${encodeURIComponent(slug)}`,
+    getPublicRequestOrigin(request),
+  );
   const response = NextResponse.redirect(destination);
 
   if (isValidOrganizationSlug(slug)) {
@@ -31,4 +34,24 @@ export async function GET(
   }
 
   return response;
+}
+
+function getPublicRequestOrigin(request: Request) {
+  const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host"));
+
+  if (forwardedHost) {
+    const forwardedProto =
+      firstHeaderValue(request.headers.get("x-forwarded-proto")) ?? "https";
+
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  return new URL(request.url).origin;
+}
+
+function firstHeaderValue(value: string | null) {
+  return value
+    ?.split(",")
+    .map((part) => part.trim())
+    .find(Boolean);
 }

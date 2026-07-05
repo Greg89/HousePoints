@@ -16,6 +16,24 @@ describe("switch organization route", () => {
     expect(response.headers.get("set-cookie")).toContain("SameSite=lax");
   });
 
+  it("uses forwarded host headers when the platform request URL is internal", async () => {
+    const response = await GET(
+      new Request("https://localhost:3000/o/beta/switch", {
+        headers: {
+          "x-forwarded-host": "housepointsweb-beta.up.railway.app",
+          "x-forwarded-proto": "https",
+        },
+      }),
+      { params: Promise.resolve({ slug: "beta" }) },
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://housepointsweb-beta.up.railway.app/o/beta",
+    );
+    expect(response.headers.get("set-cookie")).toContain(`${ACTIVE_ORGANIZATION_COOKIE}=beta`);
+  });
+
   it("redirects without setting a cookie for invalid slugs", async () => {
     const response = await GET(
       new Request("https://app.example.com/o/Beta%20Org/switch"),
