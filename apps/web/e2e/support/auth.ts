@@ -2,25 +2,28 @@ import { expect, type Page } from "@playwright/test";
 import { readE2EUserCredentials } from "./config";
 import { getE2EDiagnostics } from "./navigation";
 
+type E2ECredentials = {
+  email: string;
+  password: string;
+};
+
 export function exactNamePattern(value: string) {
   return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
 }
 
-export async function signInIfNeeded(page: Page) {
+export async function signInIfNeeded(page: Page, credentials: E2ECredentials = readE2EUserCredentials()) {
   assertNotChromeErrorPage(page, "before sign-in check");
 
   const signInLink = page.getByRole("link", { name: /sign in/i });
   if (await signInLink.isVisible().catch(() => false)) {
     await signInLink.click();
-    await completeAuth0Login(page);
+    await completeAuth0Login(page, credentials);
   }
 
   assertNotChromeErrorPage(page, "after sign-in check");
 }
 
-async function completeAuth0Login(page: Page) {
-  const credentials = readE2EUserCredentials();
-
+async function completeAuth0Login(page: Page, credentials: E2ECredentials) {
   await fillFirstVisible(
     page,
     'input[name="username"], input[name="email"], input[type="email"]',

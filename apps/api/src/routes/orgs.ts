@@ -204,8 +204,6 @@ export async function loadJoinPreviewInDb(params: {
 
     const previewUserSelect = {
       id: true,
-      organizationId: true,
-      organization: { select: { name: true, slug: true } },
       memberships: {
         where: { isActive: true, archivedAt: null },
         select: {
