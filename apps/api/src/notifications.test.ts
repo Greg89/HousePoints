@@ -194,6 +194,7 @@ describe("buildReleaseAnnouncementNotificationData", () => {
     version: "v1.2.3",
     title: "Multi-org beta",
     summary: "Multi-organization support is now available in beta.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
   };
 
   it("sets the correct notification type and severity", () => {
@@ -217,5 +218,11 @@ describe("buildReleaseAnnouncementNotificationData", () => {
     const result = buildReleaseAnnouncementNotificationData(base);
     expect(result.entityType).toBe("ReleaseAnnouncement");
     expect(result.entityId).toBe("release-1");
+  });
+
+  it("links to the release notes", () => {
+    const result = buildReleaseAnnouncementNotificationData(base);
+    expect(result.actionLabel).toBe("View release notes");
+    expect(result.actionHref).toBe("https://example.com/releases/v1.2.3.html");
   });
 });

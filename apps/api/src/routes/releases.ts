@@ -175,6 +175,7 @@ export async function registerReleaseRoutes(app: FastifyInstance): Promise<void>
               version: release.version,
               title: release.title,
               summary: release.summary,
+              releaseNotesUrl: release.releaseNotesUrl,
             })),
             skipDuplicates: true,
           })

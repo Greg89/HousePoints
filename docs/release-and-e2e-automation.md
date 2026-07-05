@@ -84,11 +84,15 @@ Do not allow GitHub Actions to write directly to the production database. CI sho
 
 ### Phase A4 - User-Facing What's New
 
-Once release records exist:
+Status: first slice implemented.
 
-- add a "What's new" entry to the account menu;
-- link release notifications to the release notes page;
-- later, add user notification preferences if release noise becomes a problem.
+Release announcement notifications now include a "View release notes" action that opens the public release notes page from the account menu. External release-note actions are limited to `https://` URLs, while existing internal notification actions continue to use scoped dashboard navigation.
+
+Future additions:
+
+- add a persistent "What's new" entry to the account menu for users who have no current release notification;
+- add a richer release-history surface inside the app if users need more than the public Pages link;
+- add user notification preferences if release noise becomes a problem.
 
 ## Track B - Scheduled Staging E2E
 
@@ -153,8 +157,8 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 |---|---|---|
 | A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold, workflow, and future generator template added; semantic generation deferred. |
 | A2 - In-app release records | Implemented | `ReleaseAnnouncement` model, secret-protected record endpoint, and workflow handoff implemented; broadcast remains deferred. |
-| A3 - Production notification broadcast | In progress | Secret-protected broadcast endpoint and manual workflow handoff implemented; What's New UX deferred. |
-| A4 - What's new UX | Deferred | Depends on release records. |
+| A3 - Production notification broadcast | Implemented | Secret-protected broadcast endpoint and manual workflow handoff implemented. |
+| A4 - What's new UX | In progress | Release notifications link to public release notes from the account menu; persistent What's New entry remains deferred. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
 | B2 - Test data contract | Deferred | Needs stable staging account/org setup. |
 | B3 - E2E coverage expansion | In progress | Read-only dashboard smoke coverage added. |

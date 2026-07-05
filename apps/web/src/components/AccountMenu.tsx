@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Check,
+  ArrowSquareOut,
   Gear,
   SignOut,
   User,
@@ -131,6 +132,11 @@ export function AccountMenu({
 
       if (canNavigate) {
         setOpen(false);
+        if (isExternalHttpsHref(href)) {
+          window.open(href, "_blank", "noopener,noreferrer");
+          return;
+        }
+
         router.push(href);
       }
     });
@@ -340,7 +346,8 @@ function NotificationCard({
   onOpenAction: (notification: Notification, href: string) => void;
 }) {
   const unread = !notification.readAt;
-  const actionHref = getSafeInternalHref(notification.actionHref, dashboardHref);
+  const actionHref = getSafeActionHref(notification.actionHref, dashboardHref);
+  const isExternalAction = Boolean(actionHref && isExternalHttpsHref(actionHref));
 
   return (
     <article
@@ -372,9 +379,10 @@ function NotificationCard({
             type="button"
             onClick={() => onOpenAction(notification, actionHref)}
             disabled={disabled}
-            className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             {notification.actionLabel}
+            {isExternalAction ? <ArrowSquareOut size={12} aria-hidden="true" /> : null}
           </button>
         ) : null}
         {unread ? (
@@ -402,9 +410,9 @@ function NotificationCard({
   );
 }
 
-function getSafeInternalHref(href: string | null, dashboardHref: string) {
+function getSafeActionHref(href: string | null, dashboardHref: string) {
   if (!href?.startsWith("/") || href.startsWith("//")) {
-    return null;
+    return isExternalHttpsHref(href) ? href : null;
   }
 
   if (href === "/") {
@@ -416,6 +424,18 @@ function getSafeInternalHref(href: string | null, dashboardHref: string) {
   }
 
   return href;
+}
+
+function isExternalHttpsHref(href: string | null) {
+  if (!href) {
+    return false;
+  }
+
+  try {
+    return new URL(href).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function formatRole(role: AccountMenuProps["session"]["role"]) {

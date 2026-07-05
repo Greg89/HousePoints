@@ -122,6 +122,7 @@ export function buildReleaseAnnouncementNotificationData(input: {
   version: string;
   title: string;
   summary: string;
+  releaseNotesUrl: string;
 }): NotificationRow {
   return {
     organizationId: input.organizationId,
@@ -130,8 +131,8 @@ export function buildReleaseAnnouncementNotificationData(input: {
     severity: "INFO",
     title: `What's new: ${input.title}`,
     body: input.summary,
-    actionLabel: null,
-    actionHref: null,
+    actionLabel: "View release notes",
+    actionHref: input.releaseNotesUrl,
     entityType: "ReleaseAnnouncement",
     entityId: input.releaseId,
     dedupeKey: `release-announcement:${input.version}:${input.organizationId}`,

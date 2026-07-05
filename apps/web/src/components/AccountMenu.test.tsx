@@ -94,6 +94,7 @@ function AccountMenuHarness({
 describe("AccountMenu", () => {
   beforeEach(() => {
     pushMock.mockClear();
+    vi.spyOn(window, "open").mockImplementation(() => null);
   });
 
   it("shows unread notification count on the account trigger", () => {
@@ -180,6 +181,45 @@ describe("AccountMenu", () => {
 
     expect(onMarkNotificationRead).toHaveBeenCalledWith("notification-1");
     expect(pushMock).toHaveBeenCalledWith("/o/acme?tab=manage&section=team");
+  });
+
+  it("marks a release announcement read before opening release notes", async () => {
+    const user = userEvent.setup();
+    const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));
+    const releaseNotification = {
+      ...unreadNotification,
+      id: "notification-release",
+      type: "RELEASE_ANNOUNCEMENT" as const,
+      severity: "INFO" as const,
+      title: "What's new: Multi-org beta",
+      body: "Multi-organization support is now available in beta.",
+      actionLabel: "View release notes",
+      actionHref: "https://housepoints.example/releases/v1.2.3.html",
+      entityType: "ReleaseAnnouncement",
+      entityId: "release-1",
+    };
+
+    render(
+      <AccountMenuHarness
+        notifications={{
+          items: [releaseNotification],
+          unreadCount: 1,
+          nextCursor: null,
+        }}
+        onMarkNotificationRead={onMarkNotificationRead}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+    await user.click(screen.getByRole("button", { name: /view release notes/i }));
+
+    expect(onMarkNotificationRead).toHaveBeenCalledWith("notification-release");
+    expect(window.open).toHaveBeenCalledWith(
+      "https://housepoints.example/releases/v1.2.3.html",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it("marks a single notification read from the row action", async () => {
