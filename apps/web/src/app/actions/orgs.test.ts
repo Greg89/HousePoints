@@ -54,7 +54,18 @@ const appUser = {
   houseId: "house-1",
   houseName: "Phoenix",
   houseColor: "#7c3aed",
-  organizationContexts: [],
+  organizationContexts: [
+    {
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+      role: "OWNER" as const,
+      houseId: "house-1",
+      houseName: "Phoenix",
+      houseColor: "#7c3aed",
+      isCurrent: true,
+    },
+  ],
   created: false,
 };
 
@@ -69,7 +80,7 @@ describe("createOrg", () => {
   it("returns ok and revalidates the dashboard when org creation succeeds", async () => {
     await expect(
       createOrg(" Acme Corp ", " acme ", " Phoenix ", "#7c3aed"),
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({ ok: true, redirectTo: "/o/acme/switch" });
 
     expect(runServerActionMock).toHaveBeenCalledWith("createOrg", expect.any(Function));
     expect(apiFetchMock).toHaveBeenCalledWith("/orgs/create", "request-1", {
@@ -85,6 +96,7 @@ describe("createOrg", () => {
     });
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/o/acme");
   });
 
   it("returns validation failures as typed results without calling the API", async () => {

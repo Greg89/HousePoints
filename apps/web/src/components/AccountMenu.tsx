@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
+  Buildings,
   Check,
   ArrowSquareOut,
   Gear,
@@ -206,21 +207,37 @@ export function AccountMenu({
             ) : null}
           </div>
 
-          {canSwitchOrganizations ? (
-            <section className="border-b bg-muted/10 p-3" aria-label="Switch organization">
+          {currentOrganization ? (
+            <section
+              className="border-b bg-muted/10 p-3"
+              aria-label={canSwitchOrganizations ? "Switch organization" : "Organization actions"}
+            >
               <div className="mb-2 px-1">
-                <h2 className="text-sm font-bold">Switch organization</h2>
+                <h2 className="text-sm font-bold">
+                  {canSwitchOrganizations ? "Switch organization" : "Organization"}
+                </h2>
                 <p className="text-xs text-muted-foreground">
-                  Notifications and dashboard data follow the selected organization.
+                  {canSwitchOrganizations
+                    ? "Notifications and dashboard data follow the selected organization."
+                    : "Create another organisation when you need a separate team space."}
                 </p>
               </div>
               <div className="space-y-2">
-                {session.organizationContexts.map((context) => (
-                  <OrganizationSwitchLink
-                    key={context.organizationId}
-                    context={context}
-                  />
-                ))}
+                {canSwitchOrganizations
+                  ? session.organizationContexts.map((context) => (
+                    <OrganizationSwitchLink
+                      key={context.organizationId}
+                      context={context}
+                    />
+                  ))
+                  : null}
+                <a
+                  href="/orgs/new"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
+                >
+                  <Buildings size={16} aria-hidden="true" />
+                  Create organisation
+                </a>
               </div>
             </section>
           ) : null}

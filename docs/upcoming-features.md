@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org archival/deletion, domain allow-list joining, optional root redirects for dashboard slug routes, and existing-member create-new-org UX. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, and member removal are implemented in Manage. Multi-org membership is implemented at the data and authorization layer through `OrganizationMembership`, and legacy user org/role/house columns have been removed from the Prisma schema. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md), and org archive rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md).
+Still deferred: org archival/deletion, domain allow-list joining, and optional root redirects for dashboard slug routes. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, member removal, and existing-member create-new-org UX are implemented. Multi-org membership is implemented at the data and authorization layer through `OrganizationMembership`, and legacy user org/role/house columns have been removed from the Prisma schema. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md), and org archive rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md).
 
 ### How it should work
 
@@ -30,7 +30,7 @@ Still deferred: org archival/deletion, domain allow-list joining, optional root 
 - `OWNER` can promote members to `ADMIN`, demote admins back to `MEMBER`, and remove non-owner users from the organization from Manage Team. Role changes and removals are audited.
 - `OWNER` can rename the organization display name and change the organization slug from Manage Settings. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org archival/deletion, optional root redirects for dashboard slug routes, domain allow-list joining, and existing-member create-new-org UX are not implemented yet.
+- Org archival/deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
@@ -41,10 +41,10 @@ Still deferred: org archival/deletion, domain allow-list joining, optional root 
 - All existing endpoints already filter by `organizationId` derived from the actor's mapping; this is already enforced.
 - Bootstrap creates an unmapped user only; org creation and invite joining are explicit flows.
 - Same-email alternate Auth0 provider logins link to the existing user only from verified email token claims. Unverified/body-only email conflicts return `ACCOUNT_LINK_REQUIRED`.
-- A user can belong to multiple organizations through `OrganizationMembership`. The next product slice is allowing an existing member to intentionally create another organization and switch into it.
+- A user can belong to multiple organizations through `OrganizationMembership`. Existing members can intentionally create another organization from the account menu and are switched into the new organization after setup.
 
 **Open questions**
-- What exact UX should existing members use to create an additional organization, and should the new org become active immediately?
+- Should the existing-member create-new-org flow move into a richer organization management page as multi-org usage grows?
 - Do we allow a user to leave an org and join another? What happens to their transaction history?
 - Do we need multi-use standing invite links, or is single-use enough for the first production cohort?
 - Do we need an "org discovery" page, or is the invite link the only entry point?

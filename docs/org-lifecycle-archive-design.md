@@ -212,14 +212,12 @@ Operational checks:
 
 ## Post-Ops Product Follow-Up
 
-After org lifecycle, release automation, and owner/admin E2E coverage are complete, the first product feature should be:
+Implemented first slice:
 
 **Allow an existing member of one organization to create another organization.**
 
-The data model now supports this. The product work should define:
+The account menu now exposes a create-organization action for signed-in members, reuses the first-org setup form, and switches the user into the newly created organization after setup. Follow-up product hardening should define:
 
-- where the create-new-org action lives for users who already have an active org;
-- whether the newly created org becomes the selected active org immediately;
 - how the account menu/org switcher presents the new org;
 - whether owner onboarding should guide first-house setup differently for second orgs;
 - how release notes and E2E smoke tests cover the multi-org create/switch flow.

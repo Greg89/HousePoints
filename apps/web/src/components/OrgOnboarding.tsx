@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Buildings, LinkSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createOrg, joinOrg } from "@/app/actions/orgs";
@@ -8,6 +10,10 @@ import { cn } from "@/lib/cn";
 
 interface OrgOnboardingProps {
   userName: string;
+  initialView?: View;
+  allowJoin?: boolean;
+  backHref?: string;
+  introText?: ReactNode;
 }
 
 type View = "pick" | "create" | "join";
@@ -22,9 +28,17 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
-export function OrgOnboarding({ userName }: OrgOnboardingProps) {
-  const [view, setView] = useState<View>("pick");
+export function OrgOnboarding({
+  userName,
+  initialView = "pick",
+  allowJoin = true,
+  backHref = "/",
+  introText,
+}: OrgOnboardingProps) {
+  const router = useRouter();
+  const [view, setView] = useState<View>(initialView);
   const [isPending, startTransition] = useTransition();
+  const showPickView = initialView === "pick";
 
   // Create org state
   const [orgName, setOrgName] = useState("");
@@ -62,6 +76,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
         }
 
         toast.success("Organisation created!", { description: `Welcome to ${orgName}` });
+        router.push(result.redirectTo);
       } catch (err) {
         toast.error("Could not create organisation", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -84,6 +99,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
         }
 
         toast.success("You've joined the organisation!");
+        router.push("/");
       } catch (err) {
         toast.error("Could not join organisation", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -99,7 +115,11 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
         <div className="text-center space-y-2">
           <h1 className="font-display text-4xl font-bold text-primary">House Points</h1>
           <p className="text-muted-foreground text-sm">
-            Welcome, <strong>{userName}</strong>. Let&apos;s get you set up.
+            {introText ?? (
+              <>
+                Welcome, <strong>{userName}</strong>. Let&apos;s get you set up.
+              </>
+            )}
           </p>
         </div>
 
@@ -120,20 +140,22 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
               </div>
             </button>
 
-            <button
-              onClick={() => setView("join")}
-              className="flex items-start gap-4 p-5 rounded-xl border bg-card hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <LinkSimple size={22} className="text-accent-foreground" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Join with an invite link</p>
-                <p className="text-muted-foreground text-xs mt-0.5">
-                  Someone shared a token with you. Paste it here to join their org.
-                </p>
-              </div>
-            </button>
+            {allowJoin ? (
+              <button
+                onClick={() => setView("join")}
+                className="flex items-start gap-4 p-5 rounded-xl border bg-card hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
+              >
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <LinkSimple size={22} className="text-accent-foreground" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Join with an invite link</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">
+                    Someone shared a token with you. Paste it here to join their org.
+                  </p>
+                </div>
+              </button>
+            ) : null}
 
             <div className="text-center pt-2">
               <a href="/auth/logout" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -213,7 +235,14 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
 
             <div className="flex gap-3 pt-1">
               <button
-                onClick={() => setView("pick")}
+                onClick={() => {
+                  if (showPickView) {
+                    setView("pick");
+                    return;
+                  }
+
+                  router.push(backHref);
+                }}
                 className="flex-1 px-4 py-2 rounded-lg border text-sm hover:bg-muted transition-colors"
               >
                 Back
@@ -228,7 +257,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}
               >
-                {isPending ? "Creating…" : "Create organisation"}
+                {isPending ? "Creating..." : "Create organisation"}
               </button>
             </div>
           </div>
@@ -245,7 +274,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
               <label className="text-sm font-medium">Invite token</label>
               <input
                 type="text"
-                placeholder="Paste your invite token here…"
+                placeholder="Paste your invite token here..."
                 value={inviteToken}
                 onChange={(e) => setInviteToken(e.target.value)}
                 className={cn(
@@ -272,7 +301,7 @@ export function OrgOnboarding({ userName }: OrgOnboardingProps) {
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}
               >
-                {isPending ? "Joining…" : "Join organisation"}
+                {isPending ? "Joining..." : "Join organisation"}
               </button>
             </div>
           </div>

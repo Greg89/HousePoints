@@ -129,6 +129,8 @@ describe("AccountMenu", () => {
     expect(dialog).toHaveTextContent("Admin");
     expect(dialog).toHaveTextContent("Acme Corp");
     expect(within(dialog).queryByRole("region", { name: /switch organization/i })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("region", { name: /organization actions/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: /create organisation/i })).toHaveAttribute("href", "/orgs/new");
     expect(within(dialog).getByText("New member needs a house")).toBeInTheDocument();
     expect(within(dialog).getByText("Action required")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /assign house/i })).toBeInTheDocument();
@@ -178,6 +180,7 @@ describe("AccountMenu", () => {
     expect(within(switcher).getByText("Acme Corp")).toBeInTheDocument();
     expect(within(switcher).getByText("Current")).toBeInTheDocument();
     expect(within(switcher).getByRole("link", { name: /beta org/i })).toHaveAttribute("href", "/o/beta/switch");
+    expect(within(switcher).getByRole("link", { name: /create organisation/i })).toHaveAttribute("href", "/orgs/new");
   });
 
   it("marks an action notification read before navigating", async () => {
