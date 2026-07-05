@@ -11,6 +11,14 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const routerReplaceMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: routerReplaceMock,
+  }),
+}));
+
 const users = [
   { id: "user-1", displayName: "Alice Assigned", email: "alice@example.com", role: "ADMIN" as const, houseId: "house-1" },
   { id: "user-2", displayName: "Ben Unassigned", email: "ben@example.com", role: "MEMBER" as const, houseId: null },
@@ -170,6 +178,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     onTransferOwnership: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSlug: vi.fn().mockResolvedValue({ ok: true }),
     onUpdateOrgSettings: vi.fn().mockResolvedValue({ ok: true }),
+    onArchiveOrganization: vi.fn().mockResolvedValue({ ok: true, redirectTo: "/o/acme" }),
     onLoadAdminAudit: vi.fn().mockResolvedValue({
       items: recentAdminActions,
       nextCursor: null,
@@ -390,6 +399,54 @@ describe("AdminForms", () => {
     const { toast } = await import("sonner");
     expect(toast.success).toHaveBeenCalledWith("Ownership transferred", {
       description: "Ben Unassigned is now the organization owner.",
+    });
+  });
+
+  it("lets owners archive the organization only after typing the current slug", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Settings");
+    const archiveForm = within(screen.getByRole("form", { name: "Archive organization" }));
+    const archiveButton = archiveForm.getByRole("button", { name: "Archive organization" });
+
+    expect(archiveForm.getByText("This is a soft delete. Data is retained for audit and future recovery work, but users cannot continue using the archived organization.")).toBeInTheDocument();
+    expect(archiveButton).toBeDisabled();
+
+    await user.type(archiveForm.getByLabelText("Confirm archive"), "acme");
+
+    expect(archiveButton).toBeEnabled();
+    await user.click(archiveButton);
+
+    await waitFor(() => expect(props.onArchiveOrganization).toHaveBeenCalledOnce());
+    const archiveMock = props.onArchiveOrganization as ReturnType<typeof vi.fn>;
+    const formData = archiveMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      confirmation: "acme",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Organization archived", {
+      description: "Opening the archived organization page.",
+    });
+    expect(routerReplaceMock).toHaveBeenCalledWith("/o/acme");
+  });
+
+  it("shows a safe toast when organization archive fails", async () => {
+    const { user, props } = setupAdminForms({
+      onArchiveOrganization: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "OWNER_REQUIRED",
+        message: "The organization could not be archived. Please try again.",
+      }),
+    });
+    switchToManageSection("Settings");
+    const archiveForm = within(screen.getByRole("form", { name: "Archive organization" }));
+
+    await user.type(archiveForm.getByLabelText("Confirm archive"), "acme");
+    await user.click(archiveForm.getByRole("button", { name: "Archive organization" }));
+
+    await waitFor(() => expect(props.onArchiveOrganization).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to archive organization", {
+      description: "The organization could not be archived. Please try again.",
     });
   });
 

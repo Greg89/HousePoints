@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { User } from "@auth0/nextjs-auth0/types";
 import { apiErrorSchema } from "@housepoints/contracts";
 import type { ZodType } from "zod";
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { getAuth0Client } from "@/lib/auth0";
 import { logWarn, serializeErrorForLog } from "@/lib/logging";
 
@@ -55,6 +56,7 @@ type ApiRequestDependencies = {
   fetchImpl: typeof fetch;
   getAccessToken: () => Promise<string>;
   getIdToken?: () => Promise<string | null | undefined>;
+  getOrganizationSlug?: () => Promise<string | null | undefined>;
   timeoutMs: number;
 };
 
@@ -66,6 +68,7 @@ export function createApiRequester(dependencies: ApiRequestDependencies) {
   ): Promise<Response> {
     const accessToken = await dependencies.getAccessToken();
     const idToken = await dependencies.getIdToken?.();
+    const organizationSlug = await dependencies.getOrganizationSlug?.();
     const headers = new Headers(init.headers);
 
     headers.set("authorization", `Bearer ${accessToken}`);
@@ -73,6 +76,9 @@ export function createApiRequester(dependencies: ApiRequestDependencies) {
     headers.set("x-request-id", requestId);
     if (idToken) {
       headers.set("x-auth0-id-token", idToken);
+    }
+    if (organizationSlug) {
+      headers.set("x-housepoints-organization-slug", organizationSlug);
     }
 
     return dependencies.fetchImpl(
@@ -195,6 +201,7 @@ export async function apiFetch(
     fetchImpl: fetch,
     getAccessToken: async () => context.accessToken,
     getIdToken: async () => context.idToken,
+    getOrganizationSlug: readActiveOrganizationSlug,
     timeoutMs: DEFAULT_TIMEOUT_MS,
   })(path, requestId, init);
 }

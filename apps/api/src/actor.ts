@@ -1,10 +1,12 @@
 import type { UserRole } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { pickPreferredMembership } from "./membership-context.js";
 
 export type ActorRecord = {
   id: string;
   auth0Sub: string;
   displayName: string;
+  membershipId: string;
   role: UserRole;
   houseId: string | null;
   organizationId: string;
@@ -20,35 +22,22 @@ export function isOwnerRole(role: UserRole): boolean {
   return role === "OWNER";
 }
 
-export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
-  const identity = await prisma.authIdentity.findUnique({
-    where: { providerSubject: auth0Sub },
-    select: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          role: true,
-          houseId: true,
-          organizationId: true,
-          organization: {
-            select: {
-              name: true,
-              slug: true,
-            },
-          },
-        },
+const actorUserSelect = {
+  id: true,
+  displayName: true,
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+      organization: {
+        archivedAt: null,
       },
     },
-  });
-  const actor = identity?.user ?? await prisma.user.findUnique({
-    where: { auth0Sub },
     select: {
       id: true,
-      displayName: true,
+      organizationId: true,
       role: true,
       houseId: true,
-      organizationId: true,
       organization: {
         select: {
           name: true,
@@ -56,32 +45,61 @@ export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | nul
         },
       },
     },
+  },
+} as const;
+
+export async function getActorBySub(auth0Sub: string): Promise<ActorRecord | null> {
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: {
+      user: {
+        select: actorUserSelect,
+      },
+    },
+  });
+  const actor = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: actorUserSelect,
   });
 
   if (!actor) {
     return null;
   }
 
-  if (!actor.organizationId || !actor.organization) {
-    return null;
+  const activeMembership = resolvePreferredMembership(actor);
+
+  if (activeMembership) {
+    return {
+      id: actor.id,
+      auth0Sub,
+      displayName: actor.displayName,
+      membershipId: activeMembership.id,
+      role: activeMembership.role,
+      houseId: activeMembership.houseId,
+      organizationId: activeMembership.organizationId,
+      organizationName: activeMembership.organization.name,
+      organizationSlug: activeMembership.organization.slug,
+    };
   }
 
-  return {
-    id: actor.id,
-    auth0Sub,
-    displayName: actor.displayName,
-    role: actor.role,
-    houseId: actor.houseId,
-    organizationId: actor.organizationId,
-    organizationName: actor.organization.name,
-    organizationSlug: actor.organization.slug,
-  };
+  return null;
 }
 
 export type UserOrgContext = {
   organizationId: string | null;
   organizationName: string | null;
   organizationSlug: string | null;
+};
+
+export type UserRouteMembershipContext = {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  organizationArchivedAt: Date | null;
+};
+
+export type UserRouteOrgContext = UserOrgContext & {
+  requestedMembership: UserRouteMembershipContext | null;
 };
 
 /**
@@ -92,11 +110,22 @@ export type UserOrgContext = {
  */
 export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgContext | null> {
   const userSelect = {
-    organizationId: true,
-    organization: {
+    memberships: {
+      where: {
+        isActive: true,
+        archivedAt: null,
+        organization: {
+          archivedAt: null,
+        },
+      },
       select: {
-        name: true,
-        slug: true,
+        organizationId: true,
+        organization: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
       },
     },
   } as const;
@@ -114,9 +143,141 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
     return null;
   }
 
+  return resolvePreferredOrgContext(user);
+}
+
+type PreferredOrgContextSource = {
+  memberships?: Array<{
+    organizationId: string;
+    organization: { name: string; slug: string; archivedAt?: Date | null };
+  }>;
+};
+
+type PreferredMembershipSource = {
+  memberships?: Array<{
+    id: string;
+    organizationId: string;
+    role: UserRole;
+    houseId: string | null;
+    organization: { name: string; slug: string };
+  }>;
+};
+
+function resolvePreferredMembership(user: PreferredMembershipSource) {
+  return pickPreferredMembership(user.memberships);
+}
+
+function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
+  const preferredMembership = user.memberships?.find(
+    (membership) => !membership.organization.archivedAt,
+  ) ?? null;
+
+  if (preferredMembership) {
+    return {
+      organizationId: preferredMembership.organizationId,
+      organizationName: preferredMembership.organization.name,
+      organizationSlug: preferredMembership.organization.slug,
+    };
+  }
+
   return {
-    organizationId: user.organizationId,
-    organizationName: user.organization?.name ?? null,
-    organizationSlug: user.organization?.slug ?? null,
+    organizationId: null,
+    organizationName: null,
+    organizationSlug: null,
+  };
+}
+
+export async function getActorBySubForOrganizationSlug(
+  auth0Sub: string,
+  organizationSlug: string,
+): Promise<ActorRecord | null> {
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: {
+      user: {
+        select: actorUserSelect,
+      },
+    },
+  });
+  const actor = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: actorUserSelect,
+  });
+
+  if (!actor) {
+    return null;
+  }
+
+  const requestedMembership = (actor.memberships ?? []).find(
+    (membership) => membership.organization.slug === organizationSlug,
+  );
+
+  if (requestedMembership) {
+    return {
+      id: actor.id,
+      auth0Sub,
+      displayName: actor.displayName,
+      membershipId: requestedMembership.id,
+      role: requestedMembership.role,
+      houseId: requestedMembership.houseId,
+      organizationId: requestedMembership.organizationId,
+      organizationName: requestedMembership.organization.name,
+      organizationSlug: requestedMembership.organization.slug,
+    };
+  }
+
+  return null;
+}
+
+export async function getUserRouteOrgContextBySub(
+  auth0Sub: string,
+  requestedOrganizationId: string,
+): Promise<UserRouteOrgContext | null> {
+  const userSelect = {
+    memberships: {
+      where: {
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        organizationId: true,
+        organization: {
+          select: {
+            name: true,
+            slug: true,
+            archivedAt: true,
+          },
+        },
+      },
+    },
+  } as const;
+
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { user: { select: userSelect } },
+  });
+  const user = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: userSelect,
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  const requestedMembership = (user.memberships ?? []).find(
+    (membership) => membership.organizationId === requestedOrganizationId,
+  );
+
+  return {
+    ...resolvePreferredOrgContext(user),
+    requestedMembership: requestedMembership
+      ? {
+          organizationId: requestedMembership.organizationId,
+          organizationName: requestedMembership.organization.name,
+          organizationSlug: requestedMembership.organization.slug,
+          organizationArchivedAt: requestedMembership.organization.archivedAt ?? null,
+        }
+      : null,
   };
 }

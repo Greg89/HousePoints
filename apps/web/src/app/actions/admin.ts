@@ -8,6 +8,7 @@ import {
   adminUserSchema,
   adminHouseSchema,
   assignUserHouseResponseSchema,
+  archiveOrgResponseSchema,
   deletedPointSchema,
   inviteLinkSchema,
   orgSettingsSchema,
@@ -23,9 +24,9 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { ArchiveOrganizationResult, CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
-import { getActorMappingForAdmin } from "./admin-auth";
+import { getActorMappingForAdmin, resolveActiveActorMapping } from "./admin-auth";
 
 export async function createHouse(formData: FormData): Promise<HouseMutationResult> {
   return runServerAction("createHouse", async (context) => {
@@ -256,6 +257,64 @@ export async function transferOwnership(formData: FormData): Promise<RoleChangeR
   });
 }
 
+export async function archiveOrganization(formData: FormData): Promise<ArchiveOrganizationResult> {
+  return runServerAction("archiveOrganization", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("archiveOrganization", requestId);
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+    if (confirmation !== actor.organizationSlug) {
+      return {
+        ok: false,
+        code: "ORG_ARCHIVE_CONFIRMATION_MISMATCH",
+        message: "Type the current organization slug to archive this organization.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/archive", requestId, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    try {
+      const archivedOrganization = await parseApiResponse(
+        response,
+        archiveOrgResponseSchema,
+        "The organization could not be archived. Please try again.",
+      );
+
+      logInfo("web.admin.org_archived", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationSlug: archivedOrganization.slug,
+        archivedAt: archivedOrganization.archivedAt,
+      });
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        organizationSlug: actor.organizationSlug,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    revalidatePath("/");
+    revalidatePath(`/o/${actor.organizationSlug}`);
+
+    return { ok: true, redirectTo: `/o/${encodeURIComponent(actor.organizationSlug)}` };
+  });
+}
+
 export async function assignUserHouse(formData: FormData): Promise<HouseAssignmentResult> {
   return runServerAction("assignUserHouse", async (context) => {
     const { requestId } = context;
@@ -447,7 +506,7 @@ export async function readAdminContext(requestId: string = randomUUID()) {
     return null;
   }
 
-  const mapping = await getCurrentUserForRequest(requestId);
+  const mapping = resolveActiveActorMapping(await getCurrentUserForRequest(requestId));
 
   if (mapping.role !== "ADMIN" && mapping.role !== "OWNER") {
     return null;
@@ -541,7 +600,7 @@ export async function readPointAdjustmentStats(
 export async function createInviteLink(): Promise<CreateInviteResult> {
   return runServerAction("createInviteLink", async (context) => {
     const { requestId } = context;
-    const actor = await getCurrentUserForRequest(requestId);
+    const actor = await getActorMappingForAdmin("createInviteLink", requestId);
 
     const response = await apiFetch("/orgs/invite", requestId, {
       method: "POST",

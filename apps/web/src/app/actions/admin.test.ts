@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, transferOwnership, updateOrgSettings, updateOrgSlug } from "./admin";
+import { archiveOrganization, assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, transferOwnership, updateOrgSettings, updateOrgSlug } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -33,6 +33,7 @@ vi.mock("@/lib/api-client", async (importActual) => {
 
 vi.mock("./admin-auth", () => ({
   getActorMappingForAdmin: vi.fn(),
+  resolveActiveActorMapping: vi.fn((mapping) => mapping),
 }));
 
 const apiFetchMock = vi.mocked(apiFetch);
@@ -56,6 +57,7 @@ const actor = {
   houseId: "house-1",
   houseName: "Slytherin",
   houseColor: "#22c55e",
+  organizationContexts: [],
   created: false,
 };
 
@@ -580,6 +582,86 @@ describe("transferOwnership", () => {
   });
 });
 
+describe("archiveOrganization", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: "2026-07-04T12:00:00.000Z",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: "2026-07-04T12:00:00.000Z",
+    });
+  });
+
+  it("returns ok and revalidates dashboard routes when archive succeeds", async () => {
+    const formData = new FormData();
+    formData.set("confirmation", "acme");
+
+    await expect(archiveOrganization(formData)).resolves.toEqual({
+      ok: true,
+      redirectTo: "/o/acme",
+    });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("archiveOrganization", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("archiveOrganization", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/org/archive", "request-1", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/o/acme");
+  });
+
+  it("returns validation failures when the slug confirmation does not match", async () => {
+    const formData = new FormData();
+    formData.set("confirmation", "wrong");
+
+    await expect(archiveOrganization(formData)).resolves.toEqual({
+      ok: false,
+      code: "ORG_ARCHIVE_CONFIRMATION_MISMATCH",
+      message: "Type the current organization slug to archive this organization.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("confirmation", "acme");
+    const error = new ApiResponseError(
+      403,
+      "OWNER_REQUIRED",
+      "The organization could not be archived. Please try again.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(archiveOrganization(formData)).resolves.toEqual({
+      ok: false,
+      code: "OWNER_REQUIRED",
+      message: "The organization could not be archived. Please try again.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "archiveOrganization", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        organizationSlug: "acme",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("removeOrgMember", () => {
   beforeEach(() => {
     apiFetchMock.mockResolvedValue(Response.json({
@@ -676,6 +758,7 @@ describe("createInviteLink", () => {
     });
 
     expect(runServerActionMock).toHaveBeenCalledWith("createInviteLink", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("createInviteLink", "request-1");
     expect(apiFetchMock).toHaveBeenCalledWith("/orgs/invite", "request-1", {
       method: "POST",
       body: JSON.stringify({}),

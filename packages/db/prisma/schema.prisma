@@ -43,6 +43,7 @@ enum PointTransactionType {
 enum AuditEventType {
   INVITE_CREATED
   INVITE_USED
+  ORG_ARCHIVED
   POINT_DELETED
   POINTS_DEDUCTED
   SEASON_STARTED
@@ -59,6 +60,7 @@ enum NotificationType {
   SEASON_STARTED
   POINT_AWARD_RECEIVED
   POINT_DEDUCTION_RECEIVED
+  RELEASE_ANNOUNCEMENT
 }
 
 enum NotificationSeverity {
@@ -71,7 +73,9 @@ model Organization {
   id           String             @id @default(cuid())
   name         String
   slug         String             @unique
-  users        User[]
+  archivedAt   DateTime?
+  archivedById String?
+  memberships  OrganizationMembership[]
   houses       House[]
   transactions PointTransaction[]
   invites      OrgInvite[]
@@ -79,8 +83,12 @@ model Organization {
   auditEvents  AuditEvent[]
   slugAliases  OrganizationSlugAlias[]
   notifications Notification[]
+  archivedBy    User?              @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
+
+  @@index([archivedAt])
+  @@index([archivedById])
 }
 
 model OrganizationSlugAlias {
@@ -120,7 +128,7 @@ model House {
   color          String             @default("#7c3aed")
   description    String?
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  users        User[]
+  memberships  OrganizationMembership[]
   transactions PointTransaction[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
@@ -135,25 +143,40 @@ model User {
   email                String?            @unique
   displayName          String
   houseThemeEnabled    Boolean            @default(false)
-  role                 Role               @default(MEMBER)
-  organizationId       String?
-  organization         Organization?      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  houseId              String?
-  house                House?             @relation(fields: [houseId], references: [id], onDelete: Restrict)
   pointTransactions    PointTransaction[] @relation("ActorTransactions")
   receivedTransactions PointTransaction[] @relation("PointsReceived")
   deletedPointTransactions PointTransaction[] @relation("DeletedPointTransactions")
   createdInvites       OrgInvite[]        @relation("CreatedInvites")
   usedInvite           OrgInvite[]        @relation("UsedInvites")
+  archivedOrganizations Organization[]    @relation("ArchivedOrganizations")
   createdSeasons       Season[]           @relation("CreatedSeasons")
   auditEvents          AuditEvent[]       @relation("AuditEventActor")
   authIdentities        AuthIdentity[]
+  memberships           OrganizationMembership[]
   notifications         Notification[]     @relation("NotificationRecipient")
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+}
 
-  @@index([organizationId])
-  @@index([houseId])
+model OrganizationMembership {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           Role         @default(MEMBER)
+  houseId        String?
+  isActive       Boolean      @default(true)
+  archivedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  house          House?       @relation(fields: [houseId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([userId, archivedAt])
+  @@index([organizationId, role])
+  @@index([organizationId, houseId])
 }
 
 model AuthIdentity {
@@ -260,4 +283,19 @@ model Notification {
   @@unique([recipientUserId, dedupeKey])
   @@index([recipientUserId, readAt, createdAt])
   @@index([organizationId, type, createdAt])
+}
+
+model ReleaseAnnouncement {
+  id              String    @id @default(cuid())
+  version         String    @unique
+  title           String
+  summary         String
+  releaseNotesUrl String
+  releasedAt      DateTime
+  broadcastAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([releasedAt])
+  @@index([broadcastAt])
 }

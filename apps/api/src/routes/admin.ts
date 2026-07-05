@@ -4,6 +4,7 @@ import { buildRoleChangedNotificationData } from "../notifications.js";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
+  archiveOrgSchema,
   actorScopeSchema,
   assignUserHouseSchema,
   createHouseSchema,
@@ -32,10 +33,20 @@ export async function loadAdminContextData(organizationId: string) {
     recentStartedSeasons,
     auditEvents,
   ] = await Promise.all([
-    prisma.user.findMany({
-      where: { organizationId },
-      orderBy: { displayName: "asc" },
-      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+    prisma.organizationMembership.findMany({
+      where: { organizationId, isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
     }),
     prisma.house.findMany({
       where: { organizationId },
@@ -86,7 +97,24 @@ export async function loadAdminContextData(organizationId: string) {
       },
     }),
   ]);
-  return { users, houses, recentDeletedPoints, recentInvites, inviteGeneratedCount, inviteUsedCount, activeSeason, activeSeasonDeductionTotals, recentStartedSeasons, auditEvents };
+  return {
+    users: users.map((membership) => ({
+      id: membership.user.id,
+      displayName: membership.user.displayName,
+      email: membership.user.email,
+      role: membership.role,
+      houseId: membership.houseId,
+    })),
+    houses,
+    recentDeletedPoints,
+    recentInvites,
+    inviteGeneratedCount,
+    inviteUsedCount,
+    activeSeason,
+    activeSeasonDeductionTotals,
+    recentStartedSeasons,
+    auditEvents,
+  };
 }
 
 export async function updateOrgSettingsInDb(params: {
@@ -208,11 +236,23 @@ export async function upsertHouseForOrg(params: {
   });
 }
 
-export async function findUsersForAssignment(targetUserId: string, targetHouseId: string) {
+export async function findAssignmentTargets(
+  organizationId: string,
+  targetUserId: string,
+  targetHouseId: string,
+) {
   return Promise.all([
-    prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, displayName: true, organizationId: true },
+    prisma.organizationMembership.findFirst({
+      where: {
+        organizationId,
+        userId: targetUserId,
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        user: { select: { id: true, displayName: true } },
+      },
     }),
     prisma.house.findUnique({
       where: { id: targetHouseId },
@@ -225,15 +265,23 @@ export async function assignUserToHouseInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetUser: { id: string; displayName: string };
+  targetMembership: { id: string; user: { id: string; displayName: string } };
   targetHouse: { id: string; name: string };
 }) {
   return prisma.$transaction(async (tx) => {
-    const assignedUser = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const assignedMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: { houseId: params.targetHouse.id },
-      select: { id: true, displayName: true, houseId: true },
+      select: {
+        houseId: true,
+        user: { select: { id: true, displayName: true } },
+      },
     });
+    const assignedUser = {
+      id: assignedMembership.user.id,
+      displayName: assignedMembership.user.displayName,
+      houseId: assignedMembership.houseId,
+    };
     await tx.auditEvent.create({
       data: {
         organizationId: params.organizationId,
@@ -258,10 +306,64 @@ export async function assignUserToHouseInDb(params: {
   });
 }
 
-export async function findUserForRoleChange(targetUserId: string) {
-  return prisma.user.findUnique({
-    where: { id: targetUserId },
-    select: { id: true, displayName: true, email: true, role: true, houseId: true, organizationId: true },
+export async function findMembershipForRoleChange(organizationId: string, targetUserId: string) {
+  return prisma.organizationMembership.findFirst({
+    where: {
+      organizationId,
+      userId: targetUserId,
+      isActive: true,
+      archivedAt: null,
+    },
+    select: {
+      id: true,
+      userId: true,
+      role: true,
+      houseId: true,
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+        },
+      },
+    },
+  });
+}
+
+export async function archiveOrganizationInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  organizationName: string;
+  organizationSlug: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const archivedAt = new Date();
+    const archivedAtIso = archivedAt.toISOString();
+    const organization = await tx.organization.update({
+      where: { id: params.organizationId },
+      data: {
+        archivedAt,
+        archivedById: params.actorId,
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "ORG_ARCHIVED",
+        summary: `${params.actorDisplayName} archived ${params.organizationName}.`,
+        metadata: {
+          organizationName: params.organizationName,
+          organizationSlug: params.organizationSlug,
+          archivedAt: archivedAtIso,
+        },
+      },
+    });
+
+    return { ...organization, archivedAt };
   });
 }
 
@@ -269,29 +371,51 @@ export async function changeUserRoleInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetUser: { id: string; displayName: string; role: string };
+  targetMembership: {
+    id: string;
+    role: string;
+    houseId: string | null;
+    user: { id: string; displayName: string; email: string | null };
+  };
   newRole: string;
 }) {
   return prisma.$transaction(async (tx) => {
-    const changedUser = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const changedMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: { role: params.newRole as "MEMBER" | "ADMIN" | "OWNER" },
-      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
     });
-    const ownerRecipients = await tx.user.findMany({
-      where: { organizationId: params.organizationId, role: "OWNER", id: { not: params.actorId } },
-      select: { id: true },
+    const changedUser = {
+      id: changedMembership.user.id,
+      displayName: changedMembership.user.displayName,
+      email: changedMembership.user.email,
+      role: changedMembership.role,
+      houseId: changedMembership.houseId,
+    };
+    const ownerRecipients = await tx.organizationMembership.findMany({
+      where: {
+        organizationId: params.organizationId,
+        role: "OWNER",
+        userId: { not: params.actorId },
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
     });
     await tx.auditEvent.create({
       data: {
         organizationId: params.organizationId,
         actorUserId: params.actorId,
         eventType: "USER_ROLE_CHANGED",
-        summary: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetUser.role} to ${changedUser.role}.`,
-        metadata: { targetUserId: changedUser.id, targetUserName: changedUser.displayName, previousRole: params.targetUser.role, newRole: changedUser.role },
+        summary: `${params.actorDisplayName} changed ${changedUser.displayName} from ${params.targetMembership.role} to ${changedUser.role}.`,
+        metadata: { targetUserId: changedUser.id, targetUserName: changedUser.displayName, previousRole: params.targetMembership.role, newRole: changedUser.role },
       },
     });
-    const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.id)]));
+    const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.user.id)]));
     if (recipientIds.length > 0) {
       await tx.notification.createMany({
         data: recipientIds.map((recipientId) => buildRoleChangedNotificationData({
@@ -300,7 +424,7 @@ export async function changeUserRoleInDb(params: {
           actorDisplayName: params.actorDisplayName,
           targetUserDisplayName: changedUser.displayName,
           targetUserId: changedUser.id,
-          previousRole: params.targetUser.role,
+          previousRole: params.targetMembership.role,
           newRole: changedUser.role,
         })),
         skipDuplicates: true,
@@ -313,20 +437,37 @@ export async function changeUserRoleInDb(params: {
 export async function transferOwnershipInDb(params: {
   organizationId: string;
   actor: { id: string; displayName: string };
-  targetUser: { id: string; displayName: string; email: string | null; role: string; houseId: string | null };
+  actorMembership: { id: string };
+  targetMembership: {
+    id: string;
+    role: string;
+    houseId: string | null;
+    user: { id: string; displayName: string; email: string | null };
+  };
 }) {
   return prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: params.actor.id },
+    await tx.organizationMembership.update({
+      where: { id: params.actorMembership.id },
       data: { role: "ADMIN" },
       select: { id: true },
     });
 
-    const newOwner = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const newOwnerMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: { role: "OWNER" },
-      select: { id: true, displayName: true, email: true, role: true, houseId: true },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
     });
+    const newOwner = {
+      id: newOwnerMembership.user.id,
+      displayName: newOwnerMembership.user.displayName,
+      email: newOwnerMembership.user.email,
+      role: newOwnerMembership.role,
+      houseId: newOwnerMembership.houseId,
+    };
 
     await tx.auditEvent.create({
       data: {
@@ -339,7 +480,7 @@ export async function transferOwnershipInDb(params: {
           previousOwnerName: params.actor.displayName,
           newOwnerId: newOwner.id,
           newOwnerName: newOwner.displayName,
-          previousRole: params.targetUser.role,
+          previousRole: params.targetMembership.role,
           newRole: "OWNER",
         },
       },
@@ -353,7 +494,7 @@ export async function transferOwnershipInDb(params: {
           actorDisplayName: params.actor.displayName,
           targetUserDisplayName: newOwner.displayName,
           targetUserId: newOwner.id,
-          previousRole: params.targetUser.role,
+          previousRole: params.targetMembership.role,
           newRole: "OWNER",
         }),
         buildRoleChangedNotificationData({
@@ -377,24 +518,31 @@ export async function removeOrgMemberInDb(params: {
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
-  targetUser: { id: string; displayName: string; role: string };
+  targetMembership: {
+    id: string;
+    role: string;
+    user: { id: string; displayName: string };
+  };
 }) {
   return prisma.$transaction(async (tx) => {
-    const removedUser = await tx.user.update({
-      where: { id: params.targetUser.id },
+    const removedAt = new Date();
+    const removedMembership = await tx.organizationMembership.update({
+      where: { id: params.targetMembership.id },
       data: {
-        organizationId: null,
+        isActive: false,
+        archivedAt: removedAt,
         houseId: null,
         role: "MEMBER",
       },
-      select: { id: true, displayName: true },
+      select: {
+        user: { select: { id: true, displayName: true } },
+      },
     });
 
-    const removedAt = new Date();
     await tx.notification.updateMany({
       where: {
         organizationId: params.organizationId,
-        recipientUserId: removedUser.id,
+        recipientUserId: removedMembership.user.id,
         archivedAt: null,
       },
       data: { readAt: removedAt, archivedAt: removedAt },
@@ -405,7 +553,7 @@ export async function removeOrgMemberInDb(params: {
         organizationId: params.organizationId,
         type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
         entityType: "User",
-        entityId: removedUser.id,
+        entityId: removedMembership.user.id,
         archivedAt: null,
       },
       data: { readAt: removedAt, archivedAt: removedAt },
@@ -416,16 +564,16 @@ export async function removeOrgMemberInDb(params: {
         organizationId: params.organizationId,
         actorUserId: params.actorId,
         eventType: "USER_REMOVED_FROM_ORG",
-        summary: `${params.actorDisplayName} removed ${removedUser.displayName} from the organization.`,
+        summary: `${params.actorDisplayName} removed ${removedMembership.user.displayName} from the organization.`,
         metadata: {
-          targetUserId: removedUser.id,
-          targetUserName: removedUser.displayName,
-          previousRole: params.targetUser.role,
+          targetUserId: removedMembership.user.id,
+          targetUserName: removedMembership.user.displayName,
+          previousRole: params.targetMembership.role,
         },
       },
     });
 
-    return removedUser;
+    return removedMembership.user;
   });
 }
 
@@ -600,13 +748,23 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+    const [actorMembership, targetMembership] = await Promise.all([
+      findMembershipForRoleChange(actor.organizationId, actor.id),
+      findMembershipForRoleChange(actor.organizationId, parsed.targetUserId),
+    ]);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!actorMembership || actorMembership.role !== "OWNER") {
+      return reply.status(403).send({
+        message: "Owner role required",
+        code: "OWNER_REQUIRED",
+      });
+    }
+
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
-    if (targetUser.role === "OWNER") {
+    if (targetMembership.role === "OWNER") {
       return reply.status(409).send({
         message: "That member is already an owner.",
         code: "TARGET_ALREADY_OWNER",
@@ -616,13 +774,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const newOwner = await transferOwnershipInDb({
       organizationId: actor.organizationId,
       actor: { id: actor.id, displayName: actor.displayName },
-      targetUser: {
-        id: targetUser.id,
-        displayName: targetUser.displayName,
-        email: targetUser.email,
-        role: targetUser.role,
-        houseId: targetUser.houseId,
-      },
+      actorMembership,
+      targetMembership,
     });
 
     info(request.log, "admin.org.owner_transferred", {
@@ -633,6 +786,34 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return newOwner;
+  });
+
+  app.post("/admin/org/archive", async (request, reply) => {
+    const parsed = await parseBody(archiveOrgSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    const archivedOrganization = await archiveOrganizationInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      organizationName: actor.organizationName,
+      organizationSlug: actor.organizationSlug,
+    });
+
+    info(request.log, "admin.org.archived", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      organizationSlug: actor.organizationSlug,
+      archivedAt: archivedOrganization.archivedAt.toISOString(),
+    });
+
+    return {
+      ...archivedOrganization,
+      archivedAt: archivedOrganization.archivedAt.toISOString(),
+    };
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {
@@ -727,12 +908,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireAdminActor(request, reply);
     if (!actor) return;
 
-    const [targetUser, targetHouse] = await findUsersForAssignment(
+    const [targetMembership, targetHouse] = await findAssignmentTargets(
+      actor.organizationId,
       parsed.targetUserId,
       parsed.targetHouseId,
     );
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
@@ -744,7 +926,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
-      targetUser,
+      targetMembership,
       targetHouse,
     });
 
@@ -767,13 +949,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
 
-    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+    const targetMembership = await findMembershipForRoleChange(actor.organizationId, parsed.targetUserId);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
-    if (targetUser.role === "OWNER") {
+    if (targetMembership.role === "OWNER") {
       return reply.status(409).send({
         message: "Owner roles cannot be changed here",
         code: "OWNER_ROLE_IMMUTABLE",
@@ -784,7 +966,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
-      targetUser: { id: targetUser.id, displayName: targetUser.displayName, role: targetUser.role },
+      targetMembership,
       newRole: parsed.role,
     });
 
@@ -792,7 +974,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
       targetUserId: updatedUser.id,
-      previousRole: targetUser.role,
+      previousRole: targetMembership.role,
       newRole: updatedUser.role,
     });
 
@@ -813,13 +995,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const targetUser = await findUserForRoleChange(parsed.targetUserId);
+    const targetMembership = await findMembershipForRoleChange(actor.organizationId, parsed.targetUserId);
 
-    if (!targetUser || targetUser.organizationId !== actor.organizationId) {
+    if (!targetMembership) {
       return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
     }
 
-    if (targetUser.role === "OWNER") {
+    if (targetMembership.role === "OWNER") {
       return reply.status(409).send({
         message: "Transfer ownership before removing an owner.",
         code: "OWNER_REMOVE_FORBIDDEN",
@@ -830,18 +1012,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
-      targetUser: {
-        id: targetUser.id,
-        displayName: targetUser.displayName,
-        role: targetUser.role,
-      },
+      targetMembership,
     });
 
     info(request.log, "admin.user.removed_from_org", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
       targetUserId: removedUser.id,
-      previousRole: targetUser.role,
+      previousRole: targetMembership.role,
     });
 
     return removedUser;

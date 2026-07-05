@@ -127,10 +127,24 @@ export async function loadContributorNames(
   organizationId: string,
 ) {
   if (!userIds.length) return [];
-  return prisma.user.findMany({
-    where: { id: { in: userIds }, organizationId },
-    select: { id: true, displayName: true },
+  const memberships = await prisma.organizationMembership.findMany({
+    where: {
+      organizationId,
+      isActive: true,
+      archivedAt: null,
+      userId: { in: userIds },
+    },
+    select: {
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
+    },
   });
+
+  return memberships.map((membership) => membership.user);
 }
 
 export async function startSeasonTransaction(actor: ActorRecord, seasonName: string) {
@@ -176,16 +190,20 @@ export async function startSeasonTransaction(actor: ActorRecord, seasonName: str
       },
     });
 
-    const notificationRecipients = await tx.user.findMany({
-      where: { organizationId: actor.organizationId },
-      select: { id: true },
+    const notificationRecipients = await tx.organizationMembership.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
     });
 
     if (notificationRecipients.length > 0) {
       await tx.notification.createMany({
         data: notificationRecipients.map((recipient) => buildSeasonStartedNotificationData({
           organizationId: actor.organizationId,
-          recipientId: recipient.id,
+          recipientId: recipient.user.id,
           actorDisplayName: actor.displayName,
           seasonName: activeSeason.name,
           seasonId: activeSeason.id,

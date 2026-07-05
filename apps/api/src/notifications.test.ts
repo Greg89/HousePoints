@@ -5,6 +5,7 @@ import {
   buildSeasonStartedNotificationData,
   buildRoleChangedNotificationData,
   buildMemberNeedsAssignmentNotificationData,
+  buildReleaseAnnouncementNotificationData,
 } from "./notifications.js";
 
 describe("buildPointAwardNotificationData", () => {
@@ -182,5 +183,46 @@ describe("buildMemberNeedsAssignmentNotificationData", () => {
   it("routes to the team management section", () => {
     const result = buildMemberNeedsAssignmentNotificationData(base);
     expect(result.actionHref).toBe("/?tab=manage&section=team");
+  });
+});
+
+describe("buildReleaseAnnouncementNotificationData", () => {
+  const base = {
+    organizationId: "org-1",
+    recipientId: "user-1",
+    releaseId: "release-1",
+    version: "v1.2.3",
+    title: "Multi-org beta",
+    summary: "Multi-organization support is now available in beta.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+  };
+
+  it("sets the correct notification type and severity", () => {
+    const result = buildReleaseAnnouncementNotificationData(base);
+    expect(result.type).toBe("RELEASE_ANNOUNCEMENT");
+    expect(result.severity).toBe("INFO");
+  });
+
+  it("generates user-facing copy from the release metadata", () => {
+    const result = buildReleaseAnnouncementNotificationData(base);
+    expect(result.title).toBe("What's new: Multi-org beta");
+    expect(result.body).toBe("Multi-organization support is now available in beta.");
+  });
+
+  it("generates a dedupe key scoped by release version and organization", () => {
+    const result = buildReleaseAnnouncementNotificationData(base);
+    expect(result.dedupeKey).toBe("release-announcement:v1.2.3:org-1");
+  });
+
+  it("sets entityType and entityId to the release", () => {
+    const result = buildReleaseAnnouncementNotificationData(base);
+    expect(result.entityType).toBe("ReleaseAnnouncement");
+    expect(result.entityId).toBe("release-1");
+  });
+
+  it("links to the release notes", () => {
+    const result = buildReleaseAnnouncementNotificationData(base);
+    expect(result.actionLabel).toBe("View release notes");
+    expect(result.actionHref).toBe("https://example.com/releases/v1.2.3.html");
   });
 });

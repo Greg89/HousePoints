@@ -7,28 +7,43 @@ export const bootstrapUserSchema = z.object({
 
 export type BootstrapUserInput = z.infer<typeof bootstrapUserSchema>;
 
+const userRoleSchema = z.enum(["MEMBER", "ADMIN", "OWNER"]);
+
+export const appUserOrganizationContextSchema = z.object({
+  organizationId: z.string(),
+  organizationName: z.string(),
+  organizationSlug: z.string(),
+  role: userRoleSchema,
+  houseId: z.string().nullable(),
+  houseName: z.string().nullable(),
+  houseColor: z.string().nullable(),
+  isCurrent: z.boolean(),
+});
+
 export const appUserSchema = z.object({
   id: z.string(),
   auth0Sub: z.string(),
   email: z.string().nullable(),
   displayName: z.string(),
   houseThemeEnabled: z.boolean(),
-  role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
+  role: userRoleSchema,
   organizationId: z.string().nullable(),
   organizationSlug: z.string().nullable(),
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
   houseColor: z.string().nullable(),
+  organizationContexts: z.array(appUserOrganizationContextSchema).default([]),
   created: z.boolean(),
 });
 
 export type AppUser = z.infer<typeof appUserSchema>;
+export type AppUserOrganizationContext = z.infer<typeof appUserOrganizationContextSchema>;
 export type UserRole = AppUser["role"];
 
 export const orgMemberSchema = z.object({
   id: z.string(),
   displayName: z.string(),
-  role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
+  role: userRoleSchema,
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
   houseColor: z.string().nullable(),
@@ -47,11 +62,7 @@ export const updateProfileSchema = z.object({
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
-export const updateProfileResponseSchema = z.object({
-  id: z.string().min(1),
-  displayName: z.string().min(1).max(120),
-  houseThemeEnabled: z.boolean(),
-});
+export const updateProfileResponseSchema = appUserSchema.omit({ created: true }).strict();
 
 export type UpdateProfileResponse = z.infer<
   typeof updateProfileResponseSchema

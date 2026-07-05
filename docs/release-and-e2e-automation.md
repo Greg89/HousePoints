@@ -29,11 +29,15 @@ Implemented first slice:
 
 Future A1 automation can generate GitHub Releases and static release pages from the same release metadata. The current manual version gives the project a durable public release history without notifying users inside the app yet.
 
+Automation scaffolding is staged under `tools/release/`. The committed `templates/release-page.html` file is the future machine-rendered release page shape, while the current `site/releases/template.html` remains the human-copyable manual template.
+
 ### Phase A2 - In-App Release Records
+
+Status: workflow handoff implemented; broadcast deferred.
 
 Add an app-owned release record instead of having CI write notification rows directly.
 
-Suggested model:
+Implemented model:
 
 - `ReleaseAnnouncement`
   - `id`
@@ -45,33 +49,49 @@ Suggested model:
   - `broadcastAt`
   - `createdAt`
 
-The app should own the release business rules, including duplicate prevention and notification fanout.
+The first API surface is `POST /system/releases/record`. It is protected by `RELEASE_AUTOMATION_SECRET`, upserts by `version`, and returns the stored release announcement. The `Publish Release Notes` workflow calls this endpoint after GitHub Pages deploys successfully, using the deployed Pages URL plus the selected release note path.
+
+Required workflow configuration:
+
+- `RELEASE_AUTOMATION_SECRET` as a GitHub secret, matching the API environment variable.
+- `RELEASE_RECORD_API_BASE_URL` as a GitHub variable, pointing to the public API base URL.
+
+The app should own the release business rules, including duplicate prevention and notification fanout. Notification fanout remains deferred to Phase A3.
 
 ### Phase A3 - Production Notification Broadcast
 
-After a production release is deployed and healthy, CI can call a protected API endpoint:
+Status: first slice implemented.
+
+After a production release is deployed and healthy, CI or an operator can call a protected API endpoint:
 
 ```text
-POST /system/releases/{releaseId}/broadcast
+POST /system/releases/broadcast
 ```
 
 The API should:
 
-- require a release-broadcast secret or machine credential;
+- require the release automation secret;
 - verify the release exists and was not already broadcast;
-- create durable informational notifications for active users;
+- create durable informational notifications for active users in active organizations;
 - record `broadcastAt`;
-- log and audit the broadcast.
+- log the broadcast.
+
+The first implementation accepts a release `version`, uses the same `RELEASE_AUTOMATION_SECRET` as release recording, and creates idempotent `RELEASE_ANNOUNCEMENT` notifications with dedupe keys scoped by release version and organization. The endpoint returns the release, the number of notifications inserted, and whether the release had already been broadcast.
+
+The `Publish Release Notes` workflow includes an explicit `broadcast_release` input. Leave it disabled while rehearsing release notes and enable it only after production health is verified.
 
 Do not allow GitHub Actions to write directly to the production database. CI should trigger app behavior; the app should enforce product rules.
 
 ### Phase A4 - User-Facing What's New
 
-Once release records exist:
+Status: implemented.
 
-- add a "What's new" entry to the account menu;
-- link release notifications to the release notes page;
-- later, add user notification preferences if release noise becomes a problem.
+Release announcement notifications include a "View release notes" action that opens the public release notes page from the account menu. The account menu also includes a persistent "What's New" entry when `APP_RELEASE_NOTES_URL` is configured on the web app. External release-note actions are limited to `https://` URLs, while existing internal notification actions continue to use scoped dashboard navigation.
+
+Future additions:
+
+- add a richer release-history surface inside the app if users need more than the public Pages link;
+- add user notification preferences if release noise becomes a problem.
 
 ## Track B - Scheduled Staging E2E
 
@@ -92,6 +112,7 @@ Required staging environment secrets:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 - `E2E_TARGET_MEMBER`
+- `E2E_ORG_SLUG`
 
 Optional manual input:
 
@@ -99,7 +120,11 @@ Optional manual input:
 
 ### Phase B2 - Test Data Contract
 
-Define a stable staging test organization:
+Status: first slice implemented.
+
+The staging test data contract is documented in [Staging E2E Test Data Contract](./staging-e2e-test-data-contract.md), and the Playwright specs share a single environment contract module under `apps/web/e2e/support/config.ts`.
+
+Current contract:
 
 - one owner/admin test user for scripted login;
 - at least one target member in a different account;
@@ -134,10 +159,10 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 
 | Phase | Status | Notes |
 |---|---|---|
-| A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold and workflow added; semantic generation deferred. |
-| A2 - In-app release records | Deferred | Required before in-app release broadcasts. |
-| A3 - Production notification broadcast | Deferred | Should be app-owned, not direct DB writes from CI. |
-| A4 - What's new UX | Deferred | Depends on release records. |
+| A1 - Generated release notes | Implemented | Manual GitHub Pages release notes scaffold, workflow, and future generator template added; semantic generation deferred. |
+| A2 - In-app release records | Implemented | `ReleaseAnnouncement` model, secret-protected record endpoint, and workflow handoff implemented; broadcast remains deferred. |
+| A3 - Production notification broadcast | Implemented | Secret-protected broadcast endpoint and manual workflow handoff implemented. |
+| A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
-| B2 - Test data contract | Deferred | Needs stable staging account/org setup. |
+| B2 - Test data contract | In progress | First staging data contract documented and centralized in Playwright config helpers; dedicated owner/admin/member actors remain future work. |
 | B3 - E2E coverage expansion | In progress | Read-only dashboard smoke coverage added. |

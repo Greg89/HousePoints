@@ -1,9 +1,15 @@
 import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
+import {
+  ApiResponseError,
+  apiFetch,
+  getOptionalAuthenticatedApiContext,
+  parseApiResponse,
+} from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { updateDisplayName, updateHouseThemePreference } from "./profile";
+import { readSessionSummary, updateDisplayName, updateHouseThemePreference } from "./profile";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -11,6 +17,10 @@ vi.mock("next/cache", () => ({
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUserForRequest: vi.fn(),
+}));
+
+vi.mock("@/lib/active-organization", () => ({
+  readActiveOrganizationSlug: vi.fn(),
 }));
 
 vi.mock("@/lib/action-context", () => ({
@@ -26,34 +36,172 @@ vi.mock("@/lib/api-client", async (importActual) => {
   return {
     ...actual,
     apiFetch: vi.fn(),
+    getOptionalAuthenticatedApiContext: vi.fn(),
     parseApiResponse: vi.fn(),
   };
 });
 
 const apiFetchMock = vi.mocked(apiFetch);
+const readActiveOrganizationSlugMock = vi.mocked(readActiveOrganizationSlug);
 const getCurrentUserForRequestMock = vi.mocked(getCurrentUserForRequest);
+const getOptionalAuthenticatedApiContextMock = vi.mocked(getOptionalAuthenticatedApiContext);
 const logServerActionFailedMock = vi.mocked(logServerActionFailed);
 const parseApiResponseMock = vi.mocked(parseApiResponse);
 const revalidatePathMock = vi.mocked(revalidatePath);
 const runServerActionMock = vi.mocked(runServerAction);
 
-describe("updateDisplayName", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getCurrentUserForRequestMock.mockResolvedValue({
-      id: "user-1",
-      auth0Sub: "auth0|user-1",
-      email: "user@example.com",
-      displayName: "User One",
-      houseThemeEnabled: false,
-      role: "MEMBER",
+const currentUser = {
+  id: "user-1",
+  auth0Sub: "auth0|user-1",
+  email: "user@example.com",
+  displayName: "User One",
+  houseThemeEnabled: false,
+  role: "MEMBER" as const,
+  organizationId: "org-1",
+  organizationSlug: "acme",
+  houseId: "house-1",
+  houseName: "Slytherin",
+  houseColor: "#22c55e",
+  organizationContexts: [
+    {
       organizationId: "org-1",
+      organizationName: "Acme Corp",
       organizationSlug: "acme",
+      role: "MEMBER" as const,
       houseId: "house-1",
       houseName: "Slytherin",
       houseColor: "#22c55e",
-      created: false,
+      isCurrent: true,
+    },
+    {
+      organizationId: "org-2",
+      organizationName: "Beta Org",
+      organizationSlug: "beta",
+      role: "ADMIN" as const,
+      houseId: null,
+      houseName: null,
+      houseColor: null,
+      isCurrent: false,
+    },
+  ],
+  created: false,
+};
+
+describe("readSessionSummary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    readActiveOrganizationSlugMock.mockResolvedValue(null);
+  });
+
+  it("returns unauthenticated state without loading the app user", async () => {
+    getOptionalAuthenticatedApiContextMock.mockResolvedValue(null);
+
+    await expect(readSessionSummary("request-1")).resolves.toEqual({
+      isAuthenticated: false,
     });
+
+    expect(getCurrentUserForRequestMock).not.toHaveBeenCalled();
+  });
+
+  it("includes active organization contexts from the app user mapping", async () => {
+    getOptionalAuthenticatedApiContextMock.mockResolvedValue({
+      user: {
+        sub: "auth0|user-1",
+        email: "stale@example.com",
+        name: "Stale Token Name",
+      },
+      accessToken: "access-token",
+    });
+    getCurrentUserForRequestMock.mockResolvedValue(currentUser);
+
+    await expect(readSessionSummary("request-1")).resolves.toMatchObject({
+      isAuthenticated: true,
+      userName: "User One",
+      userEmail: "stale@example.com",
+      userSub: "auth0|user-1",
+      appUserId: "user-1",
+      organizationId: "org-1",
+      organizationSlug: "acme",
+      organizationContexts: currentUser.organizationContexts,
+      needsOrg: false,
+      needsHouseAssignment: false,
+    });
+  });
+
+  it("derives the active session organization from membership contexts before legacy fields", async () => {
+    getOptionalAuthenticatedApiContextMock.mockResolvedValue({
+      user: {
+        sub: "auth0|user-1",
+        email: "stale@example.com",
+        name: "Stale Token Name",
+      },
+      accessToken: "access-token",
+    });
+    getCurrentUserForRequestMock.mockResolvedValue({
+      ...currentUser,
+      role: "MEMBER",
+      organizationId: null,
+      organizationSlug: null,
+      houseId: null,
+      houseName: null,
+      houseColor: null,
+      organizationContexts: [
+        {
+          organizationId: "org-2",
+          organizationName: "Beta Org",
+          organizationSlug: "beta",
+          role: "ADMIN",
+          houseId: "house-2",
+          houseName: "Ravenclaw",
+          houseColor: "#2563eb",
+          isCurrent: true,
+        },
+      ],
+    });
+
+    await expect(readSessionSummary("request-1")).resolves.toMatchObject({
+      organizationId: "org-2",
+      organizationSlug: "beta",
+      houseId: "house-2",
+      houseName: "Ravenclaw",
+      houseColor: "#2563eb",
+      role: "ADMIN",
+      needsOrg: false,
+      needsHouseAssignment: false,
+    });
+  });
+
+  it("prefers the selected organization cookie over the current membership flag", async () => {
+    readActiveOrganizationSlugMock.mockResolvedValue("beta");
+    getOptionalAuthenticatedApiContextMock.mockResolvedValue({
+      user: {
+        sub: "auth0|user-1",
+        email: "stale@example.com",
+        name: "Stale Token Name",
+      },
+      accessToken: "access-token",
+    });
+    getCurrentUserForRequestMock.mockResolvedValue(currentUser);
+
+    await expect(readSessionSummary("request-1")).resolves.toMatchObject({
+      organizationId: "org-2",
+      organizationSlug: "beta",
+      houseId: null,
+      role: "ADMIN",
+      organizationContexts: [
+        expect.objectContaining({ organizationId: "org-1", isCurrent: false }),
+        expect.objectContaining({ organizationId: "org-2", isCurrent: true }),
+      ],
+      needsHouseAssignment: true,
+    });
+  });
+});
+
+describe("updateDisplayName", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    readActiveOrganizationSlugMock.mockResolvedValue(null);
+    getCurrentUserForRequestMock.mockResolvedValue(currentUser);
     apiFetchMock.mockResolvedValue(Response.json({ id: "user-1", displayName: "Updated User", houseThemeEnabled: false }));
     parseApiResponseMock.mockResolvedValue({ id: "user-1", displayName: "Updated User", houseThemeEnabled: false });
   });
@@ -119,20 +267,7 @@ describe("updateDisplayName", () => {
 describe("updateHouseThemePreference", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getCurrentUserForRequestMock.mockResolvedValue({
-      id: "user-1",
-      auth0Sub: "auth0|user-1",
-      email: "user@example.com",
-      displayName: "User One",
-      houseThemeEnabled: false,
-      role: "MEMBER",
-      organizationId: "org-1",
-      organizationSlug: "acme",
-      houseId: "house-1",
-      houseName: "Slytherin",
-      houseColor: "#22c55e",
-      created: false,
-    });
+    getCurrentUserForRequestMock.mockResolvedValue(currentUser);
     apiFetchMock.mockResolvedValue(Response.json({ id: "user-1", displayName: "User One", houseThemeEnabled: true }));
     parseApiResponseMock.mockResolvedValue({ id: "user-1", displayName: "User One", houseThemeEnabled: true });
   });

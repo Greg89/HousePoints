@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBooleanFlag, parseCorsAllowedOrigins } from "./config";
+import { parseBooleanFlag, parseCorsAllowedOrigins, parseReleaseAutomationSecret } from "./config";
 
 describe("parseCorsAllowedOrigins", () => {
   it("normalizes and deduplicates comma-separated HTTP origins", () => {
@@ -31,5 +31,15 @@ describe("parseBooleanFlag", () => {
     expect(parseBooleanFlag("false")).toBe(false);
     expect(parseBooleanFlag("1")).toBe(false);
     expect(parseBooleanFlag(undefined)).toBe(false);
+  });
+});
+
+describe("parseReleaseAutomationSecret", () => {
+  it("trims a configured release automation secret", () => {
+    expect(parseReleaseAutomationSecret("  release-secret-123  ")).toBe("release-secret-123");
+  });
+
+  it.each([undefined, "", "short-secret"])("rejects invalid release automation secret %j", (value) => {
+    expect(() => parseReleaseAutomationSecret(value)).toThrow();
   });
 });

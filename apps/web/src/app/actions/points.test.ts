@@ -52,6 +52,7 @@ describe("awardPoints", () => {
       houseId: "house-1",
       houseName: "Slytherin",
       houseColor: "#22c55e",
+      organizationContexts: [],
       created: false,
     });
     apiFetchMock.mockResolvedValue(Response.json({ id: "tx-1" }));
@@ -132,6 +133,7 @@ describe("deductPoints", () => {
       houseId: "house-1",
       houseName: "Slytherin",
       houseColor: "#22c55e",
+      organizationContexts: [],
       created: false,
     });
     apiFetchMock.mockResolvedValue(Response.json({ id: "tx-deduction" }));

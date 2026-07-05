@@ -86,6 +86,28 @@ describe("createApiRequester", () => {
     expect(headers.get("x-auth0-id-token")).toBe("id-token");
   });
 
+  it("forwards the active organization slug when one is available", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
+    const request = createApiRequester({
+      baseUrl: "https://api.example.com/",
+      fetchImpl,
+      getAccessToken: async () => "access-token",
+      getOrganizationSlug: async () => "beta",
+      timeoutMs: 5_000,
+    });
+
+    await request("/members", "request-123", {
+      method: "POST",
+      body: "{}",
+    });
+
+    const headers = new Headers(fetchImpl.mock.calls[0][1]?.headers);
+
+    expect(headers.get("x-housepoints-organization-slug")).toBe("beta");
+  });
+
   it("preserves a caller-provided abort signal", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(null, { status: 204 }),

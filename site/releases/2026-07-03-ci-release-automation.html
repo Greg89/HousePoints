@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HousePoints CI and Release Automation Release Notes</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">Released 2026-07-03</p>
+        <h1>CI and release automation baseline</h1>
+        <p class="summary">
+          This release adds the first durable release communication channel and a
+          scheduled staging E2E safety net for the most important production workflows.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          <ul class="section-list">
+            <li>Published public release notes through GitHub Pages.</li>
+            <li>Added a manual release notes workflow for the current release process.</li>
+            <li>Added a scheduled staging Playwright workflow for deployed-environment checks.</li>
+            <li>Added a read-only dashboard smoke test covering login and core tab navigation.</li>
+            <li>Kept the existing award-points E2E path as the primary mutating workflow check.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Fixes</h2>
+          <ul class="section-list">
+            <li>Hardened Auth0 E2E selectors so social-login buttons do not conflict with the primary Continue action.</li>
+            <li>Hardened point-award E2E selectors so the +5 point button does not conflict with +50.</li>
+            <li>Adjusted Pages publishing so the workflow enables GitHub Pages at runtime before deployment.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li>The staging E2E workflow uses the GitHub Environment named <code>staging</code>.</li>
+            <li>Required staging secrets are <code>E2E_BASE_URL</code>, <code>E2E_USER_EMAIL</code>, <code>E2E_USER_PASSWORD</code>, and <code>E2E_TARGET_MEMBER</code>.</li>
+            <li>The release notes workflow publishes the committed <code>site</code> directory to GitHub Pages.</li>
+            <li>Semantic-release remains deferred, but the future template and automation notes now live under <code>tools/release</code>.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          <ul class="section-list">
+            <li>Staging E2E workflow completed successfully.</li>
+            <li>Release notes GitHub Pages workflow completed successfully.</li>
+            <li><code>npm.cmd run lint</code> passed for repo-level lint coverage.</li>
+            <li><code>git diff --check</code> passed for whitespace validation.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

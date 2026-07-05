@@ -20,6 +20,7 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerPointRoutes } from "./routes/points.js";
+import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { createApiLogger } from "./logging.js";
@@ -56,7 +57,13 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await app.register(cors, {
     origin: [...corsAllowedOrigins],
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["authorization", "content-type", "x-request-id", "x-auth0-id-token"],
+    allowedHeaders: [
+      "authorization",
+      "content-type",
+      "x-request-id",
+      "x-auth0-id-token",
+      "x-housepoints-release-secret",
+    ],
     maxAge: 600,
   });
 
@@ -83,6 +90,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerOrgRoutes(app);
   await registerUserRoutes(app, { verifyIdToken });
   await registerPointRoutes(app, { pointAdjustmentsEnabled });
+  await registerReleaseRoutes(app);
   await registerDashboardRoutes(app);
 
   return app;

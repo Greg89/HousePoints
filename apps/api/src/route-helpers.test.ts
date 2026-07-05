@@ -4,6 +4,7 @@ import { z } from "zod";
 
 vi.mock("./actor.js", () => ({
   getActorBySub: vi.fn(),
+  getActorBySubForOrganizationSlug: vi.fn(),
   isAdminRole: (role: string) => role === "ADMIN" || role === "OWNER",
   isOwnerRole: (role: string) => role === "OWNER",
 }));
@@ -29,7 +30,7 @@ vi.mock("./season-scope.js", () => {
   };
 });
 
-import { getActorBySub } from "./actor.js";
+import { getActorBySub, getActorBySubForOrganizationSlug } from "./actor.js";
 import { warn } from "./logging.js";
 import { resolveSeasonScope, SeasonScopeError } from "./season-scope.js";
 import {
@@ -42,6 +43,7 @@ import {
 import type { ActorRecord } from "./actor.js";
 
 const mockGetActorBySub = getActorBySub as ReturnType<typeof vi.fn>;
+const mockGetActorBySubForOrganizationSlug = getActorBySubForOrganizationSlug as ReturnType<typeof vi.fn>;
 const mockWarn = warn as ReturnType<typeof vi.fn>;
 const mockResolveSeasonScope = resolveSeasonScope as ReturnType<typeof vi.fn>;
 
@@ -51,10 +53,15 @@ function makeReply() {
   return { reply: { status } as unknown as FastifyReply, send, status };
 }
 
-function makeRequest(body: unknown = {}, subject = "auth0|user-1") {
+function makeRequest(
+  body: unknown = {},
+  subject = "auth0|user-1",
+  headers: Record<string, string> = {},
+) {
   return {
     body,
     auth: { subject },
+    headers,
     log: {},
   } as unknown as FastifyRequest;
 }
@@ -63,6 +70,7 @@ const baseActor: ActorRecord = {
   id: "user-1",
   auth0Sub: "auth0|user-1",
   displayName: "Test User",
+  membershipId: "membership-1",
   role: "MEMBER",
   houseId: "house-1",
   organizationId: "org-1",
@@ -115,6 +123,26 @@ describe("requireActor", () => {
     const result = await requireActor(request, reply);
 
     expect(result).toBe(baseActor);
+    expect(reply.status).not.toHaveBeenCalled();
+  });
+
+  it("resolves the actor for the scoped organization slug header", async () => {
+    mockGetActorBySubForOrganizationSlug.mockResolvedValue({
+      ...baseActor,
+      organizationSlug: "beta",
+    });
+    const request = makeRequest(
+      {},
+      "auth0|user-1",
+      { "x-housepoints-organization-slug": "beta" },
+    );
+    const { reply } = makeReply();
+
+    const result = await requireActor(request, reply);
+
+    expect(result).toMatchObject({ organizationSlug: "beta" });
+    expect(mockGetActorBySubForOrganizationSlug).toHaveBeenCalledWith("auth0|user-1", "beta");
+    expect(mockGetActorBySub).not.toHaveBeenCalled();
     expect(reply.status).not.toHaveBeenCalled();
   });
 

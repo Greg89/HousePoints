@@ -161,6 +161,11 @@ type BundleSample = {
   endpoints: EndpointSample[];
 };
 
+type BenchmarkMember = {
+  id: string;
+  membershipHouseId: string | null;
+};
+
 function percentile(values: number[], percentileValue: number): number {
   if (values.length === 0) return 0;
 
@@ -214,14 +219,19 @@ async function createScenario(
       auth0Sub: actorSubject,
       email: `${runSlug}-owner@example.test`,
       displayName: "Benchmark Owner",
-      role: "OWNER",
-      organizationId: organization.id,
-      houseId: houses[0]?.id,
       authIdentities: {
         create: {
           providerSubject: actorSubject,
         },
       },
+    },
+  });
+  await prisma.organizationMembership.create({
+    data: {
+      organizationId: organization.id,
+      userId: owner.id,
+      role: "OWNER",
+      houseId: houses[0]?.id,
     },
   });
 
@@ -245,37 +255,41 @@ async function createScenario(
     },
   });
 
-  const members = [owner];
+  const members: BenchmarkMember[] = [{ id: owner.id, membershipHouseId: houses[0]?.id ?? null }];
   const remainingMembers = Math.max(0, config.memberCount - 1);
 
   for (let index = 0; index < remainingMembers; index += 1) {
     const memberSubject = `auth0|${runSlug}-member-${index + 1}`;
     const house = houses[index % houses.length];
 
-    members.push(
-      await prisma.user.create({
-        data: {
-          auth0Sub: memberSubject,
-          email: `${runSlug}-member-${index + 1}@example.test`,
-          displayName: `Benchmark Member ${String(index + 1).padStart(3, "0")}`,
-          role: "MEMBER",
-          organizationId: organization.id,
-          houseId: house?.id,
-          authIdentities: {
-            create: {
-              providerSubject: memberSubject,
-            },
+    const member = await prisma.user.create({
+      data: {
+        auth0Sub: memberSubject,
+        email: `${runSlug}-member-${index + 1}@example.test`,
+        displayName: `Benchmark Member ${String(index + 1).padStart(3, "0")}`,
+        authIdentities: {
+          create: {
+            providerSubject: memberSubject,
           },
         },
-      }),
-    );
+      },
+    });
+    await prisma.organizationMembership.create({
+      data: {
+        organizationId: organization.id,
+        userId: member.id,
+        role: "MEMBER",
+        houseId: house?.id,
+      },
+    });
+    members.push({ id: member.id, membershipHouseId: house?.id ?? null });
   }
 
   if (config.transactionCount > 0) {
     await prisma.pointTransaction.createMany({
       data: Array.from({ length: config.transactionCount }, (_, index) => {
         const targetUser = members[index % members.length] ?? owner;
-        const targetHouseId = targetUser.houseId ?? houses[0]?.id;
+        const targetHouseId = targetUser.membershipHouseId ?? houses[0]?.id;
 
         if (!targetHouseId) {
           throw new Error("Benchmark scenario requires at least one house");
@@ -315,20 +329,35 @@ async function cleanupScenarios(
 ): Promise<void> {
   if (organizationIds.length === 0) return;
 
+  const memberships = await prisma.organizationMembership.findMany({
+    where: { organizationId: { in: organizationIds } },
+    select: { userId: true },
+  });
+  const userIds = memberships.map((membership) => membership.userId);
+
   await prisma.pointTransaction.deleteMany({
     where: { organizationId: { in: organizationIds } },
   });
   await prisma.orgInvite.deleteMany({
     where: { organizationId: { in: organizationIds } },
   });
+  await prisma.notification.deleteMany({
+    where: { organizationId: { in: organizationIds } },
+  });
+  await prisma.auditEvent.deleteMany({
+    where: { organizationId: { in: organizationIds } },
+  });
   await prisma.authIdentity.deleteMany({
-    where: { user: { organizationId: { in: organizationIds } } },
+    where: { userId: { in: userIds } },
   });
   await prisma.season.deleteMany({
     where: { organizationId: { in: organizationIds } },
   });
-  await prisma.user.deleteMany({
+  await prisma.organizationMembership.deleteMany({
     where: { organizationId: { in: organizationIds } },
+  });
+  await prisma.user.deleteMany({
+    where: { id: { in: userIds } },
   });
   await prisma.house.deleteMany({
     where: { organizationId: { in: organizationIds } },

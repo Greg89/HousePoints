@@ -7,7 +7,12 @@ export type MutationResult =
     };
 
 export type AwardPointsResult = MutationResult;
-export type CreateOrgResult = MutationResult;
+export type ArchiveOrganizationResult =
+  | { ok: true; redirectTo: string }
+  | Extract<MutationResult, { ok: false }>;
+export type CreateOrgResult =
+  | { ok: true; redirectTo: string }
+  | Extract<MutationResult, { ok: false }>;
 export type DeletePointResult = MutationResult;
 export type DeductPointsResult = MutationResult;
 export type HouseAssignmentResult = MutationResult;

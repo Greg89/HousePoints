@@ -85,8 +85,9 @@ export async function createOrg(
       }),
     });
 
+    let appUser;
     try {
-      await parseOrgUserResponse(
+      appUser = await parseOrgUserResponse(
         response,
         "The organisation could not be created. Please try again.",
       );
@@ -108,8 +109,17 @@ export async function createOrg(
     }
 
     revalidatePath("/");
+    revalidatePath(`/o/${trimmedOrgSlug}`);
 
-    return { ok: true };
+    const createdOrganizationSlug =
+      appUser.organizationContexts.find(
+        (context) => context.organizationSlug === trimmedOrgSlug,
+      )?.organizationSlug ?? trimmedOrgSlug;
+
+    return {
+      ok: true,
+      redirectTo: `/o/${encodeURIComponent(createdOrganizationSlug)}/switch`,
+    };
   });
 }
 

@@ -81,21 +81,28 @@ Deferred sub-features:
 - Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
-- Delete or archive an organization.
+- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, archive actions are audited, archived organization routes render a neutral archived-state page instead of the dashboard, and owners can launch the archive action from the Manage Settings danger zone with slug confirmation. Successful archives now send the owner to that neutral archived-state page.
+
+Recommended remaining order:
+
+1. Expand staging E2E coverage for owner and admin flows.
+2. Continue product hardening around multi-org switching and lifecycle recovery.
 
 ---
 
-## 5.6 Multi-org membership model [todo]
+## 5.6 Multi-org membership model [done]
 
-Current users belong to one organization through `User.organizationId`. That is enough for the first production shape, but it does not support one person switching between multiple organizations.
+Users now belong to organizations through `OrganizationMembership`, with role and house assignment scoped per organization. The legacy `User.organizationId`, `User.role`, and `User.houseId` fields have a removal migration after the membership backfill and read/write migration.
 
-Future approach:
+Design status: the staged migration plan lives in [Multi-Org Membership Design](./multi-org-membership-design.md). Runtime reads and writes use active memberships, the web resolves active organization state through membership contexts, and the schema-removal migration is in place.
 
-1. Add an `OrganizationMembership` join table with role and house assignment per organization.
-2. Move role and house assignment out of `User` and into membership scope.
+Implemented approach:
+
+1. Add and backfill `OrganizationMembership`.
+2. Move role and house assignment reads/writes out of `User` and into membership scope.
 3. Add active-organization selection in the web session.
 4. Update actor resolution to return a membership-scoped actor.
-5. Backfill existing users into one membership each before switching reads.
+5. Remove legacy user org, role, and house fields after the backfill and compatibility guards are in place.
 
 ---
 

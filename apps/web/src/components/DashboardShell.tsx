@@ -38,6 +38,7 @@ import type {
   SeasonComparison,
   SeasonContext,
   Trait,
+  AppUserOrganizationContext,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -50,6 +51,7 @@ interface DashboardShellProps {
     houseThemeEnabled: boolean;
     role: "MEMBER" | "ADMIN" | "OWNER";
     organizationSlug: string | null;
+    organizationContexts: AppUserOrganizationContext[];
   };
   leaderboard: LeaderboardEntry[];
   members: OrgMember[];
@@ -77,6 +79,7 @@ interface DashboardShellProps {
   dashboardHref: string;
   loginUrl: string;
   logoutUrl: string;
+  releaseNotesUrl?: string | null;
   showSeasonOverviewCard?: boolean;
   adminSection?: React.ReactNode;
 }
@@ -183,6 +186,7 @@ export function DashboardShell({
   onDeletePoint,
   dashboardHref,
   logoutUrl,
+  releaseNotesUrl,
   showSeasonOverviewCard = false,
   adminSection,
 }: DashboardShellProps) {
@@ -334,12 +338,14 @@ export function DashboardShell({
               session={{
                 userName: session.userName,
                 role: session.role,
+                organizationContexts: session.organizationContexts,
               }}
               dashboardHref={dashboardHref}
               notifications={currentNotifications}
               onNotificationsChange={setCurrentNotifications}
               onMarkNotificationRead={onMarkNotificationRead}
               onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+              releaseNotesUrl={releaseNotesUrl}
               logoutUrl={logoutUrl}
             />
             <NotificationPoller

@@ -12,10 +12,63 @@ vi.mock("@housepoints/db", () => ({
 }));
 
 import { prisma } from "@housepoints/db";
-import { getActorBySub, isAdminRole, isOwnerRole } from "./actor";
+import {
+  getActorBySub,
+  getActorBySubForOrganizationSlug,
+  getUserOrgContextBySub,
+  getUserRouteOrgContextBySub,
+  isAdminRole,
+  isOwnerRole,
+} from "./actor";
 
 const mockIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const actorUserSelect = {
+  id: true,
+  displayName: true,
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
+    },
+    select: {
+      id: true,
+      organizationId: true,
+      role: true,
+      houseId: true,
+      organization: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
+    },
+  },
+};
+
+const orgContextUserSelect = {
+  memberships: {
+    where: {
+      isActive: true,
+      archivedAt: null,
+      organization: {
+        archivedAt: null,
+      },
+    },
+    select: {
+      organizationId: true,
+      organization: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
+    },
+  },
+};
 
 describe("isAdminRole", () => {
   it("allows admin and owner roles to use admin capabilities", () => {
@@ -38,18 +91,30 @@ describe("getActorBySub", () => {
     vi.resetAllMocks();
   });
 
-  it("looks up actors by linked Auth0 identity with the expected select shape", async () => {
+  it("prefers active membership fields when resolving an actor by linked Auth0 identity", async () => {
     mockIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
         displayName: "Member User",
         role: "MEMBER",
-        houseId: "house-1",
+        houseId: "legacy-house",
         organizationId: "org-1",
         organization: {
-          name: "Acme Corp",
-          slug: "acme",
+          name: "Legacy Acme",
+          slug: "legacy-acme",
         },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "membership-house",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
 
@@ -57,8 +122,9 @@ describe("getActorBySub", () => {
       id: "user-1",
       auth0Sub: "github|member",
       displayName: "Member User",
-      role: "MEMBER",
-      houseId: "house-1",
+      membershipId: "membership-1",
+      role: "ADMIN",
+      houseId: "membership-house",
       organizationId: "org-1",
       organizationName: "Acme Corp",
       organizationSlug: "acme",
@@ -68,19 +134,7 @@ describe("getActorBySub", () => {
       where: { providerSubject: "github|member" },
       select: {
         user: {
-          select: {
-            id: true,
-            displayName: true,
-            role: true,
-            houseId: true,
-            organizationId: true,
-            organization: {
-              select: {
-                name: true,
-                slug: true,
-              },
-            },
-          },
+          select: actorUserSelect,
         },
       },
     });
@@ -99,14 +153,27 @@ describe("getActorBySub", () => {
         name: "Acme Corp",
         slug: "acme",
       },
+      memberships: [
+        {
+          id: "membership-1",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-2",
+          organization: {
+            name: "Acme Corp",
+            slug: "acme",
+          },
+        },
+      ],
     });
 
     await expect(getActorBySub("auth0|member")).resolves.toEqual({
       id: "user-1",
       auth0Sub: "auth0|member",
       displayName: "Member User",
-      role: "MEMBER",
-      houseId: "house-1",
+      membershipId: "membership-1",
+      role: "OWNER",
+      houseId: "house-2",
       organizationId: "org-1",
       organizationName: "Acme Corp",
       organizationSlug: "acme",
@@ -114,19 +181,150 @@ describe("getActorBySub", () => {
 
     expect(mockFindUnique).toHaveBeenCalledWith({
       where: { auth0Sub: "auth0|member" },
-      select: {
-        id: true,
-        displayName: true,
-        role: true,
-        houseId: true,
-        organizationId: true,
+      select: actorUserSelect,
+    });
+  });
+
+  it("returns null when no active membership exists even if legacy org fields are present", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: "house-1",
+        organizationId: "org-1",
         organization: {
-          select: {
-            name: true,
-            slug: true,
-          },
+          name: "Acme Corp",
+          slug: "acme",
         },
+        memberships: [],
       },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toBeNull();
+  });
+
+  it("uses the first active membership when the legacy organization shadow is empty", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: null,
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-1",
+      role: "ADMIN",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("uses the first active membership when the legacy organization shadow is stale", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: null,
+        organizationId: "org-stale",
+        organization: null,
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-1",
+      role: "OWNER",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("uses the first active membership when the legacy organization shadow matches another membership", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "MEMBER",
+        houseId: null,
+        organizationId: "org-2",
+        organization: {
+          name: "Beta Org",
+          slug: "beta",
+        },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "ADMIN",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+          {
+            id: "membership-2",
+            organizationId: "org-2",
+            role: "OWNER",
+            houseId: "house-2",
+            organization: {
+              name: "Beta Org",
+              slug: "beta",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySub("auth0|member")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-1",
+      role: "ADMIN",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
     });
   });
 
@@ -146,9 +344,288 @@ describe("getActorBySub", () => {
         houseId: null,
         organizationId: null,
         organization: null,
+        memberships: [],
       },
     });
 
     await expect(getActorBySub("auth0|member")).resolves.toBeNull();
+  });
+});
+
+describe("getActorBySubForOrganizationSlug", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns the membership-scoped actor for the requested organization slug", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-1",
+        organization: {
+          name: "Legacy Acme",
+          slug: "legacy-acme",
+        },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+          {
+            id: "membership-2",
+            organizationId: "org-2",
+            role: "ADMIN",
+            houseId: "house-2",
+            organization: {
+              name: "Beta Org",
+              slug: "beta",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySubForOrganizationSlug("auth0|member", "beta")).resolves.toEqual({
+      id: "user-1",
+      auth0Sub: "auth0|member",
+      displayName: "Member User",
+      membershipId: "membership-2",
+      role: "ADMIN",
+      houseId: "house-2",
+      organizationId: "org-2",
+      organizationName: "Beta Org",
+      organizationSlug: "beta",
+    });
+  });
+
+  it("returns null when the requested slug is not one of the user's active memberships", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-1",
+        organization: {
+          name: "Legacy Acme",
+          slug: "legacy-acme",
+        },
+        memberships: [
+          {
+            id: "membership-1",
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getActorBySubForOrganizationSlug("auth0|member", "beta")).resolves.toBeNull();
+  });
+
+  it("does not fall back to legacy user org fields for scoped API calls", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-1",
+        displayName: "Member User",
+        role: "OWNER",
+        houseId: "legacy-house",
+        organizationId: "org-legacy",
+        organization: {
+          name: "Legacy Acme",
+          slug: "legacy-acme",
+        },
+        memberships: [],
+      },
+    });
+
+    await expect(
+      getActorBySubForOrganizationSlug("auth0|member", "legacy-acme"),
+    ).resolves.toBeNull();
+  });
+});
+
+describe("getUserOrgContextBySub", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns the active membership context when the legacy current organization shadow is empty", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+
+    expect(mockIdentityFindUnique).toHaveBeenCalledWith({
+      where: { providerSubject: "auth0|member" },
+      select: { user: { select: orgContextUserSelect } },
+    });
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("uses the first active membership without consulting the legacy current organization shadow", async () => {
+    mockIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue({
+      organizationId: "org-2",
+      organization: {
+        name: "Legacy Org",
+        slug: "legacy-org",
+      },
+      memberships: [
+        {
+          organizationId: "org-1",
+          organization: {
+            name: "Acme Corp",
+            slug: "acme",
+          },
+        },
+        {
+          organizationId: "org-2",
+          organization: {
+            name: "Current Org",
+            slug: "current-org",
+          },
+        },
+      ],
+    });
+
+    await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("returns empty org fields when no active membership exists", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-legacy",
+        organization: {
+          name: "Legacy Org",
+          slug: "legacy-org",
+        },
+        memberships: [],
+      },
+    });
+
+    await expect(getUserOrgContextBySub("auth0|member")).resolves.toEqual({
+      organizationId: null,
+      organizationName: null,
+      organizationSlug: null,
+    });
+  });
+});
+
+describe("getUserRouteOrgContextBySub", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns requested membership plus an active fallback organization when the legacy shadow is empty", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+          {
+            organizationId: "org-2",
+            organization: {
+              name: "Second Org",
+              slug: "second-org",
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getUserRouteOrgContextBySub("auth0|member", "org-2")).resolves.toEqual({
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+      requestedMembership: {
+        organizationId: "org-2",
+        organizationName: "Second Org",
+        organizationSlug: "second-org",
+        organizationArchivedAt: null,
+      },
+    });
+  });
+
+  it("returns archived requested membership without selecting it as the active fallback organization", async () => {
+    const archivedAt = new Date("2026-07-04T17:30:00.000Z");
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Archived Org",
+              slug: "archived-org",
+              archivedAt,
+            },
+          },
+          {
+            organizationId: "org-2",
+            organization: {
+              name: "Active Org",
+              slug: "active-org",
+              archivedAt: null,
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(getUserRouteOrgContextBySub("auth0|member", "org-1")).resolves.toEqual({
+      organizationId: "org-2",
+      organizationName: "Active Org",
+      organizationSlug: "active-org",
+      requestedMembership: {
+        organizationId: "org-1",
+        organizationName: "Archived Org",
+        organizationSlug: "archived-org",
+        organizationArchivedAt: archivedAt,
+      },
+    });
   });
 });

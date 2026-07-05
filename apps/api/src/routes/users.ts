@@ -124,22 +124,35 @@ export async function updateUserProfile(
       ...(update.displayName !== undefined ? { displayName: update.displayName } : {}),
       ...(update.houseThemeEnabled !== undefined ? { houseThemeEnabled: update.houseThemeEnabled } : {}),
     },
-    select: { id: true, displayName: true, houseThemeEnabled: true },
+    select: APP_USER_SELECT,
   });
 }
 
 export async function listOrgMembers(organizationId: string) {
-  return prisma.user.findMany({
-    where: { organizationId },
-    orderBy: { displayName: "asc" },
+  const memberships = await prisma.organizationMembership.findMany({
+    where: { organizationId, isActive: true, archivedAt: null },
+    orderBy: { user: { displayName: "asc" } },
     select: {
       id: true,
-      displayName: true,
       role: true,
       houseId: true,
       house: { select: { name: true, color: true } },
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+        },
+      },
     },
   });
+
+  return memberships.map((membership) => ({
+    id: membership.user.id,
+    displayName: membership.user.displayName,
+    role: membership.role,
+    houseId: membership.houseId,
+    house: membership.house,
+  }));
 }
 
 export async function registerUserRoutes(
@@ -154,13 +167,14 @@ export async function registerUserRoutes(
     const existing = await findExistingUser(auth0Sub);
 
     if (existing) {
+      const mappedExisting = mapAppUser(existing);
       info(request.log, "users.bootstrap.loaded", {
         userId: existing.id,
         auth0Sub: existing.auth0Sub,
-        organizationId: existing.organizationId,
-        hasHouse: Boolean(existing.houseId),
+        organizationId: mappedExisting.organizationId,
+        hasHouse: Boolean(mappedExisting.houseId),
       });
-      return { ...mapAppUser(existing), created: false };
+      return { ...mappedExisting, created: false };
     }
 
     const idToken = readIdTokenHeader(request.headers["x-auth0-id-token"]);
@@ -179,15 +193,16 @@ export async function registerUserRoutes(
 
     if (existingByEmail) {
       await linkIdentityToUser(auth0Sub, existingByEmail.id);
+      const mappedExistingByEmail = mapAppUser(existingByEmail);
 
       info(request.log, "users.bootstrap.identity_linked", {
         userId: existingByEmail.id,
         auth0Sub,
         email: existingByEmail.email,
-        organizationId: existingByEmail.organizationId,
+        organizationId: mappedExistingByEmail.organizationId,
       });
 
-      return { ...mapAppUser(existingByEmail), created: false };
+      return { ...mappedExistingByEmail, created: false };
     }
 
     const conflictingEmailUser = !verifiedEmail && parsed.email
@@ -248,7 +263,7 @@ export async function registerUserRoutes(
       houseThemeEnabled: updated.houseThemeEnabled,
     });
 
-    return updated;
+    return mapAppUser(updated);
   });
 
   app.post("/members", async (request, reply) => {

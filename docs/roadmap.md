@@ -79,5 +79,5 @@ Each tier has its own file with detailed task breakdowns.
 | 5.3 | Connection pooling via capped direct Postgres pool | [done] |
 | 5.4 | Self-serve org creation and single-use invite joining | [done] |
 | 5.5 | Org settings, owner transfer, admin removal, and org deletion | [doing] |
-| 5.6 | Multi-org membership model | [todo] |
+| 5.6 | Multi-org membership model | [done] |
 | 5.7 | Query count and response-time baselines for empty, typical, and larger orgs | [done] |

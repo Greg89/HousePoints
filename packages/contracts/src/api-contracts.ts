@@ -17,6 +17,8 @@ import {
   removeOrgMemberSchema,
   transferOwnerSchema,
   adminUserSchema,
+  archiveOrgResponseSchema,
+  archiveOrgSchema,
 } from "./admin-schemas.js";
 import {
   dashboardSummarySchema,
@@ -66,6 +68,12 @@ import {
   renameSeasonSchema,
   seasonSchema,
 } from "./season-schemas.js";
+import {
+  broadcastReleaseAnnouncementResponseSchema,
+  broadcastReleaseAnnouncementSchema,
+  createReleaseAnnouncementSchema,
+  releaseAnnouncementSchema,
+} from "./release-schemas.js";
 
 type ApiContract = {
   request: z.ZodType;
@@ -88,6 +96,7 @@ export const apiContracts = {
   "/admin/org/settings": defineContract(updateOrgSettingsSchema, orgSettingsSchema),
   "/admin/org/slug": defineContract(updateOrgSlugSchema, orgSettingsSchema),
   "/admin/org/owner": defineContract(transferOwnerSchema, adminUserSchema),
+  "/admin/org/archive": defineContract(archiveOrgSchema, archiveOrgResponseSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,
@@ -110,6 +119,11 @@ export const apiContracts = {
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),
   "/notifications/mark-all-read": defineContract(actorScopeSchema, notificationMutationResponseSchema),
   "/notifications/mark-read": defineContract(markNotificationsReadSchema, notificationMutationResponseSchema),
+  "/system/releases/broadcast": defineContract(
+    broadcastReleaseAnnouncementSchema,
+    broadcastReleaseAnnouncementResponseSchema,
+  ),
+  "/system/releases/record": defineContract(createReleaseAnnouncementSchema, releaseAnnouncementSchema),
   "/orgs/create": defineContract(createOrgSchema, appUserSchema),
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),
   "/orgs/join/preview": defineContract(joinInvitePreviewSchema, joinInvitePreviewResponseSchema),

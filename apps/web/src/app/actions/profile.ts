@@ -2,7 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { updateProfileResponseSchema, type UserRole } from "@housepoints/contracts";
+import {
+  updateProfileResponseSchema,
+  type AppUserOrganizationContext,
+  type UserRole,
+} from "@housepoints/contracts";
 import {
   ApiResponseError,
   apiFetch,
@@ -10,6 +14,8 @@ import {
   parseApiResponse,
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
+import { resolveActiveAppUserMapping } from "@/lib/active-user-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import type { ProfileUpdateResult } from "@/lib/action-results";
 import { logInfo, logWarn } from "@/lib/logging";
@@ -25,6 +31,7 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   houseId?: string | null;
   houseName?: string | null;
   houseColor?: string | null;
+  organizationContexts?: AppUserOrganizationContext[];
   houseThemeEnabled?: boolean;
   role?: UserRole;
   needsOrg?: boolean;
@@ -54,12 +61,17 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   };
 
   const mapping = await getCurrentUserForRequest(requestId);
+  const activeOrganizationSlug = await readActiveOrganizationSlug();
+  const activeMapping = resolveActiveAppUserMapping(mapping, activeOrganizationSlug);
+  const organizationId = activeMapping.organizationId;
+  const organizationSlug = activeMapping.organizationSlug;
+  const houseId = activeMapping.houseId;
 
   logInfo("web.session.read", {
     requestId,
     userSub: summary.userSub,
     appUserId: mapping.id,
-    hasHouse: Boolean(mapping.houseId),
+    hasHouse: Boolean(houseId),
   });
 
   logInfo("web.action.completed", {
@@ -71,15 +83,16 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     ...summary,
     userName: mapping.displayName,  // DB is source of truth; Auth0 token may be stale
     appUserId: mapping.id,
-    organizationId: mapping.organizationId,
-    organizationSlug: mapping.organizationSlug,
-    houseId: mapping.houseId,
-    houseName: mapping.houseName,
-    houseColor: mapping.houseColor,
+    organizationId,
+    organizationSlug,
+    houseId,
+    houseName: activeMapping.houseName,
+    houseColor: activeMapping.houseColor,
+    organizationContexts: activeMapping.organizationContexts,
     houseThemeEnabled: mapping.houseThemeEnabled,
-    role: mapping.role,
-    needsOrg: !mapping.organizationId,
-    needsHouseAssignment: !!mapping.organizationId && !mapping.houseId,
+    role: activeMapping.role,
+    needsOrg: !organizationId,
+    needsHouseAssignment: !!organizationId && !houseId,
   };
 }
 

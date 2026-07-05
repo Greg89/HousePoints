@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { notFound, redirect } from "next/navigation";
 import { readOrgRouteContext } from "@/app/actions/orgs";
 import { renderDashboardPage } from "@/app/dashboard-page";
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { WebAuthenticationError } from "@/lib/api-client";
 import OrganizationDashboardPage from "./page";
 
@@ -23,8 +24,13 @@ vi.mock("@/app/dashboard-page", () => ({
   renderDashboardPage: vi.fn(),
 }));
 
+vi.mock("@/lib/active-organization", () => ({
+  readActiveOrganizationSlug: vi.fn(),
+}));
+
 const readOrgRouteContextMock = vi.mocked(readOrgRouteContext);
 const renderDashboardPageMock = vi.mocked(renderDashboardPage);
+const readActiveOrganizationSlugMock = vi.mocked(readActiveOrganizationSlug);
 const notFoundMock = vi.mocked(notFound);
 const redirectMock = vi.mocked(redirect);
 
@@ -42,6 +48,7 @@ describe("OrganizationDashboardPage", () => {
       requestedSlug: "acme",
       organizationSlug: "acme",
     });
+    readActiveOrganizationSlugMock.mockResolvedValue("acme");
     renderDashboardPageMock.mockResolvedValue(
       <main>
         <h1>Dashboard</h1>
@@ -68,6 +75,15 @@ describe("OrganizationDashboardPage", () => {
 
     expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(renderDashboardPageMock).toHaveBeenCalledWith("/o/acme");
+  });
+
+  it("redirects through the switch route when the selected organization cookie is stale", async () => {
+    readActiveOrganizationSlugMock.mockResolvedValue("beta");
+
+    await expect(renderPage("acme")).rejects.toThrow("NEXT_REDIRECT:/o/acme/switch");
+
+    expect(redirectMock).toHaveBeenCalledWith("/o/acme/switch");
+    expect(renderDashboardPageMock).not.toHaveBeenCalled();
   });
 
   it("redirects old slug aliases to the canonical organization slug", async () => {
@@ -112,6 +128,25 @@ describe("OrganizationDashboardPage", () => {
     expect(screen.getByText(/belongs to Other Org/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open your dashboard" })).toHaveAttribute("href", "/o/other-org");
     expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute("href", "/auth/logout");
+    expect(renderDashboardPageMock).not.toHaveBeenCalled();
+  });
+
+  it("shows an archived organization state instead of rendering the dashboard", async () => {
+    readOrgRouteContextMock.mockResolvedValue({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+    });
+
+    render(await renderPage("acme"));
+
+    expect(screen.getByRole("heading", { name: "This organization is archived" })).toBeInTheDocument();
+    expect(screen.getByText(/Acme Corp has been archived/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute("href", "/auth/logout");
+    expect(readActiveOrganizationSlugMock).not.toHaveBeenCalled();
     expect(renderDashboardPageMock).not.toHaveBeenCalled();
   });
 

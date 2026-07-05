@@ -1,14 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { exactNamePattern, missingRequiredEnv, signInIfNeeded } from "./support/auth";
+import { missingRequiredEnv, readTargetMemberName, requiredStagingEnv } from "./support/config";
+import { exactNamePattern, signInIfNeeded } from "./support/auth";
+import { expectDashboardReady } from "./support/dashboard";
+import { gotoE2EStart } from "./support/navigation";
 
-const requiredEnv = [
-  "E2E_BASE_URL",
-  "E2E_USER_EMAIL",
-  "E2E_USER_PASSWORD",
-  "E2E_TARGET_MEMBER",
-] as const;
-
-const missingEnv = missingRequiredEnv(requiredEnv);
+const missingEnv = missingRequiredEnv(requiredStagingEnv);
 
 test.skip(
   missingEnv.length > 0,
@@ -16,13 +12,13 @@ test.skip(
 );
 
 test("login, award points, and see activity plus leaderboard updates", async ({ page }) => {
-  const targetMember = process.env.E2E_TARGET_MEMBER!;
+  const targetMember = readTargetMemberName();
   const note = `Playwright E2E recognition ${Date.now()}`;
 
-  await page.goto("/");
+  await gotoE2EStart(page);
   await signInIfNeeded(page);
 
-  await expect(page.getByText(/welcome back/i)).toBeVisible();
+  await expectDashboardReady(page);
 
   await page.getByRole("button", { name: /award points/i }).first().click();
   const dialog = page.getByRole("dialog", { name: /award points/i });

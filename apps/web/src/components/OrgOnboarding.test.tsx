@@ -5,6 +5,14 @@ import { toast } from "sonner";
 import { createOrg, joinOrg } from "@/app/actions/orgs";
 import { OrgOnboarding } from "./OrgOnboarding";
 
+const pushMock = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: pushMock,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -29,7 +37,7 @@ function setupOnboarding() {
 describe("OrgOnboarding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createOrgMock.mockResolvedValue({ ok: true });
+    createOrgMock.mockResolvedValue({ ok: true, redirectTo: "/o/acme/switch" });
     joinOrgMock.mockResolvedValue({ ok: true });
   });
 
@@ -52,7 +60,28 @@ describe("OrgOnboarding", () => {
     expect(toastMock.success).toHaveBeenCalledWith("Organisation created!", {
       description: "Welcome to Acme Corp",
     });
+    expect(pushMock).toHaveBeenCalledWith("/o/acme/switch");
     expect(toastMock.error).not.toHaveBeenCalled();
+  });
+
+  it("can start directly on the create view for existing members", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrgOnboarding
+        userName="User One"
+        initialView="create"
+        allowJoin={false}
+        backHref="/o/acme"
+        introText="Create another organization."
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /join with an invite link/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Create another organization.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(pushMock).toHaveBeenCalledWith("/o/acme");
   });
 
   it("shows a safe create error when the typed result fails", async () => {
@@ -84,6 +113,7 @@ describe("OrgOnboarding", () => {
 
     await waitFor(() => expect(joinOrgMock).toHaveBeenCalledWith("invite-token"));
     expect(toastMock.success).toHaveBeenCalledWith("You've joined the organisation!");
+    expect(pushMock).toHaveBeenCalledWith("/");
     expect(toastMock.error).not.toHaveBeenCalled();
   });
 

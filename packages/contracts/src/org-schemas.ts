@@ -84,6 +84,13 @@ export const orgRouteContextSchema = z.discriminatedUnion("status", [
     actorOrganizationName: z.string().min(1),
   }),
   z.object({
+    status: z.literal("ARCHIVED"),
+    requestedSlug: slugSchema,
+    organizationSlug: slugSchema,
+    organizationName: z.string().min(1),
+    archivedAt: z.string().datetime(),
+  }),
+  z.object({
     status: z.literal("NO_ACTOR_ORG"),
     requestedSlug: slugSchema,
     organizationSlug: slugSchema.optional(),

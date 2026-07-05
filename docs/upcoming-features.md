@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org deletion, domain allow-list joining, optional root redirects for dashboard slug routes, and true multi-org membership. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, and member removal are implemented in Manage. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), and the dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md).
+Still deferred: org archival/deletion, domain allow-list joining, and optional root redirects for dashboard slug routes. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, member removal, and existing-member create-new-org UX are implemented. Multi-org membership is implemented at the data and authorization layer through `OrganizationMembership`, and legacy user org/role/house columns have been removed from the Prisma schema. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md), and org archive rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md).
 
 ### How it should work
 
@@ -30,7 +30,7 @@ Still deferred: org deletion, domain allow-list joining, optional root redirects
 - `OWNER` can promote members to `ADMIN`, demote admins back to `MEMBER`, and remove non-owner users from the organization from Manage Team. Role changes and removals are audited.
 - `OWNER` can rename the organization display name and change the organization slug from Manage Settings. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
+- Org archival/deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
@@ -41,13 +41,14 @@ Still deferred: org deletion, domain allow-list joining, optional root redirects
 - All existing endpoints already filter by `organizationId` derived from the actor's mapping; this is already enforced.
 - Bootstrap creates an unmapped user only; org creation and invite joining are explicit flows.
 - Same-email alternate Auth0 provider logins link to the existing user only from verified email token claims. Unverified/body-only email conflicts return `ACCOUNT_LINK_REQUIRED`.
-- A user can only belong to **one org** in the current schema (single `organizationId` on `User`). Multi-org membership remains deferred.
+- A user can belong to multiple organizations through `OrganizationMembership`. Existing members can intentionally create another organization from Account and are switched into the new organization after setup.
 
 **Open questions**
+- Should the existing-member create-new-org flow move into a richer organization management page as multi-org usage grows?
 - Do we allow a user to leave an org and join another? What happens to their transaction history?
 - Do we need multi-use standing invite links, or is single-use enough for the first production cohort?
 - Do we need an "org discovery" page, or is the invite link the only entry point?
-- What final retention and recovery rules do we want for org deletion or archival?
+- What final retention and recovery rules do we want for org deletion or archival? First-pass archive rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md).
 
 ---
 
@@ -148,7 +149,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 A durable in-app attention layer for events that users might miss if they are not actively watching the app.
 
 ### Current state
-The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, settings, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are implemented as org-wide informational notifications created when an owner starts a new season. `POINT_AWARD_RECEIVED` notifications are implemented as targeted informational notifications for the awarded member, with self-awards skipped to avoid inbox noise. `POINT_DEDUCTION_RECEIVED` notifications are implemented as targeted warning notifications for the deducted member. `ROLE_CHANGED` notifications are implemented for owner role-management changes, notifying the changed user plus other owners.
+The MVP notification workflow is implemented for `MEMBER_NEEDS_HOUSE_ASSIGNMENT`. When a user accepts an invite and remains unassigned, admins and owners receive durable per-user notifications, unread badge state in the account menu, and active-session toast cues through lightweight polling. The account menu supports notification preview, mark-read, mark-all-read, Account, and sign out. When the member is assigned to a house, the related action-required notifications are marked read and archived inside the assignment transaction. `SEASON_STARTED` notifications are implemented as org-wide informational notifications created when an owner starts a new season. `POINT_AWARD_RECEIVED` notifications are implemented as targeted informational notifications for the awarded member, with self-awards skipped to avoid inbox noise. `POINT_DEDUCTION_RECEIVED` notifications are implemented as targeted warning notifications for the deducted member. `ROLE_CHANGED` notifications are implemented for owner role-management changes, notifying the changed user plus other owners.
 
 Still deferred: a full notification page, user notification preferences, email delivery, server-sent events or websocket fanout, and additional notification producers such as org setting changes.
 

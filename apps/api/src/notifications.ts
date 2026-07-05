@@ -114,3 +114,27 @@ export function buildMemberNeedsAssignmentNotificationData(input: {
     dedupeKey: `member-needs-house-assignment:${input.organizationId}:${input.joinedUserId}`,
   };
 }
+
+export function buildReleaseAnnouncementNotificationData(input: {
+  organizationId: string;
+  recipientId: string;
+  releaseId: string;
+  version: string;
+  title: string;
+  summary: string;
+  releaseNotesUrl: string;
+}): NotificationRow {
+  return {
+    organizationId: input.organizationId,
+    recipientUserId: input.recipientId,
+    type: "RELEASE_ANNOUNCEMENT",
+    severity: "INFO",
+    title: `What's new: ${input.title}`,
+    body: input.summary,
+    actionLabel: "View release notes",
+    actionHref: input.releaseNotesUrl,
+    entityType: "ReleaseAnnouncement",
+    entityId: input.releaseId,
+    dedupeKey: `release-announcement:${input.version}:${input.organizationId}`,
+  };
+}

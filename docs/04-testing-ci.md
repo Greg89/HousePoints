@@ -110,7 +110,7 @@ The integration suite intentionally asserts that invalid operations fail. Prisma
 
 **Status:** Implemented as an opt-in staging/local harness and scheduled staging monitor.
 
-Prerequisite: a seeded test database, test Auth0 tenant or staging environment, and a test user that belongs to an organization with at least one assignable target member.
+Prerequisite: a seeded test database, test Auth0 tenant or staging environment, and a test user that belongs to an organization with at least one assignable target member. The canonical staging data expectations live in [Staging E2E Test Data Contract](./staging-e2e-test-data-contract.md).
 
 Implemented E2E paths:
 
@@ -135,6 +135,7 @@ $env:E2E_BASE_URL = "https://your-staging-web-url"
 $env:E2E_USER_EMAIL = "test-user@example.com"
 $env:E2E_USER_PASSWORD = "test-user-password"
 $env:E2E_TARGET_MEMBER = "Target Member Name"
+$env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
 ```
 
@@ -148,6 +149,11 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 - `E2E_TARGET_MEMBER`
+- `E2E_ORG_SLUG`
+
+`E2E_ORG_SLUG` routes tests directly to `/o/{slug}`. The scheduled staging workflow requires it so the test account always lands in the known-good E2E organization.
+
+The current required secrets are intentionally limited to the tests that exist today. Future owner/admin/member actors should be added only when those tests are implemented.
 
 The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).
 

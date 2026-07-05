@@ -6,7 +6,20 @@ import {
 import { error, info, warn } from "./logging.js";
 
 export function isPublicRoute(routeUrl: string | undefined): boolean {
-  return routeUrl === "/health";
+  return routeUrl === "/health"
+    || routeUrl === "/system/releases/record"
+    || routeUrl === "/system/releases/broadcast";
+}
+
+function getRequestPath(url: string): string {
+  return url.split("?", 1)[0] ?? url;
+}
+
+export function isPublicRequestRoute(
+  routeUrl: string | undefined,
+  requestUrl: string,
+): boolean {
+  return isPublicRoute(routeUrl) || isPublicRoute(getRequestPath(requestUrl));
 }
 
 export function registerAuthenticationHook(
@@ -16,7 +29,7 @@ export function registerAuthenticationHook(
   app.decorateRequest("auth");
 
   app.addHook("preValidation", async (request, reply) => {
-    if (isPublicRoute(request.routeOptions.url)) {
+    if (isPublicRequestRoute(request.routeOptions.url, request.url)) {
       return;
     }
 

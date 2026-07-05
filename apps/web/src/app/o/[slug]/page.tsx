@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { readOrgRouteContext } from "@/app/actions/orgs";
 import { renderDashboardPage } from "@/app/dashboard-page";
+import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { WebAuthenticationError } from "@/lib/api-client";
 import { logError, serializeErrorForLog } from "@/lib/logging";
 
@@ -63,6 +64,26 @@ async function renderOrganizationDashboardPage(slug: string, route: string) {
         secondaryLabel="Sign out"
       />
     );
+  }
+
+  if (routeContext.status === "ARCHIVED") {
+    return (
+      <SlugRouteMessage
+        title="This organization is archived"
+        description={`${routeContext.organizationName} has been archived. Historical records are preserved, but the dashboard is no longer available for normal activity.`}
+        actionHref="/"
+        actionLabel="Go home"
+        secondaryHref="/auth/logout"
+        secondaryLabel="Sign out"
+      />
+    );
+  }
+
+  if (routeContext.status === "MATCH") {
+    const activeOrganizationSlug = await readActiveOrganizationSlug();
+    if (activeOrganizationSlug !== routeContext.organizationSlug) {
+      redirect(`/o/${encodeURIComponent(routeContext.organizationSlug)}/switch`);
+    }
   }
 
   try {

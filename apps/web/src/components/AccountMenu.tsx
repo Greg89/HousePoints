@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Check,
+  ArrowSquareOut,
   Gear,
+  Megaphone,
   SignOut,
   User,
 } from "@phosphor-icons/react";
-import type { Notification, PagedNotifications } from "@housepoints/contracts";
+import type { AppUserOrganizationContext, Notification, PagedNotifications } from "@housepoints/contracts";
 import type { NotificationMutationResult } from "@/lib/action-results";
 import { cn } from "@/lib/cn";
 
@@ -17,12 +19,14 @@ type AccountMenuProps = {
   session: {
     userName: string;
     role: "MEMBER" | "ADMIN" | "OWNER";
+    organizationContexts: AppUserOrganizationContext[];
   };
   notifications: PagedNotifications;
   onNotificationsChange: (notifications: PagedNotifications) => void;
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   dashboardHref: string;
+  releaseNotesUrl?: string | null;
   logoutUrl: string;
 };
 
@@ -40,6 +44,7 @@ export function AccountMenu({
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   dashboardHref,
+  releaseNotesUrl,
   logoutUrl,
 }: AccountMenuProps) {
   const router = useRouter();
@@ -49,6 +54,13 @@ export function AccountMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const displayedUnreadCount = Math.min(notifications.unreadCount, 99);
   const hasUnread = notifications.unreadCount > 0;
+  const currentOrganization = session.organizationContexts.find((context) => context.isCurrent) ?? null;
+  const canSwitchOrganizations = session.organizationContexts.length > 1;
+  const visibleOrganizationContexts = getVisibleOrganizationContexts(session.organizationContexts);
+  const hiddenOrganizationCount = Math.max(
+    0,
+    session.organizationContexts.length - visibleOrganizationContexts.length,
+  );
 
   useEffect(() => {
     if (!open) {
@@ -128,6 +140,11 @@ export function AccountMenu({
 
       if (canNavigate) {
         setOpen(false);
+        if (isExternalHttpsHref(href)) {
+          window.open(href, "_blank", "noopener,noreferrer");
+          return;
+        }
+
         router.push(href);
       }
     });
@@ -179,71 +196,121 @@ export function AccountMenu({
         <div
           role="dialog"
           aria-label="Account and notifications"
-          className="absolute right-0 z-40 mt-3 w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
+          className="absolute right-0 z-40 mt-3 flex max-h-[calc(100dvh-7rem)] w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
         >
-          <div className="border-b p-4">
+          <div className="shrink-0 border-b p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Signed in
             </p>
             <p className="mt-1 font-display text-lg font-semibold leading-tight">{session.userName}</p>
             <p className="mt-1 text-xs font-medium text-muted-foreground">{formatRole(session.role)}</p>
-          </div>
-
-          <section className="max-h-96 overflow-y-auto p-3" aria-label="Notifications">
-            <div className="mb-2 flex items-center justify-between gap-3 px-1">
-              <div>
-                <h2 className="text-sm font-bold">Notifications</h2>
-                <p className="text-xs text-muted-foreground">
-                  {hasUnread ? `${notifications.unreadCount} unread` : "All caught up"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                disabled={!hasUnread || isPending}
-                className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Mark all read
-              </button>
-            </div>
-
-            {error ? (
-              <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {error}
+            {currentOrganization ? (
+              <p className="mt-2 text-xs font-semibold text-primary">
+                {currentOrganization.organizationName}
               </p>
             ) : null}
+          </div>
 
-            {notifications.items.length === 0 ? (
-              <div className="rounded-xl border border-dashed p-5 text-center">
-                <Check size={24} className="mx-auto text-primary" aria-hidden="true" />
-                <p className="mt-2 text-sm font-semibold">You&apos;re all caught up.</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Notifications that need attention will show up here.
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {canSwitchOrganizations ? (
+              <section
+                className="border-b bg-muted/10 p-3"
+                aria-label="Switch organization"
+              >
+                <div className="mb-2 px-1">
+                  <h2 className="text-sm font-bold">Switch organization</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Notifications and dashboard data follow the selected organization.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {visibleOrganizationContexts.map((context) => (
+                    <OrganizationSwitchLink
+                      key={context.organizationId}
+                      context={context}
+                    />
+                  ))}
+                  {hiddenOrganizationCount > 0 ? (
+                    <a
+                      href="/settings#organisations"
+                      className="flex w-full items-center justify-center rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
+                    >
+                      View all organisations ({hiddenOrganizationCount} more)
+                    </a>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
+            <section className="p-3" aria-label="Notifications">
+              <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <h2 className="text-sm font-bold">Notifications</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {hasUnread ? `${notifications.unreadCount} unread` : "All caught up"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  disabled={!hasUnread || isPending}
+                  className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Mark all read
+                </button>
+              </div>
+
+              {error ? (
+                <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {error}
                 </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {notifications.items.map((notification) => (
-                  <NotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    dashboardHref={dashboardHref}
-                    disabled={isPending}
-                    onMarkRead={handleMarkRead}
-                    onOpenAction={handleOpenAction}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+              ) : null}
 
-          <div className="grid grid-cols-2 gap-2 border-t bg-muted/20 p-3">
+              {notifications.items.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-5 text-center">
+                  <Check size={24} className="mx-auto text-primary" aria-hidden="true" />
+                  <p className="mt-2 text-sm font-semibold">You&apos;re all caught up.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Notifications that need attention will show up here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {notifications.items.map((notification) => (
+                    <NotificationCard
+                      key={notification.id}
+                      notification={notification}
+                      dashboardHref={dashboardHref}
+                      disabled={isPending}
+                      onMarkRead={handleMarkRead}
+                      onOpenAction={handleOpenAction}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          <div className="shrink-0 space-y-2 border-t bg-muted/20 p-3">
+            {isExternalHttpsHref(releaseNotesUrl ?? null) ? (
+              <a
+                href={releaseNotesUrl ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
+              >
+                <Megaphone size={16} aria-hidden="true" />
+                What&apos;s New
+                <ArrowSquareOut size={13} aria-hidden="true" />
+              </a>
+            ) : null}
+            <div className="grid grid-cols-2 gap-2">
             <a
               href="/settings"
               className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
             >
               <Gear size={16} aria-hidden="true" />
-              Settings
+              Account
             </a>
             <a
               href={logoutUrl}
@@ -252,11 +319,59 @@ export function AccountMenu({
               <SignOut size={16} aria-hidden="true" />
               Sign out
             </a>
+            </div>
           </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+function OrganizationSwitchLink({ context }: { context: AppUserOrganizationContext }) {
+  const content = (
+    <>
+      <span className="min-w-0">
+        <span className="block truncate font-semibold">{context.organizationName}</span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {formatRole(context.role)}
+          {context.houseName ? `, ${context.houseName}` : ""}
+        </span>
+      </span>
+      {context.isCurrent ? (
+        <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary">
+          Current
+        </span>
+      ) : null}
+    </>
+  );
+
+  const className = cn(
+    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+    context.isCurrent
+      ? "bg-primary/5 text-foreground"
+      : "bg-card text-foreground hover:bg-muted/70",
+  );
+
+  if (context.isCurrent) {
+    return (
+      <span className={className} aria-current="page">
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <a className={className} href={`/o/${encodeURIComponent(context.organizationSlug)}/switch`}>
+      {content}
+    </a>
+  );
+}
+
+function getVisibleOrganizationContexts(contexts: AppUserOrganizationContext[]) {
+  const current = contexts.find((context) => context.isCurrent);
+  const others = contexts.filter((context) => !context.isCurrent);
+
+  return (current ? [current, ...others] : contexts).slice(0, 2);
 }
 
 function NotificationCard({
@@ -273,7 +388,8 @@ function NotificationCard({
   onOpenAction: (notification: Notification, href: string) => void;
 }) {
   const unread = !notification.readAt;
-  const actionHref = getSafeInternalHref(notification.actionHref, dashboardHref);
+  const actionHref = getSafeActionHref(notification.actionHref, dashboardHref);
+  const isExternalAction = Boolean(actionHref && isExternalHttpsHref(actionHref));
 
   return (
     <article
@@ -305,9 +421,10 @@ function NotificationCard({
             type="button"
             onClick={() => onOpenAction(notification, actionHref)}
             disabled={disabled}
-            className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             {notification.actionLabel}
+            {isExternalAction ? <ArrowSquareOut size={12} aria-hidden="true" /> : null}
           </button>
         ) : null}
         {unread ? (
@@ -335,9 +452,9 @@ function NotificationCard({
   );
 }
 
-function getSafeInternalHref(href: string | null, dashboardHref: string) {
+function getSafeActionHref(href: string | null, dashboardHref: string) {
   if (!href?.startsWith("/") || href.startsWith("//")) {
-    return null;
+    return isExternalHttpsHref(href) ? href : null;
   }
 
   if (href === "/") {
@@ -349,6 +466,18 @@ function getSafeInternalHref(href: string | null, dashboardHref: string) {
   }
 
   return href;
+}
+
+function isExternalHttpsHref(href: string | null) {
+  if (!href) {
+    return false;
+  }
+
+  try {
+    return new URL(href).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function formatRole(role: AccountMenuProps["session"]["role"]) {

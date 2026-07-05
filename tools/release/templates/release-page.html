@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HousePoints {{version}} Release Notes</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Released {{releasedAt}}</p>
+        <h1>{{version}}</h1>
+        <p class="summary">{{summary}}</p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          {{highlights}}
+        </article>
+
+        <article class="card">
+          <h2>Fixes</h2>
+          {{fixes}}
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          {{operationsNotes}}
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          {{verification}}
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

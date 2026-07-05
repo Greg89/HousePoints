@@ -48,6 +48,7 @@ export const adminAuditActionSchema = z.object({
     "POINT_DELETED",
     "INVITE_CREATED",
     "INVITE_USED",
+    "ORG_ARCHIVED",
     "SEASON_STARTED",
     "ORG_SETTINGS_UPDATED",
     "POINTS_DEDUCTED",
@@ -164,3 +165,16 @@ export const updateOrgSlugSchema = z.object({
 }).strict();
 
 export type UpdateOrgSlugInput = z.infer<typeof updateOrgSlugSchema>;
+
+export const archiveOrgSchema = z.object({}).strict();
+
+export type ArchiveOrgInput = z.infer<typeof archiveOrgSchema>;
+
+export const archiveOrgResponseSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  archivedAt: z.string().datetime(),
+});
+
+export type ArchiveOrgResponse = z.infer<typeof archiveOrgResponseSchema>;

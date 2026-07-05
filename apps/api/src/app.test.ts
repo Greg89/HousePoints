@@ -1,10 +1,10 @@
-﻿/**
- * API integration tests using Fastify's app.inject() â€” no real network or DB.
+/**
+ * API integration tests using Fastify's app.inject() - no real network or DB.
  * Prisma is mocked per test so we control exactly what the DB "returns".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// â”€â”€ Mock @housepoints/db before importing anything that uses it â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Mock @housepoints/db before importing anything that uses it.
 vi.mock("@housepoints/db", () => ({
   createPrimaryOrganizationSlugAlias: vi.fn(),
   isOrganizationSlugReserved: vi.fn(),
@@ -19,6 +19,12 @@ vi.mock("@housepoints/db", () => ({
     },
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    organizationMembership: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -55,6 +61,11 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
+    releaseAnnouncement: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+      update: vi.fn(),
+    },
     season: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -72,7 +83,7 @@ vi.mock("@housepoints/db", () => ({
   },
 }));
 
-// â”€â”€ Also mock dotenv/config (no .env file needed in CI) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Also mock dotenv/config (no .env file needed in CI).
 vi.mock("dotenv/config", () => ({}));
 
 import { buildApp } from "./app";
@@ -86,6 +97,10 @@ import {
 // Typed shorthand helpers
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipFindFirst = prisma.organizationMembership.findFirst as ReturnType<typeof vi.fn>;
+const mockMembershipFindMany = prisma.organizationMembership.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipCreate = prisma.organizationMembership.create as ReturnType<typeof vi.fn>;
+const mockMembershipUpdate = prisma.organizationMembership.update as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockAuthIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
@@ -113,6 +128,9 @@ const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.
 const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
 const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
+const mockReleaseAnnouncementFindUnique = prisma.releaseAnnouncement.findUnique as ReturnType<typeof vi.fn>;
+const mockReleaseAnnouncementUpsert = prisma.releaseAnnouncement.upsert as ReturnType<typeof vi.fn>;
+const mockReleaseAnnouncementUpdate = prisma.releaseAnnouncement.update as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
@@ -126,7 +144,7 @@ const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
-// â”€â”€ Shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Shared fixtures.
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
 const HOUSE = { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null, organizationId: "org-1" };
 const ACTIVE_SEASON = {
@@ -144,8 +162,37 @@ const SEASON_ZERO = {
   isActive: false,
 };
 
+type TestUserRole = "MEMBER" | "ADMIN" | "OWNER";
+
+type TestMembershipOverrides = {
+  id?: string;
+  organizationId?: string;
+  role?: TestUserRole;
+  houseId?: string | null;
+  organization?: { name: string; slug: string };
+  house?: { name: string; color: string } | null;
+};
+
+const makeUserMembership = (userId: string, overrides: TestMembershipOverrides = {}) => ({
+  id: `membership-${userId}`,
+  organizationId: "org-1",
+  role: "MEMBER" as TestUserRole,
+  houseId: "house-1",
+  organization: { name: "Acme Corp", slug: "acme" },
+  house: { name: "Phoenix", color: "#7c3aed" },
+  ...overrides,
+});
+
 /** Full user shape returned by prisma.user.findUnique (matches select in app.ts) */
-const makeMember = (overrides = {}) => ({
+const withDefaultMembership = <T extends {
+  id: string;
+  memberships?: unknown[];
+}>(user: T, membershipOverrides: TestMembershipOverrides | null = {}): T & { memberships: unknown[] } => ({
+  ...user,
+  memberships: user.memberships ?? (membershipOverrides === null ? [] : [makeUserMembership(user.id, membershipOverrides)]),
+});
+
+const makeMember = (overrides = {}, membershipOverrides: TestMembershipOverrides | null = {}) => withDefaultMembership({
   id: "user-1",
   auth0Sub: "auth0|member",
   email: "member@acme.com",
@@ -157,9 +204,9 @@ const makeMember = (overrides = {}) => ({
   organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
-});
+}, membershipOverrides === null ? null : { role: "MEMBER", ...membershipOverrides });
 
-const makeAdmin = (overrides = {}) => ({
+const makeAdmin = (overrides = {}, membershipOverrides: TestMembershipOverrides | null = {}) => withDefaultMembership({
   id: "user-2",
   auth0Sub: "auth0|admin",
   email: "admin@acme.com",
@@ -171,14 +218,38 @@ const makeAdmin = (overrides = {}) => ({
   organization: { name: "Acme Corp", slug: "acme" },
   house: { name: "Phoenix", color: "#7c3aed" },
   ...overrides,
-});
+}, membershipOverrides === null ? null : { role: "ADMIN", ...membershipOverrides });
 
-const makeOwner = (overrides = {}) => ({
-  ...makeAdmin(),
+const makeOwner = (overrides = {}, membershipOverrides: TestMembershipOverrides | null = {}) => withDefaultMembership({
   id: "user-owner",
   auth0Sub: "auth0|owner",
+  email: "owner@acme.com",
   displayName: "Olivia",
+  houseThemeEnabled: false,
   role: "OWNER" as const,
+  houseId: "house-1",
+  organizationId: "org-1",
+  organization: { name: "Acme Corp", slug: "acme" },
+  house: { name: "Phoenix", color: "#7c3aed" },
+  ...overrides,
+}, membershipOverrides === null ? null : { role: "OWNER", ...membershipOverrides });
+
+const makeTargetMembership = (overrides = {}) => ({
+  userId: "user-1",
+  houseId: "house-1",
+  user: {
+    id: "user-1",
+    displayName: "Alice",
+  },
+  ...overrides,
+});
+
+const makeActorMembership = (overrides = {}) => ({
+  id: "membership-admin",
+  organizationId: "org-1",
+  role: "ADMIN" as const,
+  houseId: "house-1",
+  organization: { name: "Acme Corp", slug: "acme" },
   ...overrides,
 });
 
@@ -189,6 +260,8 @@ beforeEach(() => {
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
   mockUserFindMany.mockResolvedValue([]);
+  mockMembershipFindFirst.mockResolvedValue(null);
+  mockMembershipFindMany.mockResolvedValue([]);
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
@@ -201,6 +274,25 @@ beforeEach(() => {
   mockNotificationCreateMany.mockResolvedValue({ count: 0 });
   mockNotificationFindMany.mockResolvedValue([]);
   mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
+  const releaseAnnouncement = {
+    id: "release-1",
+    version: "v1.2.3",
+    title: "Release notes automation",
+    summary: "Adds app-owned release records.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+    releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+    broadcastAt: null,
+    createdAt: new Date("2026-07-04T18:01:00.000Z"),
+    updatedAt: new Date("2026-07-04T18:02:00.000Z"),
+  };
+  mockReleaseAnnouncementFindUnique.mockResolvedValue(releaseAnnouncement);
+  mockReleaseAnnouncementUpsert.mockResolvedValue(releaseAnnouncement);
+  mockReleaseAnnouncementUpdate.mockResolvedValue({
+    ...releaseAnnouncement,
+    broadcastAt: new Date("2026-07-04T18:03:00.000Z"),
+    updatedAt: new Date("2026-07-04T18:03:00.000Z"),
+  });
+  delete process.env.RELEASE_AUTOMATION_SECRET;
   mockTransaction.mockImplementation(
     async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
   );
@@ -239,7 +331,7 @@ async function buildTestApp(
   return app;
 }
 
-// â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Tests.
 
 describe("GET /health", () => {
   it("returns 200 { ok: true }", async () => {
@@ -251,6 +343,136 @@ describe("GET /health", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
     expect(app.server.listening).toBe(false);
+    await app.close();
+  });
+});
+
+describe("POST /system/releases/record", () => {
+  const releasePayload = {
+    version: "v1.2.3",
+    title: "Release notes automation",
+    summary: "Adds app-owned release records.",
+    releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+    releasedAt: "2026-07-04T18:00:00.000Z",
+  };
+
+  it("records release metadata when the automation secret matches", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: releasePayload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "release-1",
+      ...releasePayload,
+      broadcastAt: null,
+      createdAt: "2026-07-04T18:01:00.000Z",
+      updatedAt: "2026-07-04T18:02:00.000Z",
+    });
+    expect(mockReleaseAnnouncementUpsert).toHaveBeenCalledWith({
+      where: { version: "v1.2.3" },
+      create: {
+        version: "v1.2.3",
+        title: "Release notes automation",
+        summary: "Adds app-owned release records.",
+        releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+        releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+      },
+      update: {
+        title: "Release notes automation",
+        summary: "Adds app-owned release records.",
+        releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+        releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+      },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        summary: true,
+        releaseNotesUrl: true,
+        releasedAt: true,
+        broadcastAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await app.close();
+  });
+
+  it("fails closed when release automation is not configured", async () => {
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: releasePayload,
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      code: "RELEASE_AUTOMATION_NOT_CONFIGURED",
+    });
+    expect(mockReleaseAnnouncementUpsert).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects invalid release automation secrets", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "wrong-secret-value",
+      },
+      payload: releasePayload,
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      code: "INVALID_RELEASE_AUTOMATION_SECRET",
+    });
+    expect(mockReleaseAnnouncementUpsert).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("validates release metadata before writing", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/record",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: {
+        ...releasePayload,
+        releaseNotesUrl: "not-a-url",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    expect(mockReleaseAnnouncementUpsert).not.toHaveBeenCalled();
+
     await app.close();
   });
 });
@@ -376,7 +598,7 @@ describe("CORS", () => {
     );
     expect(res.headers["access-control-allow-methods"]).toContain("POST");
     expect(res.headers["access-control-allow-headers"]).toBe(
-      "authorization, content-type, x-request-id, x-auth0-id-token",
+      "authorization, content-type, x-request-id, x-auth0-id-token, x-housepoints-release-secret",
     );
     await app.close();
   });
@@ -616,7 +838,7 @@ describe("POST /points/adjust", () => {
   it("returns 403 when target user is from a different org", async () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())  // getActorBySub
-      .mockResolvedValueOnce(makeMember({ organizationId: "org-OTHER" })); // target user
+      .mockResolvedValueOnce(makeMember({}, { organizationId: "org-OTHER" })); // target user
     const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
@@ -629,9 +851,8 @@ describe("POST /points/adjust", () => {
   });
 
   it("returns 422 TARGET_USER_UNASSIGNED when target has no house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())   // getActorBySub
-      .mockResolvedValueOnce(makeMember({ houseId: null })); // target user: no house
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: null }));
     const app = await buildTestApp();
     const res = await app.inject({
       method: "POST",
@@ -668,10 +889,8 @@ describe("POST /points/adjust", () => {
   });
 
   it("awards points, notifies the recipient, and returns 201 with the transaction id and trait", async () => {
-    const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())  // getActorBySub
-      .mockResolvedValueOnce(targetUser);  // target user lookup
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({
       id: "tx-abc",
@@ -713,6 +932,24 @@ describe("POST /points/adjust", () => {
         }),
       }),
     );
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        userId: "user-1",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        userId: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [{
         organizationId: "org-1",
@@ -734,9 +971,11 @@ describe("POST /points/adjust", () => {
 
   it("does not create a recipient notification for self-awards", async () => {
     const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
-    mockFindUnique
-      .mockResolvedValueOnce(actor)
-      .mockResolvedValueOnce(actor);
+    mockFindUnique.mockResolvedValueOnce(actor);
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({
+      userId: "user-2",
+      user: { id: "user-2", displayName: "Bob" },
+    }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({
       id: "tx-self",
@@ -769,10 +1008,8 @@ describe("POST /points/adjust", () => {
   });
 
   it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
-    const targetUser = makeMember({ id: "user-1", houseId: "house-1", organizationId: "org-1" });
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())
-      .mockResolvedValueOnce(targetUser);
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp();
     const res = await app.inject({
@@ -877,7 +1114,7 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 403 ACTOR_HOUSE_REQUIRED when actor is not assigned to a house", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ houseId: null }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { houseId: null }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -915,7 +1152,7 @@ describe("POST /points/deduct", () => {
   it("returns 403 CROSS_ORGANIZATION_TARGET when target is outside the actor organization", async () => {
     mockFindUnique
       .mockResolvedValueOnce(makeAdmin())
-      .mockResolvedValueOnce(makeMember({ organizationId: "org-other", houseId: "house-2" }));
+      .mockResolvedValueOnce(makeMember({}, { organizationId: "org-other", houseId: "house-2" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -932,9 +1169,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 422 TARGET_USER_UNASSIGNED when target has no house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin())
-      .mockResolvedValueOnce(makeMember({ houseId: null }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: null }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -951,9 +1187,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 409 SAME_HOUSE_TARGET when target is in the actor house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ houseId: "house-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-1" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -970,9 +1205,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("returns 409 ACTIVE_SEASON_REQUIRED when no active season exists", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ houseId: "house-2" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp("auth0|admin");
 
@@ -991,9 +1225,12 @@ describe("POST /points/deduct", () => {
 
   it("returns 409 DEDUCTION_COOLDOWN_ACTIVE when the actor house already deducted recently", async () => {
     const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({
+      houseId: "legacy-house",
+      memberships: [makeActorMembership({ houseId: "house-1" })],
+    }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
+    mockMembershipFindMany.mockResolvedValue([{ userId: "user-2" }, { userId: "user-owner" }]);
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxFindFirst.mockResolvedValueOnce({
       id: "tx-recent-house-deduction",
@@ -1009,13 +1246,22 @@ describe("POST /points/deduct", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("DEDUCTION_COOLDOWN_ACTIVE");
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        houseId: "house-1",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { userId: true },
+    });
     expect(mockTxFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
           seasonId: "season-active",
           type: "DEDUCTION",
-          actor: { houseId: "house-1" },
+          actorUserId: { in: ["user-2", "user-owner"] },
         }),
       }),
     );
@@ -1027,9 +1273,8 @@ describe("POST /points/deduct", () => {
 
   it("returns 409 TARGET_DEDUCTION_LIMIT_ACTIVE when the target already received a recent deduction", async () => {
     const previousCreatedAt = new Date("2026-06-22T12:00:00.000Z");
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxFindFirst
       .mockResolvedValueOnce(null)
@@ -1065,9 +1310,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("creates a fixed deduction for admins against another house", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({ id: "tx-deduction" });
     const app = await buildTestApp("auth0|admin");
@@ -1136,9 +1380,8 @@ describe("POST /points/deduct", () => {
   });
 
   it("allows owners to create deductions", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ houseId: "house-1" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-1", houseId: "house-2", organizationId: "org-1" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({ houseId: "house-1" }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ houseId: "house-2" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxCreate.mockResolvedValue({ id: "tx-owner-deduction" });
     const app = await buildTestApp("auth0|owner");
@@ -1257,7 +1500,7 @@ describe("POST /points/delete", () => {
   });
 
   it("does not reveal transactions from another organization", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockTxFindUnique.mockResolvedValue({
       id: "tx-1",
       organizationId: "org-other",
@@ -1303,7 +1546,7 @@ describe("POST /points/delete", () => {
 
 describe("POST /seasons/context", () => {
   it("returns active season and historical seasons for the actor's organization", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([ACTIVE_SEASON, SEASON_ZERO]);
     const app = await buildTestApp();
 
@@ -1382,7 +1625,7 @@ describe("POST /seasons/compare", () => {
   };
 
   it("compares house rank, points, velocity, and top contributors across two seasons", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([fromSeason, toSeason]);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-2", name: "Ember", color: "#ef4444" },
@@ -1448,11 +1691,11 @@ describe("POST /seasons/compare", () => {
           _sum: { delta: -10 },
         },
       ]);
-    mockUserFindMany.mockResolvedValue([
-      { id: "user-1", displayName: "Alice" },
-      { id: "user-2", displayName: "Bob" },
-      { id: "user-3", displayName: "Cora" },
-      { id: "user-4", displayName: "Drew" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "user-1", displayName: "Alice" } },
+      { user: { id: "user-2", displayName: "Bob" } },
+      { user: { id: "user-3", displayName: "Cora" } },
+      { user: { id: "user-4", displayName: "Drew" } },
     ]);
     const app = await buildTestApp();
 
@@ -1503,11 +1746,13 @@ describe("POST /seasons/compare", () => {
         },
       }),
     );
-    expect(mockUserFindMany).toHaveBeenCalledWith(
+    expect(mockMembershipFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: { in: ["user-1", "user-2", "user-3", "user-4"] },
           organizationId: "org-secure",
+          isActive: true,
+          archivedAt: null,
+          userId: { in: ["user-1", "user-2", "user-3", "user-4"] },
         },
       }),
     );
@@ -1636,7 +1881,7 @@ describe("POST /seasons/compare", () => {
   });
 
   it("rejects cross-organization or unknown season IDs", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([fromSeason]);
     const app = await buildTestApp();
 
@@ -1692,13 +1937,15 @@ describe("POST /seasons/compare", () => {
         };
       }),
     );
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindMany.mockResolvedValue([fromSeason, toSeason]);
     mockHouseFindMany.mockResolvedValue(houses);
     mockTxGroupBy
       .mockResolvedValueOnce(houseTotals)
       .mockResolvedValueOnce(contributorTotals);
-    mockUserFindMany.mockResolvedValue(users);
+    mockMembershipFindMany.mockResolvedValue(
+      users.map((user) => ({ user })),
+    );
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -1713,12 +1960,14 @@ describe("POST /seasons/compare", () => {
     expect(res.statusCode).toBe(200);
     expect(mockHouseFindMany).toHaveBeenCalledTimes(1);
     expect(mockTxGroupBy).toHaveBeenCalledTimes(2);
-    expect(mockUserFindMany).toHaveBeenCalledTimes(1);
-    expect(mockUserFindMany).toHaveBeenCalledWith(
+    expect(mockMembershipFindMany).toHaveBeenCalledTimes(1);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          id: { in: users.map((user) => user.id) },
           organizationId: "org-secure",
+          isActive: true,
+          archivedAt: null,
+          userId: { in: users.map((user) => user.id) },
         },
       }),
     );
@@ -1758,14 +2007,14 @@ describe("POST /seasons/start", () => {
       endsAt: new Date("2026-08-01T12:00:00.000Z"),
       isActive: false,
     };
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
-    mockUserFindMany.mockResolvedValue([
-      { id: "user-owner" },
-      { id: "user-admin" },
-      { id: "user-member" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "user-owner" } },
+      { user: { id: "user-admin" } },
+      { user: { id: "user-member" } },
     ]);
     mockNotificationCreateMany.mockResolvedValue({ count: 3 });
     const app = await buildTestApp("auth0|owner");
@@ -1819,11 +2068,13 @@ describe("POST /seasons/start", () => {
         },
       },
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [
@@ -1889,7 +2140,7 @@ describe("POST /seasons/start", () => {
   });
 
   it("rejects admins when starting a season", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -1953,11 +2204,11 @@ describe("POST /seasons/start", () => {
       endsAt: new Date("2026-08-01T12:00:00.000Z"),
       isActive: false,
     };
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockSeasonUpdate.mockResolvedValue(closedSeason);
     mockSeasonCreate.mockResolvedValue(nextSeason);
-    mockUserFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([]);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -1967,11 +2218,13 @@ describe("POST /seasons/start", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -1981,7 +2234,7 @@ describe("POST /seasons/start", () => {
 describe("POST /seasons/rename", () => {
   it("allows an owner to rename a season in their organization", async () => {
     const renamedSeason = { ...ACTIVE_SEASON, name: "Summer 2026" };
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue({ id: "season-active" });
     mockSeasonUpdate.mockResolvedValue(renamedSeason);
     const app = await buildTestApp("auth0|owner");
@@ -2018,7 +2271,7 @@ describe("POST /seasons/rename", () => {
   });
 
   it("rejects cross-organization or unknown season IDs when renaming", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp("auth0|owner");
 
@@ -2035,7 +2288,7 @@ describe("POST /seasons/rename", () => {
   });
 
   it("rejects admins when renaming a season", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -2055,7 +2308,7 @@ describe("POST /seasons/rename", () => {
 describe("POST /houses/leaderboard", () => {
   it("scopes leaderboard houses to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockHouseFindMany.mockResolvedValue([
@@ -2064,14 +2317,12 @@ describe("POST /houses/leaderboard", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
-        _count: { users: 2 },
       },
       {
         id: "house-2",
         name: "Dragon",
         color: "#dc2626",
         description: "Fire team",
-        _count: { users: 1 },
       },
     ]);
     mockTxGroupBy.mockResolvedValue([
@@ -2086,6 +2337,12 @@ describe("POST /houses/leaderboard", () => {
         _count: { _all: 2 },
       },
     ]);
+    mockMembershipFindMany.mockResolvedValue([
+      { houseId: "house-1" },
+      { houseId: "house-1" },
+      { houseId: "house-2" },
+      { houseId: null },
+    ]);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -2099,10 +2356,22 @@ describe("POST /houses/leaderboard", () => {
       expect.objectContaining({
         where: { organizationId: "org-secure" },
         select: expect.objectContaining({
-          _count: { select: { users: true } },
+          id: true,
+          name: true,
+          color: true,
+          description: true,
         }),
       }),
     );
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
+        houseId: { not: null },
+      },
+      select: { houseId: true },
+    });
     expect(mockTxGroupBy).toHaveBeenCalledWith({
       by: ["targetHouseId"],
       where: {
@@ -2138,7 +2407,7 @@ describe("POST /houses/leaderboard", () => {
 
   it("uses a requested historical season for house standings", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockHouseFindMany.mockResolvedValue([
@@ -2147,9 +2416,9 @@ describe("POST /houses/leaderboard", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
-        _count: { users: 2 },
       },
     ]);
+    mockMembershipFindMany.mockResolvedValue([{ houseId: "house-1" }]);
     mockTxGroupBy.mockResolvedValue([
       {
         targetHouseId: "house-1",
@@ -2245,14 +2514,14 @@ describe("POST /admin/context", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ADMIN_REQUIRED");
-    expect(mockUserFindMany).not.toHaveBeenCalled();
+    expect(mockMembershipFindMany).not.toHaveBeenCalled();
     expect(mockHouseFindMany).not.toHaveBeenCalled();
     await app.close();
   });
 
   it("allows an admin and scopes organization context to the actor's organization", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
-    mockUserFindMany.mockResolvedValue([]);
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindMany.mockResolvedValue([]);
     mockHouseFindMany.mockResolvedValue([]);
     const app = await buildTestApp("auth0|admin");
 
@@ -2284,11 +2553,21 @@ describe("POST /admin/context", () => {
       },
       adminAuditNextCursor: null,
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: "org-secure" },
-      }),
-    );
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
     expect(mockHouseFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { organizationId: "org-secure" },
@@ -2297,15 +2576,84 @@ describe("POST /admin/context", () => {
     await app.close();
   });
 
+  it("builds team management users from active memberships instead of legacy user organization fields", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindMany.mockResolvedValue([
+      {
+        role: "MEMBER",
+        houseId: null,
+        user: {
+          id: "user-cross-shadow",
+          displayName: "Casey Cross",
+          email: "casey@example.com",
+        },
+      },
+      {
+        role: "ADMIN",
+        houseId: "house-2",
+        user: {
+          id: "user-admin",
+          displayName: "Ada Admin",
+          email: "ada@example.com",
+        },
+      },
+    ]);
+    mockHouseFindMany.mockResolvedValue([]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().users).toEqual([
+      {
+        id: "user-cross-shadow",
+        displayName: "Casey Cross",
+        email: "casey@example.com",
+        role: "MEMBER",
+        houseId: null,
+      },
+      {
+        id: "user-admin",
+        displayName: "Ada Admin",
+        email: "ada@example.com",
+        role: "ADMIN",
+        houseId: "house-2",
+      },
+    ]);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    expect(mockUserFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("allows an owner and returns the complete organization context", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-owner",
-        displayName: "Olivia",
-        email: "owner@acme.com",
         role: "OWNER",
         houseId: "house-1",
+        user: {
+          id: "user-owner",
+          displayName: "Olivia",
+          email: "owner@acme.com",
+        },
       },
     ]);
     mockHouseFindMany.mockResolvedValue([
@@ -2369,9 +2717,10 @@ describe("POST /admin/context", () => {
       },
       adminAuditNextCursor: null,
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith(
+    expect(mockMembershipFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: "org-1" },
+        where: { organizationId: "org-1", isActive: true, archivedAt: null },
+        orderBy: { user: { displayName: "asc" } },
       }),
     );
     expect(mockHouseFindMany).toHaveBeenCalledWith(
@@ -2575,7 +2924,7 @@ describe("POST /admin/point-adjustments/stats", () => {
   });
 
   it("returns active-season point adjustment reporting by default", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
@@ -2642,7 +2991,7 @@ describe("POST /admin/point-adjustments/stats", () => {
   });
 
   it("uses a requested historical season for point adjustment reporting", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
@@ -2709,7 +3058,7 @@ describe("POST /admin/audit", () => {
   });
 
   it("returns filtered paged audit history scoped to the actor's organization", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockAuditEventFindMany.mockResolvedValue([
       {
         id: "audit-delete-1",
@@ -2804,8 +3153,7 @@ describe("POST /admin/users/assign-house", () => {
 
   it("returns 404 when target user is not found", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin()); // getActorBySub
-    // targetUser and targetHouse both null â€” returned via Promise.all
-    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
     mockHouseFindUnique.mockResolvedValue(HOUSE);
     const app = await buildTestApp();
     const res = await app.inject({
@@ -2819,11 +3167,14 @@ describe("POST /admin/users/assign-house", () => {
   });
 
   it("returns 404 when target house belongs to another organization", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeAdmin({ organizationId: "org-1" }));
-    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      id: "user-1",
-      displayName: "Alice",
-      organizationId: "org-1",
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-1" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-1",
+      userId: "user-1",
+      user: {
+        id: "user-1",
+        displayName: "Alice",
+      },
     });
     mockHouseFindUnique.mockResolvedValue({
       id: "house-other",
@@ -2847,20 +3198,25 @@ describe("POST /admin/users/assign-house", () => {
 
   it("assigns a user to a house, writes audit history, and resolves matching assignment notifications", async () => {
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
-    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      id: "user-1",
-      displayName: "Alice",
-      organizationId: "org-1",
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-1",
+      userId: "user-1",
+      user: {
+        id: "user-1",
+        displayName: "Alice",
+      },
     });
     mockHouseFindUnique.mockResolvedValue({
       id: "house-1",
       organizationId: "org-1",
       name: "Phoenix",
     });
-    mockUserUpdate.mockResolvedValue({
-      id: "user-1",
-      displayName: "Alice",
+    mockMembershipUpdate.mockResolvedValue({
       houseId: "house-1",
+      user: {
+        id: "user-1",
+        displayName: "Alice",
+      },
     });
     mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
     const app = await buildTestApp("auth0|admin");
@@ -2877,15 +3233,27 @@ describe("POST /admin/users/assign-house", () => {
       displayName: "Alice",
       houseId: "house-1",
     });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-1" },
-      data: { houseId: "house-1" },
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        userId: "user-1",
+        isActive: true,
+        archivedAt: null,
+      },
       select: {
         id: true,
-        displayName: true,
-        houseId: true,
+        user: { select: { id: true, displayName: true } },
       },
     });
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-1" },
+      data: { houseId: "house-1" },
+      select: {
+        houseId: true,
+        user: { select: { id: true, displayName: true } },
+      },
+    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",
@@ -2921,9 +3289,19 @@ describe("POST /users/profile", () => {
   it("updates and returns the authenticated user's display name", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockUserUpdate.mockResolvedValue({
-      id: "user-1",
-      displayName: "Alice Updated",
-      houseThemeEnabled: false,
+      ...makeMember({
+        displayName: "Alice Updated",
+        role: "MEMBER",
+      }),
+      memberships: [
+        {
+          organizationId: "org-1",
+          role: "MEMBER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+          house: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ],
     });
     const app = await buildTestApp();
 
@@ -2934,15 +3312,28 @@ describe("POST /users/profile", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       id: "user-1",
       displayName: "Alice Updated",
       houseThemeEnabled: false,
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "MEMBER",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { displayName: "Alice Updated" },
-      select: { id: true, displayName: true, houseThemeEnabled: true },
+      select: expect.objectContaining({
+        id: true,
+        displayName: true,
+        houseThemeEnabled: true,
+        memberships: expect.any(Object),
+      }),
     });
     await app.close();
   });
@@ -2950,9 +3341,16 @@ describe("POST /users/profile", () => {
   it("updates and returns the authenticated user's house theme preference", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockUserUpdate.mockResolvedValue({
-      id: "user-1",
-      displayName: "Alice",
-      houseThemeEnabled: true,
+      ...makeMember({ houseThemeEnabled: true }),
+      memberships: [
+        {
+          organizationId: "org-1",
+          role: "MEMBER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+          house: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ],
     });
     const app = await buildTestApp();
 
@@ -2963,15 +3361,28 @@ describe("POST /users/profile", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       id: "user-1",
       displayName: "Alice",
       houseThemeEnabled: true,
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "MEMBER",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockUserUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { houseThemeEnabled: true },
-      select: { id: true, displayName: true, houseThemeEnabled: true },
+      select: expect.objectContaining({
+        id: true,
+        displayName: true,
+        houseThemeEnabled: true,
+        memberships: expect.any(Object),
+      }),
     });
     await app.close();
   });
@@ -2997,7 +3408,7 @@ describe("POST /admin/users/role", () => {
 
   it("returns 404 when the target user is outside the owner's organization", async () => {
     mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
+      .mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }))
       .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
     const app = await buildTestApp("auth0|owner");
 
@@ -3015,13 +3426,23 @@ describe("POST /admin/users/role", () => {
   });
 
   it("rejects attempts to change an owner role", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeOwner({
-        id: "user-owner-2",
-        displayName: "Second Owner",
-        organizationId: "org-secure",
-      }));
+    const targetOwner = makeOwner({
+      id: "user-owner-2",
+      displayName: "Second Owner",
+      organizationId: "org-secure",
+    });
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-owner-2",
+      userId: "user-owner-2",
+      role: "OWNER",
+      houseId: targetOwner.houseId,
+      user: {
+        id: targetOwner.id,
+        displayName: targetOwner.displayName,
+        email: targetOwner.email,
+      },
+    });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3046,19 +3467,30 @@ describe("POST /admin/users/role", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate.mockResolvedValue({
-      id: "user-target",
-      displayName: "Taylor",
-      email: "taylor@acme.com",
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: targetUser.role,
+      houseId: targetUser.houseId,
+      user: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+      },
+    });
+    mockMembershipUpdate.mockResolvedValue({
       role: "ADMIN",
       houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
     });
-    mockUserFindMany.mockResolvedValue([
-      { id: "user-owner-2" },
-      { id: "user-target" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "user-owner-2" } },
+      { user: { id: "user-target" } },
     ]);
     const app = await buildTestApp("auth0|owner");
 
@@ -3070,17 +3502,37 @@ describe("POST /admin/users/role", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-target" },
-      data: { role: "ADMIN" },
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        userId: "user-target",
+        isActive: true,
+        archivedAt: null,
+      },
       select: {
         id: true,
-        displayName: true,
-        email: true,
+        userId: true,
         role: true,
         houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
       },
     });
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-target" },
+      data: { role: "ADMIN" },
+      select: {
+        role: true,
+        houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-secure",
@@ -3095,13 +3547,15 @@ describe("POST /admin/users/role", () => {
         },
       },
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-secure",
         role: "OWNER",
-        id: { not: "user-owner" },
+        userId: { not: "user-owner" },
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [
@@ -3151,15 +3605,26 @@ describe("POST /admin/users/role", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate.mockResolvedValue({
-      id: "user-target",
-      displayName: "Taylor",
-      email: "taylor@acme.com",
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: targetUser.role,
+      houseId: targetUser.houseId,
+      user: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+      },
+    });
+    mockMembershipUpdate.mockResolvedValue({
       role: "MEMBER",
       houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
     });
     const app = await buildTestApp("auth0|owner");
 
@@ -3171,17 +3636,16 @@ describe("POST /admin/users/role", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-target" },
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-target" },
       data: { role: "MEMBER" },
       select: {
-        id: true,
-        displayName: true,
-        email: true,
         role: true,
         houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
       },
     });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-secure",
@@ -3241,7 +3705,7 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("rejects transferring ownership to self", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3258,9 +3722,16 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("returns 404 when the target user is outside the owner's organization", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst
+      .mockResolvedValueOnce({
+        id: "membership-owner",
+        userId: "user-owner",
+        role: "OWNER",
+        houseId: "house-1",
+        user: { id: "user-owner", displayName: "Olivia", email: "admin@acme.com" },
+      })
+      .mockResolvedValueOnce(null);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3277,13 +3748,22 @@ describe("POST /admin/org/owner", () => {
   });
 
   it("rejects transferring ownership to another owner", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeOwner({
-        id: "user-owner-2",
-        displayName: "Second Owner",
-        organizationId: "org-secure",
-      }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst
+      .mockResolvedValueOnce({
+        id: "membership-owner",
+        userId: "user-owner",
+        role: "OWNER",
+        houseId: "house-1",
+        user: { id: "user-owner", displayName: "Olivia", email: "admin@acme.com" },
+      })
+      .mockResolvedValueOnce({
+        id: "membership-owner-2",
+        userId: "user-owner-2",
+        role: "OWNER",
+        houseId: "house-1",
+        user: { id: "user-owner-2", displayName: "Second Owner", email: "second-owner@acme.com" },
+      });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3308,17 +3788,36 @@ describe("POST /admin/org/owner", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate
-      .mockResolvedValueOnce({ id: "user-owner" })
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst
       .mockResolvedValueOnce({
-        id: "user-target",
-        displayName: "Taylor",
-        email: "taylor@acme.com",
+        id: "membership-owner",
+        userId: "user-owner",
         role: "OWNER",
         houseId: "house-1",
+        user: { id: "user-owner", displayName: "Olivia", email: "admin@acme.com" },
+      })
+      .mockResolvedValueOnce({
+        id: "membership-target",
+        userId: "user-target",
+        role: targetUser.role,
+        houseId: targetUser.houseId,
+        user: {
+          id: targetUser.id,
+          displayName: targetUser.displayName,
+          email: targetUser.email,
+        },
+      });
+    mockMembershipUpdate
+      .mockResolvedValueOnce({ id: "membership-owner" })
+      .mockResolvedValueOnce({
+        role: "OWNER",
+        houseId: "house-1",
+        user: {
+          id: "user-target",
+          displayName: "Taylor",
+          email: "taylor@acme.com",
+        },
       });
     const app = await buildTestApp("auth0|owner");
 
@@ -3330,22 +3829,21 @@ describe("POST /admin/org/owner", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
-    expect(mockUserUpdate).toHaveBeenNthCalledWith(1, {
-      where: { id: "user-owner" },
+    expect(mockMembershipUpdate).toHaveBeenNthCalledWith(1, {
+      where: { id: "membership-owner" },
       data: { role: "ADMIN" },
       select: { id: true },
     });
-    expect(mockUserUpdate).toHaveBeenNthCalledWith(2, {
-      where: { id: "user-target" },
+    expect(mockMembershipUpdate).toHaveBeenNthCalledWith(2, {
+      where: { id: "membership-target" },
       data: { role: "OWNER" },
       select: {
-        id: true,
-        displayName: true,
-        email: true,
         role: true,
         houseId: true,
+        user: { select: { id: true, displayName: true, email: true } },
       },
     });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-secure",
@@ -3402,6 +3900,91 @@ describe("POST /admin/org/owner", () => {
   });
 });
 
+describe("POST /admin/org/archive", () => {
+  it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/archive",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects unknown archive request fields", async () => {
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/archive",
+      payload: { reason: "closing this organization" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("allows an owner to archive the organization and writes an audit event", async () => {
+    const archivedAt = new Date("2026-07-04T17:30:00.000Z");
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockOrgUpdate.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt,
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/archive",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockOrgUpdate).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      data: {
+        archivedAt: expect.any(Date),
+        archivedById: "user-owner",
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "ORG_ARCHIVED",
+        summary: "Olivia archived Acme Corp.",
+        metadata: {
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          archivedAt: expect.any(String),
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: expect.stringMatching(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+      ),
+    });
+    await app.close();
+  });
+});
+
 describe("POST /admin/users/remove", () => {
   it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
@@ -3420,7 +4003,7 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("rejects owner self-removal", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3436,9 +4019,8 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("returns 404 when target user is outside the owner's organization", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeMember({ id: "user-other", organizationId: "org-other" }));
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3454,13 +4036,18 @@ describe("POST /admin/users/remove", () => {
   });
 
   it("rejects removing another owner", async () => {
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(makeOwner({
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-owner-2",
+      userId: "user-owner-2",
+      role: "OWNER",
+      houseId: "house-1",
+      user: {
         id: "user-owner-2",
         displayName: "Second Owner",
-        organizationId: "org-secure",
-      }));
+        email: "second-owner@acme.com",
+      },
+    });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -3475,7 +4062,7 @@ describe("POST /admin/users/remove", () => {
     await app.close();
   });
 
-  it("removes a member from the organization, clears org-scoped fields, archives notifications, and writes audit", async () => {
+  it("removes a member from the organization, archives notifications, and writes audit", async () => {
     const targetUser = makeMember({
       id: "user-target",
       displayName: "Taylor",
@@ -3483,12 +4070,23 @@ describe("POST /admin/users/remove", () => {
       organizationId: "org-secure",
       houseId: "house-1",
     });
-    mockFindUnique
-      .mockResolvedValueOnce(makeOwner({ organizationId: "org-secure" }))
-      .mockResolvedValueOnce(targetUser);
-    mockUserUpdate.mockResolvedValue({
-      id: "user-target",
-      displayName: "Taylor",
+    mockFindUnique.mockResolvedValueOnce(makeOwner({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: targetUser.role,
+      houseId: targetUser.houseId,
+      user: {
+        id: targetUser.id,
+        displayName: targetUser.displayName,
+        email: targetUser.email,
+      },
+    });
+    mockMembershipUpdate.mockResolvedValue({
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+      },
     });
     const app = await buildTestApp("auth0|owner");
 
@@ -3500,15 +4098,19 @@ describe("POST /admin/users/remove", () => {
 
     expect(res.statusCode).toBe(200);
     expect(mockTransaction).toHaveBeenCalledOnce();
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: "user-target" },
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-target" },
       data: {
-        organizationId: null,
+        isActive: false,
+        archivedAt: expect.any(Date),
         houseId: null,
         role: "MEMBER",
       },
-      select: { id: true, displayName: true },
+      select: {
+        user: { select: { id: true, displayName: true } },
+      },
     });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockNotificationUpdateMany).toHaveBeenCalledTimes(2);
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
@@ -3877,7 +4479,7 @@ describe("POST /transactions/recent", () => {
   });
 
   it("returns current-season point adjustment reporting by house", async () => {
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockUserFindMany.mockResolvedValue([]);
     mockHouseFindMany.mockResolvedValue([
       { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null },
@@ -3945,7 +4547,7 @@ describe("POST /transactions/recent", () => {
 describe("POST /users/scores", () => {
   it("scopes member scores to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockTxGroupBy.mockResolvedValue([
@@ -3974,7 +4576,7 @@ describe("POST /users/scores", () => {
   });
 
   it("uses a requested historical season for member scores", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockTxGroupBy.mockResolvedValue([
       { targetUserId: "user-1", _sum: { delta: 12 } },
@@ -4007,7 +4609,7 @@ describe("POST /users/scores", () => {
   });
 
   it("rejects cross-organization or unknown season IDs for member scores", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(null);
     const app = await buildTestApp();
 
@@ -4024,18 +4626,232 @@ describe("POST /users/scores", () => {
   });
 });
 
+describe("POST /system/releases/broadcast", () => {
+  it("broadcasts release notifications to active members once", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    mockMembershipFindMany.mockResolvedValue([
+      { organizationId: "org-1", userId: "user-1" },
+      { organizationId: "org-1", userId: "user-2" },
+      { organizationId: "org-2", userId: "user-1" },
+    ]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 3 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: { version: "v1.2.3" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      release: {
+        id: "release-1",
+        version: "v1.2.3",
+        title: "Release notes automation",
+        summary: "Adds app-owned release records.",
+        releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+        releasedAt: "2026-07-04T18:00:00.000Z",
+        broadcastAt: "2026-07-04T18:03:00.000Z",
+        createdAt: "2026-07-04T18:01:00.000Z",
+        updatedAt: "2026-07-04T18:03:00.000Z",
+      },
+      notificationCount: 3,
+      alreadyBroadcast: false,
+    });
+    expect(mockReleaseAnnouncementFindUnique).toHaveBeenCalledWith({
+      where: { version: "v1.2.3" },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        summary: true,
+        releaseNotesUrl: true,
+        releasedAt: true,
+        broadcastAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        isActive: true,
+        archivedAt: null,
+        organization: {
+          archivedAt: null,
+        },
+      },
+      select: {
+        organizationId: true,
+        userId: true,
+      },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-1",
+          recipientUserId: "user-1",
+          type: "RELEASE_ANNOUNCEMENT",
+          severity: "INFO",
+          title: "What's new: Release notes automation",
+          body: "Adds app-owned release records.",
+          actionLabel: "View release notes",
+          actionHref: "https://example.com/releases/v1.2.3.html",
+          entityType: "ReleaseAnnouncement",
+          entityId: "release-1",
+          dedupeKey: "release-announcement:v1.2.3:org-1",
+        },
+        {
+          organizationId: "org-1",
+          recipientUserId: "user-2",
+          type: "RELEASE_ANNOUNCEMENT",
+          severity: "INFO",
+          title: "What's new: Release notes automation",
+          body: "Adds app-owned release records.",
+          actionLabel: "View release notes",
+          actionHref: "https://example.com/releases/v1.2.3.html",
+          entityType: "ReleaseAnnouncement",
+          entityId: "release-1",
+          dedupeKey: "release-announcement:v1.2.3:org-1",
+        },
+        {
+          organizationId: "org-2",
+          recipientUserId: "user-1",
+          type: "RELEASE_ANNOUNCEMENT",
+          severity: "INFO",
+          title: "What's new: Release notes automation",
+          body: "Adds app-owned release records.",
+          actionLabel: "View release notes",
+          actionHref: "https://example.com/releases/v1.2.3.html",
+          entityType: "ReleaseAnnouncement",
+          entityId: "release-1",
+          dedupeKey: "release-announcement:v1.2.3:org-2",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(mockReleaseAnnouncementUpdate).toHaveBeenCalledWith({
+      where: { id: "release-1" },
+      data: { broadcastAt: expect.any(Date) },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        summary: true,
+        releaseNotesUrl: true,
+        releasedAt: true,
+        broadcastAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await app.close();
+  });
+
+  it("does not create duplicate notifications after a release has been broadcast", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    mockReleaseAnnouncementFindUnique.mockResolvedValue({
+      id: "release-1",
+      version: "v1.2.3",
+      title: "Release notes automation",
+      summary: "Adds app-owned release records.",
+      releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+      releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+      broadcastAt: new Date("2026-07-04T18:03:00.000Z"),
+      createdAt: new Date("2026-07-04T18:01:00.000Z"),
+      updatedAt: new Date("2026-07-04T18:03:00.000Z"),
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: { version: "v1.2.3" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      notificationCount: 0,
+      alreadyBroadcast: true,
+      release: {
+        broadcastAt: "2026-07-04T18:03:00.000Z",
+      },
+    });
+    expect(mockMembershipFindMany).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockReleaseAnnouncementUpdate).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("returns 404 when the release is missing", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    mockReleaseAnnouncementFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: { version: "missing-release" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toMatchObject({
+      code: "RELEASE_NOT_FOUND",
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockReleaseAnnouncementUpdate).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects invalid release automation secrets", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "wrong-secret-value",
+      },
+      payload: { version: "v1.2.3" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      code: "INVALID_RELEASE_AUTOMATION_SECRET",
+    });
+    expect(mockReleaseAnnouncementFindUnique).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+});
+
 describe("POST /members", () => {
   it("scopes member reads to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(
-      makeMember({ organizationId: "org-secure" }),
+      makeMember({}, { organizationId: "org-secure" }),
     );
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-1",
-        displayName: "Alice",
         role: "MEMBER",
         houseId: "house-1",
         house: { name: "Phoenix", color: "#7c3aed" },
+        user: {
+          id: "user-1",
+          displayName: "Alice",
+        },
       },
     ]);
     const app = await buildTestApp();
@@ -4047,11 +4863,32 @@ describe("POST /members", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockUserFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: "org-secure" },
-      }),
-    );
+    expect(res.json()).toEqual([
+      {
+        id: "user-1",
+        displayName: "Alice",
+        role: "MEMBER",
+        houseId: "house-1",
+        houseName: "Phoenix",
+        houseColor: "#7c3aed",
+      },
+    ]);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        id: true,
+        role: true,
+        houseId: true,
+        house: { select: { name: true, color: true } },
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
     await app.close();
   });
 });
@@ -4121,24 +4958,30 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-1", delta: 12, createdAt: now },
         { targetHouseId: "house-2", delta: 4, createdAt: now },
       ]);
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-1",
-        displayName: "Alice",
         role: "MEMBER",
         houseId: "house-1",
+        user: {
+          id: "user-1",
+          displayName: "Alice",
+        },
       },
       {
-        id: "user-2",
-        displayName: "Bob",
         role: "ADMIN",
         houseId: "house-1",
+        user: {
+          id: "user-2",
+          displayName: "Bob",
+        },
       },
       {
-        id: "user-3",
-        displayName: "Cora",
         role: "MEMBER",
         houseId: "house-2",
+        user: {
+          id: "user-3",
+          displayName: "Cora",
+        },
       },
     ]);
     const app = await buildTestApp();
@@ -4262,11 +5105,20 @@ describe("POST /dashboard/summary", () => {
         }),
       );
     }
-    expect(mockUserFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: "org-1" },
-      }),
-    );
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: { organizationId: "org-1", isActive: true, archivedAt: null },
+      orderBy: { user: { displayName: "asc" } },
+      select: {
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
     for (const call of mockTxFindMany.mock.calls) {
       expect(call[0]).toEqual(
         expect.objectContaining({
@@ -4291,7 +5143,7 @@ describe("POST /dashboard/summary", () => {
   });
 
   it("uses a requested historical season for reporting summary", async () => {
-    mockFindUnique.mockResolvedValue(makeMember({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
     mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
     mockHouseFindMany.mockResolvedValue([
       HOUSE,
@@ -4314,12 +5166,14 @@ describe("POST /dashboard/summary", () => {
         { type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } },
       ]);
     mockTxFindMany.mockResolvedValue([]);
-    mockUserFindMany.mockResolvedValue([
+    mockMembershipFindMany.mockResolvedValue([
       {
-        id: "user-3",
-        displayName: "Cora",
         role: "MEMBER",
         houseId: "house-2",
+        user: {
+          id: "user-3",
+          displayName: "Cora",
+        },
       },
     ]);
     const app = await buildTestApp();
@@ -4411,13 +5265,38 @@ describe("POST /orgs/create", () => {
     await app.close();
   });
 
-  it("returns ALREADY_IN_ORG before starting setup when identity already belongs to an organization", async () => {
+  it("allows an existing org member to create another organization", async () => {
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
         id: "user-1",
-        organizationId: "org-existing",
       },
     });
+    mockOrgCreate.mockResolvedValue(ORG);
+    mockHouseCreate.mockResolvedValue(HOUSE);
+    mockSeasonCreate.mockResolvedValue({ id: "season-0" });
+    mockFindUnique.mockResolvedValue({
+      ...makeMember({
+        role: "OWNER",
+        email: "alice@example.com",
+        organization: { name: "Acme Corp", slug: "acme" },
+      }),
+      memberships: [
+        {
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+          house: { name: "Phoenix", color: "#7c3aed" },
+        },
+      ],
+    });
+    mockUserUpdate.mockResolvedValue(
+      makeMember({
+        role: "OWNER",
+        email: "alice@example.com",
+        organization: { name: "Acme Corp", slug: "acme" },
+      }),
+    );
     const app = await buildTestApp("auth0|member");
 
     const res = await app.inject({
@@ -4426,19 +5305,65 @@ describe("POST /orgs/create", () => {
       payload,
     });
 
-    expect(res.statusCode).toBe(409);
-    expect(res.json().code).toBe("ALREADY_IN_ORG");
-    expect(mockTransaction).not.toHaveBeenCalled();
-    expect(mockOrgCreate).not.toHaveBeenCalled();
-    expect(mockHouseCreate).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      role: "OWNER",
+      organizationId: "org-1",
+      houseId: "house-1",
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "OWNER",
+          houseId: "house-1",
+          isCurrent: true,
+        }),
+      ],
+    });
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "user-1" },
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
+        }),
+      }),
+    );
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "OWNER",
+        houseId: "house-1",
+      },
+      select: { id: true },
+    });
     await app.close();
   });
 
   it("atomically creates the organization, first house, and assigned owner", async () => {
-    mockFindUnique.mockResolvedValue({
-      id: "user-1",
-      organizationId: null,
-    });
+    mockFindUnique
+      .mockResolvedValueOnce({
+        id: "user-1",
+      })
+      .mockResolvedValueOnce({
+        ...makeMember({
+          role: "OWNER",
+          email: "alice@example.com",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }),
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "OWNER",
+            houseId: "house-1",
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: { name: "Phoenix", color: "#7c3aed" },
+          },
+        ],
+      });
     mockOrgCreate.mockResolvedValue(ORG);
     mockHouseCreate.mockResolvedValue(HOUSE);
     mockSeasonCreate.mockResolvedValue({ id: "season-0" });
@@ -4463,6 +5388,15 @@ describe("POST /orgs/create", () => {
       organizationId: "org-1",
       houseId: "house-1",
       houseName: "Phoenix",
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "OWNER",
+          houseId: "house-1",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockHouseCreate).toHaveBeenCalledWith({
@@ -4479,13 +5413,22 @@ describe("POST /orgs/create", () => {
     });
     expect(mockUserUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          organizationId: "org-1",
-          houseId: "house-1",
-          role: "OWNER",
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
         }),
       }),
     );
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "OWNER",
+        houseId: "house-1",
+      },
+      select: { id: true },
+    });
     expect(mockSeasonCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",
@@ -4502,7 +5445,6 @@ describe("POST /orgs/create", () => {
   it("returns an error when the atomic setup transaction fails", async () => {
     mockFindUnique.mockResolvedValue({
       id: "user-1",
-      organizationId: null,
     });
     mockTransaction.mockRejectedValue(new Error("transaction failed"));
     const app = await buildTestApp("auth0|member");
@@ -4543,7 +5485,7 @@ describe("POST /orgs/invite", () => {
 
   it("allows an admin to create a single-use invite for their organization", async () => {
     const expiresAt = new Date("2099-01-01T00:00:00.000Z");
-    mockFindUnique.mockResolvedValue(makeAdmin({ organizationId: "org-secure" }));
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockInviteCreate.mockResolvedValue({
       id: "invite-1",
       expiresAt,
@@ -4611,6 +5553,7 @@ describe("POST /orgs/join/preview", () => {
       id: "org-1",
       name: "Acme Corp",
       slug: "acme",
+      archivedAt: null,
     },
   };
 
@@ -4664,11 +5607,56 @@ describe("POST /orgs/join/preview", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-1",
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      membershipStatus: "SAME_ORG",
+      memberOrganizationName: "Acme Corp",
+      memberOrganizationSlug: "acme",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("uses active memberships over the legacy current organization shadow", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
         organization: {
-          name: "Acme Corp",
-          slug: "acme",
+          name: "Other Org",
+          slug: "other-org",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -4694,11 +5682,17 @@ describe("POST /orgs/join/preview", () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
-        organizationId: "org-other",
-        organization: {
-          name: "Other Org",
-          slug: "other-org",
-        },
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-other",
+            organization: {
+              name: "Other Org",
+              slug: "other-org",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -4714,6 +5708,37 @@ describe("POST /orgs/join/preview", () => {
       membershipStatus: "OTHER_ORG",
       memberOrganizationName: "Other Org",
       memberOrganizationSlug: "other-org",
+    });
+    expect(mockInviteUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("ignores stale legacy organization shadows when no active memberships exist", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+        memberships: [],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join/preview",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      membershipStatus: "NONE",
+      memberOrganizationName: null,
+      memberOrganizationSlug: null,
     });
     expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     await app.close();
@@ -4767,6 +5792,15 @@ describe("POST /orgs/route-context", () => {
           name: "Acme Corp",
           slug: "acme",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -4787,6 +5821,43 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
+  it("returns MATCH when an active membership exists even if the legacy current organization differs", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: "org-other",
+        organization: {
+          name: "Other Org",
+          slug: "other-org",
+        },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "MATCH",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
   it("returns ALIAS_REDIRECT for an old slug owned by the actor's organization", async () => {
     mockResolveOrganizationSlug.mockResolvedValue({
       ...resolvedSlug,
@@ -4800,6 +5871,15 @@ describe("POST /orgs/route-context", () => {
           name: "Acme Corp",
           slug: "acme",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -4819,6 +5899,50 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
+  it("returns ARCHIVED for members of an archived organization", async () => {
+    const archivedAt = new Date("2026-07-04T17:30:00.000Z");
+    mockResolveOrganizationSlug.mockResolvedValue({
+      ...resolvedSlug,
+      organization: {
+        ...resolvedSlug.organization,
+        archivedAt,
+      },
+    });
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+              archivedAt,
+            },
+          },
+        ],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+    });
+    await app.close();
+  });
+
   it("returns NOT_FOUND for an unknown slug without exposing organization data", async () => {
     mockResolveOrganizationSlug.mockResolvedValue(null);
     mockAuthIdentityFindUnique.mockResolvedValue({
@@ -4828,6 +5952,15 @@ describe("POST /orgs/route-context", () => {
           name: "Acme Corp",
           slug: "acme",
         },
+        memberships: [
+          {
+            organizationId: "org-1",
+            organization: {
+              name: "Acme Corp",
+              slug: "acme",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -4871,7 +6004,7 @@ describe("POST /orgs/route-context", () => {
     await app.close();
   });
 
-  it("returns DIFFERENT_ORG when the requested slug belongs to another organization", async () => {
+  it("returns NO_ACTOR_ORG when only legacy org fields exist", async () => {
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
@@ -4880,6 +6013,41 @@ describe("POST /orgs/route-context", () => {
           name: "Other Org",
           slug: "other-org",
         },
+        memberships: [],
+      },
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/route-context",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "NO_ACTOR_ORG",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+    });
+    await app.close();
+  });
+
+  it("returns DIFFERENT_ORG from active memberships when the legacy current organization is empty", async () => {
+    mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        organizationId: null,
+        organization: null,
+        memberships: [
+          {
+            organizationId: "org-other",
+            organization: {
+              name: "Other Org",
+              slug: "other-org",
+            },
+          },
+        ],
       },
     });
     const app = await buildTestApp();
@@ -5016,11 +6184,25 @@ describe("POST /orgs/join", () => {
   it("updates membership and claims the invite in one transaction", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockResolveOrganizationSlug.mockResolvedValue(resolvedSlug);
-    mockFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        ...joinedUser,
+        memberships: [
+          {
+            organizationId: "org-1",
+            role: "MEMBER",
+            houseId: null,
+            organization: { name: "Acme Corp", slug: "acme" },
+            house: null,
+          },
+        ],
+      });
     mockCreate.mockResolvedValue(joinedUser);
-    mockUserFindMany.mockResolvedValue([
-      { id: "admin-1" },
-      { id: "owner-1" },
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "admin-1" } },
+      { user: { id: "owner-1" } },
     ]);
     mockNotificationCreateMany.mockResolvedValue({ count: 2 });
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
@@ -5037,6 +6219,14 @@ describe("POST /orgs/join", () => {
       organizationId: "org-1",
       houseId: null,
       created: true,
+      organizationContexts: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          organizationSlug: "acme",
+          role: "MEMBER",
+          isCurrent: true,
+        }),
+      ],
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockInviteUpdateMany).toHaveBeenCalledWith({
@@ -5050,6 +6240,24 @@ describe("POST /orgs/join", () => {
         usedById: "user-1",
       },
     });
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "MEMBER",
+        houseId: null,
+      },
+      select: { id: true },
+    });
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
+        }),
+      }),
+    );
     expect(mockAuditEventCreate).toHaveBeenCalledWith({
       data: {
         organizationId: "org-1",
@@ -5063,13 +6271,15 @@ describe("POST /orgs/join", () => {
         },
       },
     });
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-1",
         role: { in: ["ADMIN", "OWNER"] },
-        id: { not: "user-1" },
+        userId: { not: "user-1" },
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [
@@ -5106,15 +6316,21 @@ describe("POST /orgs/join", () => {
     await app.close();
   });
 
-  it("does not create assignment notifications when the joined user already has a house", async () => {
+  it("ignores stale legacy house assignment when deciding join notifications", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
-    mockFindUnique.mockResolvedValue(null);
-    mockCreate.mockResolvedValue(makeMember({
+    const housedUser = makeMember({
       email: "alice@example.com",
       houseId: "house-1",
       house: { name: "Phoenix", color: "#7c3aed" },
-    }));
+    });
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(housedUser);
+    mockCreate.mockResolvedValue(housedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    mockMembershipFindMany.mockResolvedValue([{ user: { id: "admin-1" } }]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 1 });
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -5124,17 +6340,39 @@ describe("POST /orgs/join", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
-    expect(mockUserFindMany).not.toHaveBeenCalled();
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        role: { in: ["ADMIN", "OWNER"] },
+        userId: { not: "user-1" },
+        isActive: true,
+        archivedAt: null,
+      },
+      select: { user: { select: { id: true } } },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({
+          organizationId: "org-1",
+          recipientUserId: "admin-1",
+          type: "MEMBER_NEEDS_HOUSE_ASSIGNMENT",
+          entityId: "user-1",
+        }),
+      ],
+      skipDuplicates: true,
+    }));
     await app.close();
   });
 
   it("skips notification creation when no admin or owner recipients exist", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
-    mockFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(joinedUser);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
-    mockUserFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([]);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -5144,13 +6382,15 @@ describe("POST /orgs/join", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mockUserFindMany).toHaveBeenCalledWith({
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-1",
         role: { in: ["ADMIN", "OWNER"] },
-        id: { not: "user-1" },
+        userId: { not: "user-1" },
+        isActive: true,
+        archivedAt: null,
       },
-      select: { id: true },
+      select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -5158,10 +6398,13 @@ describe("POST /orgs/join", () => {
 
   it("uses skipDuplicates so assignment notifications are idempotent", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
-    mockFindUnique.mockResolvedValue(null);
+    mockFindUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(joinedUser);
     mockCreate.mockResolvedValue(joinedUser);
     mockInviteUpdateMany.mockResolvedValue({ count: 1 });
-    mockUserFindMany.mockResolvedValue([{ id: "admin-1" }]);
+    mockMembershipFindMany.mockResolvedValue([{ user: { id: "admin-1" } }]);
     mockNotificationCreateMany.mockResolvedValue({ count: 0 });
     const app = await buildTestApp();
 
@@ -5200,11 +6443,94 @@ describe("POST /orgs/join", () => {
     await app.close();
   });
 
-  it("does not claim an invite for a user already in another organization", async () => {
+  it("creates a membership when an existing user joins another organization", async () => {
     mockInviteFindUnique.mockResolvedValue(invite);
     mockFindUnique.mockResolvedValue({
       id: "user-1",
       organizationId: "org-other",
+    });
+    mockUserUpdate.mockResolvedValue(joinedUser);
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "user-1" },
+        data: expect.not.objectContaining({
+          organizationId: expect.anything(),
+          houseId: expect.anything(),
+          role: expect.anything(),
+        }),
+      }),
+    );
+    expect(mockMembershipCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        userId: "user-1",
+        role: "MEMBER",
+        houseId: null,
+      },
+      select: { id: true },
+    });
+    expect(mockInviteUpdateMany).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("reactivates an archived membership when the invite is valid", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: "org-other",
+    });
+    mockMembershipFindFirst.mockResolvedValue({
+      id: "membership-archived",
+      isActive: false,
+      archivedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    mockUserUpdate.mockResolvedValue(joinedUser);
+    mockMembershipUpdate.mockResolvedValue({ id: "membership-archived" });
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/join",
+      payload,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockMembershipUpdate).toHaveBeenCalledWith({
+      where: { id: "membership-archived" },
+      data: {
+        isActive: true,
+        archivedAt: null,
+        role: "MEMBER",
+        houseId: null,
+      },
+      select: { id: true },
+    });
+    expect(mockMembershipCreate).not.toHaveBeenCalled();
+    expect(mockInviteUpdateMany).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("does not claim an invite when the user already has an active membership in that organization", async () => {
+    mockInviteFindUnique.mockResolvedValue(invite);
+    mockFindUnique.mockResolvedValue({
+      id: "user-1",
+      organizationId: "org-1",
+    });
+    mockMembershipFindFirst.mockResolvedValue({
+      id: "membership-1",
+      isActive: true,
+      archivedAt: null,
     });
     const app = await buildTestApp();
 
@@ -5216,6 +6542,7 @@ describe("POST /orgs/join", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("ALREADY_IN_ORG");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
     expect(mockInviteUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
