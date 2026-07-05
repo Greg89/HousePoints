@@ -1,9 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Prisma } from "@prisma/client";
-import { createReleaseAnnouncementSchema } from "@housepoints/contracts";
+import {
+  broadcastReleaseAnnouncementSchema,
+  createReleaseAnnouncementSchema,
+} from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { readReleaseAutomationSecretFromEnv } from "../config.js";
+import { buildReleaseAnnouncementNotificationData } from "../notifications.js";
 import { info, warn } from "../logging.js";
 import { parseBody } from "../route-helpers.js";
 
@@ -118,5 +122,97 @@ export async function registerReleaseRoutes(app: FastifyInstance): Promise<void>
     });
 
     return mapReleaseAnnouncement(release);
+  });
+
+  app.post("/system/releases/broadcast", async (request, reply) => {
+    if (!(await requireReleaseAutomationSecret(request, reply))) {
+      return;
+    }
+
+    const parsed = await parseBody(broadcastReleaseAnnouncementSchema, request, reply);
+    if (!parsed) return;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const release = await tx.releaseAnnouncement.findUnique({
+        where: { version: parsed.version },
+        select: RELEASE_ANNOUNCEMENT_SELECT,
+      });
+
+      if (!release) {
+        return { status: "not_found" as const };
+      }
+
+      const alreadyBroadcast = Boolean(release.broadcastAt);
+      if (alreadyBroadcast) {
+        return {
+          status: "broadcast" as const,
+          release,
+          notificationCount: 0,
+          alreadyBroadcast,
+        };
+      }
+
+      const recipients = await tx.organizationMembership.findMany({
+        where: {
+          isActive: true,
+          archivedAt: null,
+          organization: {
+            archivedAt: null,
+          },
+        },
+        select: {
+          organizationId: true,
+          userId: true,
+        },
+      });
+
+      const createResult = recipients.length > 0
+        ? await tx.notification.createMany({
+            data: recipients.map((recipient) => buildReleaseAnnouncementNotificationData({
+              organizationId: recipient.organizationId,
+              recipientId: recipient.userId,
+              releaseId: release.id,
+              version: release.version,
+              title: release.title,
+              summary: release.summary,
+            })),
+            skipDuplicates: true,
+          })
+        : { count: 0 };
+
+      const broadcastAt = new Date();
+      const updatedRelease = await tx.releaseAnnouncement.update({
+        where: { id: release.id },
+        data: { broadcastAt },
+        select: RELEASE_ANNOUNCEMENT_SELECT,
+      });
+
+      return {
+        status: "broadcast" as const,
+        release: updatedRelease,
+        notificationCount: createResult.count,
+        alreadyBroadcast,
+      };
+    });
+
+    if (result.status === "not_found") {
+      return reply.status(404).send({
+        code: "RELEASE_NOT_FOUND",
+        message: "Release announcement was not found.",
+      });
+    }
+
+    info(request.log, "releases.broadcasted", {
+      releaseId: result.release.id,
+      version: result.release.version,
+      notificationCount: result.notificationCount,
+      alreadyBroadcast: result.alreadyBroadcast,
+    });
+
+    return {
+      release: mapReleaseAnnouncement(result.release),
+      notificationCount: result.notificationCount,
+      alreadyBroadcast: result.alreadyBroadcast,
+    };
   });
 }

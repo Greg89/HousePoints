@@ -90,7 +90,7 @@ Staging E2E workflow
 2. Create GitHub Releases for production tags.
 3. Publish generated release notes to GitHub Pages.
 4. Create app-owned release records. First slice implemented through `POST /system/releases/record`, protected by `RELEASE_AUTOMATION_SECRET`.
-5. Broadcast in-app release notifications after production deploys and health checks pass.
+5. Broadcast in-app release notifications after production deploys and health checks pass. First slice implemented through `POST /system/releases/broadcast`, protected by `RELEASE_AUTOMATION_SECRET`.
 
 GitHub Actions should trigger app behavior for user notifications. It should not write release notifications directly into the production database.
 
@@ -127,6 +127,27 @@ Required JSON body:
 - `releasedAt`
 
 The endpoint upserts by `version`, which makes workflow retries safe. It does not create user notifications.
+
+## Release Broadcast Endpoint
+
+`POST /system/releases/broadcast` creates app-owned informational notifications for a recorded release. The endpoint is idempotent: it skips releases that already have `broadcastAt`, and notification rows also use dedupe keys so retries do not duplicate user notifications.
+
+Required header:
+
+- `x-housepoints-release-secret`: must match `RELEASE_AUTOMATION_SECRET`.
+
+Required JSON body:
+
+- `version`
+
+Behavior:
+
+- Finds the release by `version`.
+- Creates one unread `RELEASE_ANNOUNCEMENT` notification for each active membership in an active organization.
+- Sets `broadcastAt`.
+- Returns the stored release, notification count, and `alreadyBroadcast`.
+
+For the multi-org beta release, record the release first, verify the row exists, then broadcast the same `version` after the production deploy is healthy.
 
 ## Future Semantic Release Shape
 

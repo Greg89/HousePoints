@@ -69,6 +69,8 @@ import {
   seasonSchema,
 } from "./season-schemas.js";
 import {
+  broadcastReleaseAnnouncementResponseSchema,
+  broadcastReleaseAnnouncementSchema,
   createReleaseAnnouncementSchema,
   releaseAnnouncementSchema,
 } from "./release-schemas.js";
@@ -117,6 +119,10 @@ export const apiContracts = {
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),
   "/notifications/mark-all-read": defineContract(actorScopeSchema, notificationMutationResponseSchema),
   "/notifications/mark-read": defineContract(markNotificationsReadSchema, notificationMutationResponseSchema),
+  "/system/releases/broadcast": defineContract(
+    broadcastReleaseAnnouncementSchema,
+    broadcastReleaseAnnouncementResponseSchema,
+  ),
   "/system/releases/record": defineContract(createReleaseAnnouncementSchema, releaseAnnouncementSchema),
   "/orgs/create": defineContract(createOrgSchema, appUserSchema),
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),

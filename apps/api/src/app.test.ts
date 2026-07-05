@@ -62,7 +62,9 @@ vi.mock("@housepoints/db", () => ({
       updateMany: vi.fn(),
     },
     releaseAnnouncement: {
+      findUnique: vi.fn(),
       upsert: vi.fn(),
+      update: vi.fn(),
     },
     season: {
       create: vi.fn(),
@@ -126,7 +128,9 @@ const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.
 const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
 const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
+const mockReleaseAnnouncementFindUnique = prisma.releaseAnnouncement.findUnique as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementUpsert = prisma.releaseAnnouncement.upsert as ReturnType<typeof vi.fn>;
+const mockReleaseAnnouncementUpdate = prisma.releaseAnnouncement.update as ReturnType<typeof vi.fn>;
 const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
@@ -270,7 +274,7 @@ beforeEach(() => {
   mockNotificationCreateMany.mockResolvedValue({ count: 0 });
   mockNotificationFindMany.mockResolvedValue([]);
   mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
-  mockReleaseAnnouncementUpsert.mockResolvedValue({
+  const releaseAnnouncement = {
     id: "release-1",
     version: "v1.2.3",
     title: "Release notes automation",
@@ -280,6 +284,13 @@ beforeEach(() => {
     broadcastAt: null,
     createdAt: new Date("2026-07-04T18:01:00.000Z"),
     updatedAt: new Date("2026-07-04T18:02:00.000Z"),
+  };
+  mockReleaseAnnouncementFindUnique.mockResolvedValue(releaseAnnouncement);
+  mockReleaseAnnouncementUpsert.mockResolvedValue(releaseAnnouncement);
+  mockReleaseAnnouncementUpdate.mockResolvedValue({
+    ...releaseAnnouncement,
+    broadcastAt: new Date("2026-07-04T18:03:00.000Z"),
+    updatedAt: new Date("2026-07-04T18:03:00.000Z"),
   });
   delete process.env.RELEASE_AUTOMATION_SECRET;
   mockTransaction.mockImplementation(
@@ -4611,6 +4622,218 @@ describe("POST /users/scores", () => {
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("SEASON_NOT_FOUND");
     expect(mockTxGroupBy).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /system/releases/broadcast", () => {
+  it("broadcasts release notifications to active members once", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    mockMembershipFindMany.mockResolvedValue([
+      { organizationId: "org-1", userId: "user-1" },
+      { organizationId: "org-1", userId: "user-2" },
+      { organizationId: "org-2", userId: "user-1" },
+    ]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 3 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: { version: "v1.2.3" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      release: {
+        id: "release-1",
+        version: "v1.2.3",
+        title: "Release notes automation",
+        summary: "Adds app-owned release records.",
+        releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+        releasedAt: "2026-07-04T18:00:00.000Z",
+        broadcastAt: "2026-07-04T18:03:00.000Z",
+        createdAt: "2026-07-04T18:01:00.000Z",
+        updatedAt: "2026-07-04T18:03:00.000Z",
+      },
+      notificationCount: 3,
+      alreadyBroadcast: false,
+    });
+    expect(mockReleaseAnnouncementFindUnique).toHaveBeenCalledWith({
+      where: { version: "v1.2.3" },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        summary: true,
+        releaseNotesUrl: true,
+        releasedAt: true,
+        broadcastAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        isActive: true,
+        archivedAt: null,
+        organization: {
+          archivedAt: null,
+        },
+      },
+      select: {
+        organizationId: true,
+        userId: true,
+      },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organizationId: "org-1",
+          recipientUserId: "user-1",
+          type: "RELEASE_ANNOUNCEMENT",
+          severity: "INFO",
+          title: "What's new: Release notes automation",
+          body: "Adds app-owned release records.",
+          actionLabel: null,
+          actionHref: null,
+          entityType: "ReleaseAnnouncement",
+          entityId: "release-1",
+          dedupeKey: "release-announcement:v1.2.3:org-1",
+        },
+        {
+          organizationId: "org-1",
+          recipientUserId: "user-2",
+          type: "RELEASE_ANNOUNCEMENT",
+          severity: "INFO",
+          title: "What's new: Release notes automation",
+          body: "Adds app-owned release records.",
+          actionLabel: null,
+          actionHref: null,
+          entityType: "ReleaseAnnouncement",
+          entityId: "release-1",
+          dedupeKey: "release-announcement:v1.2.3:org-1",
+        },
+        {
+          organizationId: "org-2",
+          recipientUserId: "user-1",
+          type: "RELEASE_ANNOUNCEMENT",
+          severity: "INFO",
+          title: "What's new: Release notes automation",
+          body: "Adds app-owned release records.",
+          actionLabel: null,
+          actionHref: null,
+          entityType: "ReleaseAnnouncement",
+          entityId: "release-1",
+          dedupeKey: "release-announcement:v1.2.3:org-2",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(mockReleaseAnnouncementUpdate).toHaveBeenCalledWith({
+      where: { id: "release-1" },
+      data: { broadcastAt: expect.any(Date) },
+      select: {
+        id: true,
+        version: true,
+        title: true,
+        summary: true,
+        releaseNotesUrl: true,
+        releasedAt: true,
+        broadcastAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await app.close();
+  });
+
+  it("does not create duplicate notifications after a release has been broadcast", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    mockReleaseAnnouncementFindUnique.mockResolvedValue({
+      id: "release-1",
+      version: "v1.2.3",
+      title: "Release notes automation",
+      summary: "Adds app-owned release records.",
+      releaseNotesUrl: "https://example.com/releases/v1.2.3.html",
+      releasedAt: new Date("2026-07-04T18:00:00.000Z"),
+      broadcastAt: new Date("2026-07-04T18:03:00.000Z"),
+      createdAt: new Date("2026-07-04T18:01:00.000Z"),
+      updatedAt: new Date("2026-07-04T18:03:00.000Z"),
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: { version: "v1.2.3" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      notificationCount: 0,
+      alreadyBroadcast: true,
+      release: {
+        broadcastAt: "2026-07-04T18:03:00.000Z",
+      },
+    });
+    expect(mockMembershipFindMany).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockReleaseAnnouncementUpdate).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("returns 404 when the release is missing", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    mockReleaseAnnouncementFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "release-secret-123",
+      },
+      payload: { version: "missing-release" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toMatchObject({
+      code: "RELEASE_NOT_FOUND",
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockReleaseAnnouncementUpdate).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects invalid release automation secrets", async () => {
+    process.env.RELEASE_AUTOMATION_SECRET = "release-secret-123";
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/system/releases/broadcast",
+      headers: {
+        "x-housepoints-release-secret": "wrong-secret-value",
+      },
+      payload: { version: "v1.2.3" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      code: "INVALID_RELEASE_AUTOMATION_SECRET",
+    });
+    expect(mockReleaseAnnouncementFindUnique).not.toHaveBeenCalled();
+
     await app.close();
   });
 });

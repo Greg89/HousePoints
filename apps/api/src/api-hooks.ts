@@ -6,7 +6,9 @@ import {
 import { error, info, warn } from "./logging.js";
 
 export function isPublicRoute(routeUrl: string | undefined): boolean {
-  return routeUrl === "/health" || routeUrl === "/system/releases/record";
+  return routeUrl === "/health"
+    || routeUrl === "/system/releases/record"
+    || routeUrl === "/system/releases/broadcast";
 }
 
 function getRequestPath(url: string): string {

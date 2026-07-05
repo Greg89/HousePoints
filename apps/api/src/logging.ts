@@ -19,6 +19,7 @@ export type ApiLogEvent =
   | "request.unhandled_error"
   | "releases.automation_secret_invalid"
   | "releases.automation_secret_missing"
+  | "releases.broadcasted"
   | "releases.recorded"
   | "health.checked"
   | "users.bootstrap.validation_failed"

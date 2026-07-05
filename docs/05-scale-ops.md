@@ -85,8 +85,9 @@ Deferred sub-features:
 
 Recommended remaining order:
 
-1. Expand staging E2E coverage for owner and admin flows.
-2. Return to product work with existing-member create-new-org support.
+1. Finish release announcement UX by adding a What's New surface and optional workflow-triggered broadcast.
+2. Expand staging E2E coverage for owner and admin flows.
+3. Return to product work with existing-member create-new-org support.
 
 ---
 

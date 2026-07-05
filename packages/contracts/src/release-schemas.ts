@@ -18,3 +18,17 @@ export const releaseAnnouncementSchema = createReleaseAnnouncementSchema.extend(
 });
 
 export type ReleaseAnnouncement = z.infer<typeof releaseAnnouncementSchema>;
+
+export const broadcastReleaseAnnouncementSchema = z.object({
+  version: z.string().trim().min(1).max(80),
+}).strict();
+
+export type BroadcastReleaseAnnouncementInput = z.infer<typeof broadcastReleaseAnnouncementSchema>;
+
+export const broadcastReleaseAnnouncementResponseSchema = z.object({
+  release: releaseAnnouncementSchema,
+  notificationCount: z.number().int().nonnegative(),
+  alreadyBroadcast: z.boolean(),
+});
+
+export type BroadcastReleaseAnnouncementResponse = z.infer<typeof broadcastReleaseAnnouncementResponseSchema>;

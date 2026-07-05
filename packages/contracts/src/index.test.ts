@@ -47,6 +47,8 @@ import {
   notificationMutationResponseSchema,
   notificationSchema,
   pagedNotificationsSchema,
+  broadcastReleaseAnnouncementResponseSchema,
+  broadcastReleaseAnnouncementSchema,
   createReleaseAnnouncementSchema,
   releaseAnnouncementSchema,
   pagedActivityFeedSchema,
@@ -84,6 +86,7 @@ const webConsumedApiEndpoints = [
   "/notifications/list",
   "/notifications/mark-all-read",
   "/notifications/mark-read",
+  "/system/releases/broadcast",
   "/system/releases/record",
   "/orgs/create",
   "/orgs/invite",
@@ -2064,6 +2067,24 @@ describe("release announcement schemas", () => {
     expect(releaseAnnouncementSchema.parse(release)).toEqual(release);
   });
 
+  it("accepts release broadcast requests and responses", () => {
+    expect(broadcastReleaseAnnouncementSchema.parse({
+      version: " v1.2.3 ",
+    })).toEqual({
+      version: "v1.2.3",
+    });
+
+    expect(broadcastReleaseAnnouncementResponseSchema.parse({
+      release,
+      notificationCount: 12,
+      alreadyBroadcast: false,
+    })).toEqual({
+      release,
+      notificationCount: 12,
+      alreadyBroadcast: false,
+    });
+  });
+
   it("rejects invalid release record shapes", () => {
     expect(createReleaseAnnouncementSchema.safeParse({
       version: "v1.2.3",
@@ -2075,6 +2096,14 @@ describe("release announcement schemas", () => {
     expect(releaseAnnouncementSchema.safeParse({
       ...release,
       broadcastAt: "not-a-date",
+    }).success).toBe(false);
+    expect(broadcastReleaseAnnouncementSchema.safeParse({
+      version: "",
+    }).success).toBe(false);
+    expect(broadcastReleaseAnnouncementResponseSchema.safeParse({
+      release,
+      notificationCount: -1,
+      alreadyBroadcast: false,
     }).success).toBe(false);
   });
 });
