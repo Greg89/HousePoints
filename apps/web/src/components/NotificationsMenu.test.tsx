@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PagedNotifications } from "@housepoints/contracts";
@@ -248,5 +248,22 @@ describe("NotificationsMenu", () => {
     expect(onMarkAllNotificationsRead).toHaveBeenCalledOnce();
     expect(await screen.findByText("All caught up")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /mark all read/i })).toBeDisabled();
+  });
+
+  it("moves focus into notifications on open and returns focus to trigger on escape", async () => {
+    const user = userEvent.setup();
+    render(<NotificationsMenuHarness />);
+
+    const trigger = screen.getByRole("button", { name: /notifications menu/i });
+    await user.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /mark all read/i })).toHaveFocus();
+    });
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: /notifications/i })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });

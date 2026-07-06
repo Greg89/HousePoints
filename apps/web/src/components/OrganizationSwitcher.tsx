@@ -12,6 +12,8 @@ type OrganizationSwitcherProps = {
 export function OrganizationSwitcher({ organizationContexts }: OrganizationSwitcherProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const currentOrganization = useMemo(
     () => organizationContexts.find((context) => context.isCurrent) ?? organizationContexts[0] ?? null,
@@ -28,15 +30,35 @@ export function OrganizationSwitcher({ organizationContexts }: OrganizationSwitc
       return;
     }
 
+    const frame = requestAnimationFrame(() => {
+      const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+        "a[href], button:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      );
+      firstFocusable?.focus();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  function closeMenu() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     function handlePointerDown(event: PointerEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
+        closeMenu();
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeMenu();
       }
     }
 
@@ -56,10 +78,12 @@ export function OrganizationSwitcher({ organizationContexts }: OrganizationSwitc
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={`Current organization: ${currentOrganization.organizationName}`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-controls="organization-switcher-dialog"
         onClick={() => setOpen((value) => !value)}
         className="inline-flex max-w-[11.5rem] items-center gap-1.5 rounded-full border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:max-w-[16rem] sm:gap-2 sm:px-3 sm:text-sm"
       >
@@ -70,8 +94,11 @@ export function OrganizationSwitcher({ organizationContexts }: OrganizationSwitc
 
       {open ? (
         <div
+          id="organization-switcher-dialog"
+          ref={panelRef}
           role="dialog"
           aria-label="Switch organization"
+          tabIndex={-1}
           className="absolute right-0 z-40 mt-3 w-[min(calc(100vw-2rem),22rem)] rounded-2xl border bg-card p-3 shadow-xl shadow-primary/10"
         >
           <div className="mb-2 px-1">

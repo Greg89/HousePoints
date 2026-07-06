@@ -35,6 +35,8 @@ export function NotificationsMenu({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const displayedUnreadCount = Math.min(notifications.unreadCount, 99);
   const hasUnread = notifications.unreadCount > 0;
   const orderedNotifications = getOrderedNotifications(notifications.items);
@@ -47,17 +49,36 @@ export function NotificationsMenu({
       return;
     }
 
+    const frame = requestAnimationFrame(() => {
+      const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+        "a[href], button:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      );
+      firstFocusable?.focus();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  function closeMenu() {
+    setOpen(false);
+    setShowRead(false);
+    triggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setShowRead(false);
+        closeMenu();
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
-        setShowRead(false);
+        closeMenu();
       }
     }
 
@@ -149,6 +170,7 @@ export function NotificationsMenu({
   return (
     <div ref={menuRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={
           hasUnread
@@ -157,6 +179,7 @@ export function NotificationsMenu({
         }
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-controls="notifications-menu-dialog"
         onClick={() => setOpen((current) => !current)}
         className="relative flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors hover:bg-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/30"
       >
@@ -170,8 +193,11 @@ export function NotificationsMenu({
 
       {open ? (
         <div
+          id="notifications-menu-dialog"
+          ref={panelRef}
           role="dialog"
           aria-label="Notifications"
+          tabIndex={-1}
           className="absolute right-0 z-40 mt-3 flex max-h-[calc(100dvh-7rem)] w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
         >
           <section className="p-3" aria-label="Notifications feed">

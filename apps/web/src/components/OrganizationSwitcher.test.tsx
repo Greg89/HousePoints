@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { OrganizationSwitcher } from "./OrganizationSwitcher";
@@ -124,5 +124,38 @@ describe("OrganizationSwitcher", () => {
       "href",
       "/settings#organisations",
     );
+  });
+
+  it("moves focus into the switcher on open and returns focus to trigger on escape", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrganizationSwitcher
+        organizationContexts={[
+          ...baseContexts,
+          {
+            organizationId: "org-2",
+            organizationName: "Beta Org",
+            organizationSlug: "beta",
+            role: "OWNER",
+            houseId: null,
+            houseName: null,
+            houseColor: null,
+            isCurrent: false,
+          },
+        ]}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: /current organization: acme corp/i });
+    await user.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /beta org/i })).toHaveFocus();
+    });
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: /switch organization/i })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });

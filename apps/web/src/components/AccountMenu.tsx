@@ -26,6 +26,8 @@ export function AccountMenu({
   logoutUrl,
 }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const currentOrganization = session.organizationContexts.find((context) => context.isCurrent) ?? null;
 
@@ -34,15 +36,35 @@ export function AccountMenu({
       return;
     }
 
+    const frame = requestAnimationFrame(() => {
+      const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+        "a[href], button:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      );
+      firstFocusable?.focus();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  function closeMenu() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current?.contains(event.target as Node)) {
-        setOpen(false);
+        closeMenu();
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
+        closeMenu();
       }
     }
 
@@ -58,10 +80,12 @@ export function AccountMenu({
   return (
     <div ref={menuRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Account menu"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-controls="account-menu-dialog"
         onClick={() => setOpen((current) => !current)}
         className="relative flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors hover:bg-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/30"
       >
@@ -70,8 +94,11 @@ export function AccountMenu({
 
       {open ? (
         <div
+          id="account-menu-dialog"
+          ref={panelRef}
           role="dialog"
           aria-label="Account"
+          tabIndex={-1}
           className="absolute right-0 z-40 mt-3 flex w-[min(calc(100vw-2rem),20rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
         >
           <div className="shrink-0 border-b p-4">

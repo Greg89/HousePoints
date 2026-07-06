@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountMenu } from "./AccountMenu";
@@ -57,5 +57,22 @@ describe("AccountMenu", () => {
       "href",
       "https://housepoints.example/releases/",
     );
+  });
+
+  it("moves focus into the menu on open and back to trigger on escape", async () => {
+    const user = userEvent.setup();
+    render(<AccountMenu {...baseProps} />);
+
+    const trigger = screen.getByRole("button", { name: /account menu/i });
+    await user.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /account settings/i })).toHaveFocus();
+    });
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: /account/i })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });
