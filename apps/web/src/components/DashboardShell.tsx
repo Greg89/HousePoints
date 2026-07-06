@@ -18,6 +18,8 @@ import {
 import { motion } from "framer-motion";
 import { AccountMenu } from "./AccountMenu";
 import { NotificationPoller } from "./NotificationPoller";
+import { NotificationsMenu } from "./NotificationsMenu";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 import { HouseCard } from "./HouseCard";
 import { Leaderboard } from "./Leaderboard";
 import { ActivityFeed } from "./ActivityFeed";
@@ -291,71 +293,85 @@ export function DashboardShell({
     <div className="min-h-screen bg-background" style={houseThemeStyle}>
       {/* Header */}
       <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
           <Link href={dashboardHref} className="font-display text-xl font-bold tracking-wide text-primary">
             House Points
           </Link>
-          <div className="flex items-center gap-3">
-            {/* Current house badge */}
-            {session.houseName && (
-              <span
-                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-                style={{
-                  backgroundColor: `${session.houseColor ?? "var(--primary)"}20`,
-                  color: session.houseColor ?? "var(--primary)",
-                  border: `1px solid ${session.houseColor ?? "var(--primary)"}40`,
-                }}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: session.houseColor ?? "var(--primary)" }}
-                />
-                {session.houseName}
-              </span>
-            )}
-            {/* Award points button - hidden on mobile (FAB used instead) */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setAwardOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <Star weight="fill" size={16} />
-              Award Points
-            </motion.button>
-            {canDeduct ? (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setDeductOpen(true)}
-                className="hidden items-center gap-2 rounded-lg border border-destructive/30 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 sm:flex"
-              >
-                <MinusCircle weight="fill" size={16} />
-                Deduct Points
-              </motion.button>
-            ) : null}
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="hidden sm:block">
+              <OrganizationSwitcher organizationContexts={session.organizationContexts} />
+            </div>
+            <NotificationsMenu
+              notifications={currentNotifications}
+              onNotificationsChange={setCurrentNotifications}
+              onMarkNotificationRead={onMarkNotificationRead}
+              onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+              dashboardHref={dashboardHref}
+            />
             <AccountMenu
               session={{
                 userName: session.userName,
                 role: session.role,
                 organizationContexts: session.organizationContexts,
               }}
-              dashboardHref={dashboardHref}
-              notifications={currentNotifications}
-              onNotificationsChange={setCurrentNotifications}
-              onMarkNotificationRead={onMarkNotificationRead}
-              onMarkAllNotificationsRead={onMarkAllNotificationsRead}
               releaseNotesUrl={releaseNotesUrl}
               logoutUrl={logoutUrl}
             />
-            <NotificationPoller
-              notifications={currentNotifications}
-              onNotificationsChange={setCurrentNotifications}
-              onRefreshNotifications={onRefreshNotifications}
-              dashboardHref={dashboardHref}
-            />
           </div>
         </div>
+
+        <div className="hidden border-t bg-card/85 sm:block">
+          <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
+            <div className="flex min-w-0 items-center gap-3">
+              {session.houseName ? (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                  style={{
+                    backgroundColor: `${session.houseColor ?? "var(--primary)"}20`,
+                    color: session.houseColor ?? "var(--primary)",
+                    border: `1px solid ${session.houseColor ?? "var(--primary)"}40`,
+                  }}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: session.houseColor ?? "var(--primary)" }}
+                  />
+                  {session.houseName}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setAwardOpen(true)}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                <Star weight="fill" size={16} />
+                Award Points
+              </motion.button>
+              {canDeduct ? (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setDeductOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border border-destructive/30 px-4 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10"
+                >
+                  <MinusCircle weight="fill" size={16} />
+                  Deduct Points
+                </motion.button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <NotificationPoller
+          notifications={currentNotifications}
+          onNotificationsChange={setCurrentNotifications}
+          onRefreshNotifications={onRefreshNotifications}
+          dashboardHref={dashboardHref}
+        />
       </header>
 
       {/* Main content */}

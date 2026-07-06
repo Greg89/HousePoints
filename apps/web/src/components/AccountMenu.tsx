@@ -1,19 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
-  Bell,
-  Check,
   ArrowSquareOut,
   Gear,
   Megaphone,
   SignOut,
   User,
 } from "@phosphor-icons/react";
-import type { AppUserOrganizationContext, Notification, PagedNotifications } from "@housepoints/contracts";
-import type { NotificationMutationResult } from "@/lib/action-results";
-import { cn } from "@/lib/cn";
+import type { AppUserOrganizationContext } from "@housepoints/contracts";
 
 type AccountMenuProps = {
   session: {
@@ -21,46 +16,18 @@ type AccountMenuProps = {
     role: "MEMBER" | "ADMIN" | "OWNER";
     organizationContexts: AppUserOrganizationContext[];
   };
-  notifications: PagedNotifications;
-  onNotificationsChange: (notifications: PagedNotifications) => void;
-  onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
-  onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
-  dashboardHref: string;
   releaseNotesUrl?: string | null;
   logoutUrl: string;
 };
 
-const dateFormatter = new Intl.DateTimeFormat("en", {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
-
 export function AccountMenu({
   session,
-  notifications,
-  onNotificationsChange,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead,
-  dashboardHref,
   releaseNotesUrl,
   logoutUrl,
 }: AccountMenuProps) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
-  const displayedUnreadCount = Math.min(notifications.unreadCount, 99);
-  const hasUnread = notifications.unreadCount > 0;
   const currentOrganization = session.organizationContexts.find((context) => context.isCurrent) ?? null;
-  const canSwitchOrganizations = session.organizationContexts.length > 1;
-  const visibleOrganizationContexts = getVisibleOrganizationContexts(session.organizationContexts);
-  const hiddenOrganizationCount = Math.max(
-    0,
-    session.organizationContexts.length - visibleOrganizationContexts.length,
-  );
 
   useEffect(() => {
     if (!open) {
@@ -88,115 +55,24 @@ export function AccountMenu({
     };
   }, [open]);
 
-  function markLocalRead(notificationIds: string[]) {
-    const unreadIds = new Set(
-      notifications.items
-        .filter((item) => notificationIds.includes(item.id) && !item.readAt)
-        .map((item) => item.id),
-    );
-
-    if (unreadIds.size === 0) {
-      return;
-    }
-
-    onNotificationsChange({
-      ...notifications,
-      items: notifications.items.map((item) =>
-        unreadIds.has(item.id)
-          ? { ...item, readAt: new Date().toISOString() }
-          : item,
-      ),
-      unreadCount: Math.max(0, notifications.unreadCount - unreadIds.size),
-    });
-  }
-
-  async function markNotificationLocally(notificationId: string) {
-    const result = await onMarkNotificationRead(notificationId);
-
-    if (result.ok) {
-      markLocalRead([notificationId]);
-      return true;
-    }
-
-    setError(result.message);
-    return false;
-  }
-
-  function handleMarkRead(notificationId: string) {
-    setError(null);
-
-    startTransition(async () => {
-      await markNotificationLocally(notificationId);
-    });
-  }
-
-  function handleOpenAction(notification: Notification, href: string) {
-    setError(null);
-
-    startTransition(async () => {
-      const canNavigate = notification.readAt
-        ? true
-        : await markNotificationLocally(notification.id);
-
-      if (canNavigate) {
-        setOpen(false);
-        if (isExternalHttpsHref(href)) {
-          window.open(href, "_blank", "noopener,noreferrer");
-          return;
-        }
-
-        router.push(href);
-      }
-    });
-  }
-
-  function handleMarkAllRead() {
-    setError(null);
-
-    startTransition(async () => {
-      const result = await onMarkAllNotificationsRead();
-
-      if (result.ok) {
-        const unreadIds = notifications.items.filter((item) => !item.readAt).map((item) => item.id);
-        markLocalRead(unreadIds);
-        return;
-      }
-
-      setError(result.message);
-    });
-  }
-
   return (
     <div ref={menuRef} className="relative">
       <button
         type="button"
-        aria-label={
-          hasUnread
-            ? `Account menu, ${notifications.unreadCount} unread notifications`
-            : "Account menu"
-        }
+        aria-label="Account menu"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
         className="relative flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors hover:bg-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/30"
       >
-        {hasUnread ? (
-          <Bell weight="fill" size={17} aria-hidden="true" />
-        ) : (
-          <User size={17} aria-hidden="true" />
-        )}
-        {hasUnread ? (
-          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-destructive-foreground">
-            {displayedUnreadCount}
-          </span>
-        ) : null}
+        <User size={17} aria-hidden="true" />
       </button>
 
       {open ? (
         <div
           role="dialog"
-          aria-label="Account and notifications"
-          className="absolute right-0 z-40 mt-3 flex max-h-[calc(100dvh-7rem)] w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
+          aria-label="Account"
+          className="absolute right-0 z-40 mt-3 flex w-[min(calc(100vw-2rem),20rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
         >
           <div className="shrink-0 border-b p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -209,86 +85,6 @@ export function AccountMenu({
                 {currentOrganization.organizationName}
               </p>
             ) : null}
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {canSwitchOrganizations ? (
-              <section
-                className="border-b bg-muted/10 p-3"
-                aria-label="Switch organization"
-              >
-                <div className="mb-2 px-1">
-                  <h2 className="text-sm font-bold">Switch organization</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Notifications and dashboard data follow the selected organization.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {visibleOrganizationContexts.map((context) => (
-                    <OrganizationSwitchLink
-                      key={context.organizationId}
-                      context={context}
-                    />
-                  ))}
-                  {hiddenOrganizationCount > 0 ? (
-                    <a
-                      href="/settings#organisations"
-                      className="flex w-full items-center justify-center rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
-                    >
-                      View all organisations ({hiddenOrganizationCount} more)
-                    </a>
-                  ) : null}
-                </div>
-              </section>
-            ) : null}
-
-            <section className="p-3" aria-label="Notifications">
-              <div className="mb-2 flex items-center justify-between gap-3 px-1">
-                <div>
-                  <h2 className="text-sm font-bold">Notifications</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {hasUnread ? `${notifications.unreadCount} unread` : "All caught up"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleMarkAllRead}
-                  disabled={!hasUnread || isPending}
-                  className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Mark all read
-                </button>
-              </div>
-
-              {error ? (
-                <p className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {error}
-                </p>
-              ) : null}
-
-              {notifications.items.length === 0 ? (
-                <div className="rounded-xl border border-dashed p-5 text-center">
-                  <Check size={24} className="mx-auto text-primary" aria-hidden="true" />
-                  <p className="mt-2 text-sm font-semibold">You&apos;re all caught up.</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Notifications that need attention will show up here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {notifications.items.map((notification) => (
-                    <NotificationCard
-                      key={notification.id}
-                      notification={notification}
-                      dashboardHref={dashboardHref}
-                      disabled={isPending}
-                      onMarkRead={handleMarkRead}
-                      onOpenAction={handleOpenAction}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
           </div>
 
           <div className="shrink-0 space-y-2 border-t bg-muted/20 p-3">
@@ -325,147 +121,6 @@ export function AccountMenu({
       ) : null}
     </div>
   );
-}
-
-function OrganizationSwitchLink({ context }: { context: AppUserOrganizationContext }) {
-  const content = (
-    <>
-      <span className="min-w-0">
-        <span className="block truncate font-semibold">{context.organizationName}</span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {formatRole(context.role)}
-          {context.houseName ? `, ${context.houseName}` : ""}
-        </span>
-      </span>
-      {context.isCurrent ? (
-        <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary">
-          Current
-        </span>
-      ) : null}
-    </>
-  );
-
-  const className = cn(
-    "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
-    context.isCurrent
-      ? "bg-primary/5 text-foreground"
-      : "bg-card text-foreground hover:bg-muted/70",
-  );
-
-  if (context.isCurrent) {
-    return (
-      <span className={className} aria-current="page">
-        {content}
-      </span>
-    );
-  }
-
-  return (
-    <a className={className} href={`/o/${encodeURIComponent(context.organizationSlug)}/switch`}>
-      {content}
-    </a>
-  );
-}
-
-function getVisibleOrganizationContexts(contexts: AppUserOrganizationContext[]) {
-  const current = contexts.find((context) => context.isCurrent);
-  const others = contexts.filter((context) => !context.isCurrent);
-
-  return (current ? [current, ...others] : contexts).slice(0, 2);
-}
-
-function NotificationCard({
-  notification,
-  dashboardHref,
-  disabled,
-  onMarkRead,
-  onOpenAction,
-}: {
-  notification: Notification;
-  dashboardHref: string;
-  disabled: boolean;
-  onMarkRead: (notificationId: string) => void;
-  onOpenAction: (notification: Notification, href: string) => void;
-}) {
-  const unread = !notification.readAt;
-  const actionHref = getSafeActionHref(notification.actionHref, dashboardHref);
-  const isExternalAction = Boolean(actionHref && isExternalHttpsHref(actionHref));
-
-  return (
-    <article
-      className={cn(
-        "rounded-xl border p-3 text-sm transition-colors",
-        unread ? "bg-primary/5" : "bg-background/60",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            {unread ? (
-              <span className="h-2 w-2 rounded-full bg-primary" aria-label="Unread notification" />
-            ) : null}
-            <h3 className="font-semibold leading-snug">{notification.title}</h3>
-          </div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{notification.body}</p>
-        </div>
-        <time
-          dateTime={notification.createdAt}
-          className="shrink-0 whitespace-nowrap text-[11px] font-medium text-muted-foreground"
-        >
-          {dateFormatter.format(new Date(notification.createdAt))}
-        </time>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {actionHref && notification.actionLabel ? (
-          <button
-            type="button"
-            onClick={() => onOpenAction(notification, actionHref)}
-            disabled={disabled}
-            className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            {notification.actionLabel}
-            {isExternalAction ? <ArrowSquareOut size={12} aria-hidden="true" /> : null}
-          </button>
-        ) : null}
-        {unread ? (
-          <button
-            type="button"
-            onClick={() => onMarkRead(notification.id)}
-            disabled={disabled}
-            className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-wait disabled:opacity-60"
-          >
-            Mark read
-          </button>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground">
-            <Check size={12} aria-hidden="true" />
-            Read
-          </span>
-        )}
-        {notification.severity === "ACTION_REQUIRED" ? (
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">
-            Action required
-          </span>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function getSafeActionHref(href: string | null, dashboardHref: string) {
-  if (!href?.startsWith("/") || href.startsWith("//")) {
-    return isExternalHttpsHref(href) ? href : null;
-  }
-
-  if (href === "/") {
-    return dashboardHref;
-  }
-
-  if (href.startsWith("/?")) {
-    return `${dashboardHref}${href.slice(1)}`;
-  }
-
-  return href;
 }
 
 function isExternalHttpsHref(href: string | null) {
