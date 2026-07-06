@@ -114,6 +114,53 @@ describe("NotificationsMenu", () => {
     expect(within(dialog).getByRole("button", { name: /assign house/i })).toBeInTheDocument();
   });
 
+  it("prioritizes unread action-required notifications and collapses read notifications by default", async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationsMenuHarness
+        notifications={{
+          items: [
+            {
+              ...readNotification,
+              id: "notification-read-latest",
+              title: "Read but newer",
+              createdAt: "2026-06-27T10:00:00.000Z",
+            },
+            {
+              ...unreadNotification,
+              id: "notification-unread-info",
+              title: "Unread info",
+              severity: "INFO",
+              createdAt: "2026-06-27T12:00:00.000Z",
+            },
+            {
+              ...unreadNotification,
+              id: "notification-unread-action",
+              title: "Unread action required",
+              severity: "ACTION_REQUIRED",
+              createdAt: "2026-06-27T11:00:00.000Z",
+            },
+          ],
+          unreadCount: 2,
+          nextCursor: null,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /notifications menu/i }));
+
+    const unreadSection = screen.getByRole("region", { name: /unread notifications/i });
+    const headings = within(unreadSection).getAllByRole("heading", { level: 3 });
+    expect(headings[0]).toHaveTextContent("Unread action required");
+    expect(headings[1]).toHaveTextContent("Unread info");
+    expect(screen.queryByText("Read but newer")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /show read \(1\)/i }));
+
+    expect(screen.getByText("Read but newer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /hide read \(1\)/i })).toBeInTheDocument();
+  });
+
   it("marks an action notification read before navigating", async () => {
     const user = userEvent.setup();
     const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));

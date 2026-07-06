@@ -31,11 +31,16 @@ export function NotificationsMenu({
 }: NotificationsMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [showRead, setShowRead] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
   const displayedUnreadCount = Math.min(notifications.unreadCount, 99);
   const hasUnread = notifications.unreadCount > 0;
+  const orderedNotifications = getOrderedNotifications(notifications.items);
+  const unreadNotifications = orderedNotifications.filter((notification) => !notification.readAt);
+  const readNotifications = orderedNotifications.filter((notification) => Boolean(notification.readAt));
+  const showReadSection = showRead || unreadNotifications.length === 0;
 
   useEffect(() => {
     if (!open) {
@@ -45,12 +50,14 @@ export function NotificationsMenu({
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current?.contains(event.target as Node)) {
         setOpen(false);
+        setShowRead(false);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpen(false);
+        setShowRead(false);
       }
     }
 
@@ -200,17 +207,59 @@ export function NotificationsMenu({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {notifications.items.map((notification) => (
-                  <NotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    dashboardHref={dashboardHref}
-                    disabled={isPending}
-                    onMarkRead={handleMarkRead}
-                    onOpenAction={handleOpenAction}
-                  />
-                ))}
+              <div className="space-y-3">
+                {unreadNotifications.length > 0 ? (
+                  <section aria-label="Unread notifications" className="space-y-2">
+                    <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Unread
+                    </p>
+                    {unreadNotifications.map((notification) => (
+                      <NotificationCard
+                        key={notification.id}
+                        notification={notification}
+                        dashboardHref={dashboardHref}
+                        disabled={isPending}
+                        onMarkRead={handleMarkRead}
+                        onOpenAction={handleOpenAction}
+                      />
+                    ))}
+                  </section>
+                ) : null}
+
+                {readNotifications.length > 0 ? (
+                  <section aria-label="Read notifications" className="space-y-2">
+                    {unreadNotifications.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowRead((current) => !current)}
+                        className="rounded-full border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {showReadSection
+                          ? `Hide read (${readNotifications.length})`
+                          : `Show read (${readNotifications.length})`}
+                      </button>
+                    ) : (
+                      <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Recent read
+                      </p>
+                    )}
+
+                    {showReadSection ? (
+                      <div className="space-y-2">
+                        {readNotifications.map((notification) => (
+                          <NotificationCard
+                            key={notification.id}
+                            notification={notification}
+                            dashboardHref={dashboardHref}
+                            disabled={isPending}
+                            onMarkRead={handleMarkRead}
+                            onOpenAction={handleOpenAction}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
               </div>
             )}
           </section>
@@ -218,6 +267,26 @@ export function NotificationsMenu({
       ) : null}
     </div>
   );
+}
+
+function getOrderedNotifications(notifications: Notification[]) {
+  return [...notifications].sort((left, right) => {
+    const leftUnreadPriority = left.readAt ? 1 : 0;
+    const rightUnreadPriority = right.readAt ? 1 : 0;
+
+    if (leftUnreadPriority !== rightUnreadPriority) {
+      return leftUnreadPriority - rightUnreadPriority;
+    }
+
+    const leftSeverityPriority = left.severity === "ACTION_REQUIRED" ? 0 : 1;
+    const rightSeverityPriority = right.severity === "ACTION_REQUIRED" ? 0 : 1;
+
+    if (leftSeverityPriority !== rightSeverityPriority) {
+      return leftSeverityPriority - rightSeverityPriority;
+    }
+
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  });
 }
 
 function NotificationCard({
