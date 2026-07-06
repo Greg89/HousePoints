@@ -61,7 +61,7 @@ export function OrganizationSwitcher({ organizationContexts }: OrganizationSwitc
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex max-w-[16rem] items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="inline-flex max-w-[11.5rem] items-center gap-1.5 rounded-full border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:max-w-[16rem] sm:gap-2 sm:px-3 sm:text-sm"
       >
         <Buildings size={14} className="text-primary" aria-hidden="true" />
         <span className="truncate">{currentOrganization.organizationName}</span>

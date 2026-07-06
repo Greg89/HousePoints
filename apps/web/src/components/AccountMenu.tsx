@@ -88,6 +88,19 @@ export function AccountMenu({
           </div>
 
           <div className="shrink-0 space-y-2 border-t bg-muted/20 p-3">
+            <a
+              href="/settings"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
+            >
+              <Gear size={16} aria-hidden="true" />
+              Account settings
+            </a>
+            <a
+              href="/settings#organisations"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
+            >
+              Manage organisations
+            </a>
             {isExternalHttpsHref(releaseNotesUrl ?? null) ? (
               <a
                 href={releaseNotesUrl ?? undefined}
@@ -100,22 +113,13 @@ export function AccountMenu({
                 <ArrowSquareOut size={13} aria-hidden="true" />
               </a>
             ) : null}
-            <div className="grid grid-cols-2 gap-2">
-            <a
-              href="/settings"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/70"
-            >
-              <Gear size={16} aria-hidden="true" />
-              Account
-            </a>
             <a
               href={logoutUrl}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
             >
               <SignOut size={16} aria-hidden="true" />
               Sign out
             </a>
-            </div>
           </div>
         </div>
       ) : null}

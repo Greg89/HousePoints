@@ -298,9 +298,6 @@ export function DashboardShell({
             House Points
           </Link>
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <div className="hidden sm:block">
-              <OrganizationSwitcher organizationContexts={session.organizationContexts} />
-            </div>
             <NotificationsMenu
               notifications={currentNotifications}
               onNotificationsChange={setCurrentNotifications}
@@ -320,9 +317,10 @@ export function DashboardShell({
           </div>
         </div>
 
-        <div className="hidden border-t bg-card/85 sm:block">
-          <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
+        <div className="border-t bg-card/85">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 sm:h-14 sm:py-0">
             <div className="flex min-w-0 items-center gap-3">
+              <OrganizationSwitcher organizationContexts={session.organizationContexts} />
               {session.houseName ? (
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
@@ -341,7 +339,7 @@ export function DashboardShell({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-3 sm:flex">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
