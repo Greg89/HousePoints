@@ -122,12 +122,6 @@ export function AccountMenu({
               <Gear size={16} aria-hidden="true" />
               Account settings
             </a>
-            <a
-              href="/settings#organisations"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-dashed bg-card px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-muted/70"
-            >
-              Manage organisations
-            </a>
             {isExternalHttpsHref(releaseNotesUrl ?? null) ? (
               <a
                 href={releaseNotesUrl ?? undefined}

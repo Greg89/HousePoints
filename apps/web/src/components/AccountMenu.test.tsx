@@ -39,10 +39,7 @@ describe("AccountMenu", () => {
     expect(dialog).toHaveTextContent("Admin");
     expect(dialog).toHaveTextContent("Acme Corp");
     expect(within(dialog).getByRole("link", { name: /account settings/i })).toHaveAttribute("href", "/settings");
-    expect(within(dialog).getByRole("link", { name: /manage organisations/i })).toHaveAttribute(
-      "href",
-      "/settings#organisations",
-    );
+    expect(within(dialog).queryByRole("link", { name: /manage organisations/i })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: /sign out/i })).toHaveAttribute("href", "/auth/logout");
     expect(within(dialog).queryByRole("link", { name: /what's new/i })).not.toBeInTheDocument();
   });
