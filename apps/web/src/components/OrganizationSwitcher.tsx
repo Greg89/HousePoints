@@ -99,7 +99,7 @@ export function OrganizationSwitcher({ organizationContexts }: OrganizationSwitc
           role="dialog"
           aria-label="Switch organization"
           tabIndex={-1}
-          className="absolute left-0 z-40 mt-3 w-[min(calc(100vw-2rem),22rem)] rounded-2xl border bg-card p-3 shadow-xl shadow-primary/10 sm:left-auto sm:right-0"
+          className="absolute left-0 z-40 mt-3 w-[min(calc(100vw-2rem),22rem)] rounded-2xl border bg-card p-3 shadow-xl shadow-primary/10"
         >
           <div className="mb-2 px-1">
             <h2 className="text-sm font-bold">Switch organization</h2>
