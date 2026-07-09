@@ -173,6 +173,29 @@ function setupDialog(overrides: Partial<React.ComponentProps<typeof AwardPointsD
 }
 
 describe("AwardPointsDialog", () => {
+  it("filters recipients by name or house", async () => {
+    const { user } = setupDialog({
+      members: [
+        ...members,
+        {
+          id: "member-2",
+          displayName: "Ben Helper",
+          role: "MEMBER" as const,
+          houseId: "house-2",
+          houseName: "Kitchen",
+          houseColor: "#f97316",
+        },
+      ],
+    });
+    const dialog = screen.getByRole("dialog", { name: "Award Points" });
+
+    await user.click(within(dialog).getAllByRole("combobox")[0]);
+    await user.type(screen.getByRole("searchbox", { name: /search recipient/i }), "kitchen");
+
+    expect(screen.queryByRole("option", { name: /Alice Assigned/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Ben Helper/ })).toBeInTheDocument();
+  });
+
   it("shows a success toast and closes when the typed result succeeds", async () => {
     const { props, user } = setupDialog();
 

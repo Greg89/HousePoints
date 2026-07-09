@@ -164,11 +164,37 @@ function setupDialog(overrides: Partial<React.ComponentProps<typeof DeductPoints
 }
 
 describe("DeductPointsDialog", () => {
-  it("only lists members from another house", () => {
-    setupDialog();
+  it("only lists members from another house", async () => {
+    const { user } = setupDialog();
+    const dialog = screen.getByRole("dialog", { name: "Deduct Points" });
+
+    await user.click(within(dialog).getByRole("combobox"));
 
     expect(screen.queryByRole("option", { name: /Alice Samehouse/ })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Cara Otherhouse/ })).toBeInTheDocument();
+  });
+
+  it("filters eligible members by name or house", async () => {
+    const { user } = setupDialog({
+      members: [
+        ...members,
+        {
+          id: "member-3",
+          displayName: "Drew Otherhouse",
+          role: "MEMBER" as const,
+          houseId: "house-3",
+          houseName: "Kitchen",
+          houseColor: "#f97316",
+        },
+      ],
+    });
+    const dialog = screen.getByRole("dialog", { name: "Deduct Points" });
+
+    await user.click(within(dialog).getByRole("combobox"));
+    await user.type(screen.getByRole("searchbox", { name: /search member from another house/i }), "kitchen");
+
+    expect(screen.queryByRole("option", { name: /Cara Otherhouse/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Drew Otherhouse/ })).toBeInTheDocument();
   });
 
   it("shows a success toast and closes when the typed result succeeds", async () => {

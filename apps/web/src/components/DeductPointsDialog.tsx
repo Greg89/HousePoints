@@ -2,13 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import * as Select from "@radix-ui/react-select";
-import { CaretDown, Check, MinusCircle, X } from "@phosphor-icons/react";
+import { MinusCircle, X } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import type { OrgMember } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 import type { DeductPointsResult } from "@/lib/action-results";
+import { MemberCombobox } from "./MemberCombobox";
 
 interface DeductPointsDialogProps {
   open: boolean;
@@ -108,79 +108,18 @@ export function DeductPointsDialog({
               Each house can deduct once every 24 hours, and the same member can only receive one deduction in that window.
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Member from another house</label>
-              <Select.Root
-                value={targetUserId}
-                onValueChange={(value) => {
-                  setTargetUserId(value);
-                  setIsConfirming(false);
-                }}
-                disabled={eligibleMembers.length === 0}
-              >
-                <Select.Trigger
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-sm",
-                    "transition-colors hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring",
-                    eligibleMembers.length === 0 ? "cursor-not-allowed opacity-60" : "",
-                  )}
-                >
-                  <Select.Value placeholder={eligibleMembers.length === 0 ? "No eligible members" : "Select a member..."}>
-                    {selectedMember ? (
-                      <span className="flex items-center gap-2">
-                        {selectedMember.houseColor ? (
-                          <span
-                            className="h-3 w-3 flex-shrink-0 rounded-full"
-                            style={{ backgroundColor: selectedMember.houseColor }}
-                          />
-                        ) : null}
-                        {selectedMember.displayName}
-                        {selectedMember.houseName ? (
-                          <span className="text-xs text-muted-foreground">- {selectedMember.houseName}</span>
-                        ) : null}
-                      </span>
-                    ) : null}
-                  </Select.Value>
-                  <Select.Icon>
-                    <CaretDown size={16} className="text-muted-foreground" />
-                  </Select.Icon>
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content
-                    className="z-[60] min-w-[240px] overflow-hidden rounded-lg border bg-popover shadow-lg"
-                    position="popper"
-                    sideOffset={4}
-                  >
-                    <Select.Viewport className="p-1">
-                      {eligibleMembers.map((member) => (
-                        <Select.Item
-                          key={member.id}
-                          value={member.id}
-                          className={cn(
-                            "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm",
-                            "select-none outline-none hover:bg-accent/10 focus:bg-accent/10",
-                          )}
-                        >
-                          {member.houseColor ? (
-                            <span
-                              className="h-3 w-3 flex-shrink-0 rounded-full"
-                              style={{ backgroundColor: member.houseColor }}
-                            />
-                          ) : null}
-                          <Select.ItemText>{member.displayName}</Select.ItemText>
-                          {member.houseName ? (
-                            <span className="ml-auto pl-4 text-xs text-muted-foreground">{member.houseName}</span>
-                          ) : null}
-                          <Select.ItemIndicator>
-                            <Check size={14} />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                      ))}
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
-            </div>
+            <MemberCombobox
+              label="Member from another house"
+              members={eligibleMembers}
+              value={targetUserId}
+              onValueChange={(value) => {
+                setTargetUserId(value);
+                setIsConfirming(false);
+              }}
+              placeholder={eligibleMembers.length === 0 ? "No eligible members" : "Select a member..."}
+              emptyMessage="No eligible members found."
+              disabled={eligibleMembers.length === 0}
+            />
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Reason</label>
