@@ -12,19 +12,28 @@ export const adminUserSchema = z.object({
 
 export type AdminUser = z.infer<typeof adminUserSchema>;
 
+const houseThemeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const nullableHouseThemeColorSchema = houseThemeColorSchema.nullable();
+
 export const adminHouseSchema = z.object({
   id: z.string(),
   name: z.string(),
   color: z.string(),
   description: z.string().nullable(),
+  themeMode: z.enum(["GENERATED", "CUSTOM"]).default("GENERATED"),
+  themeSecondaryColor: nullableHouseThemeColorSchema.default(null),
+  themeSurfaceColor: nullableHouseThemeColorSchema.default(null),
 });
 
 export type AdminHouse = z.infer<typeof adminHouseSchema>;
 
 export const createHouseSchema = z.object({
   name: z.string().min(2).max(80),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7c3aed"),
+  color: houseThemeColorSchema.default("#7c3aed"),
   description: z.string().max(280).optional(),
+  themeMode: z.enum(["GENERATED", "CUSTOM"]).default("GENERATED"),
+  themeSecondaryColor: nullableHouseThemeColorSchema.optional(),
+  themeSurfaceColor: nullableHouseThemeColorSchema.optional(),
 }).strict();
 
 export const assignUserHouseSchema = z.object({

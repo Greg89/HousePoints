@@ -149,7 +149,16 @@ const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
 // Shared fixtures.
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
-const HOUSE = { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null, organizationId: "org-1" };
+const HOUSE = {
+  id: "house-1",
+  name: "Phoenix",
+  color: "#7c3aed",
+  description: null,
+  organizationId: "org-1",
+  themeMode: "GENERATED",
+  themeSecondaryColor: null,
+  themeSurfaceColor: null,
+};
 const ACTIVE_SEASON = {
   id: "season-active",
   name: "Q3 2026",
@@ -2518,6 +2527,49 @@ describe("POST /admin/houses", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().name).toBe("Phoenix");
+    await app.close();
+  });
+
+  it("persists optional house theme palette fields when actor is owner", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockHouseUpsert.mockResolvedValue({
+      ...HOUSE,
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/houses",
+      payload: {
+        name: "Phoenix",
+        color: "#7c3aed",
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockHouseUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      }),
+      update: expect.objectContaining({
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      }),
+    }));
+    expect(res.json()).toMatchObject({
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
     await app.close();
   });
 });

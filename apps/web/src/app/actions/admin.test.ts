@@ -257,6 +257,28 @@ describe("createHouse", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/");
   });
 
+  it("passes optional house palette fields when present", async () => {
+    const formData = new FormData();
+    formData.set("name", "Ravenclaw");
+    formData.set("color", "#1d4ed8");
+    formData.set("themeMode", "CUSTOM");
+    formData.set("themeSecondaryColor", "#22c55e");
+    formData.set("themeSurfaceColor", "#f0fdf4");
+
+    await expect(createHouse(formData)).resolves.toEqual({ ok: true });
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/houses", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Ravenclaw",
+        color: "#1d4ed8",
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      }),
+    });
+  });
+
   it("returns validation failures as typed results without calling the API", async () => {
     const formData = new FormData();
     formData.set("name", "   ");

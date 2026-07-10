@@ -52,7 +52,15 @@ export async function loadAdminContextData(organizationId: string) {
     prisma.house.findMany({
       where: { organizationId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, color: true, description: true },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        description: true,
+        themeMode: true,
+        themeSecondaryColor: true,
+        themeSurfaceColor: true,
+      },
     }),
     prisma.pointTransaction.findMany({
       where: { organizationId, deletedAt: { not: null } },
@@ -220,20 +228,37 @@ export async function upsertHouseForOrg(params: {
   name: string;
   color: string;
   description?: string | null;
+  themeMode?: "GENERATED" | "CUSTOM";
+  themeSecondaryColor?: string | null;
+  themeSurfaceColor?: string | null;
 }) {
   return prisma.house.upsert({
     where: { organizationId_name: { organizationId: params.organizationId, name: params.name } },
     update: {
       color: params.color,
       ...(params.description !== undefined ? { description: params.description } : {}),
+      ...(params.themeMode !== undefined ? { themeMode: params.themeMode } : {}),
+      ...(params.themeSecondaryColor !== undefined ? { themeSecondaryColor: params.themeSecondaryColor } : {}),
+      ...(params.themeSurfaceColor !== undefined ? { themeSurfaceColor: params.themeSurfaceColor } : {}),
     },
     create: {
       organizationId: params.organizationId,
       name: params.name,
       color: params.color,
       description: params.description ?? null,
+      themeMode: params.themeMode ?? "GENERATED",
+      themeSecondaryColor: params.themeSecondaryColor ?? null,
+      themeSurfaceColor: params.themeSurfaceColor ?? null,
     },
-    select: { id: true, name: true, color: true, description: true },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      description: true,
+      themeMode: true,
+      themeSecondaryColor: true,
+      themeSurfaceColor: true,
+    },
   });
 }
 
@@ -939,6 +964,9 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       name: parsed.name,
       color: parsed.color,
       description: parsed.description,
+      themeMode: parsed.themeMode,
+      themeSecondaryColor: parsed.themeSecondaryColor,
+      themeSurfaceColor: parsed.themeSurfaceColor,
     });
 
     info(request.log, "admin.house.created", {
@@ -946,6 +974,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       organizationId: actor.organizationId,
       houseId: house.id,
       houseName: house.name,
+      themeMode: house.themeMode,
     });
 
     return reply.status(201).send(house);

@@ -70,6 +70,11 @@ enum NotificationSeverity {
   WARNING
 }
 
+enum HouseThemeMode {
+  GENERATED
+  CUSTOM
+}
+
 model Organization {
   id           String             @id @default(cuid())
   name         String
@@ -123,16 +128,19 @@ model OrgInvite {
 }
 
 model House {
-  id             String             @id @default(cuid())
-  organizationId String
-  name           String
-  color          String             @default("#7c3aed")
-  description    String?
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships  OrganizationMembership[]
-  transactions PointTransaction[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  organizationId      String
+  name                String
+  color               String             @default("#7c3aed")
+  description         String?
+  themeMode           HouseThemeMode     @default(GENERATED)
+  themeSecondaryColor String?
+  themeSurfaceColor   String?
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships         OrganizationMembership[]
+  transactions        PointTransaction[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@unique([organizationId, name])
   @@index([organizationId])

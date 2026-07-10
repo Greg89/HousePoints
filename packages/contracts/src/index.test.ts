@@ -452,12 +452,31 @@ describe("createHouseSchema", () => {
   it("defaults color to #7c3aed when omitted", () => {
     const result = createHouseSchema.safeParse({ name: "Phoenix" });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.color).toBe("#7c3aed");
+    if (result.success) {
+      expect(result.data.color).toBe("#7c3aed");
+      expect(result.data.themeMode).toBe("GENERATED");
+    }
   });
 
   it("rejects color not matching #rrggbb", () => {
     expect(createHouseSchema.safeParse({ ...valid, color: "red" }).success).toBe(false);
     expect(createHouseSchema.safeParse({ ...valid, color: "#gg0000" }).success).toBe(false);
+  });
+
+  it("accepts optional custom palette colors", () => {
+    const result = createHouseSchema.safeParse({
+      ...valid,
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed optional palette colors", () => {
+    expect(createHouseSchema.safeParse({ ...valid, themeSecondaryColor: "green" }).success).toBe(false);
+    expect(createHouseSchema.safeParse({ ...valid, themeSurfaceColor: "#12345g" }).success).toBe(false);
   });
 
   it("rejects house name shorter than 2 chars", () => {
@@ -1221,6 +1240,9 @@ describe("adminContextSchema", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
+        themeMode: "GENERATED",
+        themeSecondaryColor: null,
+        themeSurfaceColor: null,
       },
     ],
     recentDeletedPoints: [],

@@ -180,10 +180,12 @@ No database migration required unless custom colors are included in this phase.
 
 ### Phase 3: Persist Custom House Palettes
 
+Status: data foundation in progress.
+
 Requires a database migration and contract updates.
 
-- Add optional palette fields to `House`.
-- Update house create/edit contracts and API routes.
+- Add optional palette fields to `House`. Status: complete.
+- Update house create/edit contracts and API routes. Status: complete.
 - Add owner controls for generated vs custom palette.
 - Keep generated palette as the default for existing houses.
 - Audit palette changes as house configuration updates.

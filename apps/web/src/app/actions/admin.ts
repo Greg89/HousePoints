@@ -35,6 +35,9 @@ export async function createHouse(formData: FormData): Promise<HouseMutationResu
     const name = String(formData.get("name") ?? "").trim();
     const color = String(formData.get("color") ?? "#7c3aed").trim();
     const description = String(formData.get("description") ?? "").trim() || undefined;
+    const themeMode = String(formData.get("themeMode") ?? "").trim();
+    const themeSecondaryColor = String(formData.get("themeSecondaryColor") ?? "").trim();
+    const themeSurfaceColor = String(formData.get("themeSurfaceColor") ?? "").trim();
 
     if (!name) {
       return {
@@ -50,6 +53,9 @@ export async function createHouse(formData: FormData): Promise<HouseMutationResu
         name,
         color,
         description,
+        ...(themeMode ? { themeMode } : {}),
+        ...(themeSecondaryColor ? { themeSecondaryColor } : {}),
+        ...(themeSurfaceColor ? { themeSurfaceColor } : {}),
       }),
     });
 
