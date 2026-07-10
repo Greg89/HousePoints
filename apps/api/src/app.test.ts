@@ -6856,6 +6856,18 @@ describe("POST /notifications/list", () => {
         readAt: null,
       },
     });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
+      },
+    });
     await app.close();
   });
 
@@ -6879,7 +6891,7 @@ describe("POST /notifications/list", () => {
 describe("POST /notifications/mark-read", () => {
   it("marks only unread notifications belonging to the current actor", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
-    mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
+    mockNotificationUpdateMany.mockResolvedValueOnce({ count: 2 }).mockResolvedValueOnce({ count: 0 });
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -6892,7 +6904,7 @@ describe("POST /notifications/mark-read", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ updatedCount: 2 });
-    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(1, {
       where: {
         id: { in: ["notification-1", "notification-2"] },
         organizationId: "org-1",
@@ -6902,6 +6914,50 @@ describe("POST /notifications/mark-read", () => {
       },
       data: {
         readAt: expect.any(Date),
+      },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ["notification-1", "notification-2"] },
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
+      },
+    });
+    await app.close();
+  });
+
+  it("archives release announcements after marking them read", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockNotificationUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/mark-read",
+      payload: {
+        notificationIds: ["notification-release"],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updatedCount: 1 });
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ["notification-release"] },
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
       },
     });
     await app.close();
@@ -6927,7 +6983,7 @@ describe("POST /notifications/mark-read", () => {
 describe("POST /notifications/mark-all-read", () => {
   it("marks all unread notifications for the current actor", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
-    mockNotificationUpdateMany.mockResolvedValue({ count: 3 });
+    mockNotificationUpdateMany.mockResolvedValueOnce({ count: 3 }).mockResolvedValueOnce({ count: 1 });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -6938,7 +6994,7 @@ describe("POST /notifications/mark-all-read", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ updatedCount: 3 });
-    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(1, {
       where: {
         organizationId: "org-1",
         recipientUserId: "user-owner",
@@ -6947,6 +7003,18 @@ describe("POST /notifications/mark-all-read", () => {
       },
       data: {
         readAt: expect.any(Date),
+      },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-owner",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
       },
     });
     await app.close();

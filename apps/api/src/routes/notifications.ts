@@ -40,10 +40,25 @@ function mapNotification(notification: Prisma.NotificationGetPayload<{ select: t
   };
 }
 
+async function archiveReadReleaseAnnouncements(actor: ActorRecord, archivedAt = new Date()) {
+  await prisma.notification.updateMany({
+    where: {
+      organizationId: actor.organizationId,
+      recipientUserId: actor.id,
+      archivedAt: null,
+      readAt: { not: null },
+      type: "RELEASE_ANNOUNCEMENT",
+    },
+    data: { archivedAt },
+  });
+}
+
 export async function listNotifications(
   actor: ActorRecord,
   params: { limit: number; unreadOnly: boolean; cursor?: string },
 ) {
+  await archiveReadReleaseAnnouncements(actor);
+
   const where = {
     organizationId: actor.organizationId,
     recipientUserId: actor.id,
@@ -81,6 +96,7 @@ export async function markNotificationsRead(
   actor: ActorRecord,
   notificationIds: string[],
 ) {
+  const readAt = new Date();
   const result = await prisma.notification.updateMany({
     where: {
       id: { in: notificationIds },
@@ -89,12 +105,26 @@ export async function markNotificationsRead(
       archivedAt: null,
       readAt: null,
     },
-    data: { readAt: new Date() },
+    data: { readAt },
   });
+
+  await prisma.notification.updateMany({
+    where: {
+      id: { in: notificationIds },
+      organizationId: actor.organizationId,
+      recipientUserId: actor.id,
+      archivedAt: null,
+      readAt: { not: null },
+      type: "RELEASE_ANNOUNCEMENT",
+    },
+    data: { archivedAt: readAt },
+  });
+
   return { updatedCount: result.count };
 }
 
 export async function markAllNotificationsRead(actor: ActorRecord) {
+  const readAt = new Date();
   const result = await prisma.notification.updateMany({
     where: {
       organizationId: actor.organizationId,
@@ -102,8 +132,20 @@ export async function markAllNotificationsRead(actor: ActorRecord) {
       archivedAt: null,
       readAt: null,
     },
-    data: { readAt: new Date() },
+    data: { readAt },
   });
+
+  await prisma.notification.updateMany({
+    where: {
+      organizationId: actor.organizationId,
+      recipientUserId: actor.id,
+      archivedAt: null,
+      readAt: { not: null },
+      type: "RELEASE_ANNOUNCEMENT",
+    },
+    data: { archivedAt: readAt },
+  });
+
   return { updatedCount: result.count };
 }
 

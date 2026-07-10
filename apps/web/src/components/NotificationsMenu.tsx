@@ -92,23 +92,34 @@ export function NotificationsMenu({
   }, [open]);
 
   function markLocalRead(notificationIds: string[]) {
-    const unreadIds = new Set(
-      notifications.items
-        .filter((item) => notificationIds.includes(item.id) && !item.readAt)
-        .map((item) => item.id),
-    );
+    const notificationIdSet = new Set(notificationIds);
+    const unreadIds = new Set<string>();
+    const archivedIds = new Set<string>();
 
-    if (unreadIds.size === 0) {
+    for (const item of notifications.items) {
+      if (!notificationIdSet.has(item.id)) continue;
+
+      if (!item.readAt) {
+        unreadIds.add(item.id);
+      }
+
+      if (item.type === "RELEASE_ANNOUNCEMENT") {
+        archivedIds.add(item.id);
+      }
+    }
+
+    if (unreadIds.size === 0 && archivedIds.size === 0) {
       return;
     }
 
     onNotificationsChange({
       ...notifications,
-      items: notifications.items.map((item) =>
-        unreadIds.has(item.id)
+      items: notifications.items
+        .filter((item) => !archivedIds.has(item.id))
+        .map((item) => unreadIds.has(item.id)
           ? { ...item, readAt: new Date().toISOString() }
           : item,
-      ),
+        ),
       unreadCount: Math.max(0, notifications.unreadCount - unreadIds.size),
     });
   }
@@ -137,7 +148,10 @@ export function NotificationsMenu({
     setError(null);
 
     startTransition(async () => {
-      const canNavigate = notification.readAt ? true : await markNotificationLocally(notification.id);
+      const shouldArchiveOnOpen = notification.type === "RELEASE_ANNOUNCEMENT";
+      const canNavigate = notification.readAt && !shouldArchiveOnOpen
+        ? true
+        : await markNotificationLocally(notification.id);
 
       if (canNavigate) {
         setOpen(false);
@@ -158,8 +172,10 @@ export function NotificationsMenu({
       const result = await onMarkAllNotificationsRead();
 
       if (result.ok) {
-        const unreadIds = notifications.items.filter((item) => !item.readAt).map((item) => item.id);
-        markLocalRead(unreadIds);
+        const locallyUpdatedIds = notifications.items
+          .filter((item) => !item.readAt || item.type === "RELEASE_ANNOUNCEMENT")
+          .map((item) => item.id);
+        markLocalRead(locallyUpdatedIds);
         return;
       }
 

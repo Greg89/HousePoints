@@ -214,6 +214,11 @@ describe("NotificationsMenu", () => {
       "noopener,noreferrer",
     );
     expect(pushMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /notifications menu/i }));
+
+    expect(screen.queryByText("What's new: Multi-org beta")).not.toBeInTheDocument();
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
   });
 
   it("marks a single notification read from the row action", async () => {
