@@ -743,6 +743,9 @@ describe("AdminForms", () => {
     expect(screen.getAllByText("House theme preview")).toHaveLength(2);
     expect(screen.getAllByText("Theme ready")).toHaveLength(2);
     expect(screen.getAllByText("This color is ready for readable house themes.")).toHaveLength(2);
+    expect(screen.getAllByRole("group", { name: /generated house theme preview/i })).toHaveLength(2);
+    expect(screen.getAllByText("Selected surface")).toHaveLength(2);
+    expect(screen.getAllByText("Dashboard card preview")).toHaveLength(2);
   });
 
   it("shows a warning when a house color would make a muted app theme", () => {

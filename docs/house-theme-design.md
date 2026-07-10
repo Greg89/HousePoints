@@ -157,6 +157,8 @@ Avoid turning audit tables, destructive actions, and validation states into hous
 
 ### Phase 1: Richer Generated Theme
 
+Status: complete.
+
 No database migration.
 
 - Expand `resolveHouseThemeStyle` to generate secondary, surface, gradient, and muted house tokens from the existing `House.color`.
@@ -166,6 +168,8 @@ No database migration.
 - Add tests for generated tokens, bright colors, neutral colors, and invalid colors.
 
 ### Phase 2: Owner Preview
+
+Status: complete.
 
 No database migration required unless custom colors are included in this phase.
 
