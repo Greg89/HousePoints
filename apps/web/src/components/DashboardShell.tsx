@@ -50,6 +50,9 @@ interface DashboardShellProps {
     houseId: string | null;
     houseName: string | null;
     houseColor: string | null;
+    houseThemeMode?: "GENERATED" | "CUSTOM" | null;
+    houseThemeSecondaryColor?: string | null;
+    houseThemeSurfaceColor?: string | null;
     houseThemeEnabled: boolean;
     role: "MEMBER" | "ADMIN" | "OWNER";
     organizationSlug: string | null;
@@ -231,6 +234,9 @@ export function DashboardShell({
   const houseThemeStyle = resolveHouseThemeStyle({
     enabled: session.houseThemeEnabled,
     houseColor: session.houseColor,
+    themeMode: session.houseThemeMode,
+    themeSecondaryColor: session.houseThemeSecondaryColor,
+    themeSurfaceColor: session.houseThemeSurfaceColor,
   });
 
   useEffect(() => {

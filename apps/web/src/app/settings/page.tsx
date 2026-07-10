@@ -30,6 +30,9 @@ export default async function SettingsPage() {
   const houseThemeStyle = resolveHouseThemeStyle({
     enabled: Boolean(session.houseThemeEnabled),
     houseColor: session.houseColor,
+    themeMode: session.houseThemeMode,
+    themeSecondaryColor: session.houseThemeSecondaryColor,
+    themeSurfaceColor: session.houseThemeSurfaceColor,
   });
   const organizationContexts = session.organizationContexts ?? [];
 

@@ -780,6 +780,7 @@ describe("AdminForms", () => {
     expect(Object.fromEntries(formData.entries())).toEqual({
       name: "Hufflepuff",
       color: "#facc15",
+      themeMode: "GENERATED",
       description: "Hard workers",
     });
     const { toast } = await import("sonner");
@@ -845,7 +846,37 @@ describe("AdminForms", () => {
     expect(Object.fromEntries(formData.entries())).toEqual({
       name: "Ravenclaw",
       color: "#9333ea",
+      themeMode: "GENERATED",
       description: "Curious problem solvers",
+    });
+  });
+
+  it("submits custom house palette data when custom mode is selected", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Houses");
+    const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
+
+    await user.type(createHouseForm.getByPlaceholderText("House name"), "Gryffindor");
+    await user.click(createHouseForm.getByLabelText("Custom palette"));
+    fireEvent.change(createHouseForm.getByLabelText("Secondary color"), {
+      target: { value: "#dc2626" },
+    });
+    fireEvent.change(createHouseForm.getByLabelText("Surface tint"), {
+      target: { value: "#fff1f2" },
+    });
+    await user.click(createHouseForm.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());
+    const createHouseMock = props.onCreateHouse as ReturnType<typeof vi.fn>;
+    const formData = createHouseMock.mock.calls[0][0] as FormData;
+
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      name: "Gryffindor",
+      color: "#7c3aed",
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#dc2626",
+      themeSurfaceColor: "#fff1f2",
+      description: "",
     });
   });
 

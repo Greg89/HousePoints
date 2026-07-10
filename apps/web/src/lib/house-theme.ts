@@ -50,6 +50,11 @@ function parseHexColor(value: string): RgbColor | null {
   };
 }
 
+function normalizeHexColor(value?: string | null) {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return parseHexColor(normalized) ? normalized : null;
+}
+
 function toLinearChannel(value: number) {
   const channel = value / 255;
   return channel <= 0.03928
@@ -145,6 +150,9 @@ export function assessHouseThemeColor(houseColor?: string | null): HouseThemeCol
 export function resolveHouseThemeStyle(options: {
   enabled: boolean;
   houseColor?: string | null;
+  themeMode?: "GENERATED" | "CUSTOM" | null;
+  themeSecondaryColor?: string | null;
+  themeSurfaceColor?: string | null;
 }): HouseThemeStyle | undefined {
   if (!options.enabled || !options.houseColor) {
     return undefined;
@@ -156,19 +164,29 @@ export function resolveHouseThemeStyle(options: {
     return undefined;
   }
 
+  const customThemeEnabled = options.themeMode === "CUSTOM";
+  const customSecondaryColor = customThemeEnabled ? normalizeHexColor(options.themeSecondaryColor) : null;
+  const customSurfaceColor = customThemeEnabled ? normalizeHexColor(options.themeSurfaceColor) : null;
+  const secondaryForeground = customSecondaryColor
+    ? foregroundFor(parseHexColor(customSecondaryColor)!)
+    : assessment.foreground === "#111827" ? "#ffffff" : "#111827";
+  const secondaryColor = customSecondaryColor
+    ?? mix(assessment.normalizedColor, 72, assessment.foreground === "#111827" ? "black" : "white");
+  const surfaceColor = customSurfaceColor ?? mix(assessment.normalizedColor, 10, "white");
+
   return {
     "--primary": assessment.normalizedColor,
     "--primary-foreground": assessment.foreground,
-    "--secondary": mix(assessment.normalizedColor, 72, assessment.foreground === "#111827" ? "black" : "white"),
-    "--secondary-foreground": assessment.foreground === "#111827" ? "#ffffff" : "#111827",
+    "--secondary": secondaryColor,
+    "--secondary-foreground": secondaryForeground,
     "--accent": mix(assessment.normalizedColor, 28, "white"),
     "--accent-foreground": "#111827",
     "--ring": mix(assessment.normalizedColor, 78, "white"),
-    "--house-page-wash": mix(assessment.normalizedColor, 8, "transparent"),
-    "--house-surface": mix(assessment.normalizedColor, 10, "white"),
+    "--house-page-wash": customSurfaceColor ? mix(customSurfaceColor, 35, "transparent") : mix(assessment.normalizedColor, 8, "transparent"),
+    "--house-surface": surfaceColor,
     "--house-surface-foreground": "#111827",
-    "--house-gradient-from": mix(assessment.normalizedColor, 22, "transparent"),
-    "--house-gradient-to": mix(assessment.normalizedColor, 8, "transparent"),
+    "--house-gradient-from": customSecondaryColor ? mix(customSecondaryColor, 28, "transparent") : mix(assessment.normalizedColor, 22, "transparent"),
+    "--house-gradient-to": customSurfaceColor ? mix(customSurfaceColor, 35, "transparent") : mix(assessment.normalizedColor, 8, "transparent"),
     "--house-header-border": mix(assessment.normalizedColor, 40, "transparent"),
     "--house-muted": mix(assessment.normalizedColor, 14, "white"),
     "--house-muted-foreground": mix(assessment.normalizedColor, 70, "#111827"),

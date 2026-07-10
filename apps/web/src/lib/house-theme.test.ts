@@ -102,6 +102,37 @@ describe("resolveHouseThemeStyle", () => {
     });
   });
 
+  it("uses custom palette colors when custom mode is enabled", () => {
+    expect(resolveHouseThemeStyle({
+      enabled: true,
+      houseColor: "#7c3aed",
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    })).toMatchObject({
+      "--primary": "#7c3aed",
+      "--secondary": "#22c55e",
+      "--secondary-foreground": "#111827",
+      "--house-surface": "#f0fdf4",
+      "--house-page-wash": "color-mix(in oklab, #f0fdf4 35%, transparent)",
+      "--house-gradient-from": "color-mix(in oklab, #22c55e 28%, transparent)",
+      "--house-gradient-to": "color-mix(in oklab, #f0fdf4 35%, transparent)",
+    });
+  });
+
+  it("falls back to generated palette values for malformed custom colors", () => {
+    expect(resolveHouseThemeStyle({
+      enabled: true,
+      houseColor: "#7c3aed",
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "green",
+      themeSurfaceColor: "#123",
+    })).toMatchObject({
+      "--secondary": "color-mix(in oklab, #7c3aed 72%, white)",
+      "--house-surface": "color-mix(in oklab, #7c3aed 10%, white)",
+    });
+  });
+
   it.each([
     ["purple", "#7c3aed"],
     ["green", "#22c55e"],

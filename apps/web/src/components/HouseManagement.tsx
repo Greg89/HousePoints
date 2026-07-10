@@ -11,15 +11,42 @@ interface HouseManagementProps {
 }
 
 const DEFAULT_HOUSE_COLOR = "#7c3aed";
+const DEFAULT_SECONDARY_COLOR = "#a78bfa";
+const DEFAULT_SURFACE_COLOR = "#f5f3ff";
 const HEX_COLOR_PATTERN = /^#[\da-f]{6}$/i;
+type HouseThemeMode = "GENERATED" | "CUSTOM";
 
 function getHouseColor(house?: AdminHouse) {
   return house?.color && HEX_COLOR_PATTERN.test(house.color) ? house.color : DEFAULT_HOUSE_COLOR;
 }
 
-function ThemeQualityPreview({ color }: { color: string }) {
+function getHouseThemeMode(house?: AdminHouse): HouseThemeMode {
+  return house?.themeMode === "CUSTOM" ? "CUSTOM" : "GENERATED";
+}
+
+function getOptionalHouseColor(value: string | null | undefined, fallback: string) {
+  return value && HEX_COLOR_PATTERN.test(value) ? value : fallback;
+}
+
+function ThemeQualityPreview({
+  color,
+  themeMode = "GENERATED",
+  secondaryColor,
+  surfaceColor,
+}: {
+  color: string;
+  themeMode?: HouseThemeMode;
+  secondaryColor?: string | null;
+  surfaceColor?: string | null;
+}) {
   const assessment = assessHouseThemeColor(color);
-  const themeStyle = resolveHouseThemeStyle({ enabled: true, houseColor: color });
+  const themeStyle = resolveHouseThemeStyle({
+    enabled: true,
+    houseColor: color,
+    themeMode,
+    themeSecondaryColor: secondaryColor,
+    themeSurfaceColor: surfaceColor,
+  });
   const contrastLabel = assessment.contrastRatio
     ? `${assessment.contrastRatio.toFixed(1)}:1 contrast`
     : "Contrast unavailable";
@@ -40,7 +67,9 @@ function ThemeQualityPreview({ color }: { color: string }) {
         <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClassName}`}>
           {assessment.status === "ready" ? "Theme ready" : assessment.status === "subtle" ? "Theme subtle" : "Invalid color"}
         </span>
-        <span className="text-xs text-muted-foreground">{contrastLabel}</span>
+        <span className="text-xs text-muted-foreground">
+          {themeMode === "CUSTOM" ? "Custom palette" : "Generated palette"} · {contrastLabel}
+        </span>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <span
@@ -96,13 +125,19 @@ function ColorField({
   label,
   value,
   defaultValue = DEFAULT_HOUSE_COLOR,
+  name = "color",
+  description = "Choose a house accent color",
   onChange,
+  disabled = false,
 }: {
   id: string;
   label: string;
   value?: string;
   defaultValue?: string;
+  name?: string;
+  description?: string;
   onChange?: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label
@@ -111,18 +146,101 @@ function ColorField({
     >
       <span>
         <span className="block text-sm font-medium">{label}</span>
-        <span className="block text-xs text-muted-foreground">Choose a house accent color</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
       </span>
       <input
         id={id}
-        name="color"
+        name={name}
+        aria-label={label}
         type="color"
         value={value}
         defaultValue={value === undefined ? defaultValue : undefined}
         onChange={(event) => onChange?.(event.target.value)}
+        disabled={disabled}
         className="h-9 w-12 flex-shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
       />
     </label>
+  );
+}
+
+function ThemePaletteControls({
+  idBase,
+  mode,
+  onModeChange,
+  secondaryColor,
+  onSecondaryColorChange,
+  surfaceColor,
+  onSurfaceColorChange,
+}: {
+  idBase: string;
+  mode: HouseThemeMode;
+  onModeChange: (mode: HouseThemeMode) => void;
+  secondaryColor: string;
+  onSecondaryColorChange: (value: string) => void;
+  surfaceColor: string;
+  onSurfaceColorChange: (value: string) => void;
+}) {
+  const customMode = mode === "CUSTOM";
+
+  return (
+    <fieldset className="space-y-3 rounded-xl border bg-background/60 p-3">
+      <legend className="px-1 text-sm font-semibold">Advanced theme</legend>
+      <p className="text-xs text-muted-foreground">
+        Generate a safe palette from the house color, or override the supporting colors for a stronger house identity.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
+          <input
+            type="radio"
+            name="themeMode"
+            aria-label="Generate palette"
+            value="GENERATED"
+            checked={mode === "GENERATED"}
+            onChange={() => onModeChange("GENERATED")}
+            className="mt-1"
+          />
+          <span>
+            <span className="block font-medium">Generate palette</span>
+            <span className="block text-xs text-muted-foreground">Recommended default.</span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border bg-card px-3 py-2 text-sm">
+          <input
+            type="radio"
+            name="themeMode"
+            aria-label="Custom palette"
+            value="CUSTOM"
+            checked={customMode}
+            onChange={() => onModeChange("CUSTOM")}
+            className="mt-1"
+          />
+          <span>
+            <span className="block font-medium">Custom palette</span>
+            <span className="block text-xs text-muted-foreground">Tune secondary and surface colors.</span>
+          </span>
+        </label>
+      </div>
+      {customMode ? (
+        <div className="grid gap-3">
+          <ColorField
+            id={`${idBase}-secondary-color`}
+            name="themeSecondaryColor"
+            label="Secondary color"
+            description="Used for gradients and supporting accents"
+            value={secondaryColor}
+            onChange={onSecondaryColorChange}
+          />
+          <ColorField
+            id={`${idBase}-surface-color`}
+            name="themeSurfaceColor"
+            label="Surface tint"
+            description="Used for subtle page and card washes"
+            value={surfaceColor}
+            onChange={onSurfaceColorChange}
+          />
+        </div>
+      ) : null}
+    </fieldset>
   );
 }
 
@@ -130,9 +248,15 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
   const [createPending, startCreate] = useTransition();
   const [editPending, startEdit] = useTransition();
   const [createHouseColor, setCreateHouseColor] = useState(DEFAULT_HOUSE_COLOR);
+  const [createThemeMode, setCreateThemeMode] = useState<HouseThemeMode>("GENERATED");
+  const [createSecondaryColor, setCreateSecondaryColor] = useState(DEFAULT_SECONDARY_COLOR);
+  const [createSurfaceColor, setCreateSurfaceColor] = useState(DEFAULT_SURFACE_COLOR);
   const [editHouseName, setEditHouseName] = useState("");
   const [editHouseColor, setEditHouseColor] = useState(DEFAULT_HOUSE_COLOR);
   const [editHouseDescription, setEditHouseDescription] = useState("");
+  const [editThemeMode, setEditThemeMode] = useState<HouseThemeMode>("GENERATED");
+  const [editSecondaryColor, setEditSecondaryColor] = useState(DEFAULT_SECONDARY_COLOR);
+  const [editSurfaceColor, setEditSurfaceColor] = useState(DEFAULT_SURFACE_COLOR);
 
   function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -152,6 +276,9 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
 
         toast.success("House created", { description: name });
         setCreateHouseColor(DEFAULT_HOUSE_COLOR);
+        setCreateThemeMode("GENERATED");
+        setCreateSecondaryColor(DEFAULT_SECONDARY_COLOR);
+        setCreateSurfaceColor(DEFAULT_SURFACE_COLOR);
         form.reset();
       } catch (err) {
         toast.error("Failed to create house", {
@@ -181,6 +308,9 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         setEditHouseName("");
         setEditHouseColor(DEFAULT_HOUSE_COLOR);
         setEditHouseDescription("");
+        setEditThemeMode("GENERATED");
+        setEditSecondaryColor(DEFAULT_SECONDARY_COLOR);
+        setEditSurfaceColor(DEFAULT_SURFACE_COLOR);
         form.reset();
       } catch (err) {
         toast.error("Failed to update house", {
@@ -220,7 +350,21 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             value={createHouseColor}
             onChange={setCreateHouseColor}
           />
-          <ThemeQualityPreview color={createHouseColor} />
+          <ThemePaletteControls
+            idBase="create-house"
+            mode={createThemeMode}
+            onModeChange={setCreateThemeMode}
+            secondaryColor={createSecondaryColor}
+            onSecondaryColorChange={setCreateSecondaryColor}
+            surfaceColor={createSurfaceColor}
+            onSurfaceColorChange={setCreateSurfaceColor}
+          />
+          <ThemeQualityPreview
+            color={createHouseColor}
+            themeMode={createThemeMode}
+            secondaryColor={createThemeMode === "CUSTOM" ? createSecondaryColor : null}
+            surfaceColor={createThemeMode === "CUSTOM" ? createSurfaceColor : null}
+          />
           <input
             name="description"
             className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -257,6 +401,9 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
               setEditHouseName(selectedHouseName);
               setEditHouseColor(getHouseColor(selectedHouse));
               setEditHouseDescription(selectedHouse?.description ?? "");
+              setEditThemeMode(getHouseThemeMode(selectedHouse));
+              setEditSecondaryColor(getOptionalHouseColor(selectedHouse?.themeSecondaryColor, DEFAULT_SECONDARY_COLOR));
+              setEditSurfaceColor(getOptionalHouseColor(selectedHouse?.themeSurfaceColor, DEFAULT_SURFACE_COLOR));
             }}
           >
             <option value="" disabled>Select house...</option>
@@ -270,7 +417,21 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             value={editHouseColor}
             onChange={setEditHouseColor}
           />
-          <ThemeQualityPreview color={editHouseColor} />
+          <ThemePaletteControls
+            idBase="edit-house"
+            mode={editThemeMode}
+            onModeChange={setEditThemeMode}
+            secondaryColor={editSecondaryColor}
+            onSecondaryColorChange={setEditSecondaryColor}
+            surfaceColor={editSurfaceColor}
+            onSurfaceColorChange={setEditSurfaceColor}
+          />
+          <ThemeQualityPreview
+            color={editHouseColor}
+            themeMode={editThemeMode}
+            secondaryColor={editThemeMode === "CUSTOM" ? editSecondaryColor : null}
+            surfaceColor={editThemeMode === "CUSTOM" ? editSurfaceColor : null}
+          />
           <input
             name="description"
             value={editHouseDescription}
