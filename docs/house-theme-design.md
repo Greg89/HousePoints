@@ -192,11 +192,27 @@ Requires a database migration and contract updates.
 
 ### Phase 4: Theme QA Matrix
 
-Status: automated token matrix complete; manual visual screenshot pass pending.
+Status: automated token and shell matrix complete; manual visual screenshot pass pending.
 
 - Test representative house colors: purple, green, blue, orange, yellow, red, gray, near-black, and near-white.
 - Verify dashboard, settings, manage, award/deduct dialogs, notification tray, and mobile layouts.
 - Capture screenshots for future regression checks.
+
+Automated coverage:
+
+- `apps/web/src/lib/house-theme-qa.ts` owns the representative color set so resolver and shell tests stay aligned.
+- `apps/web/src/lib/house-theme.test.ts` verifies every representative color returns the expected readiness and foreground behavior.
+- `apps/web/src/components/DashboardShell.test.tsx` verifies representative themes apply shell/header tokens on the dashboard.
+- `apps/web/src/app/settings/page.test.tsx` verifies custom palettes apply shell/header/card tokens on account settings.
+
+Manual screenshot checklist:
+
+- Dashboard overview at desktop and laptop heights.
+- Dashboard manage tab for an owner, including house management preview.
+- Award and deduct member dropdown dialogs with a populated org.
+- Notification/account tray near the bottom of a laptop viewport.
+- Account settings profile, organisations, and preferences sections.
+- Mobile dashboard and settings navigation.
 
 ## First Implementation Slice
 

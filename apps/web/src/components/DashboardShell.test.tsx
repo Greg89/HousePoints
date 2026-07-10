@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardShell } from "./DashboardShell";
+import { houseThemeQaCases } from "@/lib/house-theme-qa";
 
 const searchParamsState = vi.hoisted(() => ({
   value: "",
@@ -652,6 +653,25 @@ describe("DashboardShell", () => {
 
     expect(container.firstElementChild).toHaveStyle({ "--primary": "#22c55e" });
     expect(container.firstElementChild).toHaveClass("house-theme-shell");
+    expect(screen.getByRole("banner")).toHaveClass("house-theme-header");
+    expect(screen.getByText("Welcome back,").closest("div")).toHaveClass("house-theme-card");
+  });
+
+  it.each(houseThemeQaCases)("keeps the dashboard shell themed for representative $label themes", ({ color }) => {
+    const { container } = render(
+      <DashboardShell
+        {...baseProps}
+        session={{
+          ...baseProps.session,
+          houseColor: color,
+          houseThemeEnabled: true,
+        }}
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveStyle({ "--primary": color });
+    expect(container.firstElementChild).toHaveClass("house-theme-shell");
+    expect(screen.getByRole("banner")).toHaveClass("house-theme-header");
   });
 
   it("shows admin tools only after an admin opens the Manage tab", async () => {

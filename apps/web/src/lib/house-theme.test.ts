@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assessHouseThemeColor, resolveHouseThemeStyle } from "./house-theme";
+import { houseThemeQaCases } from "./house-theme-qa";
 
 const expectedThemeTokens = [
   "--primary",
@@ -44,16 +45,7 @@ describe("assessHouseThemeColor", () => {
     });
   });
 
-  it.each([
-    ["purple", "#7c3aed", "ready", "#ffffff"],
-    ["green", "#22c55e", "ready", "#111827"],
-    ["blue", "#1d4ed8", "ready", "#ffffff"],
-    ["orange", "#f97316", "ready", "#111827"],
-    ["red", "#dc2626", "ready", "#ffffff"],
-    ["gray", "#777777", "subtle", "#111827"],
-    ["near black", "#111827", "ready", "#ffffff"],
-    ["near white", "#f8fafc", "subtle", "#111827"],
-  ])("assesses representative %s themes", (_label, color, expectedStatus, expectedForeground) => {
+  it.each(houseThemeQaCases)("assesses representative $label themes", ({ color, expectedStatus, expectedForeground }) => {
     expect(assessHouseThemeColor(color)).toMatchObject({
       status: expectedStatus,
       normalizedColor: color,
@@ -133,16 +125,7 @@ describe("resolveHouseThemeStyle", () => {
     });
   });
 
-  it.each([
-    ["purple", "#7c3aed"],
-    ["green", "#22c55e"],
-    ["blue", "#1d4ed8"],
-    ["orange", "#f97316"],
-    ["red", "#dc2626"],
-    ["gray", "#777777"],
-    ["near black", "#111827"],
-    ["near white", "#f8fafc"],
-  ])("generates every semantic theme token for representative %s themes", (_label, color) => {
+  it.each(houseThemeQaCases)("generates every semantic theme token for representative $label themes", ({ color }) => {
     const style = resolveHouseThemeStyle({ enabled: true, houseColor: color });
 
     expect(style).toBeDefined();
