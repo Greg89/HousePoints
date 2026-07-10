@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { assessHouseThemeColor, resolveHouseThemeStyle } from "./house-theme";
 
+const expectedThemeTokens = [
+  "--primary",
+  "--primary-foreground",
+  "--secondary",
+  "--secondary-foreground",
+  "--accent",
+  "--accent-foreground",
+  "--ring",
+  "--house-page-wash",
+  "--house-surface",
+  "--house-surface-foreground",
+  "--house-gradient-from",
+  "--house-gradient-to",
+  "--house-header-border",
+  "--house-muted",
+  "--house-muted-foreground",
+];
+
 describe("assessHouseThemeColor", () => {
   it("rejects colors that cannot produce a safe theme", () => {
     expect(assessHouseThemeColor("purple")).toMatchObject({
@@ -23,6 +41,23 @@ describe("assessHouseThemeColor", () => {
     expect(assessHouseThemeColor("#777777")).toMatchObject({
       status: "subtle",
       normalizedColor: "#777777",
+    });
+  });
+
+  it.each([
+    ["purple", "#7c3aed", "ready", "#ffffff"],
+    ["green", "#22c55e", "ready", "#111827"],
+    ["blue", "#1d4ed8", "ready", "#ffffff"],
+    ["orange", "#f97316", "ready", "#111827"],
+    ["red", "#dc2626", "ready", "#ffffff"],
+    ["gray", "#777777", "subtle", "#111827"],
+    ["near black", "#111827", "ready", "#ffffff"],
+    ["near white", "#f8fafc", "subtle", "#111827"],
+  ])("assesses representative %s themes", (_label, color, expectedStatus, expectedForeground) => {
+    expect(assessHouseThemeColor(color)).toMatchObject({
+      status: expectedStatus,
+      normalizedColor: color,
+      foreground: expectedForeground,
     });
   });
 });
@@ -64,6 +99,27 @@ describe("resolveHouseThemeStyle", () => {
       "--accent-foreground": "#111827",
       "--secondary": "color-mix(in oklab, #facc15 72%, black)",
       "--secondary-foreground": "#ffffff",
+    });
+  });
+
+  it.each([
+    ["purple", "#7c3aed"],
+    ["green", "#22c55e"],
+    ["blue", "#1d4ed8"],
+    ["orange", "#f97316"],
+    ["red", "#dc2626"],
+    ["gray", "#777777"],
+    ["near black", "#111827"],
+    ["near white", "#f8fafc"],
+  ])("generates every semantic theme token for representative %s themes", (_label, color) => {
+    const style = resolveHouseThemeStyle({ enabled: true, houseColor: color });
+
+    expect(style).toBeDefined();
+    expect(Object.keys(style ?? {}).sort()).toEqual([...expectedThemeTokens].sort());
+    expect(style).toMatchObject({
+      "--primary": color,
+      "--accent-foreground": "#111827",
+      "--house-surface-foreground": "#111827",
     });
   });
 });

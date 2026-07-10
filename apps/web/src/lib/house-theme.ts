@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const MIN_THEME_CONTRAST_RATIO = 4.5;
 const MIN_DISTINCT_SATURATION = 0.18;
+const MAX_DISTINCT_LUMINANCE = 0.88;
 
 type RgbColor = {
   r: number;
@@ -118,7 +119,11 @@ export function assessHouseThemeColor(houseColor?: string | null): HouseThemeCol
   const foregroundRgb = parseHexColor(foreground);
   const computedContrastRatio = foregroundRgb ? contrastRatio(rgb, foregroundRgb) : 0;
 
-  if (computedContrastRatio < MIN_THEME_CONTRAST_RATIO || saturationFor(rgb) < MIN_DISTINCT_SATURATION) {
+  if (
+    computedContrastRatio < MIN_THEME_CONTRAST_RATIO
+    || saturationFor(rgb) < MIN_DISTINCT_SATURATION
+    || relativeLuminance(rgb) > MAX_DISTINCT_LUMINANCE
+  ) {
     return {
       status: "subtle",
       normalizedColor,

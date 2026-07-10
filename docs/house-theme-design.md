@@ -190,6 +190,8 @@ Requires a database migration and contract updates.
 
 ### Phase 4: Theme QA Matrix
 
+Status: automated token matrix complete; manual visual screenshot pass pending.
+
 - Test representative house colors: purple, green, blue, orange, yellow, red, gray, near-black, and near-white.
 - Verify dashboard, settings, manage, award/deduct dialogs, notification tray, and mobile layouts.
 - Capture screenshots for future regression checks.
