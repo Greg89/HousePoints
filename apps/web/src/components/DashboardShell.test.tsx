@@ -651,6 +651,7 @@ describe("DashboardShell", () => {
     );
 
     expect(container.firstElementChild).toHaveStyle({ "--primary": "#22c55e" });
+    expect(container.firstElementChild).toHaveClass("house-theme-shell");
   });
 
   it("shows admin tools only after an admin opens the Manage tab", async () => {

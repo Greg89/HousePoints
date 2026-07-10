@@ -42,9 +42,19 @@ describe("resolveHouseThemeStyle", () => {
     expect(resolveHouseThemeStyle({ enabled: true, houseColor: "#7c3aed" })).toEqual({
       "--primary": "#7c3aed",
       "--primary-foreground": "#ffffff",
-      "--accent": "color-mix(in oklab, #7c3aed 68%, white)",
-      "--accent-foreground": "#ffffff",
+      "--secondary": "color-mix(in oklab, #7c3aed 72%, white)",
+      "--secondary-foreground": "#111827",
+      "--accent": "color-mix(in oklab, #7c3aed 28%, white)",
+      "--accent-foreground": "#111827",
       "--ring": "color-mix(in oklab, #7c3aed 78%, white)",
+      "--house-page-wash": "color-mix(in oklab, #7c3aed 8%, transparent)",
+      "--house-surface": "color-mix(in oklab, #7c3aed 10%, white)",
+      "--house-surface-foreground": "#111827",
+      "--house-gradient-from": "color-mix(in oklab, #7c3aed 22%, transparent)",
+      "--house-gradient-to": "color-mix(in oklab, #7c3aed 8%, transparent)",
+      "--house-header-border": "color-mix(in oklab, #7c3aed 40%, transparent)",
+      "--house-muted": "color-mix(in oklab, #7c3aed 14%, white)",
+      "--house-muted-foreground": "color-mix(in oklab, #7c3aed 70%, #111827)",
     });
   });
 
@@ -52,6 +62,8 @@ describe("resolveHouseThemeStyle", () => {
     expect(resolveHouseThemeStyle({ enabled: true, houseColor: "#facc15" })).toMatchObject({
       "--primary-foreground": "#111827",
       "--accent-foreground": "#111827",
+      "--secondary": "color-mix(in oklab, #facc15 72%, black)",
+      "--secondary-foreground": "#ffffff",
     });
   });
 });

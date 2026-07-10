@@ -290,9 +290,12 @@ export function DashboardShell({
   }
 
   return (
-    <div className="min-h-screen bg-background" style={houseThemeStyle}>
+    <div
+      className={cn("min-h-screen bg-background", houseThemeStyle ? "house-theme-shell" : "")}
+      style={houseThemeStyle}
+    >
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
+      <header className={cn("sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm", houseThemeStyle ? "house-theme-header" : "")}>
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
           <Link href={dashboardHref} className="font-display text-xl font-bold tracking-wide text-primary">
             House Points
@@ -317,7 +320,7 @@ export function DashboardShell({
           </div>
         </div>
 
-        <div className="border-t bg-card/85">
+        <div className={cn("border-t bg-card/85", houseThemeStyle ? "house-theme-header" : "")}>
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 sm:h-14 sm:py-0">
             <div className="flex min-w-0 items-center gap-3">
               <OrganizationSwitcher organizationContexts={session.organizationContexts} />
@@ -375,7 +378,7 @@ export function DashboardShell({
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Welcome */}
-        <div className="mb-8">
+        <div className={cn("mb-8 rounded-2xl border bg-card/80 p-5 shadow-sm", houseThemeStyle ? "house-theme-card" : "")}>
           <p className="text-muted-foreground text-sm">Welcome back,</p>
           <h2 className="font-display text-3xl font-semibold">{session.userName}</h2>
         </div>
@@ -522,7 +525,7 @@ export function DashboardShell({
             </div>
             {showSeasonOverviewCard ? (
               <section
-                className="mt-6 rounded-2xl border bg-card/80 p-5 shadow-sm"
+                className={cn("mt-6 rounded-2xl border bg-card/80 p-5 shadow-sm", houseThemeStyle ? "house-theme-card" : "")}
                 aria-label="Current season status"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

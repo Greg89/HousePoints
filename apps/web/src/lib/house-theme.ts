@@ -18,10 +18,24 @@ export type HouseThemeColorAssessment = {
   message: string;
 };
 
-export type HouseThemeStyle = CSSProperties & Record<
-  "--primary" | "--primary-foreground" | "--accent" | "--accent-foreground" | "--ring",
-  string
->;
+type HouseThemeToken =
+  | "--primary"
+  | "--primary-foreground"
+  | "--secondary"
+  | "--secondary-foreground"
+  | "--accent"
+  | "--accent-foreground"
+  | "--ring"
+  | "--house-page-wash"
+  | "--house-surface"
+  | "--house-surface-foreground"
+  | "--house-gradient-from"
+  | "--house-gradient-to"
+  | "--house-header-border"
+  | "--house-muted"
+  | "--house-muted-foreground";
+
+export type HouseThemeStyle = CSSProperties & Record<HouseThemeToken, string>;
 
 function parseHexColor(value: string): RgbColor | null {
   if (!HEX_COLOR_PATTERN.test(value)) {
@@ -82,6 +96,10 @@ function foregroundFor(color: RgbColor) {
   return contrastWithWhite >= contrastWithBlack ? "#ffffff" : "#111827";
 }
 
+function mix(color: string, percentage: number, target: "white" | "black" | "transparent" | "#111827") {
+  return `color-mix(in oklab, ${color} ${percentage}%, ${target})`;
+}
+
 export function assessHouseThemeColor(houseColor?: string | null): HouseThemeColorAssessment {
   const normalizedColor = houseColor?.trim().toLowerCase() ?? "";
   const rgb = parseHexColor(normalizedColor);
@@ -136,8 +154,18 @@ export function resolveHouseThemeStyle(options: {
   return {
     "--primary": assessment.normalizedColor,
     "--primary-foreground": assessment.foreground,
-    "--accent": `color-mix(in oklab, ${assessment.normalizedColor} 68%, white)`,
-    "--accent-foreground": assessment.foreground,
-    "--ring": `color-mix(in oklab, ${assessment.normalizedColor} 78%, white)`,
+    "--secondary": mix(assessment.normalizedColor, 72, assessment.foreground === "#111827" ? "black" : "white"),
+    "--secondary-foreground": assessment.foreground === "#111827" ? "#ffffff" : "#111827",
+    "--accent": mix(assessment.normalizedColor, 28, "white"),
+    "--accent-foreground": "#111827",
+    "--ring": mix(assessment.normalizedColor, 78, "white"),
+    "--house-page-wash": mix(assessment.normalizedColor, 8, "transparent"),
+    "--house-surface": mix(assessment.normalizedColor, 10, "white"),
+    "--house-surface-foreground": "#111827",
+    "--house-gradient-from": mix(assessment.normalizedColor, 22, "transparent"),
+    "--house-gradient-to": mix(assessment.normalizedColor, 8, "transparent"),
+    "--house-header-border": mix(assessment.normalizedColor, 40, "transparent"),
+    "--house-muted": mix(assessment.normalizedColor, 14, "white"),
+    "--house-muted-foreground": mix(assessment.normalizedColor, 70, "#111827"),
   };
 }
