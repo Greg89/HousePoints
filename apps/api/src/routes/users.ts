@@ -4,7 +4,7 @@ import {
   bootstrapUserSchema,
   updateProfileSchema,
 } from "@housepoints/contracts";
-import { prisma } from "@housepoints/db";
+import { prisma, updateUserDisplayName } from "@housepoints/db";
 import { mapAppUser, APP_USER_SELECT } from "../app-user.js";
 import { info, warn } from "../logging.js";
 import type { VerifyIdToken } from "../auth.js";
@@ -118,10 +118,20 @@ export async function updateUserProfile(
   actorId: string,
   update: { displayName?: string; houseThemeEnabled?: boolean },
 ) {
+  if (update.displayName !== undefined) {
+    return updateUserDisplayName(prisma, {
+      userId: actorId,
+      displayName: update.displayName,
+      data: update.houseThemeEnabled !== undefined
+        ? { houseThemeEnabled: update.houseThemeEnabled }
+        : undefined,
+      select: APP_USER_SELECT,
+    });
+  }
+
   return prisma.user.update({
     where: { id: actorId },
     data: {
-      ...(update.displayName !== undefined ? { displayName: update.displayName } : {}),
       ...(update.houseThemeEnabled !== undefined ? { houseThemeEnabled: update.houseThemeEnabled } : {}),
     },
     select: APP_USER_SELECT,

@@ -16,7 +16,7 @@ import {
   updateOrgSlugSchema,
   updateOrgSettingsSchema,
 } from "@housepoints/contracts";
-import { isOrganizationSlugReserved, prisma } from "@housepoints/db";
+import { isOrganizationSlugReserved, prisma, updateUserDisplayName } from "@housepoints/db";
 import { info, warn } from "../logging.js";
 import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapDeletedPoint, DELETED_POINT_SELECT } from "./points.js";
@@ -449,9 +449,9 @@ export async function updateMemberDisplayNameInDb(params: {
 }) {
   return prisma.$transaction(async (tx) => {
     const previousDisplayName = params.targetMembership.user.displayName;
-    const updatedUserRecord = await tx.user.update({
-      where: { id: params.targetMembership.user.id },
-      data: { displayName: params.displayName },
+    const updatedUserRecord = await updateUserDisplayName(tx, {
+      userId: params.targetMembership.user.id,
+      displayName: params.displayName,
       select: {
         id: true,
         displayName: true,

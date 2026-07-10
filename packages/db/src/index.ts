@@ -5,3 +5,4 @@ export {
   resolveOrganizationSlug,
 } from "./organization-slugs.js";
 export type { ResolvedOrganizationSlug } from "./organization-slugs.js";
+export { updateUserDisplayName } from "./users.js";

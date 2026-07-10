@@ -9,6 +9,7 @@ vi.mock("@housepoints/db", () => ({
   createPrimaryOrganizationSlugAlias: vi.fn(),
   isOrganizationSlugReserved: vi.fn(),
   resolveOrganizationSlug: vi.fn(),
+  updateUserDisplayName: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
     organization: {
@@ -92,6 +93,7 @@ import {
   isOrganizationSlugReserved,
   prisma,
   resolveOrganizationSlug,
+  updateUserDisplayName,
 } from "@housepoints/db";
 
 // Typed shorthand helpers
@@ -120,6 +122,7 @@ const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi
 const mockCreatePrimaryOrganizationSlugAlias = createPrimaryOrganizationSlugAlias as ReturnType<typeof vi.fn>;
 const mockIsOrganizationSlugReserved = isOrganizationSlugReserved as ReturnType<typeof vi.fn>;
 const mockResolveOrganizationSlug = resolveOrganizationSlug as ReturnType<typeof vi.fn>;
+const mockUpdateUserDisplayName = updateUserDisplayName as ReturnType<typeof vi.fn>;
 const mockOrgSlugAliasCreate = prisma.organizationSlugAlias.create as ReturnType<typeof vi.fn>;
 const mockOrgSlugAliasUpdateMany = prisma.organizationSlugAlias.updateMany as ReturnType<typeof vi.fn>;
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
@@ -267,6 +270,24 @@ beforeEach(() => {
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
+  mockUpdateUserDisplayName.mockImplementation(
+    (
+      client: typeof prisma,
+      input: {
+        userId: string;
+        displayName: string;
+        data?: Record<string, unknown>;
+        select: Record<string, unknown>;
+      },
+    ) => client.user.update({
+      where: { id: input.userId },
+      data: {
+        ...input.data,
+        displayName: input.displayName,
+      },
+      select: input.select,
+    }),
+  );
   mockSeasonFindMany.mockResolvedValue([]);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
