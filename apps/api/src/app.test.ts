@@ -3285,6 +3285,149 @@ describe("POST /admin/users/assign-house", () => {
   });
 });
 
+describe("POST /admin/users/display-name", () => {
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-1", displayName: "Alice Updated" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when target user is outside the actor organization", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-other", displayName: "Other User" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 without audit noise when the display name is unchanged", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: "MEMBER",
+      houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-target", displayName: "Taylor" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("DISPLAY_NAME_UNCHANGED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("lets admins update an active member display name and writes audit history", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: "MEMBER",
+      houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
+    });
+    mockUserUpdate.mockResolvedValue({
+      id: "user-target",
+      displayName: "Taylor Smith",
+      email: "taylor@acme.com",
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-target", displayName: "Taylor Smith" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor Smith",
+      email: "taylor@acme.com",
+      role: "MEMBER",
+      houseId: "house-1",
+    });
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        userId: "user-target",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-target" },
+      data: { displayName: "Taylor Smith" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-2",
+        eventType: "USER_DISPLAY_NAME_CHANGED",
+        summary: "Bob changed Taylor's display name to Taylor Smith.",
+        metadata: {
+          targetUserId: "user-target",
+          previousDisplayName: "Taylor",
+          newDisplayName: "Taylor Smith",
+        },
+      },
+    });
+    await app.close();
+  });
+});
+
 describe("POST /users/profile", () => {
   it("updates and returns the authenticated user's display name", async () => {
     mockFindUnique.mockResolvedValue(makeMember());

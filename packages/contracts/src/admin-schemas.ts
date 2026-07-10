@@ -42,6 +42,15 @@ export type AssignUserHouseResponse = z.infer<
   typeof assignUserHouseResponseSchema
 >;
 
+export const updateMemberDisplayNameSchema = z.object({
+  targetUserId: z.string().min(1),
+  displayName: z.string().trim().min(1).max(120),
+}).strict();
+
+export type UpdateMemberDisplayNameInput = z.infer<
+  typeof updateMemberDisplayNameSchema
+>;
+
 export const adminAuditActionSchema = z.object({
   id: z.string().min(1),
   type: z.enum([
@@ -53,6 +62,7 @@ export const adminAuditActionSchema = z.object({
     "ORG_SETTINGS_UPDATED",
     "POINTS_DEDUCTED",
     "USER_HOUSE_ASSIGNED",
+    "USER_DISPLAY_NAME_CHANGED",
     "USER_ROLE_CHANGED",
     "USER_REMOVED_FROM_ORG",
   ]),

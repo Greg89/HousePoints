@@ -42,6 +42,7 @@ export type ApiLogEvent =
   | "admin.org.owner_transferred"
   | "admin.org.settings_updated"
   | "admin.point_adjustments.loaded"
+  | "admin.user.display_name_changed"
   | "admin.user.house_assigned"
   | "admin.user.removed_from_org"
   | "admin.user.role_changed"

@@ -2,6 +2,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import {
   Check,
   Copy,
+  IdentificationBadge,
   LinkSimple,
   UserMinus,
   UserSwitch,
@@ -11,6 +12,7 @@ import type { AdminAuditAction, InviteStats, UserRole } from "@housepoints/contr
 import type {
   CreateInviteResult,
   HouseAssignmentResult,
+  MemberDisplayNameResult,
   MemberRemovalResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
@@ -25,6 +27,7 @@ interface TeamManagementProps {
   inviteStats: InviteStats;
   actorRole: UserRole;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
+  onUpdateMemberDisplayName: (formData: FormData) => Promise<MemberDisplayNameResult>;
   onRemoveOrgMember: (formData: FormData) => Promise<MemberRemovalResult>;
   onCreateInvite: () => Promise<CreateInviteResult>;
 }
@@ -51,11 +54,13 @@ export function TeamManagement({
   inviteStats,
   actorRole,
   onAssignHouse,
+  onUpdateMemberDisplayName,
   onRemoveOrgMember,
   onCreateInvite,
 }: TeamManagementProps) {
   const [assignPending, startAssign] = useTransition();
   const [invitePending, startInvite] = useTransition();
+  const [displayNamePending, startDisplayNameUpdate] = useTransition();
   const [removePending, startRemove] = useTransition();
   const [inviteJoinPath, setInviteJoinPath] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
@@ -124,6 +129,37 @@ export function TeamManagement({
     });
   }
 
+  function handleDisplayNameUpdate(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const targetUserId = String(formData.get("targetUserId") ?? "");
+    const displayName = String(formData.get("displayName") ?? "").trim();
+    const currentName = users.find((user) => user.id === targetUserId)?.displayName ?? "Member";
+
+    startDisplayNameUpdate(async () => {
+      try {
+        const result = await onUpdateMemberDisplayName(formData);
+
+        if (!result.ok) {
+          toast.error("Failed to update display name", {
+            description: result.message,
+          });
+          return;
+        }
+
+        toast.success("Display name updated", {
+          description: `${currentName} -> ${displayName}`,
+        });
+        form.reset();
+      } catch (err) {
+        toast.error("Failed to update display name", {
+          description: err instanceof Error ? err.message : "Something went wrong",
+        });
+      }
+    });
+  }
+
   function handleRemoveMember(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!isOwner) return;
@@ -178,7 +214,7 @@ export function TeamManagement({
         </p>
       </div>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-3">
         <form
           aria-label="Assign user to house"
           onSubmit={handleAssign}
@@ -299,6 +335,59 @@ export function TeamManagement({
             </button>
           )}
         </section>
+
+        <form
+          aria-label="Update member display name"
+          onSubmit={handleDisplayNameUpdate}
+          className="grid min-w-0 content-start gap-4 rounded-xl border bg-card p-5"
+        >
+          <div>
+            <h5 className="flex items-center gap-2 text-sm font-semibold">
+              <IdentificationBadge size={16} />
+              Edit Display Name
+            </h5>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Help members fix confusing profile names. Every change is added to the audit trail.
+            </p>
+          </div>
+          <div className="grid min-w-0 gap-3">
+            <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+              Member
+              <select
+                name="targetUserId"
+                aria-label="Member display name target"
+                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+                required
+                defaultValue=""
+              >
+                <option value="" disabled>Select member...</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.displayName} ({user.role.toLowerCase()})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
+              New display name
+              <input
+                name="displayName"
+                aria-label="New display name"
+                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm font-normal text-foreground focus:outline-none"
+                maxLength={120}
+                placeholder="Enter display name"
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={displayNamePending || users.length === 0}
+              className="h-10 w-full rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {displayNamePending ? "Updating..." : "Update display name"}
+            </button>
+          </div>
+        </form>
       </div>
 
       <section

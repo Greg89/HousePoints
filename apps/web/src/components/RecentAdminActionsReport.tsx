@@ -5,6 +5,7 @@ import {
   ShieldCheck,
   TrendDown,
   Trash,
+  IdentificationBadge,
   UserMinus,
   UserPlus,
   UserSwitch,
@@ -32,6 +33,7 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   ORG_SETTINGS_UPDATED: "Organization updated",
   POINTS_DEDUCTED: "Points deducted",
   USER_HOUSE_ASSIGNED: "House assigned",
+  USER_DISPLAY_NAME_CHANGED: "Display name changed",
   USER_ROLE_CHANGED: "Role changed",
   USER_REMOVED_FROM_ORG: "Member removed",
 };
@@ -45,6 +47,7 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   ORG_SETTINGS_UPDATED: Buildings,
   POINTS_DEDUCTED: TrendDown,
   USER_HOUSE_ASSIGNED: UserSwitch,
+  USER_DISPLAY_NAME_CHANGED: IdentificationBadge,
   USER_ROLE_CHANGED: ShieldCheck,
   USER_REMOVED_FROM_ORG: UserMinus,
 };
@@ -54,6 +57,7 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "POINT_DELETED", label: "Point deletions" },
   { value: "POINTS_DEDUCTED", label: "Point deductions" },
   { value: "USER_ROLE_CHANGED", label: "Role changes" },
+  { value: "USER_DISPLAY_NAME_CHANGED", label: "Display name changes" },
   { value: "USER_REMOVED_FROM_ORG", label: "Member removals" },
   { value: "USER_HOUSE_ASSIGNED", label: "House assignments" },
   { value: "ORG_SETTINGS_UPDATED", label: "Organization updates" },

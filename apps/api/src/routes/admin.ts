@@ -12,6 +12,7 @@ import {
   removeOrgMemberSchema,
   seasonScopedRequestSchema,
   transferOwnerSchema,
+  updateMemberDisplayNameSchema,
   updateOrgSlugSchema,
   updateOrgSettingsSchema,
 } from "@housepoints/contracts";
@@ -431,6 +432,55 @@ export async function changeUserRoleInDb(params: {
       });
     }
     return changedUser;
+  });
+}
+
+export async function updateMemberDisplayNameInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  targetMembership: {
+    id: string;
+    role: string;
+    houseId: string | null;
+    user: { id: string; displayName: string; email: string | null };
+  };
+  displayName: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const previousDisplayName = params.targetMembership.user.displayName;
+    const updatedUserRecord = await tx.user.update({
+      where: { id: params.targetMembership.user.id },
+      data: { displayName: params.displayName },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+      },
+    });
+    const updatedUser = {
+      id: updatedUserRecord.id,
+      displayName: updatedUserRecord.displayName,
+      email: updatedUserRecord.email,
+      role: params.targetMembership.role,
+      houseId: params.targetMembership.houseId,
+    };
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "USER_DISPLAY_NAME_CHANGED",
+        summary: `${params.actorDisplayName} changed ${previousDisplayName}'s display name to ${updatedUser.displayName}.`,
+        metadata: {
+          targetUserId: updatedUser.id,
+          previousDisplayName,
+          newDisplayName: updatedUser.displayName,
+        },
+      },
+    });
+
+    return updatedUser;
   });
 }
 
@@ -976,6 +1026,45 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       targetUserId: updatedUser.id,
       previousRole: targetMembership.role,
       newRole: updatedUser.role,
+    });
+
+    return updatedUser;
+  });
+
+  app.post("/admin/users/display-name", async (request, reply) => {
+    const parsed = await parseBody(updateMemberDisplayNameSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
+
+    const targetMembership = await findMembershipForRoleChange(actor.organizationId, parsed.targetUserId);
+
+    if (!targetMembership) {
+      return reply.status(404).send({ message: "Target user not found", code: "TARGET_USER_NOT_FOUND" });
+    }
+
+    if (targetMembership.user.displayName === parsed.displayName) {
+      return reply.status(409).send({
+        message: "That member already has this display name.",
+        code: "DISPLAY_NAME_UNCHANGED",
+      });
+    }
+
+    const updatedUser = await updateMemberDisplayNameInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      targetMembership,
+      displayName: parsed.displayName,
+    });
+
+    info(request.log, "admin.user.display_name_changed", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      targetUserId: updatedUser.id,
+      previousDisplayName: targetMembership.user.displayName,
+      newDisplayName: updatedUser.displayName,
     });
 
     return updatedUser;

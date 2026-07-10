@@ -12,6 +12,7 @@ import {
   readPointAdjustmentStats,
   removeOrgMember,
   transferOwnership,
+  updateMemberDisplayName,
   updateOrgSlug,
   updateOrgSettings,
 } from "./actions/admin";
@@ -165,6 +166,7 @@ export async function renderDashboardPage(route: string) {
       actorRole={session.role ?? "MEMBER"}
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
+      onUpdateMemberDisplayName={updateMemberDisplayName}
       onPromoteUser={promoteUserRole}
       onRemoveOrgMember={removeOrgMember}
       onTransferOwnership={transferOwnership}

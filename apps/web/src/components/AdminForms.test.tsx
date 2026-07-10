@@ -173,6 +173,7 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     adminAuditNextCursor: null,
     onCreateHouse: vi.fn().mockResolvedValue({ ok: true }),
     onAssignHouse: vi.fn().mockResolvedValue({ ok: true }),
+    onUpdateMemberDisplayName: vi.fn().mockResolvedValue({ ok: true }),
     onPromoteUser: vi.fn().mockResolvedValue({ ok: true }),
     onRemoveOrgMember: vi.fn().mockResolvedValue({ ok: true }),
     onTransferOwnership: vi.fn().mockResolvedValue({ ok: true }),
@@ -900,6 +901,52 @@ describe("AdminForms", () => {
     expect(memberSelect).toHaveClass("w-full", "min-w-0");
     expect(houseSelect).toHaveClass("w-full", "min-w-0");
     expect(assignButton).toHaveClass("w-full");
+  });
+
+  it("lets admins update member display names from the Members section", async () => {
+    const { user, props } = setupAdminForms({ actorRole: "ADMIN" });
+    switchToManageSection("Members");
+    const displayNameForm = within(screen.getByRole("form", { name: "Update member display name" }));
+
+    await user.selectOptions(displayNameForm.getByLabelText("Member display name target"), "user-2");
+    await user.type(displayNameForm.getByLabelText("New display name"), "Ben Updated");
+    await user.click(displayNameForm.getByRole("button", { name: "Update display name" }));
+
+    await waitFor(() => expect(props.onUpdateMemberDisplayName).toHaveBeenCalledOnce());
+
+    const updateDisplayNameMock = props.onUpdateMemberDisplayName as ReturnType<typeof vi.fn>;
+    const formData = updateDisplayNameMock.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toEqual({
+      targetUserId: "user-2",
+      displayName: "Ben Updated",
+    });
+    const { toast } = await import("sonner");
+    expect(toast.success).toHaveBeenCalledWith("Display name updated", {
+      description: "Ben Unassigned -> Ben Updated",
+    });
+  });
+
+  it("shows a safe toast when display-name update returns an expected failure", async () => {
+    const { user, props } = setupAdminForms({
+      actorRole: "ADMIN",
+      onUpdateMemberDisplayName: vi.fn().mockResolvedValue({
+        ok: false,
+        code: "DISPLAY_NAME_UNCHANGED",
+        message: "That member already has this display name.",
+      }),
+    });
+    switchToManageSection("Members");
+    const displayNameForm = within(screen.getByRole("form", { name: "Update member display name" }));
+
+    await user.selectOptions(displayNameForm.getByLabelText("Member display name target"), "user-2");
+    await user.type(displayNameForm.getByLabelText("New display name"), "Ben Unassigned");
+    await user.click(displayNameForm.getByRole("button", { name: "Update display name" }));
+
+    await waitFor(() => expect(props.onUpdateMemberDisplayName).toHaveBeenCalledOnce());
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("Failed to update display name", {
+      description: "That member already has this display name.",
+    });
   });
 
   it("lets owners promote members to admins from the Roles section", async () => {

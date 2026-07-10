@@ -31,6 +31,7 @@ import {
   seasonScopedRequestSchema,
   updateOrgSettingsSchema,
   updateOrgSlugSchema,
+  updateMemberDisplayNameSchema,
   transferOwnerSchema,
   seasonTransitionSchema,
   memberScoreSchema,
@@ -78,6 +79,7 @@ const webConsumedApiEndpoints = [
   "/admin/org/archive",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
+  "/admin/users/display-name",
   "/admin/users/remove",
   "/admin/users/role",
   "/dashboard/summary",
@@ -496,6 +498,39 @@ describe("assignUserHouseSchema", () => {
   });
 });
 
+describe("updateMemberDisplayNameSchema", () => {
+  const valid = {
+    targetUserId: "user_1",
+    displayName: "Alice Updated",
+  };
+
+  it("accepts valid input", () => {
+    expect(updateMemberDisplayNameSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("trims the display name", () => {
+    const result = updateMemberDisplayNameSchema.safeParse({
+      ...valid,
+      displayName: "  Alice Updated  ",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.displayName).toBe("Alice Updated");
+  });
+
+  it("rejects empty targetUserId", () => {
+    expect(updateMemberDisplayNameSchema.safeParse({ ...valid, targetUserId: "" }).success).toBe(false);
+  });
+
+  it("rejects empty displayName after trim", () => {
+    expect(updateMemberDisplayNameSchema.safeParse({ ...valid, displayName: "   " }).success).toBe(false);
+  });
+
+  it("rejects displayName longer than 120 chars", () => {
+    expect(updateMemberDisplayNameSchema.safeParse({ ...valid, displayName: "A".repeat(121) }).success).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // updateProfileSchema
 // ---------------------------------------------------------------------------
@@ -563,6 +598,11 @@ describe("authenticated request schemas", () => {
     [assignUserHouseSchema, {
       targetUserId: "user-1",
       targetHouseId: "house-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [updateMemberDisplayNameSchema, {
+      targetUserId: "user-1",
+      displayName: "Alice",
       actorAuth0Sub: "auth0|attacker",
     }],
     [updateProfileSchema, {
@@ -1479,6 +1519,32 @@ describe("adminAuditActionSchema", () => {
     expect(
       adminAuditActionSchema.parse({
         id: "audit-event:audit-10",
+        type: "USER_DISPLAY_NAME_CHANGED",
+        occurredAt: "2026-06-21T14:30:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia changed Ben's display name to Benjamin.",
+        metadata: {
+          targetUserId: "user-2",
+          previousDisplayName: "Ben",
+          newDisplayName: "Benjamin",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-10",
+      type: "USER_DISPLAY_NAME_CHANGED",
+      occurredAt: "2026-06-21T14:30:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia changed Ben's display name to Benjamin.",
+      metadata: {
+        targetUserId: "user-2",
+        previousDisplayName: "Ben",
+        newDisplayName: "Benjamin",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-11",
         type: "ORG_ARCHIVED",
         occurredAt: "2026-06-21T15:00:00.000Z",
         actorName: "Olivia",
@@ -1490,7 +1556,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-10",
+      id: "audit-event:audit-11",
       type: "ORG_ARCHIVED",
       occurredAt: "2026-06-21T15:00:00.000Z",
       actorName: "Olivia",

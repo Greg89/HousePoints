@@ -15,6 +15,7 @@ import {
   promoteUserSchema,
   removeOrgMemberResponseSchema,
   removeOrgMemberSchema,
+  updateMemberDisplayNameSchema,
   transferOwnerSchema,
   adminUserSchema,
   archiveOrgResponseSchema,
@@ -109,6 +110,7 @@ export const apiContracts = {
     removeOrgMemberSchema,
     removeOrgMemberResponseSchema,
   ),
+  "/admin/users/display-name": defineContract(updateMemberDisplayNameSchema, adminUserSchema),
   "/admin/users/role": defineContract(promoteUserSchema, adminUserSchema),
   "/dashboard/summary": defineContract(
     seasonScopedRequestSchema,
