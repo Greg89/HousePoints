@@ -225,6 +225,8 @@ export async function loadAuditPage(params: {
 
 export async function upsertHouseForOrg(params: {
   organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
   name: string;
   color: string;
   description?: string | null;
@@ -232,34 +234,94 @@ export async function upsertHouseForOrg(params: {
   themeSecondaryColor?: string | null;
   themeSurfaceColor?: string | null;
 }) {
-  return prisma.house.upsert({
-    where: { organizationId_name: { organizationId: params.organizationId, name: params.name } },
-    update: {
-      color: params.color,
-      ...(params.description !== undefined ? { description: params.description } : {}),
-      ...(params.themeMode !== undefined ? { themeMode: params.themeMode } : {}),
-      ...(params.themeSecondaryColor !== undefined ? { themeSecondaryColor: params.themeSecondaryColor } : {}),
-      ...(params.themeSurfaceColor !== undefined ? { themeSurfaceColor: params.themeSurfaceColor } : {}),
-    },
-    create: {
-      organizationId: params.organizationId,
-      name: params.name,
-      color: params.color,
-      description: params.description ?? null,
-      themeMode: params.themeMode ?? "GENERATED",
-      themeSecondaryColor: params.themeSecondaryColor ?? null,
-      themeSurfaceColor: params.themeSurfaceColor ?? null,
-    },
-    select: {
-      id: true,
-      name: true,
-      color: true,
-      description: true,
-      themeMode: true,
-      themeSecondaryColor: true,
-      themeSurfaceColor: true,
-    },
+  return prisma.$transaction(async (tx) => {
+    const previousHouse = await tx.house.findUnique({
+      where: { organizationId_name: { organizationId: params.organizationId, name: params.name } },
+      select: HOUSE_AUDIT_SELECT,
+    });
+    const house = await tx.house.upsert({
+      where: { organizationId_name: { organizationId: params.organizationId, name: params.name } },
+      update: {
+        color: params.color,
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.themeMode !== undefined ? { themeMode: params.themeMode } : {}),
+        ...(params.themeSecondaryColor !== undefined ? { themeSecondaryColor: params.themeSecondaryColor } : {}),
+        ...(params.themeSurfaceColor !== undefined ? { themeSurfaceColor: params.themeSurfaceColor } : {}),
+      },
+      create: {
+        organizationId: params.organizationId,
+        name: params.name,
+        color: params.color,
+        description: params.description ?? null,
+        themeMode: params.themeMode ?? "GENERATED",
+        themeSecondaryColor: params.themeSecondaryColor ?? null,
+        themeSurfaceColor: params.themeSurfaceColor ?? null,
+      },
+      select: HOUSE_AUDIT_SELECT,
+    });
+    const changedFields = getChangedHouseFields(previousHouse, house);
+    const operation = previousHouse ? "updated" : "created";
+    const changedFieldSummary = changedFields.length > 0 ? `: ${changedFields.join(", ")}` : "";
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "HOUSE_SETTINGS_UPDATED",
+        summary: previousHouse
+          ? `${params.actorDisplayName} updated house ${house.name}${changedFieldSummary}.`
+          : `${params.actorDisplayName} created house ${house.name}.`,
+        metadata: {
+          operation,
+          houseId: house.id,
+          houseName: house.name,
+          changedFields: changedFields.join(","),
+          previousColor: previousHouse?.color ?? null,
+          newColor: house.color,
+          previousDescription: previousHouse?.description ?? null,
+          newDescription: house.description,
+          previousThemeMode: previousHouse?.themeMode ?? null,
+          newThemeMode: house.themeMode,
+          previousThemeSecondaryColor: previousHouse?.themeSecondaryColor ?? null,
+          newThemeSecondaryColor: house.themeSecondaryColor,
+          previousThemeSurfaceColor: previousHouse?.themeSurfaceColor ?? null,
+          newThemeSurfaceColor: house.themeSurfaceColor,
+        },
+      },
+    });
+
+    return {
+      ...house,
+      auditOperation: operation,
+      auditChangedFields: changedFields,
+    };
   });
+}
+
+const HOUSE_AUDIT_SELECT = {
+  id: true,
+  name: true,
+  color: true,
+  description: true,
+  themeMode: true,
+  themeSecondaryColor: true,
+  themeSurfaceColor: true,
+} satisfies Prisma.HouseSelect;
+
+type HouseAuditRecord = Prisma.HouseGetPayload<{ select: typeof HOUSE_AUDIT_SELECT }>;
+
+function getChangedHouseFields(previousHouse: HouseAuditRecord | null, house: HouseAuditRecord) {
+  if (!previousHouse) {
+    return ["created"];
+  }
+
+  return [
+    previousHouse.color !== house.color ? "color" : null,
+    previousHouse.description !== house.description ? "description" : null,
+    previousHouse.themeMode !== house.themeMode ? "themeMode" : null,
+    previousHouse.themeSecondaryColor !== house.themeSecondaryColor ? "themeSecondaryColor" : null,
+    previousHouse.themeSurfaceColor !== house.themeSurfaceColor ? "themeSurfaceColor" : null,
+  ].filter((field): field is string => Boolean(field));
 }
 
 export async function findAssignmentTargets(
@@ -961,6 +1023,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
     const house = await upsertHouseForOrg({
       organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
       name: parsed.name,
       color: parsed.color,
       description: parsed.description,
@@ -969,15 +1033,24 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       themeSurfaceColor: parsed.themeSurfaceColor,
     });
 
-    info(request.log, "admin.house.created", {
+    info(request.log, house.auditOperation === "created" ? "admin.house.created" : "admin.house.updated", {
       actorUserId: actor.id,
       organizationId: actor.organizationId,
       houseId: house.id,
       houseName: house.name,
       themeMode: house.themeMode,
+      changedFields: house.auditChangedFields,
     });
 
-    return reply.status(201).send(house);
+    return reply.status(201).send({
+      id: house.id,
+      name: house.name,
+      color: house.color,
+      description: house.description,
+      themeMode: house.themeMode,
+      themeSecondaryColor: house.themeSecondaryColor,
+      themeSurfaceColor: house.themeSurfaceColor,
+    });
   });
 
   app.post("/admin/users/assign-house", async (request, reply) => {

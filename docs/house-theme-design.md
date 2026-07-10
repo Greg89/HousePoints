@@ -188,7 +188,7 @@ Requires a database migration and contract updates.
 - Update house create/edit contracts and API routes. Status: complete.
 - Add owner controls for generated vs custom palette. Status: complete.
 - Keep generated palette as the default for existing houses. Status: complete.
-- Audit palette changes as house configuration updates.
+- Audit palette changes as house configuration updates. Status: complete.
 
 ### Phase 4: Theme QA Matrix
 

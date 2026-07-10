@@ -6,6 +6,7 @@ import {
   TrendDown,
   Trash,
   IdentificationBadge,
+  House,
   UserMinus,
   UserPlus,
   UserSwitch,
@@ -26,6 +27,7 @@ type AuditFilter = "ALL" | AdminAuditAction["type"];
 
 const actionLabels: Record<AdminAuditAction["type"], string> = {
   POINT_DELETED: "Point deleted",
+  HOUSE_SETTINGS_UPDATED: "House updated",
   INVITE_CREATED: "Invite created",
   INVITE_USED: "Invite used",
   ORG_ARCHIVED: "Organization archived",
@@ -40,6 +42,7 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
 
 const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   POINT_DELETED: Trash,
+  HOUSE_SETTINGS_UPDATED: House,
   INVITE_CREATED: LinkSimple,
   INVITE_USED: UserPlus,
   ORG_ARCHIVED: Buildings,
@@ -56,6 +59,7 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "ALL", label: "All audit events" },
   { value: "POINT_DELETED", label: "Point deletions" },
   { value: "POINTS_DEDUCTED", label: "Point deductions" },
+  { value: "HOUSE_SETTINGS_UPDATED", label: "House updates" },
   { value: "USER_ROLE_CHANGED", label: "Role changes" },
   { value: "USER_DISPLAY_NAME_CHANGED", label: "Display name changes" },
   { value: "USER_REMOVED_FROM_ORG", label: "Member removals" },

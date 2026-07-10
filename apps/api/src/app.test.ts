@@ -2527,6 +2527,23 @@ describe("POST /admin/houses", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().name).toBe("Phoenix");
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "HOUSE_SETTINGS_UPDATED",
+        summary: "Olivia created house Phoenix.",
+        metadata: expect.objectContaining({
+          operation: "created",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          changedFields: "created",
+          newColor: "#7c3aed",
+          newThemeMode: "GENERATED",
+        }),
+      }),
+    });
     await app.close();
   });
 
@@ -2569,6 +2586,56 @@ describe("POST /admin/houses", () => {
       themeMode: "CUSTOM",
       themeSecondaryColor: "#22c55e",
       themeSurfaceColor: "#f0fdf4",
+    });
+    await app.close();
+  });
+
+  it("audits changed house theme fields when actor updates an existing house", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockHouseFindUnique.mockResolvedValue(HOUSE);
+    mockHouseUpsert.mockResolvedValue({
+      ...HOUSE,
+      color: "#1d4ed8",
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/houses",
+      payload: {
+        name: "Phoenix",
+        color: "#1d4ed8",
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "HOUSE_SETTINGS_UPDATED",
+        summary: "Olivia updated house Phoenix: color, themeMode, themeSecondaryColor, themeSurfaceColor.",
+        metadata: expect.objectContaining({
+          operation: "updated",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          changedFields: "color,themeMode,themeSecondaryColor,themeSurfaceColor",
+          previousColor: "#7c3aed",
+          newColor: "#1d4ed8",
+          previousThemeMode: "GENERATED",
+          newThemeMode: "CUSTOM",
+          previousThemeSecondaryColor: null,
+          newThemeSecondaryColor: "#22c55e",
+          previousThemeSurfaceColor: null,
+          newThemeSurfaceColor: "#f0fdf4",
+        }),
+      }),
     });
     await app.close();
   });

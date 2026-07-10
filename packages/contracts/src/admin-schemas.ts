@@ -64,6 +64,7 @@ export const adminAuditActionSchema = z.object({
   id: z.string().min(1),
   type: z.enum([
     "POINT_DELETED",
+    "HOUSE_SETTINGS_UPDATED",
     "INVITE_CREATED",
     "INVITE_USED",
     "ORG_ARCHIVED",

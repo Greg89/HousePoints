@@ -1463,8 +1463,36 @@ describe("adminAuditActionSchema", () => {
     expect(
       adminAuditActionSchema.parse({
         id: "audit-event:audit-7",
-        type: "ORG_SETTINGS_UPDATED",
+        type: "HOUSE_SETTINGS_UPDATED",
         occurredAt: "2026-06-21T13:45:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia updated house Phoenix: color, themeMode.",
+        metadata: {
+          operation: "updated",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          changedFields: "color,themeMode",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-7",
+      type: "HOUSE_SETTINGS_UPDATED",
+      occurredAt: "2026-06-21T13:45:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia updated house Phoenix: color, themeMode.",
+      metadata: {
+        operation: "updated",
+        houseId: "house-1",
+        houseName: "Phoenix",
+        changedFields: "color,themeMode",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-8",
+        type: "ORG_SETTINGS_UPDATED",
+        occurredAt: "2026-06-21T13:50:00.000Z",
         actorName: "Olivia",
         summary: "Olivia renamed the organization from Acme to Acme Corp.",
         metadata: {
@@ -1473,9 +1501,9 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-7",
+      id: "audit-event:audit-8",
       type: "ORG_SETTINGS_UPDATED",
-      occurredAt: "2026-06-21T13:45:00.000Z",
+      occurredAt: "2026-06-21T13:50:00.000Z",
       actorName: "Olivia",
       summary: "Olivia renamed the organization from Acme to Acme Corp.",
       metadata: {
@@ -1486,7 +1514,7 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-8",
+        id: "audit-event:audit-9",
         type: "POINTS_DEDUCTED",
         occurredAt: "2026-06-21T14:00:00.000Z",
         actorName: "Olivia",
@@ -1499,7 +1527,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-8",
+      id: "audit-event:audit-9",
       type: "POINTS_DEDUCTED",
       occurredAt: "2026-06-21T14:00:00.000Z",
       actorName: "Olivia",
@@ -1514,7 +1542,7 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-9",
+        id: "audit-event:audit-10",
         type: "USER_REMOVED_FROM_ORG",
         occurredAt: "2026-06-21T14:15:00.000Z",
         actorName: "Olivia",
@@ -1526,7 +1554,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-9",
+      id: "audit-event:audit-10",
       type: "USER_REMOVED_FROM_ORG",
       occurredAt: "2026-06-21T14:15:00.000Z",
       actorName: "Olivia",
@@ -1540,7 +1568,7 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-10",
+        id: "audit-event:audit-11",
         type: "USER_DISPLAY_NAME_CHANGED",
         occurredAt: "2026-06-21T14:30:00.000Z",
         actorName: "Olivia",
@@ -1552,7 +1580,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-10",
+      id: "audit-event:audit-11",
       type: "USER_DISPLAY_NAME_CHANGED",
       occurredAt: "2026-06-21T14:30:00.000Z",
       actorName: "Olivia",
@@ -1566,7 +1594,7 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-11",
+        id: "audit-event:audit-12",
         type: "ORG_ARCHIVED",
         occurredAt: "2026-06-21T15:00:00.000Z",
         actorName: "Olivia",
@@ -1578,7 +1606,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-11",
+      id: "audit-event:audit-12",
       type: "ORG_ARCHIVED",
       occurredAt: "2026-06-21T15:00:00.000Z",
       actorName: "Olivia",

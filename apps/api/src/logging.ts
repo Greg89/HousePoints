@@ -36,6 +36,7 @@ export type ApiLogEvent =
   | "admin.audit.loaded"
   | "admin.context.loaded"
   | "admin.house.created"
+  | "admin.house.updated"
   | "admin.org.slug_taken"
   | "admin.org.slug_updated"
   | "admin.org.archived"
