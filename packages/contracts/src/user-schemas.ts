@@ -8,6 +8,7 @@ export const bootstrapUserSchema = z.object({
 export type BootstrapUserInput = z.infer<typeof bootstrapUserSchema>;
 
 const userRoleSchema = z.enum(["MEMBER", "ADMIN", "OWNER"]);
+const houseThemeModeSchema = z.enum(["GENERATED", "CUSTOM"]);
 
 export const appUserOrganizationContextSchema = z.object({
   organizationId: z.string(),
@@ -17,6 +18,9 @@ export const appUserOrganizationContextSchema = z.object({
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
   houseColor: z.string().nullable(),
+  houseThemeMode: houseThemeModeSchema.nullable().optional(),
+  houseThemeSecondaryColor: z.string().nullable().optional(),
+  houseThemeSurfaceColor: z.string().nullable().optional(),
   isCurrent: z.boolean(),
 });
 
@@ -32,6 +36,9 @@ export const appUserSchema = z.object({
   houseId: z.string().nullable(),
   houseName: z.string().nullable(),
   houseColor: z.string().nullable(),
+  houseThemeMode: houseThemeModeSchema.nullable().optional(),
+  houseThemeSecondaryColor: z.string().nullable().optional(),
+  houseThemeSurfaceColor: z.string().nullable().optional(),
   organizationContexts: z.array(appUserOrganizationContextSchema).default([]),
   created: z.boolean(),
 });

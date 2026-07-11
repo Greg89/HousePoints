@@ -85,6 +85,34 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("link", { name: "Create organisation" })).toHaveAttribute("href", "/orgs/new");
   });
 
+  it("applies house theme surfaces when the user preference is enabled", async () => {
+    readSessionSummaryMock.mockResolvedValue({
+      isAuthenticated: true,
+      userName: "User One",
+      userEmail: "user@example.com",
+      role: "ADMIN",
+      organizationSlug: "acme",
+      houseName: "Blue House",
+      houseColor: "#2563eb",
+      houseThemeEnabled: true,
+      houseThemeMode: "CUSTOM",
+      houseThemeSecondaryColor: "#22c55e",
+      houseThemeSurfaceColor: "#f0fdf4",
+      organizationContexts: [],
+    });
+
+    const { container } = render(await SettingsPage());
+
+    expect(container.firstElementChild).toHaveStyle({
+      "--primary": "#2563eb",
+      "--secondary": "#22c55e",
+      "--house-surface": "#f0fdf4",
+    });
+    expect(container.firstElementChild).toHaveClass("house-theme-shell");
+    expect(screen.getByRole("banner")).toHaveClass("house-theme-header");
+    expect(screen.getByRole("navigation", { name: "Account settings sections" })).toHaveClass("house-theme-card");
+  });
+
   it("redirects unauthenticated users to login", async () => {
     readSessionSummaryMock.mockResolvedValue({
       isAuthenticated: false,

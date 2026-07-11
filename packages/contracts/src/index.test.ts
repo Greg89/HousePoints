@@ -31,6 +31,7 @@ import {
   seasonScopedRequestSchema,
   updateOrgSettingsSchema,
   updateOrgSlugSchema,
+  updateMemberDisplayNameSchema,
   transferOwnerSchema,
   seasonTransitionSchema,
   memberScoreSchema,
@@ -78,6 +79,7 @@ const webConsumedApiEndpoints = [
   "/admin/org/archive",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
+  "/admin/users/display-name",
   "/admin/users/remove",
   "/admin/users/role",
   "/dashboard/summary",
@@ -450,12 +452,31 @@ describe("createHouseSchema", () => {
   it("defaults color to #7c3aed when omitted", () => {
     const result = createHouseSchema.safeParse({ name: "Phoenix" });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.color).toBe("#7c3aed");
+    if (result.success) {
+      expect(result.data.color).toBe("#7c3aed");
+      expect(result.data.themeMode).toBe("GENERATED");
+    }
   });
 
   it("rejects color not matching #rrggbb", () => {
     expect(createHouseSchema.safeParse({ ...valid, color: "red" }).success).toBe(false);
     expect(createHouseSchema.safeParse({ ...valid, color: "#gg0000" }).success).toBe(false);
+  });
+
+  it("accepts optional custom palette colors", () => {
+    const result = createHouseSchema.safeParse({
+      ...valid,
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed optional palette colors", () => {
+    expect(createHouseSchema.safeParse({ ...valid, themeSecondaryColor: "green" }).success).toBe(false);
+    expect(createHouseSchema.safeParse({ ...valid, themeSurfaceColor: "#12345g" }).success).toBe(false);
   });
 
   it("rejects house name shorter than 2 chars", () => {
@@ -493,6 +514,39 @@ describe("assignUserHouseSchema", () => {
 
   it("rejects empty targetHouseId", () => {
     expect(assignUserHouseSchema.safeParse({ ...valid, targetHouseId: "" }).success).toBe(false);
+  });
+});
+
+describe("updateMemberDisplayNameSchema", () => {
+  const valid = {
+    targetUserId: "user_1",
+    displayName: "Alice Updated",
+  };
+
+  it("accepts valid input", () => {
+    expect(updateMemberDisplayNameSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("trims the display name", () => {
+    const result = updateMemberDisplayNameSchema.safeParse({
+      ...valid,
+      displayName: "  Alice Updated  ",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.displayName).toBe("Alice Updated");
+  });
+
+  it("rejects empty targetUserId", () => {
+    expect(updateMemberDisplayNameSchema.safeParse({ ...valid, targetUserId: "" }).success).toBe(false);
+  });
+
+  it("rejects empty displayName after trim", () => {
+    expect(updateMemberDisplayNameSchema.safeParse({ ...valid, displayName: "   " }).success).toBe(false);
+  });
+
+  it("rejects displayName longer than 120 chars", () => {
+    expect(updateMemberDisplayNameSchema.safeParse({ ...valid, displayName: "A".repeat(121) }).success).toBe(false);
   });
 });
 
@@ -563,6 +617,11 @@ describe("authenticated request schemas", () => {
     [assignUserHouseSchema, {
       targetUserId: "user-1",
       targetHouseId: "house-1",
+      actorAuth0Sub: "auth0|attacker",
+    }],
+    [updateMemberDisplayNameSchema, {
+      targetUserId: "user-1",
+      displayName: "Alice",
       actorAuth0Sub: "auth0|attacker",
     }],
     [updateProfileSchema, {
@@ -1181,6 +1240,9 @@ describe("adminContextSchema", () => {
         name: "Phoenix",
         color: "#7c3aed",
         description: null,
+        themeMode: "GENERATED",
+        themeSecondaryColor: null,
+        themeSurfaceColor: null,
       },
     ],
     recentDeletedPoints: [],
@@ -1401,8 +1463,36 @@ describe("adminAuditActionSchema", () => {
     expect(
       adminAuditActionSchema.parse({
         id: "audit-event:audit-7",
-        type: "ORG_SETTINGS_UPDATED",
+        type: "HOUSE_SETTINGS_UPDATED",
         occurredAt: "2026-06-21T13:45:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia updated house Phoenix: color, themeMode.",
+        metadata: {
+          operation: "updated",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          changedFields: "color,themeMode",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-7",
+      type: "HOUSE_SETTINGS_UPDATED",
+      occurredAt: "2026-06-21T13:45:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia updated house Phoenix: color, themeMode.",
+      metadata: {
+        operation: "updated",
+        houseId: "house-1",
+        houseName: "Phoenix",
+        changedFields: "color,themeMode",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-8",
+        type: "ORG_SETTINGS_UPDATED",
+        occurredAt: "2026-06-21T13:50:00.000Z",
         actorName: "Olivia",
         summary: "Olivia renamed the organization from Acme to Acme Corp.",
         metadata: {
@@ -1411,9 +1501,9 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-7",
+      id: "audit-event:audit-8",
       type: "ORG_SETTINGS_UPDATED",
-      occurredAt: "2026-06-21T13:45:00.000Z",
+      occurredAt: "2026-06-21T13:50:00.000Z",
       actorName: "Olivia",
       summary: "Olivia renamed the organization from Acme to Acme Corp.",
       metadata: {
@@ -1424,7 +1514,7 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-8",
+        id: "audit-event:audit-9",
         type: "POINTS_DEDUCTED",
         occurredAt: "2026-06-21T14:00:00.000Z",
         actorName: "Olivia",
@@ -1437,7 +1527,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-8",
+      id: "audit-event:audit-9",
       type: "POINTS_DEDUCTED",
       occurredAt: "2026-06-21T14:00:00.000Z",
       actorName: "Olivia",
@@ -1452,7 +1542,7 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-9",
+        id: "audit-event:audit-10",
         type: "USER_REMOVED_FROM_ORG",
         occurredAt: "2026-06-21T14:15:00.000Z",
         actorName: "Olivia",
@@ -1464,7 +1554,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-9",
+      id: "audit-event:audit-10",
       type: "USER_REMOVED_FROM_ORG",
       occurredAt: "2026-06-21T14:15:00.000Z",
       actorName: "Olivia",
@@ -1478,7 +1568,33 @@ describe("adminAuditActionSchema", () => {
 
     expect(
       adminAuditActionSchema.parse({
-        id: "audit-event:audit-10",
+        id: "audit-event:audit-11",
+        type: "USER_DISPLAY_NAME_CHANGED",
+        occurredAt: "2026-06-21T14:30:00.000Z",
+        actorName: "Olivia",
+        summary: "Olivia changed Ben's display name to Benjamin.",
+        metadata: {
+          targetUserId: "user-2",
+          previousDisplayName: "Ben",
+          newDisplayName: "Benjamin",
+        },
+      }),
+    ).toEqual({
+      id: "audit-event:audit-11",
+      type: "USER_DISPLAY_NAME_CHANGED",
+      occurredAt: "2026-06-21T14:30:00.000Z",
+      actorName: "Olivia",
+      summary: "Olivia changed Ben's display name to Benjamin.",
+      metadata: {
+        targetUserId: "user-2",
+        previousDisplayName: "Ben",
+        newDisplayName: "Benjamin",
+      },
+    });
+
+    expect(
+      adminAuditActionSchema.parse({
+        id: "audit-event:audit-12",
         type: "ORG_ARCHIVED",
         occurredAt: "2026-06-21T15:00:00.000Z",
         actorName: "Olivia",
@@ -1490,7 +1606,7 @@ describe("adminAuditActionSchema", () => {
         },
       }),
     ).toEqual({
-      id: "audit-event:audit-10",
+      id: "audit-event:audit-12",
       type: "ORG_ARCHIVED",
       occurredAt: "2026-06-21T15:00:00.000Z",
       actorName: "Olivia",

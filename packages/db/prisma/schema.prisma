@@ -47,7 +47,9 @@ enum AuditEventType {
   POINT_DELETED
   POINTS_DEDUCTED
   SEASON_STARTED
+  HOUSE_SETTINGS_UPDATED
   ORG_SETTINGS_UPDATED
+  USER_DISPLAY_NAME_CHANGED
   USER_HOUSE_ASSIGNED
   USER_ROLE_CHANGED
   USER_REMOVED_FROM_ORG
@@ -67,6 +69,11 @@ enum NotificationSeverity {
   INFO
   ACTION_REQUIRED
   WARNING
+}
+
+enum HouseThemeMode {
+  GENERATED
+  CUSTOM
 }
 
 model Organization {
@@ -122,16 +129,19 @@ model OrgInvite {
 }
 
 model House {
-  id             String             @id @default(cuid())
-  organizationId String
-  name           String
-  color          String             @default("#7c3aed")
-  description    String?
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  memberships  OrganizationMembership[]
-  transactions PointTransaction[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  organizationId      String
+  name                String
+  color               String             @default("#7c3aed")
+  description         String?
+  themeMode           HouseThemeMode     @default(GENERATED)
+  themeSecondaryColor String?
+  themeSurfaceColor   String?
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  memberships         OrganizationMembership[]
+  transactions        PointTransaction[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@unique([organizationId, name])
   @@index([organizationId])

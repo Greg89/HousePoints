@@ -13,4 +13,7 @@ export interface AdminHouse {
   name: string;
   color?: string;
   description?: string | null;
+  themeMode?: "GENERATED" | "CUSTOM";
+  themeSecondaryColor?: string | null;
+  themeSurfaceColor?: string | null;
 }

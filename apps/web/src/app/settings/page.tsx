@@ -11,6 +11,7 @@ import type { AppUserOrganizationContext } from "@housepoints/contracts";
 import { readSessionSummary, updateDisplayName, updateHouseThemePreference } from "@/app/actions/profile";
 import { DisplayNameForm } from "@/components/DisplayNameForm";
 import { HouseThemeToggleForm } from "@/components/HouseThemeToggleForm";
+import { cn } from "@/lib/cn";
 import { resolveHouseThemeStyle } from "@/lib/house-theme";
 
 export const dynamic = "force-dynamic";
@@ -29,12 +30,18 @@ export default async function SettingsPage() {
   const houseThemeStyle = resolveHouseThemeStyle({
     enabled: Boolean(session.houseThemeEnabled),
     houseColor: session.houseColor,
+    themeMode: session.houseThemeMode,
+    themeSecondaryColor: session.houseThemeSecondaryColor,
+    themeSurfaceColor: session.houseThemeSurfaceColor,
   });
   const organizationContexts = session.organizationContexts ?? [];
 
   return (
-    <div className="min-h-screen bg-background" style={houseThemeStyle}>
-      <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm">
+    <div
+      className={cn("min-h-screen bg-background", houseThemeStyle ? "house-theme-shell" : "")}
+      style={houseThemeStyle}
+    >
+      <header className={cn("sticky top-0 z-30 border-b bg-card/95 backdrop-blur-sm", houseThemeStyle ? "house-theme-header" : "")}>
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4">
           <Link
             href="/"
@@ -57,7 +64,7 @@ export default async function SettingsPage() {
         <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
           <nav
             aria-label="Account settings sections"
-            className="h-fit rounded-xl border bg-card p-3 lg:sticky lg:top-24"
+            className={cn("h-fit rounded-xl border bg-card p-3 lg:sticky lg:top-24", houseThemeStyle ? "house-theme-card" : "")}
           >
             <a
               href="#profile"
@@ -83,7 +90,10 @@ export default async function SettingsPage() {
           </nav>
 
           <div className="space-y-6">
-            <section id="profile" className="scroll-mt-24 rounded-xl border bg-card p-6">
+            <section
+              id="profile"
+              className={cn("scroll-mt-24 rounded-xl border bg-card p-6", houseThemeStyle ? "house-theme-card" : "")}
+            >
               <div className="mb-6 flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <IdentificationCard size={20} aria-hidden="true" />
@@ -114,7 +124,10 @@ export default async function SettingsPage() {
               </div>
             </section>
 
-            <section id="organisations" className="scroll-mt-24 rounded-xl border bg-card p-6">
+            <section
+              id="organisations"
+              className={cn("scroll-mt-24 rounded-xl border bg-card p-6", houseThemeStyle ? "house-theme-card" : "")}
+            >
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -154,7 +167,10 @@ export default async function SettingsPage() {
               )}
             </section>
 
-            <section id="preferences" className="scroll-mt-24 rounded-xl border bg-card p-6">
+            <section
+              id="preferences"
+              className={cn("scroll-mt-24 rounded-xl border bg-card p-6", houseThemeStyle ? "house-theme-card" : "")}
+            >
               <div className="mb-6 flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Palette size={20} aria-hidden="true" />

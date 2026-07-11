@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const MIN_THEME_CONTRAST_RATIO = 4.5;
 const MIN_DISTINCT_SATURATION = 0.18;
+const MAX_DISTINCT_LUMINANCE = 0.88;
 
 type RgbColor = {
   r: number;
@@ -18,10 +19,24 @@ export type HouseThemeColorAssessment = {
   message: string;
 };
 
-export type HouseThemeStyle = CSSProperties & Record<
-  "--primary" | "--primary-foreground" | "--accent" | "--accent-foreground" | "--ring",
-  string
->;
+type HouseThemeToken =
+  | "--primary"
+  | "--primary-foreground"
+  | "--secondary"
+  | "--secondary-foreground"
+  | "--accent"
+  | "--accent-foreground"
+  | "--ring"
+  | "--house-page-wash"
+  | "--house-surface"
+  | "--house-surface-foreground"
+  | "--house-gradient-from"
+  | "--house-gradient-to"
+  | "--house-header-border"
+  | "--house-muted"
+  | "--house-muted-foreground";
+
+export type HouseThemeStyle = CSSProperties & Record<HouseThemeToken, string>;
 
 function parseHexColor(value: string): RgbColor | null {
   if (!HEX_COLOR_PATTERN.test(value)) {
@@ -33,6 +48,11 @@ function parseHexColor(value: string): RgbColor | null {
     g: Number.parseInt(value.slice(3, 5), 16),
     b: Number.parseInt(value.slice(5, 7), 16),
   };
+}
+
+function normalizeHexColor(value?: string | null) {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return parseHexColor(normalized) ? normalized : null;
 }
 
 function toLinearChannel(value: number) {
@@ -82,6 +102,10 @@ function foregroundFor(color: RgbColor) {
   return contrastWithWhite >= contrastWithBlack ? "#ffffff" : "#111827";
 }
 
+function mix(color: string, percentage: number, target: "white" | "black" | "transparent" | "#111827") {
+  return `color-mix(in oklab, ${color} ${percentage}%, ${target})`;
+}
+
 export function assessHouseThemeColor(houseColor?: string | null): HouseThemeColorAssessment {
   const normalizedColor = houseColor?.trim().toLowerCase() ?? "";
   const rgb = parseHexColor(normalizedColor);
@@ -100,7 +124,11 @@ export function assessHouseThemeColor(houseColor?: string | null): HouseThemeCol
   const foregroundRgb = parseHexColor(foreground);
   const computedContrastRatio = foregroundRgb ? contrastRatio(rgb, foregroundRgb) : 0;
 
-  if (computedContrastRatio < MIN_THEME_CONTRAST_RATIO || saturationFor(rgb) < MIN_DISTINCT_SATURATION) {
+  if (
+    computedContrastRatio < MIN_THEME_CONTRAST_RATIO
+    || saturationFor(rgb) < MIN_DISTINCT_SATURATION
+    || relativeLuminance(rgb) > MAX_DISTINCT_LUMINANCE
+  ) {
     return {
       status: "subtle",
       normalizedColor,
@@ -122,6 +150,9 @@ export function assessHouseThemeColor(houseColor?: string | null): HouseThemeCol
 export function resolveHouseThemeStyle(options: {
   enabled: boolean;
   houseColor?: string | null;
+  themeMode?: "GENERATED" | "CUSTOM" | null;
+  themeSecondaryColor?: string | null;
+  themeSurfaceColor?: string | null;
 }): HouseThemeStyle | undefined {
   if (!options.enabled || !options.houseColor) {
     return undefined;
@@ -133,11 +164,31 @@ export function resolveHouseThemeStyle(options: {
     return undefined;
   }
 
+  const customThemeEnabled = options.themeMode === "CUSTOM";
+  const customSecondaryColor = customThemeEnabled ? normalizeHexColor(options.themeSecondaryColor) : null;
+  const customSurfaceColor = customThemeEnabled ? normalizeHexColor(options.themeSurfaceColor) : null;
+  const secondaryForeground = customSecondaryColor
+    ? foregroundFor(parseHexColor(customSecondaryColor)!)
+    : assessment.foreground === "#111827" ? "#ffffff" : "#111827";
+  const secondaryColor = customSecondaryColor
+    ?? mix(assessment.normalizedColor, 72, assessment.foreground === "#111827" ? "black" : "white");
+  const surfaceColor = customSurfaceColor ?? mix(assessment.normalizedColor, 10, "white");
+
   return {
     "--primary": assessment.normalizedColor,
     "--primary-foreground": assessment.foreground,
-    "--accent": `color-mix(in oklab, ${assessment.normalizedColor} 68%, white)`,
-    "--accent-foreground": assessment.foreground,
-    "--ring": `color-mix(in oklab, ${assessment.normalizedColor} 78%, white)`,
+    "--secondary": secondaryColor,
+    "--secondary-foreground": secondaryForeground,
+    "--accent": mix(assessment.normalizedColor, 28, "white"),
+    "--accent-foreground": "#111827",
+    "--ring": mix(assessment.normalizedColor, 78, "white"),
+    "--house-page-wash": customSurfaceColor ? mix(customSurfaceColor, 35, "transparent") : mix(assessment.normalizedColor, 8, "transparent"),
+    "--house-surface": surfaceColor,
+    "--house-surface-foreground": "#111827",
+    "--house-gradient-from": customSecondaryColor ? mix(customSecondaryColor, 28, "transparent") : mix(assessment.normalizedColor, 22, "transparent"),
+    "--house-gradient-to": customSurfaceColor ? mix(customSurfaceColor, 35, "transparent") : mix(assessment.normalizedColor, 8, "transparent"),
+    "--house-header-border": mix(assessment.normalizedColor, 40, "transparent"),
+    "--house-muted": mix(assessment.normalizedColor, 14, "white"),
+    "--house-muted-foreground": mix(assessment.normalizedColor, 70, "#111827"),
   };
 }

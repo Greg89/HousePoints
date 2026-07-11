@@ -10,6 +10,7 @@ import type { OrgMember, LeaderboardEntry, Trait } from "@housepoints/contracts"
 import { TRAITS, TRAIT_LABELS } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 import type { AwardPointsResult } from "@/lib/action-results";
+import { MemberCombobox } from "./MemberCombobox";
 
 interface AwardPointsDialogProps {
   open: boolean;
@@ -112,71 +113,14 @@ export function AwardPointsDialog({
 
           <div className="space-y-5">
             {/* Member selector */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Recipient</label>
-              <Select.Root value={targetUserId} onValueChange={setTargetUserId}>
-                <Select.Trigger
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-sm",
-                    "hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
-                  )}
-                >
-                  <Select.Value placeholder="Select a team member…">
-                    {selectedMember && (
-                      <span className="flex items-center gap-2">
-                        {selectedMember.houseColor && (
-                          <span
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: selectedMember.houseColor }}
-                          />
-                        )}
-                        {selectedMember.displayName}
-                        {selectedMember.houseName && (
-                          <span className="text-muted-foreground text-xs">· {selectedMember.houseName}</span>
-                        )}
-                      </span>
-                    )}
-                  </Select.Value>
-                  <Select.Icon>
-                    <CaretDown size={16} className="text-muted-foreground" />
-                  </Select.Icon>
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content
-                    className="z-[60] min-w-[200px] overflow-hidden rounded-lg border bg-popover shadow-lg"
-                    position="popper"
-                    sideOffset={4}
-                  >
-                    <Select.Viewport className="p-1">
-                      {members.filter((m) => m.houseId).map((member) => (
-                        <Select.Item
-                          key={member.id}
-                          value={member.id}
-                          className={cn(
-                            "flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer",
-                            "hover:bg-accent/10 focus:bg-accent/10 outline-none select-none"
-                          )}
-                        >
-                          {member.houseColor && (
-                            <span
-                              className="w-3 h-3 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: member.houseColor }}
-                            />
-                          )}
-                          <Select.ItemText>{member.displayName}</Select.ItemText>
-                          {member.houseName && (
-                            <span className="text-muted-foreground text-xs ml-auto pl-4">{member.houseName}</span>
-                          )}
-                          <Select.ItemIndicator>
-                            <Check size={14} />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                      ))}
-                    </Select.Viewport>
-                  </Select.Content>
-                </Select.Portal>
-              </Select.Root>
-            </div>
+            <MemberCombobox
+              label="Recipient"
+              members={members.filter((m) => m.houseId)}
+              value={targetUserId}
+              onValueChange={setTargetUserId}
+              placeholder="Select a team member..."
+              emptyMessage="No assigned members found."
+            />
 
             {/* Points input */}
             <div className="space-y-2">

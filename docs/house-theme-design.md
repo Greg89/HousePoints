@@ -2,86 +2,232 @@
 
 ## Goal
 
-Give each user an opt-in profile preference that lets the app borrow visual identity from their assigned house. The first production slice should make the app feel house-specific without turning every surface into a fully custom skin.
+Give members an opt-in profile preference that makes House Points feel connected to their assigned house without sacrificing readability, accessibility, or maintainability. The theme should feel like a meaningful app-wide identity shift, not just a button color swap.
+
+## Current State
+
+- Users can enable `houseThemeEnabled` from Account Settings.
+- The app derives a tiny token set from `House.color`.
+- The current resolver only changes `--primary`, `--primary-foreground`, `--accent`, `--accent-foreground`, and `--ring`.
+- Core surfaces stay neutral, which keeps the UI readable but makes the feature feel anemic.
+- House data stores one color only, so every generated theme depends on a single accent.
+
+## Product Principles
+
+- The setting is personal. One user can use their house theme while another keeps the default theme.
+- The house identity is organization-scoped. If a user switches orgs, the active theme follows the selected org and assigned house.
+- Owners define house branding. Members opt into using that branding.
+- The theme must be readable first, expressive second.
+- Destructive, warning, and success semantics should remain stable and recognizable.
+- The default House Points theme remains the fallback when theme data is missing, invalid, or disabled.
 
 ## UX Shape
 
-- The control lives in Profile Settings.
-- The control is a toggle labeled `Use my house theme`.
-- The toggle is enabled only when the user has an assigned house with a valid house color.
-- The dashboard and settings pages apply the theme when the preference is enabled.
-- The app falls back to the default purple/green design tokens when the preference is off, the user is unassigned, or the house color is invalid.
+### Member Preference
 
-## Theme Strategy
+- Keep the Account Settings control named `Use my house theme`.
+- Show the assigned house name and a small preview of the active theme.
+- Disable the toggle when the user has no active house assignment.
+- Disable the toggle when the house theme does not pass accessibility validation.
+- Explain that the setting follows the current organization and active house.
 
-A single house color is treated as an anchor, not a full palette. The app generates a small semantic token set from that anchor:
+### Owner Configuration
+
+Owners need more than one color to make themes feel intentional. Expand house setup from a single color to a small theme palette:
+
+- `Primary`: main house identity color.
+- `Secondary`: supporting color used for gradients, subtle accents, and selected surfaces.
+- `Surface tint`: optional soft background tint for cards and page wash.
+
+The UI should still feel simple:
+
+- Default to generating secondary and surface tint from the primary color.
+- Let owners override generated colors in an `Advanced theme` section.
+- Show a live preview before save.
+- Surface validation messages near the color controls.
+
+## Theme Token Strategy
+
+Keep theme generation centralized in `apps/web/src/lib/house-theme.ts`. The resolver should return semantic CSS variables, not component-specific styles.
+
+### Identity Tokens
+
+These can vary by house:
 
 - `--primary`
 - `--primary-foreground`
+- `--secondary`
+- `--secondary-foreground`
 - `--accent`
 - `--accent-foreground`
 - `--ring`
+- `--house-surface`
+- `--house-surface-foreground`
+- `--house-gradient-from`
+- `--house-gradient-to`
+- `--house-muted`
+- `--house-muted-foreground`
 
-The first pass intentionally leaves core surfaces stable:
+### Stable Tokens
 
-- `--background`
-- `--foreground`
-- `--card`
-- `--muted`
-- destructive/success colors
+These should not be house-themed:
 
-This keeps contrast and readability predictable while still changing the identity layer: buttons, tabs, focus rings, badges, and other primary/accent elements.
+- `--destructive`
+- `--destructive-foreground`
+- success colors
+- warning colors
+- audit severity colors
+- medal/ranking colors
+- base text color unless a high-contrast theme explicitly supports it
 
-## Production Rules
+### Surface Philosophy
 
-- Validate house color input before applying theme variables.
-- Only accept six-digit hex colors for phase one.
-- Choose primary foreground color from contrast against the generated primary color.
-- Persist the preference on the user record so it follows the account across devices.
-- Do not rely on local storage for the source of truth.
-- Keep the resolver centralized and unit tested.
-- Keep the first implementation scoped; broader palette work can happen after visual QA with real house colors.
+Do not replace every neutral surface. Instead, add a visible identity layer:
 
-## Phase 1 Scope
+- Page background gets a very subtle house wash or radial accent.
+- Header gets a faint house-tinted border or gradient line.
+- Cards can use a `--house-surface` wash for featured panels only.
+- Primary buttons, tabs, focus rings, and selected states use house identity tokens.
+- House badges and report bars continue using direct house colors.
 
-- Add `houseThemeEnabled` to `User`.
-- Include the preference in app-user/bootstrap responses.
-- Extend profile update to persist the preference.
-- Add a settings toggle.
-- Add a theme resolver utility.
-- Apply generated CSS variables on dashboard and settings surfaces.
-- Add focused tests for contracts, API behavior, settings UI, and theme generation.
+This keeps the product readable while making the theme feel present across the app.
 
-## Phase 2 Scope
+## Data Model
 
-- Add shared house color assessment next to the theme resolver.
-- Keep strict six-digit hex validation for generated themes.
-- Surface owner feedback in House Management before colors are saved.
-- Show a live preview for badge, outline, and button treatment using the same semantic theme variables as the dashboard.
-- Flag neutral colors as readable but visually subtle so owners can choose a stronger house identity.
-- Add focused tests for color assessment and owner-facing house color preview states.
+Phase one can still generate a richer theme from the existing `House.color`. A fuller implementation should persist owner-tuned palette fields on `House`.
 
-## Phase 3 Visual QA
+Proposed fields:
 
-Tested representative house colors against dashboard and settings theme surfaces:
+- `color`: existing primary color, keep for compatibility.
+- `themeSecondaryColor`: optional string.
+- `themeSurfaceColor`: optional string.
+- `themeMode`: enum-like string, initially `GENERATED` or `CUSTOM`.
 
-- Purple: `#7c3aed`
-- Green: `#22c55e`
-- Blue: `#1d4ed8`
-- Yellow: `#facc15`
-- Neutral gray: `#777777`
+Rules:
 
-Decisions from this pass:
+- `color` remains required and is the canonical primary identity color.
+- Optional colors must pass the same strict six-digit hex validation.
+- If optional colors are absent, generate them from `color`.
+- Existing contracts should expose the expanded theme as a nested `houseTheme` object once the UI needs it.
 
-- Keep success, destructive, historical-season, and medal colors stable instead of house-themed.
-- Continue using direct house colors for house identity chips, member avatars, and house-specific report bars.
-- Use semantic theme tokens for app controls such as buttons, tabs, focus rings, and profile/settings accents.
-- Disable the profile theme toggle if the assigned house color is missing or invalid, even though normal owner workflows already validate house colors before saving.
+## Accessibility Rules
 
-## Later Options
+- Primary foreground contrast must be at least WCAG AA for normal text, `4.5:1`.
+- Button, tab, and badge text must always use computed foreground colors.
+- Surface tint must not reduce body text contrast below `7:1` against foreground.
+- Focus ring must be visually distinct from both background and primary surfaces.
+- Very low saturation colors can be allowed, but the UI should warn owners that the theme will feel subtle.
+- Bright colors such as yellow should use dark foreground text automatically.
 
-- Add preview cards for default vs house theme.
-- Let owners tune house color palettes beyond one color.
-- Support richer generated scales using a color library.
-- Add contrast checks in house management when owners choose colors.
-- Apply secondary/background/card variants after usability review.
+## Application Surfaces
+
+### Dashboard
+
+The dashboard should show the strongest theme expression:
+
+- page-level soft gradient wash
+- house-themed top border or header accent
+- primary action buttons
+- selected tab state
+- focus rings
+- season selector badge
+- empty-state illustration/accent
+
+### Account Settings
+
+Settings should preview and explain the theme:
+
+- account nav active state
+- profile icon treatment
+- theme preference preview card
+- selected organization accent
+
+### Manage
+
+Manage is operational and should stay calmer:
+
+- active navigation states
+- focus rings
+- owner preview cards
+- primary save buttons
+
+Avoid turning audit tables, destructive actions, and validation states into house colors.
+
+## Implementation Phases
+
+### Phase 1: Richer Generated Theme
+
+Status: complete.
+
+No database migration.
+
+- Expand `resolveHouseThemeStyle` to generate secondary, surface, gradient, and muted house tokens from the existing `House.color`.
+- Add global CSS helpers for house theme surfaces.
+- Apply the new tokens to dashboard shell, settings shell, and key account/profile surfaces.
+- Update the settings copy to say the theme changes page accents and selected surfaces.
+- Add tests for generated tokens, bright colors, neutral colors, and invalid colors.
+
+### Phase 2: Owner Preview
+
+Status: complete.
+
+No database migration required unless custom colors are included in this phase.
+
+- Add a richer house theme preview to House Management.
+- Show examples for page wash, primary button, badge, and card accent.
+- Warn when a house color is valid but visually subtle.
+- Keep current save behavior if custom palette fields are deferred.
+
+### Phase 3: Persist Custom House Palettes
+
+Status: owner controls in progress.
+
+Requires a database migration and contract updates.
+
+- Add optional palette fields to `House`. Status: complete.
+- Update house create/edit contracts and API routes. Status: complete.
+- Add owner controls for generated vs custom palette. Status: complete.
+- Keep generated palette as the default for existing houses. Status: complete.
+- Audit palette changes as house configuration updates. Status: complete.
+
+### Phase 4: Theme QA Matrix
+
+Status: automated token and shell matrix complete; manual visual screenshot pass pending.
+
+- Test representative house colors: purple, green, blue, orange, yellow, red, gray, near-black, and near-white.
+- Verify dashboard, settings, manage, award/deduct dialogs, notification tray, and mobile layouts.
+- Capture screenshots for future regression checks.
+
+Automated coverage:
+
+- `apps/web/src/lib/house-theme-qa.ts` owns the representative color set so resolver and shell tests stay aligned.
+- `apps/web/src/lib/house-theme.test.ts` verifies every representative color returns the expected readiness and foreground behavior.
+- `apps/web/src/components/DashboardShell.test.tsx` verifies representative themes apply shell/header tokens on the dashboard.
+- `apps/web/src/app/settings/page.test.tsx` verifies custom palettes apply shell/header/card tokens on account settings.
+- `apps/web/e2e/house-theme-smoke.spec.ts` verifies the persisted user preference themes settings and dashboard shells through the browser.
+
+Manual screenshot checklist:
+
+- Dashboard overview at desktop and laptop heights.
+- Dashboard manage tab for an owner, including house management preview.
+- Award and deduct member dropdown dialogs with a populated org.
+- Notification/account tray near the bottom of a laptop viewport.
+- Account settings profile, organisations, and preferences sections.
+- Mobile dashboard and settings navigation.
+
+## First Implementation Slice
+
+Start with Phase 1. It gives users a meaningful visual difference without schema risk:
+
+1. Expand the theme resolver.
+2. Add the new semantic tokens.
+3. Apply them to dashboard and settings shells.
+4. Update tests.
+5. Revisit the owner palette fields only after the generated version feels worth keeping.
+
+## Open Questions
+
+- Should custom palette fields be owner-only, or should admins be able to configure house branding too?
+- Should the app eventually support a dark house theme mode?
+- Should season/event themes ever override house themes?
+- Should the account setting be renamed from `House theme` to `House style` or `Use my house colors`?

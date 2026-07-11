@@ -24,7 +24,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { ArchiveOrganizationResult, CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { ArchiveOrganizationResult, CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberDisplayNameResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin, resolveActiveActorMapping } from "./admin-auth";
 
@@ -35,6 +35,9 @@ export async function createHouse(formData: FormData): Promise<HouseMutationResu
     const name = String(formData.get("name") ?? "").trim();
     const color = String(formData.get("color") ?? "#7c3aed").trim();
     const description = String(formData.get("description") ?? "").trim() || undefined;
+    const themeMode = String(formData.get("themeMode") ?? "").trim();
+    const themeSecondaryColor = String(formData.get("themeSecondaryColor") ?? "").trim();
+    const themeSurfaceColor = String(formData.get("themeSurfaceColor") ?? "").trim();
 
     if (!name) {
       return {
@@ -50,6 +53,9 @@ export async function createHouse(formData: FormData): Promise<HouseMutationResu
         name,
         color,
         description,
+        ...(themeMode ? { themeMode } : {}),
+        ...(themeSecondaryColor ? { themeSecondaryColor } : {}),
+        ...(themeSurfaceColor ? { themeSurfaceColor } : {}),
       }),
     });
 
@@ -437,6 +443,83 @@ export async function promoteUserRole(formData: FormData): Promise<RoleChangeRes
       targetUserId,
       role,
     });
+
+    revalidatePath("/");
+
+    return { ok: true };
+  });
+}
+
+export async function updateMemberDisplayName(formData: FormData): Promise<MemberDisplayNameResult> {
+  return runServerAction("updateMemberDisplayName", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("updateMemberDisplayName", requestId);
+    const targetUserId = String(formData.get("targetUserId") ?? "").trim();
+    const displayName = String(formData.get("displayName") ?? "").trim();
+
+    if (!targetUserId) {
+      return {
+        ok: false,
+        code: "DISPLAY_NAME_TARGET_REQUIRED",
+        message: "Choose the member to update.",
+      };
+    }
+
+    if (!displayName) {
+      return {
+        ok: false,
+        code: "DISPLAY_NAME_REQUIRED",
+        message: "Display name is required.",
+      };
+    }
+
+    if (displayName.length > 120) {
+      return {
+        ok: false,
+        code: "DISPLAY_NAME_TOO_LONG",
+        message: "Display name must be 120 characters or fewer.",
+      };
+    }
+
+    const response = await apiFetch("/admin/users/display-name", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId,
+        displayName,
+      }),
+    });
+
+    try {
+      const updatedUser = await parseApiResponse(
+        response,
+        adminUserSchema,
+        "The member display name could not be updated. Please try again.",
+      );
+
+      logInfo("web.admin.user_display_name_changed", {
+        requestId,
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId: updatedUser.id,
+        displayNameLength: updatedUser.displayName.length,
+      });
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        targetUserId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
 
     revalidatePath("/");
 

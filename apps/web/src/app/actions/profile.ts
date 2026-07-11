@@ -31,6 +31,9 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
   houseId?: string | null;
   houseName?: string | null;
   houseColor?: string | null;
+  houseThemeMode?: "GENERATED" | "CUSTOM" | null;
+  houseThemeSecondaryColor?: string | null;
+  houseThemeSurfaceColor?: string | null;
   organizationContexts?: AppUserOrganizationContext[];
   houseThemeEnabled?: boolean;
   role?: UserRole;
@@ -88,6 +91,9 @@ export async function readSessionSummary(requestId: string = randomUUID()): Prom
     houseId,
     houseName: activeMapping.houseName,
     houseColor: activeMapping.houseColor,
+    houseThemeMode: activeMapping.houseThemeMode,
+    houseThemeSecondaryColor: activeMapping.houseThemeSecondaryColor,
+    houseThemeSurfaceColor: activeMapping.houseThemeSurfaceColor,
     organizationContexts: activeMapping.organizationContexts,
     houseThemeEnabled: mapping.houseThemeEnabled,
     role: activeMapping.role,

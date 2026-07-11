@@ -19,6 +19,7 @@ import type {
   ArchiveOrganizationResult,
   HouseAssignmentResult,
   HouseMutationResult,
+  MemberDisplayNameResult,
   MemberRemovalResult,
   OrgSettingsMutationResult,
   RenameSeasonResult,
@@ -48,6 +49,7 @@ interface AdminFormsProps {
   adminAuditNextCursor: string | null;
   onCreateHouse: (formData: FormData) => Promise<HouseMutationResult>;
   onAssignHouse: (formData: FormData) => Promise<HouseAssignmentResult>;
+  onUpdateMemberDisplayName: (formData: FormData) => Promise<MemberDisplayNameResult>;
   onPromoteUser: (formData: FormData) => Promise<RoleChangeResult>;
   onRemoveOrgMember: (formData: FormData) => Promise<MemberRemovalResult>;
   onTransferOwnership: (formData: FormData) => Promise<RoleChangeResult>;
@@ -135,6 +137,7 @@ export function AdminForms({
   adminAuditNextCursor,
   onCreateHouse,
   onAssignHouse,
+  onUpdateMemberDisplayName,
   onPromoteUser,
   onRemoveOrgMember,
   onTransferOwnership,
@@ -268,6 +271,7 @@ export function AdminForms({
               inviteStats={inviteStats}
               actorRole={actorRole}
               onAssignHouse={onAssignHouse}
+              onUpdateMemberDisplayName={onUpdateMemberDisplayName}
               onRemoveOrgMember={onRemoveOrgMember}
               onCreateInvite={onCreateInvite}
             />

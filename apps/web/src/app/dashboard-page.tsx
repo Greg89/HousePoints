@@ -12,6 +12,7 @@ import {
   readPointAdjustmentStats,
   removeOrgMember,
   transferOwnership,
+  updateMemberDisplayName,
   updateOrgSlug,
   updateOrgSettings,
 } from "./actions/admin";
@@ -165,6 +166,7 @@ export async function renderDashboardPage(route: string) {
       actorRole={session.role ?? "MEMBER"}
       onCreateHouse={createHouse}
       onAssignHouse={assignUserHouse}
+      onUpdateMemberDisplayName={updateMemberDisplayName}
       onPromoteUser={promoteUserRole}
       onRemoveOrgMember={removeOrgMember}
       onTransferOwnership={transferOwnership}
@@ -186,6 +188,9 @@ export async function renderDashboardPage(route: string) {
         houseId: session.houseId ?? null,
         houseName: session.houseName ?? null,
         houseColor: session.houseColor ?? null,
+        houseThemeMode: session.houseThemeMode ?? null,
+        houseThemeSecondaryColor: session.houseThemeSecondaryColor ?? null,
+        houseThemeSurfaceColor: session.houseThemeSurfaceColor ?? null,
         houseThemeEnabled: Boolean(session.houseThemeEnabled),
         role: session.role ?? "MEMBER",
         organizationSlug: session.organizationSlug ?? null,

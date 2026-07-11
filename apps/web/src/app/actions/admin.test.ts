@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { archiveOrganization, assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, transferOwnership, updateOrgSettings, updateOrgSlug } from "./admin";
+import { archiveOrganization, assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, transferOwnership, updateMemberDisplayName, updateOrgSettings, updateOrgSlug } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -255,6 +255,28 @@ describe("createHouse", () => {
     });
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("passes optional house palette fields when present", async () => {
+    const formData = new FormData();
+    formData.set("name", "Ravenclaw");
+    formData.set("color", "#1d4ed8");
+    formData.set("themeMode", "CUSTOM");
+    formData.set("themeSecondaryColor", "#22c55e");
+    formData.set("themeSurfaceColor", "#f0fdf4");
+
+    await expect(createHouse(formData)).resolves.toEqual({ ok: true });
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/houses", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Ravenclaw",
+        color: "#1d4ed8",
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      }),
+    });
   });
 
   it("returns validation failures as typed results without calling the API", async () => {
@@ -656,6 +678,99 @@ describe("archiveOrganization", () => {
         actorUserId: "user-1",
         organizationId: "org-1",
         organizationSlug: "acme",
+      },
+    );
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateMemberDisplayName", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "target-1",
+      displayName: "Target Updated",
+      email: "target@example.com",
+      role: "MEMBER",
+      houseId: "house-1",
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "target-1",
+      displayName: "Target Updated",
+      email: "target@example.com",
+      role: "MEMBER",
+      houseId: "house-1",
+    });
+  });
+
+  it("returns ok and revalidates the dashboard when display name update succeeds", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("displayName", " Target Updated ");
+
+    await expect(updateMemberDisplayName(formData)).resolves.toEqual({ ok: true });
+
+    expect(runServerActionMock).toHaveBeenCalledWith("updateMemberDisplayName", expect.any(Function));
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("updateMemberDisplayName", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/users/display-name", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: "target-1",
+        displayName: "Target Updated",
+      }),
+    });
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns validation failures as typed results without calling the API", async () => {
+    const missingTarget = new FormData();
+    missingTarget.set("displayName", "Target Updated");
+
+    await expect(updateMemberDisplayName(missingTarget)).resolves.toEqual({
+      ok: false,
+      code: "DISPLAY_NAME_TARGET_REQUIRED",
+      message: "Choose the member to update.",
+    });
+
+    const missingDisplayName = new FormData();
+    missingDisplayName.set("targetUserId", "target-1");
+    missingDisplayName.set("displayName", "   ");
+
+    await expect(updateMemberDisplayName(missingDisplayName)).resolves.toEqual({
+      ok: false,
+      code: "DISPLAY_NAME_REQUIRED",
+      message: "Display name is required.",
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs and returns expected API failures as typed results", async () => {
+    const formData = new FormData();
+    formData.set("targetUserId", "target-1");
+    formData.set("displayName", "Target Updated");
+    const error = new ApiResponseError(
+      409,
+      "DISPLAY_NAME_UNCHANGED",
+      "That member already has this display name.",
+    );
+    parseApiResponseMock.mockRejectedValue(error);
+
+    await expect(updateMemberDisplayName(formData)).resolves.toEqual({
+      ok: false,
+      code: "DISPLAY_NAME_UNCHANGED",
+      message: "That member already has this display name.",
+    });
+
+    expect(logServerActionFailedMock).toHaveBeenCalledWith(
+      { action: "updateMemberDisplayName", requestId: "request-1" },
+      error,
+      {
+        actorUserId: "user-1",
+        organizationId: "org-1",
+        targetUserId: "target-1",
       },
     );
     expect(revalidatePathMock).not.toHaveBeenCalled();

@@ -32,6 +32,9 @@ export function resolveActiveAppUserMapping<T extends AppUser>(
     houseId: activeOrganizationContext.houseId,
     houseName: activeOrganizationContext.houseName,
     houseColor: activeOrganizationContext.houseColor,
+    houseThemeMode: activeOrganizationContext.houseThemeMode,
+    houseThemeSecondaryColor: activeOrganizationContext.houseThemeSecondaryColor,
+    houseThemeSurfaceColor: activeOrganizationContext.houseThemeSurfaceColor,
     organizationContexts: normalizeCurrentOrganizationContexts(
       mapping.organizationContexts,
       activeOrganizationContext.organizationId,

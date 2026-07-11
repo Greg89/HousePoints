@@ -23,6 +23,14 @@
   --ring: oklch(0.65 0.15 160);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.98 0 0);
+  --house-page-wash: transparent;
+  --house-surface: var(--card);
+  --house-surface-foreground: var(--card-foreground);
+  --house-gradient-from: transparent;
+  --house-gradient-to: transparent;
+  --house-header-border: var(--border);
+  --house-muted: var(--muted);
+  --house-muted-foreground: var(--muted-foreground);
   --radius: 0.5rem;
 }
 
@@ -63,6 +71,31 @@
     background: var(--background);
     color: var(--foreground);
     font-family: Inter, system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .house-theme-shell {
+    background:
+      radial-gradient(circle at top right, var(--house-gradient-from) 0, transparent 24rem),
+      radial-gradient(circle at top left, var(--house-gradient-to) 0, transparent 18rem),
+      linear-gradient(180deg, var(--house-page-wash) 0, var(--background) 22rem);
+  }
+
+  .house-theme-header {
+    border-color: var(--house-header-border);
+    box-shadow: inset 0 -1px 0 var(--house-header-border);
+  }
+
+  .house-theme-card {
+    background:
+      linear-gradient(135deg, var(--house-surface) 0%, var(--card) 72%),
+      var(--card);
+  }
+
+  .house-theme-muted {
+    background: var(--house-muted);
+    color: var(--house-muted-foreground);
   }
 }
 

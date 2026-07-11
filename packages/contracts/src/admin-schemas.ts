@@ -12,19 +12,28 @@ export const adminUserSchema = z.object({
 
 export type AdminUser = z.infer<typeof adminUserSchema>;
 
+const houseThemeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const nullableHouseThemeColorSchema = houseThemeColorSchema.nullable();
+
 export const adminHouseSchema = z.object({
   id: z.string(),
   name: z.string(),
   color: z.string(),
   description: z.string().nullable(),
+  themeMode: z.enum(["GENERATED", "CUSTOM"]).default("GENERATED"),
+  themeSecondaryColor: nullableHouseThemeColorSchema.default(null),
+  themeSurfaceColor: nullableHouseThemeColorSchema.default(null),
 });
 
 export type AdminHouse = z.infer<typeof adminHouseSchema>;
 
 export const createHouseSchema = z.object({
   name: z.string().min(2).max(80),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#7c3aed"),
+  color: houseThemeColorSchema.default("#7c3aed"),
   description: z.string().max(280).optional(),
+  themeMode: z.enum(["GENERATED", "CUSTOM"]).default("GENERATED"),
+  themeSecondaryColor: nullableHouseThemeColorSchema.optional(),
+  themeSurfaceColor: nullableHouseThemeColorSchema.optional(),
 }).strict();
 
 export const assignUserHouseSchema = z.object({
@@ -42,10 +51,20 @@ export type AssignUserHouseResponse = z.infer<
   typeof assignUserHouseResponseSchema
 >;
 
+export const updateMemberDisplayNameSchema = z.object({
+  targetUserId: z.string().min(1),
+  displayName: z.string().trim().min(1).max(120),
+}).strict();
+
+export type UpdateMemberDisplayNameInput = z.infer<
+  typeof updateMemberDisplayNameSchema
+>;
+
 export const adminAuditActionSchema = z.object({
   id: z.string().min(1),
   type: z.enum([
     "POINT_DELETED",
+    "HOUSE_SETTINGS_UPDATED",
     "INVITE_CREATED",
     "INVITE_USED",
     "ORG_ARCHIVED",
@@ -53,6 +72,7 @@ export const adminAuditActionSchema = z.object({
     "ORG_SETTINGS_UPDATED",
     "POINTS_DEDUCTED",
     "USER_HOUSE_ASSIGNED",
+    "USER_DISPLAY_NAME_CHANGED",
     "USER_ROLE_CHANGED",
     "USER_REMOVED_FROM_ORG",
   ]),

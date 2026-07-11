@@ -57,7 +57,7 @@ export function HouseThemeToggleForm({
   }
 
   return (
-    <section className="space-y-4 rounded-xl border bg-background/60 p-4">
+    <section className="space-y-4 rounded-xl border bg-background/60 p-4 house-theme-card">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
           <Palette size={18} />
@@ -65,16 +65,27 @@ export function HouseThemeToggleForm({
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold">House theme</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Use your assigned house color for buttons, tabs, focus rings, and app accents.
+            Use your assigned house colors for page accents, selected surfaces, buttons, tabs, and focus rings.
           </p>
           {houseName && hasValidHouseColor ? (
-            <p className="mt-3 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: colorAssessment.normalizedColor ?? houseColor ?? undefined }}
-              />
-              {houseName}
-            </p>
+            <div className="mt-3 space-y-3">
+              <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: colorAssessment.normalizedColor ?? houseColor ?? undefined }}
+                />
+                {houseName}
+              </p>
+              <div className="rounded-xl border p-3 house-theme-muted">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold">Theme preview</span>
+                  <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-primary-foreground">
+                    Active
+                  </span>
+                </div>
+                <div className="mt-3 h-2 rounded-full bg-gradient-to-r from-[var(--house-gradient-from)] to-[var(--house-gradient-to)]" />
+              </div>
+            </div>
           ) : houseName ? (
             <p className="mt-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               This house needs a valid six-digit hex color before members can enable its theme.

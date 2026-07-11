@@ -9,6 +9,7 @@ vi.mock("@housepoints/db", () => ({
   createPrimaryOrganizationSlugAlias: vi.fn(),
   isOrganizationSlugReserved: vi.fn(),
   resolveOrganizationSlug: vi.fn(),
+  updateUserDisplayName: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
     organization: {
@@ -92,6 +93,7 @@ import {
   isOrganizationSlugReserved,
   prisma,
   resolveOrganizationSlug,
+  updateUserDisplayName,
 } from "@housepoints/db";
 
 // Typed shorthand helpers
@@ -120,6 +122,7 @@ const mockInviteUpdateMany = prisma.orgInvite.updateMany as ReturnType<typeof vi
 const mockCreatePrimaryOrganizationSlugAlias = createPrimaryOrganizationSlugAlias as ReturnType<typeof vi.fn>;
 const mockIsOrganizationSlugReserved = isOrganizationSlugReserved as ReturnType<typeof vi.fn>;
 const mockResolveOrganizationSlug = resolveOrganizationSlug as ReturnType<typeof vi.fn>;
+const mockUpdateUserDisplayName = updateUserDisplayName as ReturnType<typeof vi.fn>;
 const mockOrgSlugAliasCreate = prisma.organizationSlugAlias.create as ReturnType<typeof vi.fn>;
 const mockOrgSlugAliasUpdateMany = prisma.organizationSlugAlias.updateMany as ReturnType<typeof vi.fn>;
 const mockAuditEventCreate = prisma.auditEvent.create as ReturnType<typeof vi.fn>;
@@ -146,7 +149,16 @@ const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
 // Shared fixtures.
 const ORG = { id: "org-1", slug: "acme", name: "Acme Corp" };
-const HOUSE = { id: "house-1", name: "Phoenix", color: "#7c3aed", description: null, organizationId: "org-1" };
+const HOUSE = {
+  id: "house-1",
+  name: "Phoenix",
+  color: "#7c3aed",
+  description: null,
+  organizationId: "org-1",
+  themeMode: "GENERATED",
+  themeSecondaryColor: null,
+  themeSurfaceColor: null,
+};
 const ACTIVE_SEASON = {
   id: "season-active",
   name: "Q3 2026",
@@ -267,6 +279,24 @@ beforeEach(() => {
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
+  mockUpdateUserDisplayName.mockImplementation(
+    (
+      client: typeof prisma,
+      input: {
+        userId: string;
+        displayName: string;
+        data?: Record<string, unknown>;
+        select: Record<string, unknown>;
+      },
+    ) => client.user.update({
+      where: { id: input.userId },
+      data: {
+        ...input.data,
+        displayName: input.displayName,
+      },
+      select: input.select,
+    }),
+  );
   mockSeasonFindMany.mockResolvedValue([]);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
@@ -2497,6 +2527,116 @@ describe("POST /admin/houses", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().name).toBe("Phoenix");
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "HOUSE_SETTINGS_UPDATED",
+        summary: "Olivia created house Phoenix.",
+        metadata: expect.objectContaining({
+          operation: "created",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          changedFields: "created",
+          newColor: "#7c3aed",
+          newThemeMode: "GENERATED",
+        }),
+      }),
+    });
+    await app.close();
+  });
+
+  it("persists optional house theme palette fields when actor is owner", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockHouseUpsert.mockResolvedValue({
+      ...HOUSE,
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/houses",
+      payload: {
+        name: "Phoenix",
+        color: "#7c3aed",
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockHouseUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      }),
+      update: expect.objectContaining({
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      }),
+    }));
+    expect(res.json()).toMatchObject({
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+    await app.close();
+  });
+
+  it("audits changed house theme fields when actor updates an existing house", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockHouseFindUnique.mockResolvedValue(HOUSE);
+    mockHouseUpsert.mockResolvedValue({
+      ...HOUSE,
+      color: "#1d4ed8",
+      themeMode: "CUSTOM",
+      themeSecondaryColor: "#22c55e",
+      themeSurfaceColor: "#f0fdf4",
+    });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/houses",
+      payload: {
+        name: "Phoenix",
+        color: "#1d4ed8",
+        themeMode: "CUSTOM",
+        themeSecondaryColor: "#22c55e",
+        themeSurfaceColor: "#f0fdf4",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "HOUSE_SETTINGS_UPDATED",
+        summary: "Olivia updated house Phoenix: color, themeMode, themeSecondaryColor, themeSurfaceColor.",
+        metadata: expect.objectContaining({
+          operation: "updated",
+          houseId: "house-1",
+          houseName: "Phoenix",
+          changedFields: "color,themeMode,themeSecondaryColor,themeSurfaceColor",
+          previousColor: "#7c3aed",
+          newColor: "#1d4ed8",
+          previousThemeMode: "GENERATED",
+          newThemeMode: "CUSTOM",
+          previousThemeSecondaryColor: null,
+          newThemeSecondaryColor: "#22c55e",
+          previousThemeSurfaceColor: null,
+          newThemeSurfaceColor: "#f0fdf4",
+        }),
+      }),
+    });
     await app.close();
   });
 });
@@ -3279,6 +3419,149 @@ describe("POST /admin/users/assign-house", () => {
       data: {
         readAt: expect.any(Date),
         archivedAt: expect.any(Date),
+      },
+    });
+    await app.close();
+  });
+});
+
+describe("POST /admin/users/display-name", () => {
+  it("returns 403 ADMIN_REQUIRED when actor is a regular member", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-1", displayName: "Alice Updated" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 404 when target user is outside the actor organization", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce(null);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-other", displayName: "Other User" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TARGET_USER_NOT_FOUND");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 409 without audit noise when the display name is unchanged", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: "MEMBER",
+      houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-target", displayName: "Taylor" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("DISPLAY_NAME_UNCHANGED");
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("lets admins update an active member display name and writes audit history", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId: "org-secure" }));
+    mockMembershipFindFirst.mockResolvedValueOnce({
+      id: "membership-target",
+      userId: "user-target",
+      role: "MEMBER",
+      houseId: "house-1",
+      user: {
+        id: "user-target",
+        displayName: "Taylor",
+        email: "taylor@acme.com",
+      },
+    });
+    mockUserUpdate.mockResolvedValue({
+      id: "user-target",
+      displayName: "Taylor Smith",
+      email: "taylor@acme.com",
+    });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/users/display-name",
+      payload: { targetUserId: "user-target", displayName: "Taylor Smith" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      id: "user-target",
+      displayName: "Taylor Smith",
+      email: "taylor@acme.com",
+      role: "MEMBER",
+      houseId: "house-1",
+    });
+    expect(mockMembershipFindFirst).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        userId: "user-target",
+        isActive: true,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        houseId: true,
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-target" },
+      data: { displayName: "Taylor Smith" },
+      select: {
+        id: true,
+        displayName: true,
+        email: true,
+      },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        actorUserId: "user-2",
+        eventType: "USER_DISPLAY_NAME_CHANGED",
+        summary: "Bob changed Taylor's display name to Taylor Smith.",
+        metadata: {
+          targetUserId: "user-target",
+          previousDisplayName: "Taylor",
+          newDisplayName: "Taylor Smith",
+        },
       },
     });
     await app.close();
@@ -6692,6 +6975,18 @@ describe("POST /notifications/list", () => {
         readAt: null,
       },
     });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
+      },
+    });
     await app.close();
   });
 
@@ -6715,7 +7010,7 @@ describe("POST /notifications/list", () => {
 describe("POST /notifications/mark-read", () => {
   it("marks only unread notifications belonging to the current actor", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
-    mockNotificationUpdateMany.mockResolvedValue({ count: 2 });
+    mockNotificationUpdateMany.mockResolvedValueOnce({ count: 2 }).mockResolvedValueOnce({ count: 0 });
     const app = await buildTestApp("auth0|admin");
 
     const res = await app.inject({
@@ -6728,7 +7023,7 @@ describe("POST /notifications/mark-read", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ updatedCount: 2 });
-    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(1, {
       where: {
         id: { in: ["notification-1", "notification-2"] },
         organizationId: "org-1",
@@ -6738,6 +7033,50 @@ describe("POST /notifications/mark-read", () => {
       },
       data: {
         readAt: expect.any(Date),
+      },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ["notification-1", "notification-2"] },
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
+      },
+    });
+    await app.close();
+  });
+
+  it("archives release announcements after marking them read", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockNotificationUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 });
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/notifications/mark-read",
+      payload: {
+        notificationIds: ["notification-release"],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updatedCount: 1 });
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ["notification-release"] },
+        organizationId: "org-1",
+        recipientUserId: "user-2",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
       },
     });
     await app.close();
@@ -6763,7 +7102,7 @@ describe("POST /notifications/mark-read", () => {
 describe("POST /notifications/mark-all-read", () => {
   it("marks all unread notifications for the current actor", async () => {
     mockFindUnique.mockResolvedValue(makeOwner());
-    mockNotificationUpdateMany.mockResolvedValue({ count: 3 });
+    mockNotificationUpdateMany.mockResolvedValueOnce({ count: 3 }).mockResolvedValueOnce({ count: 1 });
     const app = await buildTestApp("auth0|owner");
 
     const res = await app.inject({
@@ -6774,7 +7113,7 @@ describe("POST /notifications/mark-all-read", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ updatedCount: 3 });
-    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(1, {
       where: {
         organizationId: "org-1",
         recipientUserId: "user-owner",
@@ -6783,6 +7122,18 @@ describe("POST /notifications/mark-all-read", () => {
       },
       data: {
         readAt: expect.any(Date),
+      },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        organizationId: "org-1",
+        recipientUserId: "user-owner",
+        archivedAt: null,
+        readAt: { not: null },
+        type: "RELEASE_ANNOUNCEMENT",
+      },
+      data: {
+        archivedAt: expect.any(Date),
       },
     });
     await app.close();
