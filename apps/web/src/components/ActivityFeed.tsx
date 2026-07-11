@@ -167,6 +167,7 @@ function ActivityCard({
   const actionsRef = useRef<HTMLDivElement>(null);
   const isDeduction = item.type === "DEDUCTION";
   const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
+  const actionLabel = isDeduction ? "deducted" : "recognized";
   const actionsMenuId = `activity-actions-${item.id}`;
   const hasActions = canDelete;
   const pointTone = isDeduction
@@ -212,68 +213,74 @@ function ActivityCard({
       transition={{ delay: index * 0.04, duration: 0.2 }}
       className="rounded-xl border bg-card/70 p-4 transition-colors hover:bg-muted/20"
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_11rem]">
-        <div className="flex min-w-0 items-start gap-3 lg:gap-4">
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-            {item.actorName[0]?.toUpperCase()}
-          </div>
-          <ArrowRight className="text-muted-foreground mt-2.5 flex-shrink-0" size={14} />
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
-            style={{ backgroundColor: item.targetHouseColor }}
-          >
-            {item.targetHouseName[0]?.toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1 text-sm">
-              <span className="font-semibold">{item.actorName}</span>
-              <span className="text-muted-foreground">{isDeduction ? "deducted" : "awarded"}</span>
-              {isDeduction ? (
-                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
-                  Deducted
-                </span>
-              ) : null}
-              <span className="text-muted-foreground">points</span>
-              <span className="text-muted-foreground">to</span>
-              <span className="font-semibold">{item.targetUserName}</span>
-              <span className="text-muted-foreground text-xs">({item.targetHouseName})</span>
+      <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_7rem_9rem] lg:items-center">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex flex-shrink-0 items-center gap-1.5 pt-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
+              {item.actorName[0]?.toUpperCase()}
             </div>
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.reason}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {item.trait ? (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                  {TRAIT_LABELS[item.trait]}
-                </span>
-              ) : null}
-              <span className="text-xs text-muted-foreground">
-                {relativeTime(item.createdAt)}
-              </span>
+            <ArrowRight className="text-muted-foreground" size={13} />
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
+              style={{ backgroundColor: item.targetHouseColor }}
+            >
+              {item.targetHouseName[0]?.toUpperCase()}
             </div>
+          </div>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-sm font-semibold">{item.actorName}</p>
+            <p
+              className={["text-xs font-semibold uppercase tracking-wide", pointTone.label].join(" ")}
+            >
+              {actionLabel}
+            </p>
+            <p className="truncate text-sm font-semibold">{item.targetUserName}</p>
+            <p className="truncate text-xs text-muted-foreground">{item.targetHouseName}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t pt-3 lg:items-start lg:justify-end lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          <div className="flex items-center gap-3 lg:flex-col lg:items-end">
-            <div
-              className={[
-                "min-w-20 rounded-2xl border px-3 py-2 text-center",
-                pointTone.badge,
-              ].join(" ")}
-            >
-              <div className="font-number text-2xl font-bold leading-none">{deltaLabel}</div>
-              <div
-                className={[
-                  "mt-1 text-[0.65rem] font-semibold uppercase tracking-wide",
-                  pointTone.label,
-                ].join(" ")}
-              >
-                points
-              </div>
-            </div>
+        <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <p className="line-clamp-2 text-sm text-muted-foreground">{item.reason}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {item.trait ? (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                {TRAIT_LABELS[item.trait]}
+              </span>
+            ) : null}
+            {isDeduction ? (
+              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
+                Deducted
+              </span>
+            ) : null}
+            <span className="text-xs text-muted-foreground">
+              {relativeTime(item.createdAt)}
+            </span>
+          </div>
+        </div>
+
+        <div
+          className={[
+            "flex items-center justify-between rounded-2xl border px-3 py-2 lg:min-h-20 lg:flex-col lg:justify-center lg:text-center",
+            pointTone.badge,
+          ].join(" ")}
+        >
+          <div className="font-number text-2xl font-bold leading-none">{deltaLabel}</div>
+          <div
+            className={[
+              "text-[0.65rem] font-semibold uppercase tracking-wide lg:mt-1",
+              pointTone.label,
+            ].join(" ")}
+          >
+            points
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <div className="min-w-0">
             {item.season ? (
               <span
                 className={[
-                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
                   item.season.isActive
                     ? "bg-emerald-50 text-emerald-700"
                     : "bg-amber-50 text-amber-700",
