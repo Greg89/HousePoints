@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, DotsThreeVertical, Trash } from "@phosphor-icons/react";
+import { ArrowRight, DotsThreeVertical, Eye, Trash } from "@phosphor-icons/react";
 import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
 import { POINT_REACTION_KEYS, POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
 
@@ -15,6 +15,9 @@ interface ActivityCardProps {
   canReact?: boolean;
   isReacting?: boolean;
   onReact?: (reactionKey: PointReactionKey) => void;
+  canViewReactions?: boolean;
+  isLoadingReactions?: boolean;
+  onViewReactions?: () => void;
 }
 
 const REACTION_EMOJI: Record<PointReactionKey, string> = {
@@ -45,6 +48,9 @@ export function ActivityCard({
   canReact = false,
   isReacting = false,
   onReact,
+  canViewReactions = false,
+  isLoadingReactions = false,
+  onViewReactions,
 }: ActivityCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -52,7 +58,7 @@ export function ActivityCard({
   const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
   const actionLabel = isDeduction ? "deducted" : "recognized";
   const actionsMenuId = `activity-actions-${item.id}`;
-  const hasActions = canDelete;
+  const hasActions = canDelete || canViewReactions;
   const canShowReactions = canReact && !isDeduction && Boolean(onReact);
   const reactionCounts = new Map(
     (item.reactions ?? []).map((reaction) => [reaction.reactionKey, reaction.count]),
@@ -230,6 +236,21 @@ export function ActivityCard({
                     aria-label={`Activity actions for ${item.targetUserName}`}
                     className="absolute right-0 z-20 mt-2 w-52 rounded-xl border bg-card p-1 shadow-lg"
                   >
+                    {canViewReactions ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setActionsOpen(false);
+                          onViewReactions?.();
+                        }}
+                        disabled={isLoadingReactions}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-50"
+                      >
+                        <Eye size={16} />
+                        View reactions
+                      </button>
+                    ) : null}
                     {canDelete ? (
                       <button
                         type="button"

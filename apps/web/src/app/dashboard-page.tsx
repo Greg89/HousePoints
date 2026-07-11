@@ -21,6 +21,7 @@ import {
   readDashboardSummary,
   readLeaderboard,
   readMembers,
+  readPointReactionDetails,
   reactToPointTransaction,
 } from "./actions/dashboard";
 import {
@@ -216,6 +217,7 @@ export async function renderDashboardPage(route: string) {
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
       onReactToPoint={reactToPointTransaction}
+      onReadPointReactionDetails={readPointReactionDetails}
       dashboardHref={dashboardHref}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"

@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Clock } from "@phosphor-icons/react";
 import type {
   ActivityFeedRequest,
   ActivityItem,
   OrgMember,
   PagedActivityFeed,
+  PointReactionDetailsResponse,
   PointReactionKey,
   PointReactionResponse,
   PointTransactionType,
 } from "@housepoints/contracts";
-import type { DeletePointResult, PointReactionResult } from "@/lib/action-results";
+import { POINT_REACTION_LABELS } from "@housepoints/contracts";
+import type { DeletePointResult, PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { ActivityCard } from "./ActivityCard";
 
 type ActivityTypeFilter = "ALL" | PointTransactionType;
@@ -21,6 +24,14 @@ const FILTER_OPTIONS: Array<{ value: ActivityTypeFilter; label: string; descript
   { value: "AWARD", label: "Recognition", description: "Points awarded by teammates" },
   { value: "DEDUCTION", label: "Deductions", description: "Admin point deductions" },
 ];
+
+const dateTimeFormatter = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 interface ActivityFeedProps {
   items: ActivityItem[];
@@ -33,6 +44,9 @@ interface ActivityFeedProps {
     transactionId: string,
     reactionKey: PointReactionKey | null,
   ) => Promise<PointReactionResult<PointReactionResponse>>;
+  onReadReactions?: (
+    transactionId: string,
+  ) => Promise<PointReactionDetailsResult<PointReactionDetailsResponse>>;
 }
 
 export function ActivityFeed({
@@ -43,6 +57,7 @@ export function ActivityFeed({
   canDelete = false,
   onDelete,
   onReact,
+  onReadReactions,
 }: ActivityFeedProps) {
   const [visibleItems, setVisibleItems] = useState(items);
   const [cursor, setCursor] = useState(nextCursor);
@@ -52,6 +67,14 @@ export function ActivityFeed({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reactingIds, setReactingIds] = useState<Set<string>>(() => new Set());
   const [reactionError, setReactionError] = useState<string | null>(null);
+  const [reactionDetailsContext, setReactionDetailsContext] = useState<{
+    transactionId: string;
+    targetUserName: string;
+    reason: string;
+  } | null>(null);
+  const [reactionDetails, setReactionDetails] = useState<PointReactionDetailsResponse | null>(null);
+  const [reactionDetailsError, setReactionDetailsError] = useState<string | null>(null);
+  const [loadingReactionDetailsId, setLoadingReactionDetailsId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ActivityTypeFilter>("ALL");
   const [activeMemberId, setActiveMemberId] = useState("ALL");
 
@@ -207,7 +230,38 @@ export function ActivityFeed({
     }
   }
 
+  async function handleViewReactions(item: ActivityItem) {
+    if (!onReadReactions || loadingReactionDetailsId === item.id) {
+      return;
+    }
+
+    setReactionDetailsContext({
+      transactionId: item.id,
+      targetUserName: item.targetUserName,
+      reason: item.reason,
+    });
+    setReactionDetails(null);
+    setReactionDetailsError(null);
+    setLoadingReactionDetailsId(item.id);
+
+    try {
+      const result = await onReadReactions(item.id);
+
+      if (!result.ok) {
+        setReactionDetailsError(result.message);
+        return;
+      }
+
+      setReactionDetails(result.details);
+    } catch {
+      setReactionDetailsError("Reactions could not be loaded. Please try again.");
+    } finally {
+      setLoadingReactionDetailsId(null);
+    }
+  }
+
   const hasActiveFilters = activeFilter !== "ALL" || activeMemberId !== "ALL";
+  const reactionDetailsOpen = Boolean(reactionDetailsContext);
 
   return (
     <div className="rounded-xl border bg-card">
@@ -286,6 +340,13 @@ export function ActivityFeed({
               canReact={Boolean(onReact)}
               isReacting={reactingIds.has(item.id)}
               onReact={(reactionKey) => handleReact(item, reactionKey)}
+              canViewReactions={
+                Boolean(onReadReactions)
+                && item.type === "AWARD"
+                && (item.reactions ?? []).some((reaction) => reaction.count > 0)
+              }
+              isLoadingReactions={loadingReactionDetailsId === item.id}
+              onViewReactions={() => void handleViewReactions(item)}
             />
           ))
         )}
@@ -317,6 +378,92 @@ export function ActivityFeed({
           </div>
         ) : null}
       </div>
+      <Dialog.Root
+        open={reactionDetailsOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReactionDetailsContext(null);
+            setReactionDetails(null);
+            setReactionDetailsError(null);
+            setLoadingReactionDetailsId(null);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Dialog.Title className="font-display text-2xl font-semibold">
+                  Reactions
+                </Dialog.Title>
+                <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                  {reactionDetailsContext
+                    ? `People who reacted to ${reactionDetailsContext.targetUserName}'s recognition.`
+                    : "People who reacted to this recognition."}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Close reaction details"
+                >
+                  x
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {reactionDetailsContext ? (
+              <div className="mt-4 rounded-xl border bg-muted/20 p-3">
+                <p className="line-clamp-2 text-sm text-muted-foreground">
+                  {reactionDetailsContext.reason}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="mt-5 space-y-3">
+              {loadingReactionDetailsId ? (
+                <p className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  Loading reactions...
+                </p>
+              ) : null}
+
+              {reactionDetailsError ? (
+                <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                  {reactionDetailsError}
+                </p>
+              ) : null}
+
+              {!loadingReactionDetailsId && !reactionDetailsError && reactionDetails?.reactions.length === 0 ? (
+                <p className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  No active reactions yet.
+                </p>
+              ) : null}
+
+              {reactionDetails?.reactions.map((reaction) => (
+                <div
+                  key={reaction.id}
+                  className="flex items-start justify-between gap-4 rounded-xl border bg-background p-4"
+                >
+                  <div>
+                    <p className="font-semibold">{reaction.actorName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {POINT_REACTION_LABELS[reaction.reactionKey]}
+                    </p>
+                  </div>
+                  <time
+                    dateTime={reaction.updatedAt}
+                    className="shrink-0 text-right text-xs text-muted-foreground"
+                  >
+                    {dateTimeFormatter.format(new Date(reaction.updatedAt))}
+                  </time>
+                </div>
+              ))}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

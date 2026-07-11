@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ActivityItem, OrgMember } from "@housepoints/contracts";
@@ -292,6 +292,80 @@ describe("ActivityFeed", () => {
     const selectedReaction = await screen.findByRole("button", { name: /remove love it reaction/i });
     expect(selectedReaction).toHaveAttribute("aria-pressed", "true");
     expect(selectedReaction).toHaveTextContent("1");
+  });
+
+  it("shows reaction details from the activity actions menu", async () => {
+    const user = userEvent.setup();
+    const onReadReactions = vi.fn(async () => ({
+      ok: true as const,
+      details: {
+        transactionId: "activity-1",
+        reactions: [
+          {
+            id: "reaction-1",
+            reactionKey: "party" as const,
+            actorUserId: "user-cara",
+            actorName: "Cara",
+            createdAt: "2026-06-25T12:00:00.000Z",
+            updatedAt: "2026-06-25T12:05:00.000Z",
+          },
+        ],
+      },
+    }));
+
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            reactions: [{ reactionKey: "party", count: 1 }],
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReadReactions={onReadReactions}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /view reactions/i }));
+
+    await waitFor(() => expect(onReadReactions).toHaveBeenCalledWith("activity-1"));
+    const dialog = await screen.findByRole("dialog", { name: /reactions/i });
+    expect(within(dialog).getByText("Cara")).toBeInTheDocument();
+    expect(within(dialog).getByText("Celebrate")).toBeInTheDocument();
+    expect(within(dialog).getByText("Great collaboration")).toBeInTheDocument();
+  });
+
+  it("shows a safe error when reaction details fail to load", async () => {
+    const user = userEvent.setup();
+    const onReadReactions = vi.fn(async () => ({
+      ok: false as const,
+      code: "POINT_TRANSACTION_NOT_FOUND",
+      message: "Point transaction was not found",
+    }));
+
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            reactions: [{ reactionKey: "heart", count: 1 }],
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReadReactions={onReadReactions}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /view reactions/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /reactions/i });
+    expect(await within(dialog).findByText("Point transaction was not found")).toBeInTheDocument();
   });
 
   it("sends null when the selected reaction is clicked again", async () => {

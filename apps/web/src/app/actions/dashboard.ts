@@ -7,8 +7,11 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  pointReactionDetailsRequestSchema,
+  pointReactionDetailsResponseSchema,
   pointReactionResponseSchema,
   type PointReactionKey,
+  type PointReactionDetailsResponse,
   type PointReactionResponse,
   type ActivityFeedRequest,
   type DashboardSummary,
@@ -16,7 +19,7 @@ import {
 } from "@housepoints/contracts";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
-import type { PointReactionResult } from "@/lib/action-results";
+import type { PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 
 export async function readLeaderboard(requestId: string = randomUUID()) {
@@ -123,6 +126,55 @@ export async function reactToPointTransaction(
       logServerActionFailed(context, error, {
         transactionId: trimmedTransactionId,
         reactionKey,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
+}
+
+export async function readPointReactionDetails(
+  transactionId: string,
+): Promise<PointReactionDetailsResult<PointReactionDetailsResponse>> {
+  return runServerAction("readPointReactionDetails", async (context) => {
+    const { requestId } = context;
+    const parsed = pointReactionDetailsRequestSchema.safeParse({
+      transactionId: transactionId.trim(),
+    });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        code: "POINT_TRANSACTION_REQUIRED",
+        message: "Point transaction is required.",
+      };
+    }
+
+    await getCurrentUserForRequest(requestId);
+    const response = await apiFetch("/transactions/reactions", requestId, {
+      method: "POST",
+      body: JSON.stringify(parsed.data),
+    });
+
+    try {
+      const details = await parseApiResponse(
+        response,
+        pointReactionDetailsResponseSchema,
+        "Reactions could not be loaded. Please try again.",
+      );
+
+      return { ok: true, details };
+    } catch (error) {
+      if (!(error instanceof ApiResponseError) || error.statusCode < 400 || error.statusCode >= 500) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        transactionId: parsed.data.transactionId,
       });
 
       return {
