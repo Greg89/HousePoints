@@ -236,7 +236,7 @@ Before adding reaction controls, split the Activity tab into smaller pieces:
 - `ActivityCard`: presentation for one transaction.
 - future `ActivityReactionBar`: controlled reaction buttons and counts.
 
-The Activity tab should be treated as the main team interaction surface, not a small recent-activity widget. Use `Team Activity` language, keep paging server-backed, and add filters through the activity API so users are filtering the full dataset rather than only the currently loaded page.
+The Activity tab should be treated as the main team interaction surface, not a small recent-activity widget. Use `Team Activity` language, keep paging server-backed, and add filters through the activity API so users are filtering the full dataset rather than only the currently loaded page. The first filter slices are transaction type and recipient member, both applied before pagination.
 
 The card redesign should create a clear lower action row where reactions can live without crowding the recognition sentence.
 

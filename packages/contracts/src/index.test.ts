@@ -962,10 +962,15 @@ describe("dashboard response schemas", () => {
       limit: 50,
       type: "DEDUCTION",
     });
+    expect(activityFeedRequestSchema.parse({ targetUserId: "user-1" })).toEqual({
+      limit: 50,
+      targetUserId: "user-1",
+    });
     expect(activityFeedRequestSchema.safeParse({ limit: 0 }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ limit: 101 }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ cursor: "" }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ type: "BONUS" }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ targetUserId: "" }).success).toBe(false);
   });
 
   it("accepts soft-deleted point audit records", () => {

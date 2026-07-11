@@ -57,7 +57,7 @@ export async function readMembers(requestId: string = randomUUID()) {
 }
 
 export async function readActivityPage(
-  request: Pick<ActivityFeedRequest, "cursor" | "type"> = {},
+  request: Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId"> = {},
   requestId: string = randomUUID(),
 ): Promise<PagedActivityFeed> {
   await getCurrentUserForRequest(requestId);

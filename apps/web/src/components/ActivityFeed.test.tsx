@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { ActivityItem } from "@housepoints/contracts";
+import type { ActivityItem, OrgMember } from "@housepoints/contracts";
 import { ActivityFeed } from "./ActivityFeed";
 
 vi.mock("framer-motion", () => ({
@@ -43,11 +43,31 @@ const baseActivity: ActivityItem = {
   },
 };
 
+const members: OrgMember[] = [
+  {
+    id: "user-ben",
+    displayName: "Ben",
+    role: "MEMBER",
+    houseId: "house-1",
+    houseName: "Phoenix",
+    houseColor: "#7c3aed",
+  },
+  {
+    id: "user-cara",
+    displayName: "Cara",
+    role: "MEMBER",
+    houseId: "house-2",
+    houseName: "Orion",
+    houseColor: "#0ea5e9",
+  },
+];
+
 describe("ActivityFeed", () => {
   it("shows an empty state without a load-more button", () => {
     render(
       <ActivityFeed
         items={[]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
       />,
@@ -74,6 +94,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor="activity-1"
         onLoadMore={onLoadMore}
       />,
@@ -82,7 +103,7 @@ describe("ActivityFeed", () => {
     await user.click(screen.getByRole("button", { name: /load more/i }));
 
     expect(onLoadMore).toHaveBeenCalledWith({ cursor: "activity-1" });
-    expect(await screen.findByText("Cara")).toBeInTheDocument();
+    expect(await screen.findByText("Unblocked the release")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
   });
 
@@ -122,6 +143,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor={null}
         onLoadMore={onLoadMore}
       />,
@@ -142,6 +164,57 @@ describe("ActivityFeed", () => {
     expect(await screen.findByText("Late follow-up")).toBeInTheDocument();
   });
 
+  it("loads a server-backed member filtered page and keeps the filter for pagination", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "member-page-1",
+            targetUserName: "Ben",
+            reason: "Helped onboard the team",
+          },
+        ],
+        nextCursor: "member-page-1",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "member-page-2",
+            targetUserName: "Ben",
+            reason: "Made the sprint smoother",
+          },
+        ],
+        nextCursor: null,
+      });
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText(/member/i), "user-ben");
+
+    expect(onLoadMore).toHaveBeenCalledWith({ targetUserId: "user-ben" });
+    expect(await screen.findByText("Helped onboard the team")).toBeInTheDocument();
+    expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /load more activity/i }));
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      cursor: "member-page-1",
+      targetUserId: "user-ben",
+    });
+    expect(await screen.findByText("Made the sprint smoother")).toBeInTheDocument();
+  });
+
   it("keeps the cursor available and shows a safe error when loading fails", async () => {
     const user = userEvent.setup();
     const onLoadMore = vi.fn(async () => {
@@ -151,6 +224,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor="activity-1"
         onLoadMore={onLoadMore}
       />,
@@ -172,6 +246,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
         canDelete
@@ -202,6 +277,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
         canDelete
@@ -229,6 +305,7 @@ describe("ActivityFeed", () => {
             trait: null,
           },
         ]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
       />,

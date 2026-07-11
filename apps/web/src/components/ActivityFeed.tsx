@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { Clock } from "@phosphor-icons/react";
-import type { ActivityFeedRequest, ActivityItem, PagedActivityFeed, PointTransactionType } from "@housepoints/contracts";
+import type {
+  ActivityFeedRequest,
+  ActivityItem,
+  OrgMember,
+  PagedActivityFeed,
+  PointTransactionType,
+} from "@housepoints/contracts";
 import type { DeletePointResult } from "@/lib/action-results";
 import { ActivityCard } from "./ActivityCard";
 
@@ -16,14 +22,16 @@ const FILTER_OPTIONS: Array<{ value: ActivityTypeFilter; label: string; descript
 
 interface ActivityFeedProps {
   items: ActivityItem[];
+  members: OrgMember[];
   nextCursor: string | null;
-  onLoadMore: (request: Pick<ActivityFeedRequest, "cursor" | "type">) => Promise<PagedActivityFeed>;
+  onLoadMore: (request: Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId">) => Promise<PagedActivityFeed>;
   canDelete?: boolean;
   onDelete?: (transactionId: string) => Promise<DeletePointResult>;
 }
 
 export function ActivityFeed({
   items,
+  members,
   nextCursor,
   onLoadMore,
   canDelete = false,
@@ -36,8 +44,22 @@ export function ActivityFeed({
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ActivityTypeFilter>("ALL");
+  const [activeMemberId, setActiveMemberId] = useState("ALL");
 
-  const activeRequestType = activeFilter === "ALL" ? undefined : activeFilter;
+  function buildActivityRequest(options: {
+    cursor?: string;
+    type?: ActivityTypeFilter;
+    targetUserId?: string;
+  } = {}): Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId"> {
+    const typeFilter = options.type ?? activeFilter;
+    const memberId = options.targetUserId ?? activeMemberId;
+
+    return {
+      ...(options.cursor ? { cursor: options.cursor } : {}),
+      ...(typeFilter === "ALL" ? {} : { type: typeFilter }),
+      ...(memberId === "ALL" ? {} : { targetUserId: memberId }),
+    };
+  }
 
   async function handleFilterChange(nextFilter: ActivityTypeFilter) {
     if (nextFilter === activeFilter || isLoadingMore) {
@@ -50,7 +72,28 @@ export function ActivityFeed({
     setDeleteError(null);
 
     try {
-      const page = await onLoadMore(nextFilter === "ALL" ? {} : { type: nextFilter });
+      const page = await onLoadMore(buildActivityRequest({ type: nextFilter }));
+      setVisibleItems(page.items);
+      setCursor(page.nextCursor);
+    } catch {
+      setLoadMoreError("Activity could not be filtered. Please try again.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  async function handleMemberChange(nextMemberId: string) {
+    if (nextMemberId === activeMemberId || isLoadingMore) {
+      return;
+    }
+
+    setActiveMemberId(nextMemberId);
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    setDeleteError(null);
+
+    try {
+      const page = await onLoadMore(buildActivityRequest({ targetUserId: nextMemberId }));
       setVisibleItems(page.items);
       setCursor(page.nextCursor);
     } catch {
@@ -69,7 +112,7 @@ export function ActivityFeed({
     setLoadMoreError(null);
 
     try {
-      const page = await onLoadMore({ cursor, ...(activeRequestType ? { type: activeRequestType } : {}) });
+      const page = await onLoadMore(buildActivityRequest({ cursor }));
       setVisibleItems((current) => [...current, ...page.items]);
       setCursor(page.nextCursor);
     } catch {
@@ -116,6 +159,8 @@ export function ActivityFeed({
     }
   }
 
+  const hasActiveFilters = activeFilter !== "ALL" || activeMemberId !== "ALL";
+
   return (
     <div className="rounded-xl border bg-card">
       <div className="border-b p-6">
@@ -129,37 +174,55 @@ export function ActivityFeed({
               Recognition, deductions, and teammate moments across the organization.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2" aria-label="Activity filters">
-            {FILTER_OPTIONS.map((option) => {
-              const selected = option.value === activeFilter;
+          <div className="flex flex-col gap-3 sm:items-end">
+            <div className="flex flex-wrap gap-2" aria-label="Activity filters">
+              {FILTER_OPTIONS.map((option) => {
+                const selected = option.value === activeFilter;
 
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => void handleFilterChange(option.value)}
-                  aria-pressed={selected}
-                  disabled={isLoadingMore}
-                  title={option.description}
-                  className={[
-                    "rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
-                    selected
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:border-primary/30 hover:text-foreground",
-                    "disabled:cursor-wait disabled:opacity-60",
-                  ].join(" ")}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => void handleFilterChange(option.value)}
+                    aria-pressed={selected}
+                    disabled={isLoadingMore}
+                    title={option.description}
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
+                      selected
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                      "disabled:cursor-wait disabled:opacity-60",
+                    ].join(" ")}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="flex w-full flex-col gap-1 text-sm font-semibold text-muted-foreground sm:w-auto sm:flex-row sm:items-center sm:gap-2">
+              Member
+              <select
+                value={activeMemberId}
+                onChange={(event) => void handleMemberChange(event.target.value)}
+                disabled={isLoadingMore}
+                className="min-w-56 rounded-full border bg-background px-3 py-1.5 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+              >
+                <option value="ALL">All members</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
       </div>
       <div className="overflow-y-auto max-h-[500px] p-4 space-y-3">
         {visibleItems.length === 0 ? (
           <p className="text-center text-muted-foreground py-8 text-sm">
-            {activeFilter === "ALL"
+            {!hasActiveFilters
               ? "No team activity yet. Award some points!"
               : "No activity matches this filter yet."}
           </p>
