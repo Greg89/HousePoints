@@ -79,8 +79,8 @@ async function reactToAward(
     const card = getActivityCard(page, targetMember, note);
     await expect(card).toBeVisible();
 
-    await card.getByRole("button", { name: /react with great work/i }).click();
-    await expect(card.getByRole("button", { name: /remove great work reaction/i })).toHaveAttribute("aria-pressed", "true");
+    await card.getByRole("button", { name: /react with love it/i }).click();
+    await expect(card.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
     return reactionActorName;
   } finally {
@@ -107,7 +107,7 @@ async function expectRecipientNotification(
 
     await expect(notificationsDialog.getByText("Someone reacted to your recognition")).toBeVisible();
     await expect(
-      notificationsDialog.getByText(new RegExp(`${escapeRegExp(reactionActorName)} reacted with Great work\\.`, "i")),
+      notificationsDialog.getByText(new RegExp(`${escapeRegExp(reactionActorName)} reacted with Love it\\.`, "i")),
     ).toBeVisible();
   } finally {
     await context.close();

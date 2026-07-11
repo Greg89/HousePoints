@@ -294,6 +294,24 @@ describe("ActivityFeed", () => {
     expect(selectedReaction).toHaveTextContent("1");
   });
 
+  it("shows the compact reaction picker without the retired star option", () => {
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /react with applause/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with love it/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with on fire/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with celebrate/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /react with great work/i })).not.toBeInTheDocument();
+  });
+
   it("shows reaction details from the activity actions menu", async () => {
     const user = userEvent.setup();
     const onReadReactions = vi.fn(async () => ({

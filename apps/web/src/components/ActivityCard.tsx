@@ -28,6 +28,10 @@ const REACTION_EMOJI: Record<PointReactionKey, string> = {
   star: "⭐",
 };
 
+const VISIBLE_REACTION_KEYS = POINT_REACTION_KEYS.filter(
+  (reactionKey) => reactionKey !== "star",
+);
+
 function relativeTime(isoString: string) {
   const diff = Date.now() - new Date(isoString).getTime();
   const min = Math.floor(diff / 60_000);
@@ -108,17 +112,32 @@ export function ActivityCard({
     >
       <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_7rem_9rem] lg:items-center">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex flex-shrink-0 items-center gap-1.5 pt-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
-              {item.actorName[0]?.toUpperCase()}
+          <div className="flex flex-shrink-0 flex-col items-center gap-2 pt-1">
+            <div className="flex items-center gap-1.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
+                {item.actorName[0]?.toUpperCase()}
+              </div>
+              <ArrowRight className="text-muted-foreground" size={13} />
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
+                style={{ backgroundColor: item.targetHouseColor }}
+              >
+                {item.targetHouseName[0]?.toUpperCase()}
+              </div>
             </div>
-            <ArrowRight className="text-muted-foreground" size={13} />
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
-              style={{ backgroundColor: item.targetHouseColor }}
-            >
-              {item.targetHouseName[0]?.toUpperCase()}
-            </div>
+            {item.season ? (
+              <span
+                className={[
+                  "max-w-24 truncate rounded-full px-2 py-0.5 text-[0.65rem] font-medium",
+                  item.season.isActive
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-700",
+                ].join(" ")}
+                title={item.season.name}
+              >
+                {item.season.name}
+              </span>
+            ) : null}
           </div>
           <div className="min-w-0 leading-tight">
             <p className="truncate text-sm font-semibold">{item.actorName}</p>
@@ -149,38 +168,6 @@ export function ActivityCard({
               {relativeTime(item.createdAt)}
             </span>
           </div>
-          {canShowReactions ? (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label={`Reactions for ${item.targetUserName}`}>
-              {POINT_REACTION_KEYS.map((reactionKey) => {
-                const selected = item.myReactionKey === reactionKey;
-                const count = reactionCounts.get(reactionKey) ?? 0;
-                const label = selected
-                  ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
-                  : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
-
-                return (
-                  <button
-                    key={reactionKey}
-                    type="button"
-                    aria-label={label}
-                    aria-pressed={selected}
-                    disabled={isReacting}
-                    onClick={() => onReact?.(reactionKey)}
-                    className={[
-                      "inline-flex h-8 items-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
-                      selected
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
-                      "disabled:cursor-wait disabled:opacity-60",
-                    ].join(" ")}
-                  >
-                    <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
-                    {count > 0 ? <span>{count}</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
         </div>
 
         <div
@@ -200,22 +187,45 @@ export function ActivityCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          <div className="min-w-0">
-            {item.season ? (
-              <span
-                className={[
-                  "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                  item.season.isActive
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-amber-50 text-amber-700",
-                ].join(" ")}
-              >
-                {item.season.name}
-              </span>
-            ) : null}
-          </div>
-          <div className="flex flex-shrink-0 items-start gap-2">
+        <div className="flex items-start justify-between gap-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          {canShowReactions ? (
+            <div
+              className="grid min-w-0 grid-cols-2 gap-1.5"
+              aria-label={`Reactions for ${item.targetUserName}`}
+            >
+              {VISIBLE_REACTION_KEYS.map((reactionKey) => {
+                const selected = item.myReactionKey === reactionKey;
+                const count = reactionCounts.get(reactionKey) ?? 0;
+                const label = selected
+                  ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
+                  : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
+
+                return (
+                  <button
+                    key={reactionKey}
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={selected}
+                    disabled={isReacting}
+                    onClick={() => onReact?.(reactionKey)}
+                    className={[
+                      "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
+                      selected
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
+                      "disabled:cursor-wait disabled:opacity-60",
+                    ].join(" ")}
+                  >
+                    <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
+                    {count > 0 ? <span>{count}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="min-w-0" />
+          )}
+          <div className="flex flex-shrink-0 items-start">
             {hasActions ? (
               <div ref={actionsRef} className="relative">
                 <button

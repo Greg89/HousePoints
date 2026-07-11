@@ -40,14 +40,14 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await expect(page.getByText(note)).toBeVisible();
 
   const activityCard = page.locator("div").filter({ hasText: note }).filter({ hasText: targetMember }).first();
-  await activityCard.getByRole("button", { name: /react with great work/i }).click();
-  await expect(activityCard.getByRole("button", { name: /remove great work reaction/i })).toHaveAttribute("aria-pressed", "true");
+  await activityCard.getByRole("button", { name: /react with love it/i }).click();
+  await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
   await activityCard.getByRole("button", { name: /activity actions/i }).click();
   await page.getByRole("menuitem", { name: /view reactions/i }).click();
   const reactionsDialog = page.getByRole("dialog", { name: /reactions/i });
   await expect(reactionsDialog).toBeVisible();
-  await expect(reactionsDialog.getByText("Great work")).toBeVisible();
+  await expect(reactionsDialog.getByText("Love it")).toBeVisible();
   await expect(reactionsDialog.getByText(note)).toBeVisible();
   await reactionsDialog.getByRole("button", { name: /close reaction details/i }).click();
 

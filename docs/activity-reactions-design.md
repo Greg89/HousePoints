@@ -159,7 +159,8 @@ Recommended MVP keys:
 | `heart` | Love it |
 | `fire` | On fire |
 | `party` | Celebrate |
-| `star` | Great work |
+
+`star` / `Great work` remains accepted by the contract for compatibility with existing rows, but it is retired from the visible picker so the card can use a compact 2-by-2 reaction layout.
 
 ## API Contract
 
@@ -282,7 +283,7 @@ Replace the floating delete control with a three-dot actions menu. Keep delete b
 
 Add `PointReaction`, contracts, the reaction endpoint, and notification update logic.
 
-Current progress: the `PointReaction` model, partial unique index, controlled reaction keys, mutation/detail request schemas, mutation/detail response schemas, `/transactions/react` endpoint, `/transactions/reactions` detail endpoint, deduped recipient notification behavior, activity feed reaction summaries, inline activity card reaction controls, and the activity card `View reactions` detail dialog are in place.
+Current progress: the `PointReaction` model, partial unique index, controlled reaction keys, mutation/detail request schemas, mutation/detail response schemas, `/transactions/react` endpoint, `/transactions/reactions` detail endpoint, deduped recipient notification behavior, activity feed reaction summaries, compact 2-by-2 activity card reaction controls, and the activity card `View reactions` detail dialog are in place.
 
 ### Phase 3 - Read Model
 
