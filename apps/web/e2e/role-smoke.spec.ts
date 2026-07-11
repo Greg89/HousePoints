@@ -37,14 +37,15 @@ test("admin role can reach admin sections but not owner-only tabs", async ({ pag
   await expectDashboardReady(page);
 
   await page.getByRole("tab", { name: /manage/i }).click();
-  await expect(page.getByRole("navigation", { name: /manage sections/i })).toBeVisible();
+  const manageSections = page.getByRole("navigation", { name: /manage sections/i });
+  await expect(manageSections).toBeVisible();
 
-  await expect(page.getByRole("tab", { name: /^overview$/i })).toBeEnabled();
-  await expect(page.getByRole("tab", { name: /^members$/i })).toBeEnabled();
-  await expect(page.getByRole("tab", { name: /^audit$/i })).toBeEnabled();
+  await expect(manageSections.getByRole("tab", { name: /^overview$/i })).toBeEnabled();
+  await expect(manageSections.getByRole("tab", { name: /^members$/i })).toBeEnabled();
+  await expect(manageSections.getByRole("tab", { name: /^audit$/i })).toBeEnabled();
 
   for (const ownerOnlyTab of [/^roles$/i, /^houses$/i, /^seasons$/i, /^settings$/i]) {
-    const tab = page.getByRole("tab", { name: ownerOnlyTab });
+    const tab = manageSections.getByRole("tab", { name: ownerOnlyTab });
     await expect(tab).toBeVisible();
     await expect(tab).toHaveAttribute("aria-disabled", "true");
     await expect(tab).toBeDisabled();
@@ -61,10 +62,11 @@ test("owner role can reach owner-only manage tabs", async ({ page }) => {
   await expectDashboardReady(page);
 
   await page.getByRole("tab", { name: /manage/i }).click();
-  await expect(page.getByRole("navigation", { name: /manage sections/i })).toBeVisible();
+  const manageSections = page.getByRole("navigation", { name: /manage sections/i });
+  await expect(manageSections).toBeVisible();
 
   for (const ownerOnlyTab of [/^roles$/i, /^houses$/i, /^seasons$/i, /^settings$/i]) {
-    const tab = page.getByRole("tab", { name: ownerOnlyTab });
+    const tab = manageSections.getByRole("tab", { name: ownerOnlyTab });
     await expect(tab).toBeVisible();
     await expect(tab).toBeEnabled();
   }
