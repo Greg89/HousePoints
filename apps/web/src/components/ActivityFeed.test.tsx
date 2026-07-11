@@ -53,7 +53,7 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    expect(screen.getByText("No activity yet. Award some points!")).toBeInTheDocument();
+    expect(screen.getByText("No team activity yet. Award some points!")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
   });
 
@@ -81,9 +81,65 @@ describe("ActivityFeed", () => {
 
     await user.click(screen.getByRole("button", { name: /load more/i }));
 
-    expect(onLoadMore).toHaveBeenCalledWith("activity-1");
+    expect(onLoadMore).toHaveBeenCalledWith({ cursor: "activity-1" });
     expect(await screen.findByText("Cara")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it("loads a server-backed filtered page and keeps the filter for pagination", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "deduction-1",
+            type: "DEDUCTION",
+            targetUserName: "Dana",
+            delta: -10,
+            reason: "Missed handoff",
+            trait: null,
+          },
+        ],
+        nextCursor: "deduction-1",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "deduction-2",
+            type: "DEDUCTION",
+            targetUserName: "Evan",
+            delta: -10,
+            reason: "Late follow-up",
+            trait: null,
+          },
+        ],
+        nextCursor: null,
+      });
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        nextCursor={null}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /deductions/i }));
+
+    expect(onLoadMore).toHaveBeenCalledWith({ type: "DEDUCTION" });
+    expect(await screen.findByText("Missed handoff")).toBeInTheDocument();
+    expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /load more activity/i }));
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      cursor: "deduction-1",
+      type: "DEDUCTION",
+    });
+    expect(await screen.findByText("Late follow-up")).toBeInTheDocument();
   });
 
   it("keeps the cursor available and shows a safe error when loading fails", async () => {

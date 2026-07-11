@@ -6,6 +6,7 @@ import {
   deletePointTransactionSchema,
   deductPointsSchema,
   seasonScopedRequestSchema,
+  type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -258,9 +259,16 @@ export async function listTransactions(params: {
   organizationId: string;
   limit: number;
   cursor?: string;
+  type?: PointTransactionType;
 }) {
+  const where: Prisma.PointTransactionWhereInput = {
+    organizationId: params.organizationId,
+    deletedAt: null,
+    ...(params.type ? { type: params.type } : {}),
+  };
+
   const transactions = await prisma.pointTransaction.findMany({
-    where: { organizationId: params.organizationId, deletedAt: null },
+    where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: params.limit + 1,
     ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
@@ -586,6 +594,7 @@ export async function registerPointRoutes(
       organizationId: actor.organizationId,
       limit: parsed.limit,
       cursor: parsed.cursor,
+      type: parsed.type,
     });
     const nextCursor = hasNextPage ? items.at(-1)?.id ?? null : null;
 

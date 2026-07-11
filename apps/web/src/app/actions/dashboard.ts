@@ -7,6 +7,7 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  type ActivityFeedRequest,
   type DashboardSummary,
   type PagedActivityFeed,
 } from "@housepoints/contracts";
@@ -56,13 +57,13 @@ export async function readMembers(requestId: string = randomUUID()) {
 }
 
 export async function readActivityPage(
-  cursor?: string,
+  request: Pick<ActivityFeedRequest, "cursor" | "type"> = {},
   requestId: string = randomUUID(),
 ): Promise<PagedActivityFeed> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
-    body: JSON.stringify(cursor ? { cursor } : {}),
+    body: JSON.stringify(request),
   });
   return parseApiResponse(
     response,
@@ -72,7 +73,7 @@ export async function readActivityPage(
 }
 
 export async function readActivityFeed(requestId: string = randomUUID()) {
-  const page = await readActivityPage(undefined, requestId);
+  const page = await readActivityPage({}, requestId);
   return activityFeedSchema.parse(page.items);
 }
 

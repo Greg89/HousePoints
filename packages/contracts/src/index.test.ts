@@ -958,9 +958,14 @@ describe("dashboard response schemas", () => {
       cursor: "tx-1",
       limit: 25,
     });
+    expect(activityFeedRequestSchema.parse({ type: "DEDUCTION" })).toEqual({
+      limit: 50,
+      type: "DEDUCTION",
+    });
     expect(activityFeedRequestSchema.safeParse({ limit: 0 }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ limit: 101 }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ cursor: "" }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ type: "BONUS" }).success).toBe(false);
   });
 
   it("accepts soft-deleted point audit records", () => {

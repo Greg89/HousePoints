@@ -41,6 +41,7 @@ import type {
   SeasonContext,
   Trait,
   AppUserOrganizationContext,
+  ActivityFeedRequest,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -62,7 +63,7 @@ interface DashboardShellProps {
   members: OrgMember[];
   activity: ActivityItem[];
   activityNextCursor: string | null;
-  onLoadMoreActivity: (cursor: string) => Promise<PagedActivityFeed>;
+  onLoadMoreActivity: (request: Pick<ActivityFeedRequest, "cursor" | "type">) => Promise<PagedActivityFeed>;
   /** Computed per-member point totals from activity */
   memberPoints: MemberScore[];
   dashboardSummary: DashboardSummary;

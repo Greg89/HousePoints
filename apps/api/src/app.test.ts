@@ -4512,6 +4512,31 @@ describe("POST /transactions/recent", () => {
     await app.close();
   });
 
+  it("filters activity by transaction type before paging", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { type: "DEDUCTION", limit: 10 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTxFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-1",
+          deletedAt: null,
+          type: "DEDUCTION",
+        },
+        take: 11,
+      }),
+    );
+    await app.close();
+  });
+
   it("returns trait as null when transaction has no trait", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockTxFindMany.mockResolvedValue([
