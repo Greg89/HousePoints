@@ -3,6 +3,7 @@ import { missingRequiredEnv, readTargetMemberName, requiredStagingEnv } from "./
 import { exactNamePattern, signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
 import { gotoE2EStart } from "./support/navigation";
+import { selectMemberFromCombobox } from "./support/member-picker";
 
 const missingEnv = missingRequiredEnv(requiredStagingEnv);
 
@@ -23,8 +24,7 @@ test("login, award points, and see activity plus leaderboard updates", async ({ 
   await page.getByRole("button", { name: /award points/i }).first().click();
   const dialog = page.getByRole("dialog", { name: /award points/i });
 
-  await dialog.getByText(/select a team member/i).click();
-  await page.getByRole("option", { name: exactNamePattern(targetMember) }).click();
+  await selectMemberFromCombobox(page, dialog, /recipient/i, targetMember);
 
   await dialog.getByRole("button", { name: "+5", exact: true }).click();
 

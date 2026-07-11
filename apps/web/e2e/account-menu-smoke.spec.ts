@@ -11,27 +11,19 @@ test.skip(
   `Missing E2E environment variables: ${missingEnv.join(", ")}`,
 );
 
-test("account menu exposes org scope, notifications, and account actions", async ({ page }) => {
+test("account menu exposes account actions and release notes access", async ({ page }) => {
   await gotoE2EStart(page);
   await signInIfNeeded(page);
 
   await expectDashboardReady(page);
 
   await page.getByRole("button", { name: /account menu/i }).click();
-  const accountMenu = page.getByRole("dialog", { name: /account and notifications/i });
+  const accountMenu = page.getByRole("dialog", { name: /^account$/i });
 
   await expect(accountMenu).toBeVisible();
   await expect(accountMenu.getByText(/signed in/i)).toBeVisible();
-  await expect(accountMenu.getByRole("heading", { name: /notifications/i })).toBeVisible();
-  await expect(accountMenu.getByRole("button", { name: /mark all read/i })).toBeVisible();
-  await expect(accountMenu.getByRole("link", { name: /^account$/i })).toBeVisible();
+  await expect(accountMenu.getByRole("link", { name: /account settings/i })).toBeVisible();
   await expect(accountMenu.getByRole("link", { name: /sign out/i })).toBeVisible();
-
-  const organizationSwitcher = accountMenu.getByRole("region", { name: /switch organization/i });
-  if (await organizationSwitcher.isVisible().catch(() => false)) {
-    await expect(organizationSwitcher.getByText(/notifications and dashboard data follow/i)).toBeVisible();
-    await expect(organizationSwitcher.getByText(/current/i).first()).toBeVisible();
-  }
 
   const whatsNewLink = accountMenu.getByRole("link", { name: /what'?s new/i });
   if (await whatsNewLink.isVisible().catch(() => false)) {

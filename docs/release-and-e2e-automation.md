@@ -138,7 +138,7 @@ The E2E account should not be a real user. If tests mutate data, the staging org
 
 Grow the suite slowly:
 
-1. Smoke: login, dashboard render, primary tabs navigate, account menu renders, notifications are reachable, and Manage renders when available.
+1. Smoke: login, dashboard render, primary tabs navigate, account menu renders, notifications are reachable, and role-specific Manage access is enforced.
 2. Core: award points, Activity shows the transaction, Leaderboard shows the target.
 3. Team: generate invite, assign house, promote/demote admin.
 4. Seasons: switch historical season and verify reports/standings update.
@@ -165,5 +165,5 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A3 - Production notification broadcast | Implemented | Secret-protected broadcast endpoint and manual workflow handoff implemented. |
 | A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
-| B2 - Test data contract | In progress | First staging data contract documented and centralized in Playwright config helpers; dedicated owner/admin/member actors remain future work. |
-| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, and Manage Audit smoke coverage added. |
+| B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; optional owner/admin actors now power role smoke coverage. |
+| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, role access, and Manage Audit smoke coverage added. |

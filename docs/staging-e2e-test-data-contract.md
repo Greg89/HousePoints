@@ -31,7 +31,21 @@ Required staging state when configured:
 
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
-- The user has an `ADMIN` or `OWNER` role so Manage and Audit are visible.
+- The user has an `ADMIN` role so Manage and Audit are visible while owner-only tabs remain disabled.
+- The user has a house assignment so the dashboard renders normally.
+
+### Optional Owner E2E User
+
+GitHub Environment secrets:
+
+- `E2E_OWNER_EMAIL`
+- `E2E_OWNER_PASSWORD`
+
+Required staging state when configured:
+
+- The user can authenticate through the staging Auth0 application.
+- The user belongs to the staging E2E organization.
+- The user has an `OWNER` role so owner-only Manage tabs are enabled.
 - The user has a house assignment so the dashboard renders normally.
 
 ### Target Member
@@ -68,37 +82,30 @@ The staging E2E organization should contain:
 
 The mutating happy-path test intentionally creates point activity. The staging organization should tolerate this accumulated history. If that history becomes noisy, add a reset or cleanup job before making scheduled E2E failures block releases.
 
-The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. Multi-organization switching and the What's New link are asserted only when those controls are visible in the target environment, so staging can enable those product surfaces without adding new required secrets.
+The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. The What's New link is asserted only when that control is visible in the target environment, so staging can enable that product surface without adding new required secrets.
 
 The read-only Manage Audit smoke test uses `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` when they are configured. If those optional secrets are missing, that spec skips cleanly while the member-level smoke and happy-path tests continue to run.
 
-## Future Actor Expansion
+## Role Smoke Coverage
 
-The next E2E expansion should add dedicated owner and admin actors instead of reusing one broad account for every permission level.
+Dedicated owner/admin/member smoke coverage is intentionally split by actor:
 
-Recommended future GitHub Environment secrets:
+- Primary member actor: dashboard read path and member-level point award access.
+- Optional admin actor: admin Manage sections, including members and audit, with owner-only tabs visible but disabled.
+- Optional owner actor: owner-only Manage tabs enabled.
 
-- `E2E_OWNER_EMAIL`
-- `E2E_OWNER_PASSWORD`
-- `E2E_ADMIN_EMAIL`
-- `E2E_ADMIN_PASSWORD`
-- `E2E_MEMBER_EMAIL`
-- `E2E_MEMBER_PASSWORD`
-
-Recommended role split:
-
-- Owner actor: org configuration, houses, seasons, ownership-only controls.
-- Admin actor: point awards, point deductions, team assignment, invite generation.
-- Member actor: dashboard read path, notification center, profile settings.
-
-Do not add these secrets to the workflow as required until tests use them. Required-but-unused secrets make the scheduled monitor harder to operate.
+The admin and owner credentials remain optional so local runs and partially configured environments skip those slices cleanly. In the staging GitHub Environment, configure both optional actors when you want the full permission smoke suite to run.
 
 ## Local Run
 
 ```powershell
 $env:E2E_BASE_URL = "https://your-staging-web-url"
-$env:E2E_USER_EMAIL = "test-admin@example.com"
+$env:E2E_USER_EMAIL = "test-member@example.com"
 $env:E2E_USER_PASSWORD = "test-password"
+$env:E2E_ADMIN_EMAIL = "test-admin@example.com"
+$env:E2E_ADMIN_PASSWORD = "test-password"
+$env:E2E_OWNER_EMAIL = "test-owner@example.com"
+$env:E2E_OWNER_PASSWORD = "test-password"
 $env:E2E_TARGET_MEMBER = "Stable Target Member"
 $env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
