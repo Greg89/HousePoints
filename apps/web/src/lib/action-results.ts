@@ -15,6 +15,9 @@ export type CreateOrgResult =
   | Extract<MutationResult, { ok: false }>;
 export type DeletePointResult = MutationResult;
 export type DeductPointsResult = MutationResult;
+export type PointReactionResult<PointReactionResponse> =
+  | { ok: true; reaction: PointReactionResponse }
+  | Extract<MutationResult, { ok: false }>;
 export type HouseAssignmentResult = MutationResult;
 export type HouseMutationResult = MutationResult;
 export type JoinOrgResult = MutationResult;

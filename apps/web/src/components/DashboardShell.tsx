@@ -27,7 +27,7 @@ import { OverviewReports } from "./OverviewReports";
 import { SeasonComparisonReport } from "./SeasonComparisonReport";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import { DeductPointsDialog } from "./DeductPointsDialog";
-import type { AwardPointsResult, DeductPointsResult, DeletePointResult, NotificationMutationResult } from "@/lib/action-results";
+import type { AwardPointsResult, DeductPointsResult, DeletePointResult, NotificationMutationResult, PointReactionResult } from "@/lib/action-results";
 import { resolveHouseThemeStyle } from "@/lib/house-theme";
 import type {
   DashboardSummary,
@@ -40,6 +40,8 @@ import type {
   SeasonComparison,
   SeasonContext,
   Trait,
+  PointReactionKey,
+  PointReactionResponse,
   AppUserOrganizationContext,
   ActivityFeedRequest,
 } from "@housepoints/contracts";
@@ -82,6 +84,10 @@ interface DashboardShellProps {
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
+  onReactToPoint: (
+    transactionId: string,
+    reactionKey: PointReactionKey | null,
+  ) => Promise<PointReactionResult<PointReactionResponse>>;
   dashboardHref: string;
   loginUrl: string;
   logoutUrl: string;
@@ -190,6 +196,7 @@ export function DashboardShell({
   onAward,
   onDeduct,
   onDeletePoint,
+  onReactToPoint,
   dashboardHref,
   logoutUrl,
   releaseNotesUrl,
@@ -587,6 +594,7 @@ export function DashboardShell({
               onLoadMore={onLoadMoreActivity}
               canDelete={session.role === "ADMIN" || session.role === "OWNER"}
               onDelete={onDeletePoint}
+              onReact={onReactToPoint}
             />
           </Tabs.Content>
 

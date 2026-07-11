@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, DotsThreeVertical, Trash } from "@phosphor-icons/react";
-import type { ActivityItem } from "@housepoints/contracts";
-import { TRAIT_LABELS } from "@housepoints/contracts";
+import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
+import { POINT_REACTION_KEYS, POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
 
 interface ActivityCardProps {
   item: ActivityItem;
@@ -12,7 +12,18 @@ interface ActivityCardProps {
   canDelete: boolean;
   isDeleting: boolean;
   onDelete: () => void;
+  canReact?: boolean;
+  isReacting?: boolean;
+  onReact?: (reactionKey: PointReactionKey) => void;
 }
+
+const REACTION_EMOJI: Record<PointReactionKey, string> = {
+  clap: "👏",
+  heart: "❤️",
+  fire: "🔥",
+  party: "🎉",
+  star: "⭐",
+};
 
 function relativeTime(isoString: string) {
   const diff = Date.now() - new Date(isoString).getTime();
@@ -31,6 +42,9 @@ export function ActivityCard({
   canDelete,
   isDeleting,
   onDelete,
+  canReact = false,
+  isReacting = false,
+  onReact,
 }: ActivityCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -39,6 +53,10 @@ export function ActivityCard({
   const actionLabel = isDeduction ? "deducted" : "recognized";
   const actionsMenuId = `activity-actions-${item.id}`;
   const hasActions = canDelete;
+  const canShowReactions = canReact && !isDeduction && Boolean(onReact);
+  const reactionCounts = new Map(
+    (item.reactions ?? []).map((reaction) => [reaction.reactionKey, reaction.count]),
+  );
   const pointTone = isDeduction
     ? {
         badge: "border-destructive/20 bg-destructive/10 text-destructive",
@@ -125,6 +143,38 @@ export function ActivityCard({
               {relativeTime(item.createdAt)}
             </span>
           </div>
+          {canShowReactions ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label={`Reactions for ${item.targetUserName}`}>
+              {POINT_REACTION_KEYS.map((reactionKey) => {
+                const selected = item.myReactionKey === reactionKey;
+                const count = reactionCounts.get(reactionKey) ?? 0;
+                const label = selected
+                  ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
+                  : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
+
+                return (
+                  <button
+                    key={reactionKey}
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={selected}
+                    disabled={isReacting}
+                    onClick={() => onReact?.(reactionKey)}
+                    className={[
+                      "inline-flex h-8 items-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
+                      selected
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
+                      "disabled:cursor-wait disabled:opacity-60",
+                    ].join(" ")}
+                  >
+                    <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
+                    {count > 0 ? <span>{count}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
 
         <div

@@ -7,9 +7,11 @@ import type {
   ActivityItem,
   OrgMember,
   PagedActivityFeed,
+  PointReactionKey,
+  PointReactionResponse,
   PointTransactionType,
 } from "@housepoints/contracts";
-import type { DeletePointResult } from "@/lib/action-results";
+import type { DeletePointResult, PointReactionResult } from "@/lib/action-results";
 import { ActivityCard } from "./ActivityCard";
 
 type ActivityTypeFilter = "ALL" | PointTransactionType;
@@ -27,6 +29,10 @@ interface ActivityFeedProps {
   onLoadMore: (request: Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId">) => Promise<PagedActivityFeed>;
   canDelete?: boolean;
   onDelete?: (transactionId: string) => Promise<DeletePointResult>;
+  onReact?: (
+    transactionId: string,
+    reactionKey: PointReactionKey | null,
+  ) => Promise<PointReactionResult<PointReactionResponse>>;
 }
 
 export function ActivityFeed({
@@ -36,6 +42,7 @@ export function ActivityFeed({
   onLoadMore,
   canDelete = false,
   onDelete,
+  onReact,
 }: ActivityFeedProps) {
   const [visibleItems, setVisibleItems] = useState(items);
   const [cursor, setCursor] = useState(nextCursor);
@@ -43,6 +50,8 @@ export function ActivityFeed({
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reactingIds, setReactingIds] = useState<Set<string>>(() => new Set());
+  const [reactionError, setReactionError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ActivityTypeFilter>("ALL");
   const [activeMemberId, setActiveMemberId] = useState("ALL");
 
@@ -159,6 +168,45 @@ export function ActivityFeed({
     }
   }
 
+  async function handleReact(item: ActivityItem, reactionKey: PointReactionKey) {
+    if (!onReact || reactingIds.has(item.id) || item.type !== "AWARD") {
+      return;
+    }
+
+    const nextReactionKey = item.myReactionKey === reactionKey ? null : reactionKey;
+    setReactionError(null);
+    setReactingIds((current) => new Set(current).add(item.id));
+
+    try {
+      const result = await onReact(item.id, nextReactionKey);
+
+      if (!result.ok) {
+        setReactionError(result.message);
+        return;
+      }
+
+      setVisibleItems((current) =>
+        current.map((visibleItem) =>
+          visibleItem.id === item.id
+            ? {
+                ...visibleItem,
+                myReactionKey: result.reaction.myReactionKey,
+                reactions: result.reaction.reactions,
+              }
+            : visibleItem,
+        ),
+      );
+    } catch {
+      setReactionError("Reaction could not be saved. Please try again.");
+    } finally {
+      setReactingIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }
+
   const hasActiveFilters = activeFilter !== "ALL" || activeMemberId !== "ALL";
 
   return (
@@ -235,6 +283,9 @@ export function ActivityFeed({
               canDelete={canDelete && Boolean(onDelete)}
               isDeleting={deletingIds.has(item.id)}
               onDelete={() => handleDelete(item)}
+              canReact={Boolean(onReact)}
+              isReacting={reactingIds.has(item.id)}
+              onReact={(reactionKey) => handleReact(item, reactionKey)}
             />
           ))
         )}
@@ -246,6 +297,11 @@ export function ActivityFeed({
         {deleteError ? (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {deleteError}
+          </p>
+        ) : null}
+        {reactionError ? (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {reactionError}
           </p>
         ) : null}
         {cursor ? (

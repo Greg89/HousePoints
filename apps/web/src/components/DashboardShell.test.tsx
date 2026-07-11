@@ -278,6 +278,14 @@ const baseProps = {
     items: [],
     nextCursor: null,
   })),
+  onReactToPoint: vi.fn(async () => ({
+    ok: true as const,
+    reaction: {
+      transactionId: "activity-1",
+      myReactionKey: null,
+      reactions: [],
+    },
+  })),
   memberPoints: [
     { memberId: "member-2", points: 25 },
     { memberId: "member-1", points: 5 },

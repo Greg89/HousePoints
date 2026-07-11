@@ -265,6 +265,113 @@ describe("ActivityFeed", () => {
     confirmSpy.mockRestore();
   });
 
+  it("lets a user react to an award and updates the card summary", async () => {
+    const user = userEvent.setup();
+    const onReact = vi.fn(async () => ({
+      ok: true as const,
+      reaction: {
+        transactionId: "activity-1",
+        myReactionKey: "heart" as const,
+        reactions: [{ reactionKey: "heart" as const, count: 1 }],
+      },
+    }));
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={onReact}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /react with love it/i }));
+
+    await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", "heart"));
+    const selectedReaction = await screen.findByRole("button", { name: /remove love it reaction/i });
+    expect(selectedReaction).toHaveAttribute("aria-pressed", "true");
+    expect(selectedReaction).toHaveTextContent("1");
+  });
+
+  it("sends null when the selected reaction is clicked again", async () => {
+    const user = userEvent.setup();
+    const onReact = vi.fn(async () => ({
+      ok: true as const,
+      reaction: {
+        transactionId: "activity-1",
+        myReactionKey: null,
+        reactions: [],
+      },
+    }));
+
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            myReactionKey: "heart",
+            reactions: [{ reactionKey: "heart", count: 1 }],
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={onReact}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /remove love it reaction/i }));
+
+    await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", null));
+    expect(await screen.findByRole("button", { name: /react with love it/i })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shows a safe error when a reaction mutation fails", async () => {
+    const user = userEvent.setup();
+    const onReact = vi.fn(async () => ({
+      ok: false as const,
+      code: "POINT_TRANSACTION_NOT_FOUND",
+      message: "Point transaction was not found",
+    }));
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={onReact}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /react with applause/i }));
+
+    expect(await screen.findByText("Point transaction was not found")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with applause/i })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("does not show reaction controls for deductions", () => {
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            type: "DEDUCTION",
+            delta: -10,
+            trait: null,
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /react with/i })).not.toBeInTheDocument();
+  });
+
   it("shows a safe error when deletion returns an expected failure", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();

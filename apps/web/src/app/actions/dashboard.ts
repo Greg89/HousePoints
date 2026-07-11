@@ -7,11 +7,16 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  pointReactionResponseSchema,
+  type PointReactionKey,
+  type PointReactionResponse,
   type ActivityFeedRequest,
   type DashboardSummary,
   type PagedActivityFeed,
 } from "@housepoints/contracts";
-import { apiFetch, parseApiResponse } from "@/lib/api-client";
+import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
+import type { PointReactionResult } from "@/lib/action-results";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 
 export async function readLeaderboard(requestId: string = randomUUID()) {
@@ -75,6 +80,58 @@ export async function readActivityPage(
 export async function readActivityFeed(requestId: string = randomUUID()) {
   const page = await readActivityPage({}, requestId);
   return activityFeedSchema.parse(page.items);
+}
+
+export async function reactToPointTransaction(
+  transactionId: string,
+  reactionKey: PointReactionKey | null,
+): Promise<PointReactionResult<PointReactionResponse>> {
+  return runServerAction("reactToPointTransaction", async (context) => {
+    const { requestId } = context;
+    const trimmedTransactionId = transactionId.trim();
+
+    if (!trimmedTransactionId) {
+      return {
+        ok: false,
+        code: "POINT_TRANSACTION_REQUIRED",
+        message: "Point transaction is required.",
+      };
+    }
+
+    await getCurrentUserForRequest(requestId);
+    const response = await apiFetch("/transactions/react", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        transactionId: trimmedTransactionId,
+        reactionKey,
+      }),
+    });
+
+    try {
+      const reaction = await parseApiResponse(
+        response,
+        pointReactionResponseSchema,
+        "Reaction could not be saved. Please try again.",
+      );
+
+      return { ok: true, reaction };
+    } catch (error) {
+      if (!(error instanceof ApiResponseError) || error.statusCode < 400 || error.statusCode >= 500) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        transactionId: trimmedTransactionId,
+        reactionKey,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
 }
 
 export async function readDashboardSummary(
