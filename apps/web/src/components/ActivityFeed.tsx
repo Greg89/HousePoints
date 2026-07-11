@@ -169,6 +169,15 @@ function ActivityCard({
   const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
   const actionsMenuId = `activity-actions-${item.id}`;
   const hasActions = canDelete;
+  const pointTone = isDeduction
+    ? {
+        badge: "border-destructive/20 bg-destructive/10 text-destructive",
+        label: "text-destructive",
+      }
+    : {
+        badge: "border-primary/20 bg-primary/10 text-primary",
+        label: "text-primary",
+      };
 
   useEffect(() => {
     if (!actionsOpen) {
@@ -203,8 +212,8 @@ function ActivityCard({
       transition={{ delay: index * 0.04, duration: 0.2 }}
       className="rounded-xl border bg-card/70 p-4 transition-colors hover:bg-muted/20"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_11rem]">
+        <div className="flex min-w-0 items-start gap-3 lg:gap-4">
           <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
             {item.actorName[0]?.toUpperCase()}
           </div>
@@ -224,87 +233,98 @@ function ActivityCard({
                   Deducted
                 </span>
               ) : null}
-              <span
-                className="font-number font-bold px-1.5 py-0.5 rounded text-xs"
-                style={{
-                  backgroundColor: isDeduction ? "rgb(254 226 226)" : `${item.targetHouseColor}20`,
-                  color: isDeduction ? "rgb(185 28 28)" : item.targetHouseColor,
-                }}
-              >
-                {deltaLabel}
-              </span>
+              <span className="text-muted-foreground">points</span>
               <span className="text-muted-foreground">to</span>
               <span className="font-semibold">{item.targetUserName}</span>
               <span className="text-muted-foreground text-xs">({item.targetHouseName})</span>
             </div>
             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.reason}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {item.trait ? (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  {TRAIT_LABELS[item.trait]}
+                </span>
+              ) : null}
+              <span className="text-xs text-muted-foreground">
+                {relativeTime(item.createdAt)}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-shrink-0 items-start gap-2">
-          {item.season ? (
-            <span
+        <div className="flex items-center justify-between gap-3 border-t pt-3 lg:items-start lg:justify-end lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <div className="flex items-center gap-3 lg:flex-col lg:items-end">
+            <div
               className={[
-                "rounded-full px-2 py-0.5 text-xs font-medium",
-                item.season.isActive
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700",
+                "min-w-20 rounded-2xl border px-3 py-2 text-center",
+                pointTone.badge,
               ].join(" ")}
             >
-              {item.season.name}
-            </span>
-          ) : null}
-          {hasActions ? (
-            <div ref={actionsRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setActionsOpen((current) => !current)}
-                aria-label={`Activity actions for ${item.targetUserName}`}
-                aria-haspopup="menu"
-                aria-expanded={actionsOpen}
-                aria-controls={actionsMenuId}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+              <div className="font-number text-2xl font-bold leading-none">{deltaLabel}</div>
+              <div
+                className={[
+                  "mt-1 text-[0.65rem] font-semibold uppercase tracking-wide",
+                  pointTone.label,
+                ].join(" ")}
               >
-                <DotsThreeVertical size={18} weight="bold" />
-              </button>
-              {actionsOpen ? (
-                <div
-                  id={actionsMenuId}
-                  role="menu"
-                  aria-label={`Activity actions for ${item.targetUserName}`}
-                  className="absolute right-0 z-20 mt-2 w-52 rounded-xl border bg-card p-1 shadow-lg"
-                >
-                  {canDelete ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setActionsOpen(false);
-                        onDelete();
-                      }}
-                      disabled={isDeleting}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-wait disabled:opacity-50"
-                    >
-                      <Trash size={16} />
-                      Delete point transaction
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+                points
+              </div>
             </div>
-          ) : null}
+            {item.season ? (
+              <span
+                className={[
+                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  item.season.isActive
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-700",
+                ].join(" ")}
+              >
+                {item.season.name}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-shrink-0 items-start gap-2">
+            {hasActions ? (
+              <div ref={actionsRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setActionsOpen((current) => !current)}
+                  aria-label={`Activity actions for ${item.targetUserName}`}
+                  aria-haspopup="menu"
+                  aria-expanded={actionsOpen}
+                  aria-controls={actionsMenuId}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                >
+                  <DotsThreeVertical size={18} weight="bold" />
+                </button>
+                {actionsOpen ? (
+                  <div
+                    id={actionsMenuId}
+                    role="menu"
+                    aria-label={`Activity actions for ${item.targetUserName}`}
+                    className="absolute right-0 z-20 mt-2 w-52 rounded-xl border bg-card p-1 shadow-lg"
+                  >
+                    {canDelete ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setActionsOpen(false);
+                          onDelete();
+                        }}
+                        disabled={isDeleting}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-wait disabled:opacity-50"
+                      >
+                        <Trash size={16} />
+                        Delete point transaction
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-        {item.trait ? (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-            {TRAIT_LABELS[item.trait]}
-          </span>
-        ) : null}
-        <span className="text-xs text-muted-foreground">
-          {relativeTime(item.createdAt)}
-        </span>
       </div>
     </motion.div>
   );

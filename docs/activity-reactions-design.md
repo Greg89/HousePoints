@@ -242,6 +242,7 @@ Recommended first visual direction:
 
 - make actor, action, recipient, points, trait, and timestamp easier to scan;
 - keep season and card actions in predictable card corners;
+- promote the point delta into a right-side summary rail on wider screens;
 - move secondary metadata into a compact footer row;
 - reserve the footer/right side for reactions.
 
