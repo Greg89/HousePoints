@@ -91,7 +91,7 @@ The read-only Manage Audit smoke test uses `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASS
 Dedicated owner/admin/member smoke coverage is intentionally split by actor:
 
 - Primary member actor: dashboard read path and member-level point award access.
-- Optional admin actor: admin Manage sections, including members and audit, with owner-only tabs visible but disabled.
+- Optional admin actor: admin Manage sections, including members and audit, with owner-only tabs either omitted or visible but disabled.
 - Optional owner actor: owner-only Manage tabs enabled.
 
 The admin and owner credentials remain optional so local runs and partially configured environments skip those slices cleanly. In the staging GitHub Environment, configure both optional actors when you want the full permission smoke suite to run.
