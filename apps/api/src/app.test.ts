@@ -5103,6 +5103,143 @@ describe("POST /transactions/react", () => {
   });
 });
 
+describe("POST /transactions/reactions", () => {
+  const awardTransaction = {
+    id: "tx-1",
+    organizationId: "org-1",
+    targetUserId: "user-target",
+    type: "AWARD",
+    deletedAt: null,
+  };
+
+  it("returns active reaction details for an award in the actor's organization", async () => {
+    const createdAt = new Date("2026-06-25T12:00:00.000Z");
+    const updatedAt = new Date("2026-06-25T12:05:00.000Z");
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue(awardTransaction);
+    mockPointReactionFindMany.mockResolvedValue([
+      {
+        id: "reaction-1",
+        actorUserId: "user-2",
+        reactionKey: "party",
+        createdAt,
+        updatedAt,
+        actor: { displayName: "Caitlin Swanson" },
+      },
+      {
+        id: "reaction-2",
+        actorUserId: "user-3",
+        reactionKey: "unknown-reaction",
+        createdAt,
+        updatedAt,
+        actor: { displayName: "Skipped User" },
+      },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      transactionId: "tx-1",
+      reactions: [
+        {
+          id: "reaction-1",
+          reactionKey: "party",
+          actorUserId: "user-2",
+          actorName: "Caitlin Swanson",
+          createdAt: createdAt.toISOString(),
+          updatedAt: updatedAt.toISOString(),
+        },
+      ],
+    });
+    expect(mockTxFindUnique).toHaveBeenCalledWith({
+      where: { id: "tx-1" },
+      select: {
+        id: true,
+        organizationId: true,
+        targetUserId: true,
+        type: true,
+        deletedAt: true,
+      },
+    });
+    expect(mockPointReactionFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        pointTransactionId: "tx-1",
+        deletedAt: null,
+      },
+      orderBy: [
+        { updatedAt: "desc" },
+        { id: "desc" },
+      ],
+      select: {
+        id: true,
+        actorUserId: true,
+        reactionKey: true,
+        createdAt: true,
+        updatedAt: true,
+        actor: { select: { displayName: true } },
+      },
+    });
+    await app.close();
+  });
+
+  it("returns not found for missing, deleted, or cross-org transactions", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, organizationId: "org-other" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("POINT_TRANSACTION_NOT_FOUND");
+    expect(mockPointReactionFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects deduction reaction details", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, type: "DEDUCTION" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().code).toBe("POINT_REACTION_UNSUPPORTED_TRANSACTION_TYPE");
+    expect(mockPointReactionFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects malformed detail requests", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockTxFindUnique).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /users/scores", () => {
   it("scopes member scores to the authenticated actor's organization", async () => {
     mockFindUnique.mockResolvedValue(

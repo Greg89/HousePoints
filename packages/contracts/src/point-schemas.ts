@@ -119,6 +119,30 @@ export const pointReactionResponseSchema = z.object({
 
 export type PointReactionResponse = z.infer<typeof pointReactionResponseSchema>;
 
+export const pointReactionDetailsRequestSchema = z.object({
+  transactionId: z.string().min(1),
+}).strict();
+
+export type PointReactionDetailsRequest = z.infer<typeof pointReactionDetailsRequestSchema>;
+
+export const pointReactionDetailSchema = z.object({
+  id: z.string().min(1),
+  reactionKey: pointReactionKeySchema,
+  actorUserId: z.string().min(1),
+  actorName: z.string().min(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type PointReactionDetail = z.infer<typeof pointReactionDetailSchema>;
+
+export const pointReactionDetailsResponseSchema = z.object({
+  transactionId: z.string().min(1),
+  reactions: z.array(pointReactionDetailSchema),
+});
+
+export type PointReactionDetailsResponse = z.infer<typeof pointReactionDetailsResponseSchema>;
+
 export const deletedPointSchema = z.object({
   id: z.string().min(1),
   type: pointTransactionTypeSchema.default("AWARD"),

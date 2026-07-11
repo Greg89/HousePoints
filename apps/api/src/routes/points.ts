@@ -6,6 +6,8 @@ import {
   deletePointTransactionSchema,
   deductPointsSchema,
   POINT_REACTION_LABELS,
+  pointReactionDetailsRequestSchema,
+  pointReactionDetailsResponseSchema,
   pointReactionResponseSchema,
   reactToPointTransactionSchema,
   seasonScopedRequestSchema,
@@ -419,6 +421,76 @@ async function summarizePointReactions(
       count,
     })),
   });
+}
+
+export async function listPointReactionDetails(params: {
+  transactionId: string;
+  organizationId: string;
+}) {
+  const point = await prisma.pointTransaction.findUnique({
+    where: { id: params.transactionId },
+    select: REACTABLE_TRANSACTION_SELECT,
+  });
+
+  if (!point || point.organizationId !== params.organizationId || point.deletedAt) {
+    return {
+      ok: false as const,
+      statusCode: 404,
+      code: "POINT_TRANSACTION_NOT_FOUND",
+      message: "Point transaction was not found",
+    };
+  }
+
+  if (point.type !== "AWARD") {
+    return {
+      ok: false as const,
+      statusCode: 422,
+      code: "POINT_REACTION_UNSUPPORTED_TRANSACTION_TYPE",
+      message: "Reactions are only supported for point awards",
+    };
+  }
+
+  const reactions = await prisma.pointReaction.findMany({
+    where: {
+      organizationId: params.organizationId,
+      pointTransactionId: point.id,
+      deletedAt: null,
+    },
+    orderBy: [
+      { updatedAt: "desc" },
+      { id: "desc" },
+    ],
+    select: {
+      id: true,
+      actorUserId: true,
+      reactionKey: true,
+      createdAt: true,
+      updatedAt: true,
+      actor: { select: { displayName: true } },
+    },
+  });
+
+  return {
+    ok: true as const,
+    value: pointReactionDetailsResponseSchema.parse({
+      transactionId: point.id,
+      reactions: reactions.flatMap((reaction) => {
+        const reactionKey = reaction.reactionKey as PointReactionKey;
+        if (!(reactionKey in POINT_REACTION_LABELS)) {
+          return [];
+        }
+
+        return {
+          id: reaction.id,
+          reactionKey,
+          actorUserId: reaction.actorUserId,
+          actorName: reaction.actor.displayName,
+          createdAt: reaction.createdAt.toISOString(),
+          updatedAt: reaction.updatedAt.toISOString(),
+        };
+      }),
+    }),
+  };
 }
 
 async function archivePointReactionNotification(params: {
@@ -949,6 +1021,41 @@ export async function registerPointRoutes(
       organizationId: actor.organizationId,
       transactionId: parsed.transactionId,
       reactionKey: parsed.reactionKey,
+    });
+
+    return result.value;
+  });
+
+  app.post("/transactions/reactions", async (request, reply) => {
+    const parsed = await parseBody(pointReactionDetailsRequestSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
+
+    const result = await listPointReactionDetails({
+      transactionId: parsed.transactionId,
+      organizationId: actor.organizationId,
+    });
+
+    if (!result.ok) {
+      warn(request.log, "points.reaction_details.rejected", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        transactionId: parsed.transactionId,
+        code: result.code,
+      });
+      return reply.status(result.statusCode).send({
+        code: result.code,
+        message: result.message,
+      });
+    }
+
+    info(request.log, "points.reaction_details.loaded", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      transactionId: parsed.transactionId,
+      reactionCount: result.value.reactions.length,
     });
 
     return result.value;

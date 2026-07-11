@@ -64,6 +64,8 @@ import {
   pointReactionKeySchema,
   POINT_REACTION_KEYS,
   POINT_REACTION_LABELS,
+  pointReactionDetailsRequestSchema,
+  pointReactionDetailsResponseSchema,
   pointReactionResponseSchema,
   pointTransactionTypeSchema,
   reactToPointTransactionSchema,
@@ -108,6 +110,7 @@ const webConsumedApiEndpoints = [
   "/seasons/rename",
   "/seasons/start",
   "/transactions/react",
+  "/transactions/reactions",
   "/transactions/recent",
   "/users/bootstrap",
   "/users/profile",
@@ -368,6 +371,67 @@ describe("point reaction schemas", () => {
         transactionId: "tx-1",
         myReactionKey: null,
         reactions: [{ reactionKey: "clap", count: 0 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts reaction detail requests", () => {
+    expect(
+      pointReactionDetailsRequestSchema.parse({
+        transactionId: "tx-1",
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+    });
+  });
+
+  it("accepts reaction detail responses", () => {
+    const createdAt = new Date("2026-06-25T12:00:00.000Z").toISOString();
+    const updatedAt = new Date("2026-06-25T12:05:00.000Z").toISOString();
+
+    expect(
+      pointReactionDetailsResponseSchema.parse({
+        transactionId: "tx-1",
+        reactions: [
+          {
+            id: "reaction-1",
+            reactionKey: "party",
+            actorUserId: "user-2",
+            actorName: "Caitlin Swanson",
+            createdAt,
+            updatedAt,
+          },
+        ],
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      reactions: [
+        {
+          id: "reaction-1",
+          reactionKey: "party",
+          actorUserId: "user-2",
+          actorName: "Caitlin Swanson",
+          createdAt,
+          updatedAt,
+        },
+      ],
+    });
+  });
+
+  it("rejects malformed reaction detail responses", () => {
+    expect(
+      pointReactionDetailsResponseSchema.safeParse({
+        transactionId: "tx-1",
+        reactions: [
+          {
+            id: "reaction-1",
+            reactionKey: "confetti",
+            actorUserId: "user-2",
+            actorName: "Caitlin Swanson",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
       }).success,
     ).toBe(false);
   });

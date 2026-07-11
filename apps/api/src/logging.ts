@@ -83,6 +83,8 @@ export type ApiLogEvent =
   | "points.delete.already_deleted"
   | "points.deleted"
   | "points.reaction.rejected"
+  | "points.reaction_details.loaded"
+  | "points.reaction_details.rejected"
   | "points.reaction.removed"
   | "points.reaction.saved"
   | "users.profile.updated"
