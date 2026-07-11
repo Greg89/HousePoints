@@ -296,6 +296,8 @@ Add the reaction bar to award cards. Keep deductions reaction-free.
 
 Add a staging E2E test where a second actor reacts to a point award and the recipient receives one accurate notification.
 
+Current progress: the existing happy-path Playwright smoke now verifies that a user can react to a newly created award and open the reaction detail dialog for that activity card. The second-actor notification smoke remains as the next E2E expansion.
+
 ## Open Questions
 
 - Should removal be in MVP, or should clicking the active reaction do nothing?

@@ -12,7 +12,7 @@ test.skip(
   `Missing E2E environment variables: ${missingEnv.join(", ")}`,
 );
 
-test("login, award points, and see activity plus leaderboard updates", async ({ page }) => {
+test("login, award points, react, and see activity plus leaderboard updates", async ({ page }) => {
   const targetMember = readTargetMemberName();
   const note = `Playwright E2E recognition ${Date.now()}`;
 
@@ -38,6 +38,18 @@ test("login, award points, and see activity plus leaderboard updates", async ({ 
 
   await page.getByRole("tab", { name: /activity/i }).click();
   await expect(page.getByText(note)).toBeVisible();
+
+  const activityCard = page.locator("div").filter({ hasText: note }).filter({ hasText: targetMember }).first();
+  await activityCard.getByRole("button", { name: /react with great work/i }).click();
+  await expect(activityCard.getByRole("button", { name: /remove great work reaction/i })).toHaveAttribute("aria-pressed", "true");
+
+  await activityCard.getByRole("button", { name: /activity actions/i }).click();
+  await page.getByRole("menuitem", { name: /view reactions/i }).click();
+  const reactionsDialog = page.getByRole("dialog", { name: /reactions/i });
+  await expect(reactionsDialog).toBeVisible();
+  await expect(reactionsDialog.getByText("Great work")).toBeVisible();
+  await expect(reactionsDialog.getByText(note)).toBeVisible();
+  await reactionsDialog.getByRole("button", { name: /close reaction details/i }).click();
 
   await page.getByRole("tab", { name: /leaderboard/i }).click();
   await expect(page.getByText(exactNamePattern(targetMember))).toBeVisible();

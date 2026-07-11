@@ -19,6 +19,7 @@ Required staging state:
 - The user belongs to the staging E2E organization.
 - The user has a house assignment so the dashboard renders the normal member experience.
 - The user can award points to the configured target member. Members can award points, so elevated access is not required for this user.
+- The user can react to point awards in Activity. The happy-path smoke reacts to the award it creates and opens the reaction detail dialog.
 
 ### Optional Admin E2E User
 
@@ -80,7 +81,7 @@ The staging E2E organization should contain:
 - the primary E2E user with permission to award points;
 - the configured target member with a stable display name.
 
-The mutating happy-path test intentionally creates point activity. The staging organization should tolerate this accumulated history. If that history becomes noisy, add a reset or cleanup job before making scheduled E2E failures block releases.
+The mutating happy-path test intentionally creates point activity and one reaction on that activity. The staging organization should tolerate this accumulated history. If that history becomes noisy, add a reset or cleanup job before making scheduled E2E failures block releases.
 
 The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. The What's New link is asserted only when that control is visible in the target environment, so staging can enable that product surface without adding new required secrets.
 
