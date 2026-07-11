@@ -107,6 +107,7 @@ const webConsumedApiEndpoints = [
   "/seasons/compare",
   "/seasons/rename",
   "/seasons/start",
+  "/transactions/react",
   "/transactions/recent",
   "/users/bootstrap",
   "/users/profile",

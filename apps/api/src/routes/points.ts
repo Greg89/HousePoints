@@ -5,14 +5,22 @@ import {
   activityFeedRequestSchema,
   deletePointTransactionSchema,
   deductPointsSchema,
+  POINT_REACTION_LABELS,
+  pointReactionResponseSchema,
+  reactToPointTransactionSchema,
   seasonScopedRequestSchema,
+  type PointReactionKey,
   type PointTransactionType,
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
-import { buildPointAwardNotificationData, buildPointDeductionNotificationData } from "../notifications.js";
+import {
+  buildPointAwardNotificationData,
+  buildPointDeductionNotificationData,
+  buildPointReactionNotificationData,
+} from "../notifications.js";
 
 export const ACTIVITY_ITEM_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
@@ -286,6 +294,245 @@ export async function findTransactionForDeletion(transactionId: string) {
   return prisma.pointTransaction.findUnique({
     where: { id: transactionId },
     select: { id: true, organizationId: true, deletedAt: true },
+  });
+}
+
+const REACTABLE_TRANSACTION_SELECT = {
+  id: true,
+  organizationId: true,
+  targetUserId: true,
+  type: true,
+  deletedAt: true,
+} as const;
+
+type ReactionClient = Pick<typeof prisma, "pointReaction" | "pointTransaction" | "notification">;
+
+export function buildPointReactionDedupeKey(input: {
+  organizationId: string;
+  transactionId: string;
+  actorUserId: string;
+}) {
+  return `point-reaction-received:${input.organizationId}:${input.transactionId}:${input.actorUserId}`;
+}
+
+async function summarizePointReactions(
+  client: ReactionClient,
+  organizationId: string,
+  transactionId: string,
+  actorUserId: string,
+) {
+  const reactions = await client.pointReaction.findMany({
+    where: {
+      organizationId,
+      pointTransactionId: transactionId,
+      deletedAt: null,
+    },
+    select: {
+      actorUserId: true,
+      reactionKey: true,
+    },
+  });
+
+  const counts = new Map<PointReactionKey, number>();
+  let myReactionKey: PointReactionKey | null = null;
+
+  for (const reaction of reactions) {
+    const reactionKey = reaction.reactionKey as PointReactionKey;
+    if (!(reactionKey in POINT_REACTION_LABELS)) {
+      continue;
+    }
+
+    counts.set(reactionKey, (counts.get(reactionKey) ?? 0) + 1);
+
+    if (reaction.actorUserId === actorUserId) {
+      myReactionKey = reactionKey;
+    }
+  }
+
+  return pointReactionResponseSchema.parse({
+    transactionId,
+    myReactionKey,
+    reactions: [...counts.entries()].map(([reactionKey, count]) => ({
+      reactionKey,
+      count,
+    })),
+  });
+}
+
+async function archivePointReactionNotification(params: {
+  client: ReactionClient;
+  organizationId: string;
+  transactionId: string;
+  actorUserId: string;
+  recipientUserId: string;
+}) {
+  const now = new Date();
+  await params.client.notification.updateMany({
+    where: {
+      recipientUserId: params.recipientUserId,
+      dedupeKey: buildPointReactionDedupeKey(params),
+      archivedAt: null,
+    },
+    data: {
+      archivedAt: now,
+    },
+  });
+}
+
+async function upsertPointReactionNotification(params: {
+  client: ReactionClient;
+  organizationId: string;
+  transactionId: string;
+  recipientUserId: string;
+  actorUserId: string;
+  actorDisplayName: string;
+  reactionId: string;
+  reactionKey: PointReactionKey;
+}) {
+  const notification = buildPointReactionNotificationData({
+    organizationId: params.organizationId,
+    recipientUserId: params.recipientUserId,
+    actorUserId: params.actorUserId,
+    actorDisplayName: params.actorDisplayName,
+    reactionKey: params.reactionKey,
+    transactionId: params.transactionId,
+    reactionId: params.reactionId,
+  });
+
+  const updated = await params.client.notification.updateMany({
+    where: {
+      recipientUserId: params.recipientUserId,
+      dedupeKey: notification.dedupeKey,
+    },
+    data: {
+      title: notification.title,
+      body: notification.body,
+      actionLabel: notification.actionLabel,
+      actionHref: notification.actionHref,
+      entityType: notification.entityType,
+      entityId: notification.entityId,
+      archivedAt: null,
+    },
+  });
+
+  if (updated.count === 0) {
+    await params.client.notification.createMany({
+      data: [notification],
+      skipDuplicates: true,
+    });
+  }
+}
+
+export async function reactToPointTransaction(params: {
+  transactionId: string;
+  reactionKey: PointReactionKey | null;
+  actorId: string;
+  actorDisplayName: string;
+  organizationId: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const point = await tx.pointTransaction.findUnique({
+      where: { id: params.transactionId },
+      select: REACTABLE_TRANSACTION_SELECT,
+    });
+
+    if (!point || point.organizationId !== params.organizationId || point.deletedAt) {
+      return {
+        ok: false as const,
+        statusCode: 404,
+        code: "POINT_TRANSACTION_NOT_FOUND",
+        message: "Point transaction was not found",
+      };
+    }
+
+    if (point.type !== "AWARD") {
+      return {
+        ok: false as const,
+        statusCode: 422,
+        code: "POINT_REACTION_UNSUPPORTED_TRANSACTION_TYPE",
+        message: "Reactions are only supported for point awards",
+      };
+    }
+
+    if (!point.targetUserId) {
+      return {
+        ok: false as const,
+        statusCode: 422,
+        code: "POINT_REACTION_TARGET_NOT_FOUND",
+        message: "Point recipient could not be resolved",
+      };
+    }
+
+    const existingReaction = await tx.pointReaction.findFirst({
+      where: {
+        organizationId: params.organizationId,
+        pointTransactionId: point.id,
+        actorUserId: params.actorId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        reactionKey: true,
+      },
+    });
+
+    if (params.reactionKey === null) {
+      if (existingReaction) {
+        await tx.pointReaction.update({
+          where: { id: existingReaction.id },
+          data: { deletedAt: new Date() },
+        });
+      }
+
+      if (point.targetUserId !== params.actorId) {
+        await archivePointReactionNotification({
+          client: tx,
+          organizationId: params.organizationId,
+          transactionId: point.id,
+          actorUserId: params.actorId,
+          recipientUserId: point.targetUserId,
+        });
+      }
+
+      return {
+        ok: true as const,
+        value: await summarizePointReactions(tx, params.organizationId, point.id, params.actorId),
+      };
+    }
+
+    const reaction = existingReaction
+      ? await tx.pointReaction.update({
+          where: { id: existingReaction.id },
+          data: { reactionKey: params.reactionKey },
+          select: { id: true, reactionKey: true },
+        })
+      : await tx.pointReaction.create({
+          data: {
+            organizationId: params.organizationId,
+            pointTransactionId: point.id,
+            actorUserId: params.actorId,
+            reactionKey: params.reactionKey,
+          },
+          select: { id: true, reactionKey: true },
+        });
+
+    if (point.targetUserId !== params.actorId) {
+      await upsertPointReactionNotification({
+        client: tx,
+        organizationId: params.organizationId,
+        transactionId: point.id,
+        recipientUserId: point.targetUserId,
+        actorUserId: params.actorId,
+        actorDisplayName: params.actorDisplayName,
+        reactionId: reaction.id,
+        reactionKey: reaction.reactionKey as PointReactionKey,
+      });
+    }
+
+    return {
+      ok: true as const,
+      value: await summarizePointReactions(tx, params.organizationId, point.id, params.actorId),
+    };
   });
 }
 
@@ -605,6 +852,44 @@ export async function registerPointRoutes(
       items: items.map(mapActivityItem),
       nextCursor,
     };
+  });
+
+  app.post("/transactions/react", async (request, reply) => {
+    const parsed = await parseBody(reactToPointTransactionSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
+
+    const result = await reactToPointTransaction({
+      transactionId: parsed.transactionId,
+      reactionKey: parsed.reactionKey,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      organizationId: actor.organizationId,
+    });
+
+    if (!result.ok) {
+      warn(request.log, "points.reaction.rejected", {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        transactionId: parsed.transactionId,
+        code: result.code,
+      });
+      return reply.status(result.statusCode).send({
+        code: result.code,
+        message: result.message,
+      });
+    }
+
+    info(request.log, parsed.reactionKey ? "points.reaction.saved" : "points.reaction.removed", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      transactionId: parsed.transactionId,
+      reactionKey: parsed.reactionKey,
+    });
+
+    return result.value;
   });
 
   app.post("/points/delete", async (request, reply) => {
