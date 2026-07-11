@@ -352,8 +352,10 @@ describe("ActivityFeed", () => {
     await waitFor(() => expect(onReadReactions).toHaveBeenCalledWith("activity-1"));
     const dialog = await screen.findByRole("dialog", { name: /reactions/i });
     expect(within(dialog).getByText("Cara")).toBeInTheDocument();
-    expect(within(dialog).getByText("Celebrate")).toBeInTheDocument();
+    expect(within(dialog).getByRole("img", { name: "Celebrate" })).toBeInTheDocument();
+    expect(within(dialog).queryByText("Celebrate")).not.toBeInTheDocument();
     expect(within(dialog).getByText("Great collaboration")).toBeInTheDocument();
+    expect(within(dialog).getByRole("region", { name: /reaction details list/i })).toHaveClass("overflow-y-auto");
   });
 
   it("shows a safe error when reaction details fail to load", async () => {

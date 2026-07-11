@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, DotsThreeVertical, Eye, Trash } from "@phosphor-icons/react";
 import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
-import { POINT_REACTION_KEYS, POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
+import { POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
+import { REACTION_EMOJI, VISIBLE_REACTION_KEYS } from "./point-reactions";
 
 interface ActivityCardProps {
   item: ActivityItem;
@@ -19,18 +20,6 @@ interface ActivityCardProps {
   isLoadingReactions?: boolean;
   onViewReactions?: () => void;
 }
-
-const REACTION_EMOJI: Record<PointReactionKey, string> = {
-  clap: "👏",
-  heart: "❤️",
-  fire: "🔥",
-  party: "🎉",
-  star: "⭐",
-};
-
-const VISIBLE_REACTION_KEYS = POINT_REACTION_KEYS.filter(
-  (reactionKey) => reactionKey !== "star",
-);
 
 function relativeTime(isoString: string) {
   const diff = Date.now() - new Date(isoString).getTime();

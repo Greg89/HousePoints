@@ -16,6 +16,7 @@ import type {
 import { POINT_REACTION_LABELS } from "@housepoints/contracts";
 import type { DeletePointResult, PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { ActivityCard } from "./ActivityCard";
+import { REACTION_EMOJI } from "./point-reactions";
 
 type ActivityTypeFilter = "ALL" | PointTransactionType;
 
@@ -391,8 +392,8 @@ export function ActivityFeed({
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border bg-card p-6 shadow-2xl">
+            <div className="shrink-0 flex items-start justify-between gap-4">
               <div>
                 <Dialog.Title className="font-display text-2xl font-semibold">
                   Reactions
@@ -415,14 +416,18 @@ export function ActivityFeed({
             </div>
 
             {reactionDetailsContext ? (
-              <div className="mt-4 rounded-xl border bg-muted/20 p-3">
+              <div className="mt-4 shrink-0 rounded-xl border bg-muted/20 p-3">
                 <p className="line-clamp-2 text-sm text-muted-foreground">
                   {reactionDetailsContext.reason}
                 </p>
               </div>
             ) : null}
 
-            <div className="mt-5 space-y-3">
+            <div
+              className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+              role="region"
+              aria-label="Reaction details list"
+            >
               {loadingReactionDetailsId ? (
                 <p className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
                   Loading reactions...
@@ -444,13 +449,18 @@ export function ActivityFeed({
               {reactionDetails?.reactions.map((reaction) => (
                 <div
                   key={reaction.id}
-                  className="flex items-start justify-between gap-4 rounded-xl border bg-background p-4"
+                  className="flex items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3"
                 >
-                  <div>
-                    <p className="font-semibold">{reaction.actorName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {POINT_REACTION_LABELS[reaction.reactionKey]}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="shrink-0 text-lg leading-none"
+                      title={POINT_REACTION_LABELS[reaction.reactionKey]}
+                      role="img"
+                      aria-label={POINT_REACTION_LABELS[reaction.reactionKey]}
+                    >
+                      {REACTION_EMOJI[reaction.reactionKey]}
+                    </span>
+                    <p className="truncate font-semibold">{reaction.actorName}</p>
                   </div>
                   <time
                     dateTime={reaction.updatedAt}

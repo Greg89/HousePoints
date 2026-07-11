@@ -47,7 +47,7 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await page.getByRole("menuitem", { name: /view reactions/i }).click();
   const reactionsDialog = page.getByRole("dialog", { name: /reactions/i });
   await expect(reactionsDialog).toBeVisible();
-  await expect(reactionsDialog.getByText("Love it")).toBeVisible();
+  await expect(reactionsDialog.getByRole("img", { name: "Love it" })).toBeVisible();
   await expect(reactionsDialog.getByText(note)).toBeVisible();
   await reactionsDialog.getByRole("button", { name: /close reaction details/i }).click();
 
