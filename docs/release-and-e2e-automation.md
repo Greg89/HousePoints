@@ -114,6 +114,13 @@ Required staging environment secrets:
 - `E2E_TARGET_MEMBER`
 - `E2E_ORG_SLUG`
 
+Optional staging environment secrets for full role smoke coverage:
+
+- `E2E_ADMIN_EMAIL`
+- `E2E_ADMIN_PASSWORD`
+- `E2E_OWNER_EMAIL`
+- `E2E_OWNER_PASSWORD`
+
 Optional manual input:
 
 - `base_url`, which overrides `E2E_BASE_URL` for an ad-hoc run.

@@ -30,6 +30,8 @@ jobs:
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
       E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_OWNER_PASSWORD: ${{ secrets.E2E_OWNER_PASSWORD }}
       E2E_TARGET_MEMBER: ${{ secrets.E2E_TARGET_MEMBER }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
 
@@ -77,10 +79,14 @@ jobs:
           const rawOrgSlug = process.env.E2E_ORG_SLUG?.trim();
           const startPath = rawOrgSlug ? `/o/${encodeURIComponent(rawOrgSlug)}` : "/";
           const targetUrl = new URL(startPath, baseUrl);
+          const adminConfigured = Boolean(process.env.E2E_ADMIN_EMAIL?.trim() && process.env.E2E_ADMIN_PASSWORD?.trim());
+          const ownerConfigured = Boolean(process.env.E2E_OWNER_EMAIL?.trim() && process.env.E2E_OWNER_PASSWORD?.trim());
           console.log(`E2E base protocol: ${baseUrl.protocol}`);
           console.log(`E2E base host: ${baseUrl.host}`);
           console.log(`E2E base pathname: ${baseUrl.pathname}`);
           console.log(`E2E org slug configured: ${rawOrgSlug ? "yes" : "no"}`);
+          console.log(`E2E admin actor configured: ${adminConfigured ? "yes" : "no"}`);
+          console.log(`E2E owner actor configured: ${ownerConfigured ? "yes" : "no"}`);
           console.log(`E2E start pathname: ${targetUrl.pathname}`);
           console.log(`E2E start host: ${targetUrl.host}`);
           NODE
