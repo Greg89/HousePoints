@@ -49,6 +49,35 @@ Required staging state when configured:
 - The user has an `OWNER` role so owner-only Manage tabs are enabled.
 - The user has a house assignment so the dashboard renders normally.
 
+### Optional Reaction Actor E2E User
+
+GitHub Environment secrets:
+
+- `E2E_REACTION_ACTOR_EMAIL`
+- `E2E_REACTION_ACTOR_PASSWORD`
+
+Required staging state when configured:
+
+- The user can authenticate through the staging Auth0 application.
+- The user belongs to the staging E2E organization.
+- The user has a house assignment so the dashboard renders normally.
+- The user can view the Activity tab and react to awards.
+- Prefer a user that is different from both the primary E2E user and the configured target member, so the smoke reflects the real "someone else reacted" workflow.
+
+### Optional Reaction Recipient E2E User
+
+GitHub Environment secrets:
+
+- `E2E_REACTION_RECIPIENT_EMAIL`
+- `E2E_REACTION_RECIPIENT_PASSWORD`
+
+Required staging state when configured:
+
+- The user can authenticate through the staging Auth0 application.
+- The user belongs to the staging E2E organization.
+- The user has a house assignment so the dashboard renders normally.
+- The user's display name matches `E2E_TARGET_MEMBER`, because the reaction notification smoke awards points to that configured target and then verifies the target's notification tray.
+
 ### Target Member
 
 GitHub Environment secret:
@@ -97,6 +126,14 @@ Dedicated owner/admin/member smoke coverage is intentionally split by actor:
 
 The admin and owner credentials remain optional so local runs and partially configured environments skip those slices cleanly. In the staging GitHub Environment, configure both optional actors when you want the full permission smoke suite to run.
 
+## Reaction Notification Smoke Coverage
+
+Dedicated reaction-notification smoke coverage is intentionally optional because it requires two extra Auth0 users. When `E2E_REACTION_ACTOR_EMAIL`, `E2E_REACTION_ACTOR_PASSWORD`, `E2E_REACTION_RECIPIENT_EMAIL`, and `E2E_REACTION_RECIPIENT_PASSWORD` are configured, Playwright:
+
+- signs in as the primary E2E user and awards points to `E2E_TARGET_MEMBER`;
+- signs in as the reaction actor and reacts to that exact award from Activity;
+- signs in as the reaction recipient and verifies the notification tray contains the reaction notification with the actor's display name and final reaction label.
+
 ## Local Run
 
 ```powershell
@@ -107,6 +144,10 @@ $env:E2E_ADMIN_EMAIL = "test-admin@example.com"
 $env:E2E_ADMIN_PASSWORD = "test-password"
 $env:E2E_OWNER_EMAIL = "test-owner@example.com"
 $env:E2E_OWNER_PASSWORD = "test-password"
+$env:E2E_REACTION_ACTOR_EMAIL = "test-reaction-actor@example.com"
+$env:E2E_REACTION_ACTOR_PASSWORD = "test-password"
+$env:E2E_REACTION_RECIPIENT_EMAIL = "stable-target-member@example.com"
+$env:E2E_REACTION_RECIPIENT_PASSWORD = "test-password"
 $env:E2E_TARGET_MEMBER = "Stable Target Member"
 $env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e

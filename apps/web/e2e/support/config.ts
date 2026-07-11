@@ -30,6 +30,14 @@ export function readE2EOwnerCredentials() {
   return readOptionalCredentials("E2E_OWNER_EMAIL", "E2E_OWNER_PASSWORD");
 }
 
+export function readE2EReactionActorCredentials() {
+  return readOptionalCredentials("E2E_REACTION_ACTOR_EMAIL", "E2E_REACTION_ACTOR_PASSWORD");
+}
+
+export function readE2EReactionRecipientCredentials() {
+  return readOptionalCredentials("E2E_REACTION_RECIPIENT_EMAIL", "E2E_REACTION_RECIPIENT_PASSWORD");
+}
+
 export function readTargetMemberName() {
   return process.env.E2E_TARGET_MEMBER!;
 }
