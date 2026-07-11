@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HousePoints Usability and Admin Tools Release Notes</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">Released 2026-07-10</p>
+        <h1>Usability and Admin Tools Improvements</h1>
+        <p class="summary">
+          This release improves high-traffic account and member workflows with better
+          dropdown behavior, clearer release notifications, persistent release notes
+          access, and an admin tool for helping members update display names.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          <ul class="section-list">
+            <li>Improved member dropdown behavior for point award and deduction flows.</li>
+            <li>Added release notification management so What's New announcements can be marked read and archived cleanly.</li>
+            <li>Restored the persistent What's New link in the account dropdown.</li>
+            <li>Added an admin member rename tool for updating display names inside an organization.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>What's New</h2>
+          <ul class="section-list">
+            <li>Large member lists are easier to use in dropdowns and should no longer run past the bottom of smaller laptop screens.</li>
+            <li>Release announcements behave more like normal notifications after users read them.</li>
+            <li>The account menu now keeps a stable What's New entry so users can revisit release notes even after the notification is gone.</li>
+            <li>Admins can help members fix confusing or incorrect display names without asking for a database edit.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li>The production web app should have <code>APP_RELEASE_NOTES_URL</code> configured so the persistent What's New link is visible.</li>
+            <li>The production API and GitHub Actions should share <code>RELEASE_AUTOMATION_SECRET</code> before recording or broadcasting this release.</li>
+            <li>The GitHub repository variable <code>RELEASE_RECORD_API_BASE_URL</code> should point at the production API base URL without a trailing endpoint path.</li>
+            <li>Record the release first, verify production health, then broadcast the notification to active users.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          <ul class="section-list">
+            <li>CI validation passed before production release.</li>
+            <li>Staging E2E should pass before broadcast.</li>
+            <li>Production deployment should be healthy before enabling <code>broadcast_release</code>.</li>
+            <li>After broadcast, verify the notification appears in the account menu and links to this release note.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
