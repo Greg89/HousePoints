@@ -123,7 +123,8 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /delete point transaction for ben/i }));
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
 
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith("activity-1"));
     expect(confirmSpy).toHaveBeenCalledWith(
@@ -152,7 +153,8 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /delete point transaction for ben/i }));
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
 
     expect(await screen.findByText("Point transaction is already deleted")).toBeInTheDocument();
     expect(screen.getByText("Great collaboration")).toBeInTheDocument();

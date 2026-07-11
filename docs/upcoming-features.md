@@ -157,6 +157,27 @@ The detailed product and technical plan lives in [Notification System Design](./
 
 ---
 
+## 3B. Activity Reactions
+
+### What it is
+
+Allow members to react to point-award activity cards with a small controlled emoji set. Reactions make recognition feel more communal without turning Activity into a chat feed.
+
+### Current state
+
+Not implemented. The detailed product and technical plan lives in [Activity Reactions Design](./activity-reactions-design.md).
+
+### MVP direction
+
+- Reactions apply to point awards only.
+- Each user has at most one active reaction per award in the MVP.
+- Changing a reaction updates the existing reaction instead of creating another one.
+- The awarded member receives the notification, not the point giver.
+- Reaction changes update the existing deduped notification so users do not receive notification bursts for one person's correction.
+- Activity card markup should be refactored before reaction controls are added so the new controls have a clean visual home.
+
+---
+
 ## 4. Point Adjustments
 
 ### What it is
