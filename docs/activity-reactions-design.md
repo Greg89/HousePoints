@@ -282,7 +282,7 @@ Replace the floating delete control with a three-dot actions menu. Keep delete b
 
 Add `PointReaction`, contracts, the reaction endpoint, and notification update logic.
 
-Current progress: the `PointReaction` model, partial unique index, controlled reaction keys, mutation request schema, mutation response schema, `/transactions/react` endpoint, and deduped recipient notification behavior are in place. Activity feed read-model fields and UI controls remain in the next slices.
+Current progress: the `PointReaction` model, partial unique index, controlled reaction keys, mutation request schema, mutation response schema, `/transactions/react` endpoint, deduped recipient notification behavior, and activity feed reaction summaries are in place. UI controls remain in the next slices.
 
 ### Phase 3 - Read Model
 

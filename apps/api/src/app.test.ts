@@ -4458,6 +4458,12 @@ describe("POST /transactions/recent", () => {
         targetUser: { displayName: "Alice" },
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
         season: { id: "season-active", name: "Q3 2026", isActive: true },
+        reactions: [
+          { actorUserId: "user-1", reactionKey: "heart" },
+          { actorUserId: "user-2", reactionKey: "heart" },
+          { actorUserId: "user-3", reactionKey: "clap" },
+          { actorUserId: "user-4", reactionKey: "unknown-reaction" },
+        ],
       },
       {
         id: "tx-2",
@@ -4470,6 +4476,7 @@ describe("POST /transactions/recent", () => {
         targetUser: { displayName: "Alice" },
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
         season: { id: "season-active", name: "Q3 2026", isActive: true },
+        reactions: [],
       },
     ]);
     const app = await buildTestApp();
@@ -4490,6 +4497,11 @@ describe("POST /transactions/recent", () => {
     });
     expect(items[0].actorName).toBe("Bob");
     expect(items[0].delta).toBe(10);
+    expect(items[0].myReactionKey).toBe("heart");
+    expect(items[0].reactions).toEqual([
+      { reactionKey: "heart", count: 2 },
+      { reactionKey: "clap", count: 1 },
+    ]);
     expect(page.nextCursor).toBe("tx-1");
     expect(mockTxFindMany).toHaveBeenCalledWith({
       where: { organizationId: "org-1", deletedAt: null },

@@ -28,9 +28,53 @@ export const ACTIVITY_ITEM_SELECT = {
   targetUser: { select: { displayName: true } },
   targetHouse: { select: { name: true, color: true } },
   season: { select: { id: true, name: true, isActive: true } },
+  reactions: {
+    where: { deletedAt: null },
+    select: { actorUserId: true, reactionKey: true },
+  },
 } as const;
 
-export function mapActivityItem(tx: Prisma.PointTransactionGetPayload<{ select: typeof ACTIVITY_ITEM_SELECT }>) {
+type ActivityItemTransaction = Prisma.PointTransactionGetPayload<{ select: typeof ACTIVITY_ITEM_SELECT }>;
+
+function summarizeActivityItemReactions(
+  reactions: Array<{ actorUserId: string; reactionKey: string }> | undefined,
+  actorUserId?: string,
+) {
+  const counts = new Map<PointReactionKey, number>();
+  let myReactionKey: PointReactionKey | null = null;
+
+  for (const reaction of reactions ?? []) {
+    const reactionKey = reaction.reactionKey as PointReactionKey;
+    if (!(reactionKey in POINT_REACTION_LABELS)) {
+      continue;
+    }
+
+    counts.set(reactionKey, (counts.get(reactionKey) ?? 0) + 1);
+
+    if (reaction.actorUserId === actorUserId) {
+      myReactionKey = reactionKey;
+    }
+  }
+
+  return {
+    myReactionKey,
+    reactions: [...counts.entries()].map(([reactionKey, count]) => ({
+      reactionKey,
+      count,
+    })),
+  };
+}
+
+export function mapActivityItem(
+  tx: Omit<ActivityItemTransaction, "reactions"> & {
+    reactions?: ActivityItemTransaction["reactions"];
+  },
+  actorUserId?: string,
+) {
+  const reactionSummary = tx.reactions
+    ? summarizeActivityItemReactions(tx.reactions, actorUserId)
+    : null;
+
   return {
     id: tx.id,
     actorName: tx.actor.displayName,
@@ -49,6 +93,12 @@ export function mapActivityItem(tx: Prisma.PointTransactionGetPayload<{ select: 
           isActive: tx.season.isActive,
         }
       : null,
+    ...(reactionSummary
+      ? {
+          myReactionKey: reactionSummary.myReactionKey,
+          reactions: reactionSummary.reactions,
+        }
+      : {}),
   };
 }
 
@@ -63,8 +113,20 @@ export const DELETED_POINT_SELECT = {
 } as const;
 
 export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: typeof DELETED_POINT_SELECT }>) {
+  const activityItem = mapActivityItem(tx);
+
   return {
-    ...mapActivityItem(tx),
+    id: activityItem.id,
+    type: activityItem.type,
+    actorName: activityItem.actorName,
+    targetUserName: activityItem.targetUserName,
+    targetHouseName: activityItem.targetHouseName,
+    targetHouseColor: activityItem.targetHouseColor,
+    delta: activityItem.delta,
+    reason: activityItem.reason,
+    trait: activityItem.trait,
+    createdAt: activityItem.createdAt,
+    season: activityItem.season,
     deletedAt: (tx.deletedAt ?? tx.createdAt).toISOString(),
     deletedByName: tx.deletedBy?.displayName ?? null,
     deletionReason: tx.deletionReason,
@@ -849,7 +911,7 @@ export async function registerPointRoutes(
     const nextCursor = hasNextPage ? items.at(-1)?.id ?? null : null;
 
     return {
-      items: items.map(mapActivityItem),
+      items: items.map((item) => mapActivityItem(item, actor.id)),
       nextCursor,
     };
   });

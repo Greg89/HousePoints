@@ -159,6 +159,8 @@ export const activityItemSchema = z.object({
     name: z.string().min(1),
     isActive: z.boolean(),
   }).nullable(),
+  myReactionKey: pointReactionKeySchema.nullable().optional(),
+  reactions: z.array(activityReactionSummarySchema).optional(),
 });
 
 export type ActivityItem = z.infer<typeof activityItemSchema>;

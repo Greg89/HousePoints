@@ -399,6 +399,33 @@ describe("activityItemSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts older activity item payloads without reaction fields", () => {
+    expect(activityItemSchema.parse({ ...base, trait: "LEADERSHIP" })).toEqual({
+      ...base,
+      trait: "LEADERSHIP",
+    });
+  });
+
+  it("accepts reaction summaries and the current user's selected reaction", () => {
+    expect(
+      activityItemSchema.parse({
+        ...base,
+        trait: "LEADERSHIP",
+        myReactionKey: "heart",
+        reactions: [
+          { reactionKey: "heart", count: 2 },
+          { reactionKey: "clap", count: 1 },
+        ],
+      }),
+    ).toMatchObject({
+      myReactionKey: "heart",
+      reactions: [
+        { reactionKey: "heart", count: 2 },
+        { reactionKey: "clap", count: 1 },
+      ],
+    });
+  });
+
   it("accepts a valid item with trait: null", () => {
     const result = activityItemSchema.safeParse({ ...base, trait: null });
     expect(result.success).toBe(true);
