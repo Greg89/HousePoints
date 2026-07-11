@@ -204,6 +204,7 @@ Automated coverage:
 - `apps/web/src/lib/house-theme.test.ts` verifies every representative color returns the expected readiness and foreground behavior.
 - `apps/web/src/components/DashboardShell.test.tsx` verifies representative themes apply shell/header tokens on the dashboard.
 - `apps/web/src/app/settings/page.test.tsx` verifies custom palettes apply shell/header/card tokens on account settings.
+- `apps/web/e2e/house-theme-smoke.spec.ts` verifies the persisted user preference themes settings and dashboard shells through the browser.
 
 Manual screenshot checklist:
 
