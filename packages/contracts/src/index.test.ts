@@ -61,7 +61,12 @@ import {
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
   pointAdjustmentResponseSchema,
+  pointReactionKeySchema,
+  POINT_REACTION_KEYS,
+  POINT_REACTION_LABELS,
+  pointReactionResponseSchema,
   pointTransactionTypeSchema,
+  reactToPointTransactionSchema,
   redactLogContext,
   serializeErrorForLog,
   traitSchema,
@@ -275,6 +280,95 @@ describe("pointTransactionTypeSchema", () => {
 
   it("rejects unknown point transaction types", () => {
     expect(pointTransactionTypeSchema.safeParse("BONUS").success).toBe(false);
+  });
+});
+
+describe("point reaction schemas", () => {
+  it("accepts every supported reaction key and has a label for each", () => {
+    for (const reactionKey of POINT_REACTION_KEYS) {
+      expect(pointReactionKeySchema.safeParse(reactionKey).success).toBe(true);
+      expect(POINT_REACTION_LABELS[reactionKey]).toBeTruthy();
+    }
+  });
+
+  it("rejects unknown reaction keys", () => {
+    expect(pointReactionKeySchema.safeParse("confetti").success).toBe(false);
+  });
+
+  it("accepts a reaction mutation request", () => {
+    expect(
+      reactToPointTransactionSchema.parse({
+        transactionId: "tx-1",
+        reactionKey: "clap",
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      reactionKey: "clap",
+    });
+  });
+
+  it("accepts null reaction keys for removal", () => {
+    expect(
+      reactToPointTransactionSchema.parse({
+        transactionId: "tx-1",
+        reactionKey: null,
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      reactionKey: null,
+    });
+  });
+
+  it("rejects malformed reaction mutation requests", () => {
+    expect(
+      reactToPointTransactionSchema.safeParse({
+        transactionId: "",
+        reactionKey: "clap",
+      }).success,
+    ).toBe(false);
+    expect(
+      reactToPointTransactionSchema.safeParse({
+        transactionId: "tx-1",
+        reactionKey: "confetti",
+      }).success,
+    ).toBe(false);
+    expect(
+      reactToPointTransactionSchema.safeParse({
+        transactionId: "tx-1",
+        reactionKey: "clap",
+        extra: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts reaction mutation responses", () => {
+    expect(
+      pointReactionResponseSchema.parse({
+        transactionId: "tx-1",
+        myReactionKey: "heart",
+        reactions: [
+          { reactionKey: "heart", count: 2 },
+          { reactionKey: "star", count: 1 },
+        ],
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      myReactionKey: "heart",
+      reactions: [
+        { reactionKey: "heart", count: 2 },
+        { reactionKey: "star", count: 1 },
+      ],
+    });
+  });
+
+  it("rejects empty reaction counts", () => {
+    expect(
+      pointReactionResponseSchema.safeParse({
+        transactionId: "tx-1",
+        myReactionKey: null,
+        reactions: [{ reactionKey: "clap", count: 0 }],
+      }).success,
+    ).toBe(false);
   });
 });
 

@@ -77,111 +77,113 @@ enum HouseThemeMode {
 }
 
 model Organization {
-  id           String             @id @default(cuid())
-  name         String
-  slug         String             @unique
-  archivedAt   DateTime?
-  archivedById String?
-  memberships  OrganizationMembership[]
-  houses       House[]
-  transactions PointTransaction[]
-  invites      OrgInvite[]
-  seasons      Season[]
-  auditEvents  AuditEvent[]
-  slugAliases  OrganizationSlugAlias[]
-  notifications Notification[]
-  archivedBy    User?              @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id             String                   @id @default(cuid())
+  name           String
+  slug           String                   @unique
+  archivedAt     DateTime?
+  archivedById   String?
+  memberships    OrganizationMembership[]
+  houses         House[]
+  transactions   PointTransaction[]
+  invites        OrgInvite[]
+  seasons        Season[]
+  auditEvents    AuditEvent[]
+  slugAliases    OrganizationSlugAlias[]
+  notifications  Notification[]
+  pointReactions PointReaction[]
+  archivedBy     User?                    @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
   @@index([archivedAt])
   @@index([archivedById])
 }
 
 model OrganizationSlugAlias {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
-  slug           String       @unique
-  isPrimary      Boolean      @default(false)
+  slug           String    @unique
+  isPrimary      Boolean   @default(false)
   retiredAt      DateTime?
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime  @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
 
 model OrgInvite {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  tokenHash      String    @unique          // SHA-256 of the raw token — never store raw
+  tokenHash      String       @unique // SHA-256 of the raw token — never store raw
   createdById    String
-  createdBy      User      @relation("CreatedInvites", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy      User         @relation("CreatedInvites", fields: [createdById], references: [id], onDelete: Restrict)
   expiresAt      DateTime
   usedAt         DateTime?
   usedById       String?
-  usedBy         User?     @relation("UsedInvites", fields: [usedById], references: [id], onDelete: SetNull)
-  createdAt      DateTime  @default(now())
+  usedBy         User?        @relation("UsedInvites", fields: [usedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
 
   @@index([organizationId])
   @@index([tokenHash])
 }
 
 model House {
-  id                  String             @id @default(cuid())
+  id                  String                   @id @default(cuid())
   organizationId      String
   name                String
-  color               String             @default("#7c3aed")
+  color               String                   @default("#7c3aed")
   description         String?
-  themeMode           HouseThemeMode     @default(GENERATED)
+  themeMode           HouseThemeMode           @default(GENERATED)
   themeSecondaryColor String?
   themeSurfaceColor   String?
-  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   memberships         OrganizationMembership[]
   transactions        PointTransaction[]
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   @@unique([organizationId, name])
   @@index([organizationId])
 }
 
 model User {
-  id                   String             @id @default(cuid())
-  auth0Sub             String             @unique
-  email                String?            @unique
-  displayName          String
-  houseThemeEnabled    Boolean            @default(false)
-  pointTransactions    PointTransaction[] @relation("ActorTransactions")
-  receivedTransactions PointTransaction[] @relation("PointsReceived")
-  deletedPointTransactions PointTransaction[] @relation("DeletedPointTransactions")
-  createdInvites       OrgInvite[]        @relation("CreatedInvites")
-  usedInvite           OrgInvite[]        @relation("UsedInvites")
-  archivedOrganizations Organization[]    @relation("ArchivedOrganizations")
-  createdSeasons       Season[]           @relation("CreatedSeasons")
-  auditEvents          AuditEvent[]       @relation("AuditEventActor")
-  authIdentities        AuthIdentity[]
-  memberships           OrganizationMembership[]
-  notifications         Notification[]     @relation("NotificationRecipient")
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                       String                   @id @default(cuid())
+  auth0Sub                 String                   @unique
+  email                    String?                  @unique
+  displayName              String
+  houseThemeEnabled        Boolean                  @default(false)
+  pointTransactions        PointTransaction[]       @relation("ActorTransactions")
+  receivedTransactions     PointTransaction[]       @relation("PointsReceived")
+  deletedPointTransactions PointTransaction[]       @relation("DeletedPointTransactions")
+  createdInvites           OrgInvite[]              @relation("CreatedInvites")
+  usedInvite               OrgInvite[]              @relation("UsedInvites")
+  archivedOrganizations    Organization[]           @relation("ArchivedOrganizations")
+  createdSeasons           Season[]                 @relation("CreatedSeasons")
+  auditEvents              AuditEvent[]             @relation("AuditEventActor")
+  authIdentities           AuthIdentity[]
+  memberships              OrganizationMembership[]
+  notifications            Notification[]           @relation("NotificationRecipient")
+  pointReactions           PointReaction[]          @relation("PointReactionActor")
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 }
 
 model OrganizationMembership {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   userId         String
-  role           Role         @default(MEMBER)
+  role           Role      @default(MEMBER)
   houseId        String?
-  isActive       Boolean      @default(true)
+  isActive       Boolean   @default(true)
   archivedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  house          House?       @relation(fields: [houseId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  house        House?       @relation(fields: [houseId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, userId])
   @@index([userId, archivedAt])
@@ -221,27 +223,28 @@ model Season {
 }
 
 model PointTransaction {
-  id             String   @id @default(cuid())
-  organizationId String
-  seasonId       String
-  actorUserId    String
-  targetUserId   String?
-  targetHouseId  String
-  type           PointTransactionType @default(AWARD)
-  delta          Int
-  reason         String
-  trait          Trait?
-  deletedAt      DateTime?
+  id              String               @id @default(cuid())
+  organizationId  String
+  seasonId        String
+  actorUserId     String
+  targetUserId    String?
+  targetHouseId   String
+  type            PointTransactionType @default(AWARD)
+  delta           Int
+  reason          String
+  trait           Trait?
+  deletedAt       DateTime?
   deletedByUserId String?
-  deletionReason String?
-  createdAt      DateTime @default(now())
+  deletionReason  String?
+  createdAt       DateTime             @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  season       Season       @relation(fields: [seasonId], references: [id], onDelete: Restrict)
-  actor        User         @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
-  targetUser   User?        @relation("PointsReceived", fields: [targetUserId], references: [id], onDelete: SetNull)
-  deletedBy    User?        @relation("DeletedPointTransactions", fields: [deletedByUserId], references: [id], onDelete: SetNull)
-  targetHouse  House        @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  season       Season          @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  actor        User            @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
+  targetUser   User?           @relation("PointsReceived", fields: [targetUserId], references: [id], onDelete: SetNull)
+  deletedBy    User?           @relation("DeletedPointTransactions", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  targetHouse  House           @relation(fields: [targetHouseId], references: [id], onDelete: Restrict)
+  reactions    PointReaction[]
 
   @@index([organizationId, createdAt])
   @@index([organizationId, seasonId, createdAt])
@@ -252,6 +255,24 @@ model PointTransaction {
   @@index([targetUserId, seasonId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([deletedByUserId])
+}
+
+model PointReaction {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  pointTransactionId String
+  actorUserId        String
+  reactionKey        String
+  deletedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pointTransaction PointTransaction @relation(fields: [pointTransactionId], references: [id], onDelete: Cascade)
+  actor            User             @relation("PointReactionActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, pointTransactionId])
+  @@index([actorUserId, updatedAt])
 }
 
 model AuditEvent {

@@ -29,6 +29,18 @@ export const POINT_TRANSACTION_TYPES = ["AWARD", "DEDUCTION"] as const;
 export const pointTransactionTypeSchema = z.enum(POINT_TRANSACTION_TYPES);
 export type PointTransactionType = (typeof POINT_TRANSACTION_TYPES)[number];
 
+export const POINT_REACTION_KEYS = ["clap", "heart", "fire", "party", "star"] as const;
+export const pointReactionKeySchema = z.enum(POINT_REACTION_KEYS);
+export type PointReactionKey = (typeof POINT_REACTION_KEYS)[number];
+
+export const POINT_REACTION_LABELS: Record<PointReactionKey, string> = {
+  clap: "Applause",
+  heart: "Love it",
+  fire: "On fire",
+  party: "Celebrate",
+  star: "Great work",
+};
+
 export const TRAIT_LABELS: Record<Trait, string> = {
   LEADERSHIP:          "Leadership",
   OWNERSHIP:           "Ownership",
@@ -84,6 +96,28 @@ export const deletePointTransactionSchema = z.object({
 }).strict();
 
 export type DeletePointTransactionInput = z.infer<typeof deletePointTransactionSchema>;
+
+export const reactToPointTransactionSchema = z.object({
+  transactionId: z.string().min(1),
+  reactionKey: pointReactionKeySchema.nullable(),
+}).strict();
+
+export type ReactToPointTransactionInput = z.infer<typeof reactToPointTransactionSchema>;
+
+export const activityReactionSummarySchema = z.object({
+  reactionKey: pointReactionKeySchema,
+  count: z.number().int().min(1),
+});
+
+export type ActivityReactionSummary = z.infer<typeof activityReactionSummarySchema>;
+
+export const pointReactionResponseSchema = z.object({
+  transactionId: z.string().min(1),
+  myReactionKey: pointReactionKeySchema.nullable(),
+  reactions: z.array(activityReactionSummarySchema),
+});
+
+export type PointReactionResponse = z.infer<typeof pointReactionResponseSchema>;
 
 export const deletedPointSchema = z.object({
   id: z.string().min(1),
