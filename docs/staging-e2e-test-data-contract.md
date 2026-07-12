@@ -134,6 +134,15 @@ Dedicated reaction-notification smoke coverage is intentionally optional because
 - signs in as the reaction actor and reacts to that exact award from Activity;
 - signs in as the reaction recipient and verifies the notification tray contains the reaction notification with the actor's display name and final reaction label.
 
+For full staging reaction coverage, configure all four reaction secrets in the GitHub `staging` Environment:
+
+- `E2E_REACTION_ACTOR_EMAIL`
+- `E2E_REACTION_ACTOR_PASSWORD`
+- `E2E_REACTION_RECIPIENT_EMAIL`
+- `E2E_REACTION_RECIPIENT_PASSWORD`
+
+If any one of these is missing, the reaction-notification smoke skips by design while the rest of the staging suite continues to run.
+
 ## Local Run
 
 ```powershell

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { missingRequiredEnv, readTargetMemberName, requiredStagingEnv } from "./support/config";
 import { exactNamePattern, signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
@@ -39,7 +39,7 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await page.getByRole("tab", { name: /activity/i }).click();
   await expect(page.getByText(note)).toBeVisible();
 
-  const activityCard = page.locator("div").filter({ hasText: note }).filter({ hasText: targetMember }).first();
+  const activityCard = getActivityCard(page, targetMember, note);
   await activityCard.getByRole("button", { name: /react with love it/i }).click();
   await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
@@ -54,3 +54,11 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await page.getByRole("tab", { name: /leaderboard/i }).click();
   await expect(page.getByText(exactNamePattern(targetMember))).toBeVisible();
 });
+
+function getActivityCard(page: Page, targetMember: string, note: string) {
+  return page
+    .getByTestId("activity-card")
+    .filter({ hasText: note })
+    .filter({ hasText: targetMember })
+    .first();
+}

@@ -116,7 +116,7 @@ async function expectRecipientNotification(
 
 function getActivityCard(page: Page, targetMember: string, note: string) {
   return page
-    .locator("div.rounded-xl")
+    .getByTestId("activity-card")
     .filter({ hasText: note })
     .filter({ hasText: targetMember })
     .first();

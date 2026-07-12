@@ -62,7 +62,7 @@ The UI should immediately show Greg's final selected reaction.
 
 ### Removing A Reaction
 
-Clicking the selected reaction again may remove the reaction. If removal is included in the MVP, prefer soft deletion:
+Clicking the selected reaction again removes the reaction. The MVP uses soft deletion:
 
 ```text
 deletedAt = now()
@@ -112,8 +112,7 @@ Reaction change:
 
 Reaction removal:
 
-- archive the deduped notification if it is still unread;
-- if it has already been read, either archive it or leave it as historical read context. MVP recommendation: archive it so the notification tray reflects current state.
+- archive the deduped notification so the notification tray reflects current state.
 
 This gives the user the final accurate reaction without letting accidental changes produce notification bursts.
 
@@ -231,11 +230,11 @@ The activity feed should return counts for the currently visible page. Avoid a p
 
 ## UI Direction
 
-Before adding reaction controls, split the Activity tab into smaller pieces:
+The Activity tab is split into smaller pieces:
 
 - `ActivityFeed`: pagination, load-more state, delete state.
 - `ActivityCard`: presentation for one transaction.
-- future `ActivityReactionBar`: controlled reaction buttons and counts.
+- `point-reactions`: shared reaction emoji and visible picker constants.
 
 The Activity tab should be treated as the main team interaction surface, not a small recent-activity widget. Use `Team Activity` language, keep paging server-backed, and add filters through the activity API so users are filtering the full dataset rather than only the currently loaded page. The first filter slices are transaction type and recipient member, both applied before pagination.
 
@@ -257,15 +256,17 @@ Current actions:
 
 - `Delete point transaction`, shown only to admins and owners with delete permission.
 
-Future actions:
+Current actions:
 
-- `View reactions`, available once reaction detail data exists.
+- `View reactions`, shown when reaction detail data exists for an award.
 
-The future reaction detail dialog should show:
+The reaction detail dialog shows:
 
-- reaction label;
+- reaction emoji, with an accessible label;
 - member display name;
 - reaction timestamp.
+
+The reaction list is capped inside the modal and scrolls independently so larger organizations can show many reactions without expanding the page.
 
 Keep the menu visible only when there is at least one real action for the current user. Avoid shipping a disabled placeholder for `View reactions` before reaction data exists.
 
@@ -283,25 +284,27 @@ Replace the floating delete control with a three-dot actions menu. Keep delete b
 
 Add `PointReaction`, contracts, the reaction endpoint, and notification update logic.
 
-Current progress: the `PointReaction` model, partial unique index, controlled reaction keys, mutation/detail request schemas, mutation/detail response schemas, `/transactions/react` endpoint, `/transactions/reactions` detail endpoint, deduped recipient notification behavior, activity feed reaction summaries, compact 2-by-2 activity card reaction controls, and the activity card `View reactions` detail dialog are in place.
+Status: done. The `PointReaction` model, partial unique index, controlled reaction keys, mutation/detail request schemas, mutation/detail response schemas, `/transactions/react` endpoint, `/transactions/reactions` detail endpoint, deduped recipient notification behavior, activity feed reaction summaries, compact 2-by-2 activity card reaction controls, and the activity card `View reactions` detail dialog are in place.
 
 ### Phase 3 - Read Model
 
 Add reaction summaries and `myReactionKey` to activity feed responses.
 
+Status: done.
+
 ### Phase 4 - UI MVP
 
 Add the reaction bar to award cards. Keep deductions reaction-free.
+
+Status: done. Award cards expose the visible reaction set in a compact 2-by-2 picker. Deductions do not show reaction controls.
 
 ### Phase 5 - E2E Smoke
 
 Add a staging E2E test where a second actor reacts to a point award and the recipient receives one accurate notification.
 
-Current progress: the existing happy-path Playwright smoke verifies that a user can react to a newly created award and open the reaction detail dialog for that activity card. An optional staging Playwright smoke also verifies that a dedicated reaction actor can react to a new award and the point recipient receives the reaction notification when `E2E_REACTION_ACTOR_*` and `E2E_REACTION_RECIPIENT_*` credentials are configured.
+Status: done. The existing happy-path Playwright smoke verifies that a user can react to a newly created award and open the reaction detail dialog for that activity card. An optional staging Playwright smoke also verifies that a dedicated reaction actor can react to a new award and the point recipient receives the reaction notification when `E2E_REACTION_ACTOR_*` and `E2E_REACTION_RECIPIENT_*` credentials are configured.
 
 ## Open Questions
 
-- Should removal be in MVP, or should clicking the active reaction do nothing?
-- Should reaction notifications appear as read history after a reaction is removed, or should they always archive?
 - Should the point giver ever receive a summary notification later, such as "3 people reacted to your recognition"?
 - Should owners be able to configure the allowed reaction set per organization?
