@@ -295,7 +295,7 @@ describe("ActivityFeed", () => {
     expect(selectedReaction).toHaveTextContent("1");
   });
 
-  it("shows the compact reaction picker without the retired star option", async () => {
+  it("shows the compact reaction picker with the full positive reaction set", async () => {
     const user = userEvent.setup();
     render(
       <ActivityFeed
@@ -316,7 +316,9 @@ describe("ActivityFeed", () => {
     expect(screen.getByRole("menuitem", { name: /react with love it/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /react with on fire/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /react with celebrate/i })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: /react with great work/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with great work/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with sparkles/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with trophy/i })).toBeInTheDocument();
   });
 
   it("shows reaction details from the activity actions menu", async () => {
