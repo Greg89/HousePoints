@@ -3,6 +3,22 @@ import { expect, type Page } from "@playwright/test";
 import { getE2EDiagnostics } from "./navigation";
 
 export async function expectDashboardReady(page: Page) {
+  await ensureDashboardState(page);
+
+  if (await page.getByText(/something went wrong/i).isVisible().catch(() => false)) {
+    // Staging occasionally serves a transient error boundary after auth redirects.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await ensureDashboardState(page);
+  }
+
+  if (await page.getByText(/something went wrong/i).isVisible().catch(() => false)) {
+    throw new Error("E2E user reached the app error boundary. Check web/API logs for the staging request.");
+  }
+
+  await expect(page.getByText(/welcome back/i)).toBeVisible();
+}
+
+async function ensureDashboardState(page: Page) {
   await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
 
   await Promise.any([
@@ -25,12 +41,6 @@ export async function expectDashboardReady(page: Page) {
       "E2E user reached organization onboarding. Add this user to the E2E organization or set E2E_ORG_SLUG to an organization they belong to.",
     );
   }
-
-  if (await page.getByText(/something went wrong/i).isVisible().catch(() => false)) {
-    throw new Error("E2E user reached the app error boundary. Check web/API logs for the staging request.");
-  }
-
-  await expect(page.getByText(/welcome back/i)).toBeVisible();
 }
 
 async function buildDashboardTimeoutMessage(page: Page) {

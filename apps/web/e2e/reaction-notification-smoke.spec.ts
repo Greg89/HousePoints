@@ -78,8 +78,9 @@ async function reactToAward(
     const card = getActivityCard(page, note);
     await expect(card).toBeVisible();
 
-    await card.getByRole("button", { name: /react with love it/i }).click();
-    await expect(card.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
+    await card.getByRole("button", { name: /open reactions for/i }).click();
+    await card.getByRole("menuitem", { name: /react with love it/i }).click();
+    await expect(card.getByRole("menuitem", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
     return reactionActorName;
   } finally {
@@ -133,7 +134,7 @@ async function expectRecipientNotification(
 
 function getActivityCard(page: Page, note: string) {
   return page.getByText(note, { exact: true }).locator(
-    "xpath=ancestor::*[@data-testid='activity-card' or (contains(concat(' ', normalize-space(@class), ' '), ' rounded-xl ') and .//button[contains(@aria-label, 'React with')])][1]",
+    "xpath=ancestor::*[@data-testid='activity-card' or (contains(concat(' ', normalize-space(@class), ' '), ' rounded-xl ') and .//button[contains(@aria-label, 'Open reactions for')])][1]",
   );
 }
 

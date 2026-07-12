@@ -40,8 +40,9 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await expect(page.getByText(note)).toBeVisible();
 
   const activityCard = getActivityCard(page, note);
-  await activityCard.getByRole("button", { name: /react with love it/i }).click();
-  await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
+  await activityCard.getByRole("button", { name: /open reactions for/i }).click();
+  await activityCard.getByRole("menuitem", { name: /react with love it/i }).click();
+  await expect(activityCard.getByRole("menuitem", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
   await activityCard.getByRole("button", { name: /activity actions/i }).click();
   await page.getByRole("menuitem", { name: /view reactions/i }).click();
@@ -57,6 +58,6 @@ test("login, award points, react, and see activity plus leaderboard updates", as
 
 function getActivityCard(page: Page, note: string) {
   return page.getByText(note, { exact: true }).locator(
-    "xpath=ancestor::*[@data-testid='activity-card' or (contains(concat(' ', normalize-space(@class), ' '), ' rounded-xl ') and .//button[contains(@aria-label, 'React with')])][1]",
+    "xpath=ancestor::*[@data-testid='activity-card' or (contains(concat(' ', normalize-space(@class), ' '), ' rounded-xl ') and .//button[contains(@aria-label, 'Open reactions for')])][1]",
   );
 }
