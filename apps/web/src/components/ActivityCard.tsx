@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, DotsThreeVertical, Eye, Trash } from "@phosphor-icons/react";
+import { ArrowRight, CaretDown, DotsThreeVertical, Eye, Trash } from "@phosphor-icons/react";
 import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
 import { POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
 import { REACTION_EMOJI, VISIBLE_REACTION_KEYS } from "./point-reactions";
@@ -208,7 +208,7 @@ export function ActivityCard({
                 aria-haspopup="menu"
                 aria-expanded={reactionsOpen}
                 aria-controls={reactionsMenuId}
-                className="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                className="inline-flex h-8 min-w-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
               >
                 {topReactionKeys.length > 0 ? (
                   <span className="inline-flex items-center gap-0.5" aria-hidden="true">
@@ -218,18 +218,19 @@ export function ActivityCard({
                   </span>
                 ) : null}
                 {item.myReactionKey ? (
-                  <span className="text-primary">
-                    {REACTION_EMOJI[item.myReactionKey]} You
+                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-primary">
+                    {REACTION_EMOJI[item.myReactionKey]} you
                   </span>
                 ) : null}
-                <span>{totalReactions > 0 ? totalReactions : "React"}</span>
+                <span>{totalReactions > 0 ? `${totalReactions}` : "React"}</span>
+                <CaretDown size={12} weight="bold" aria-hidden="true" />
               </button>
               {reactionsOpen ? (
                 <div
                   id={reactionsMenuId}
                   role="menu"
                   aria-label={`Reaction picker for ${item.targetUserName}`}
-                  className="absolute left-0 top-full z-20 mt-2 w-52 rounded-xl border bg-card p-2 shadow-lg"
+                  className="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-xl border bg-card p-2 shadow-lg"
                 >
                   <div className="grid grid-cols-2 gap-1.5">
                     {VISIBLE_REACTION_KEYS.map((reactionKey) => {
