@@ -3,10 +3,13 @@ import { POINT_REACTION_KEYS, type PointReactionKey } from "@housepoints/contrac
 export const REACTION_EMOJI: Record<PointReactionKey, string> = {
   clap: "👏",
   heart: "❤️",
-  fire: "🔥",
-  party: "🎉",
   star: "⭐",
   sparkles: "✨",
+  raisedHands: "🙌",
+  hundred: "💯",
+  party: "🎉",
+  fire: "🔥",
+  rocket: "🚀",
   trophy: "🏆",
 };
 

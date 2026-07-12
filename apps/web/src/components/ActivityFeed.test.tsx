@@ -314,10 +314,13 @@ describe("ActivityFeed", () => {
 
     expect(screen.getByRole("menuitem", { name: /react with applause/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /react with love it/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /react with on fire/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /react with celebrate/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /react with great work/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /react with sparkles/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with raised hands/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with 100/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with celebrate/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with on fire/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with rocket/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /react with trophy/i })).toBeInTheDocument();
   });
 

@@ -29,17 +29,31 @@ export const POINT_TRANSACTION_TYPES = ["AWARD", "DEDUCTION"] as const;
 export const pointTransactionTypeSchema = z.enum(POINT_TRANSACTION_TYPES);
 export type PointTransactionType = (typeof POINT_TRANSACTION_TYPES)[number];
 
-export const POINT_REACTION_KEYS = ["clap", "heart", "fire", "party", "star", "sparkles", "trophy"] as const;
+export const POINT_REACTION_KEYS = [
+  "clap",
+  "heart",
+  "star",
+  "sparkles",
+  "raisedHands",
+  "hundred",
+  "party",
+  "fire",
+  "rocket",
+  "trophy",
+] as const;
 export const pointReactionKeySchema = z.enum(POINT_REACTION_KEYS);
 export type PointReactionKey = (typeof POINT_REACTION_KEYS)[number];
 
 export const POINT_REACTION_LABELS: Record<PointReactionKey, string> = {
   clap: "Applause",
   heart: "Love it",
-  fire: "On fire",
-  party: "Celebrate",
   star: "Great work",
   sparkles: "Sparkles",
+  raisedHands: "Raised hands",
+  hundred: "100",
+  party: "Celebrate",
+  fire: "On fire",
+  rocket: "Rocket",
   trophy: "Trophy",
 };
 
