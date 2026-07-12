@@ -286,15 +286,17 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /react with love it/i }));
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /react with love it/i }));
 
     await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", "heart"));
-    const selectedReaction = await screen.findByRole("button", { name: /remove love it reaction/i });
+    const selectedReaction = await screen.findByRole("menuitem", { name: /remove love it reaction/i });
     expect(selectedReaction).toHaveAttribute("aria-pressed", "true");
     expect(selectedReaction).toHaveTextContent("1");
   });
 
-  it("shows the compact reaction picker without the retired star option", () => {
+  it("shows the compact reaction picker without the retired star option", async () => {
+    const user = userEvent.setup();
     render(
       <ActivityFeed
         items={[baseActivity]}
@@ -305,11 +307,16 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /react with applause/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /react with love it/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /react with on fire/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /react with celebrate/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /react with great work/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /react with applause/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open reactions for ben/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+
+    expect(screen.getByRole("menuitem", { name: /react with applause/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with love it/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with on fire/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /react with celebrate/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /react with great work/i })).not.toBeInTheDocument();
   });
 
   it("shows reaction details from the activity actions menu", async () => {
@@ -415,10 +422,11 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /remove love it reaction/i }));
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /remove love it reaction/i }));
 
     await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", null));
-    expect(await screen.findByRole("button", { name: /react with love it/i })).toHaveAttribute("aria-pressed", "false");
+    expect(await screen.findByRole("menuitem", { name: /react with love it/i })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows a safe error when a reaction mutation fails", async () => {
@@ -439,10 +447,11 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /react with applause/i }));
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /react with applause/i }));
 
     expect(await screen.findByText("Point transaction was not found")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /react with applause/i })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("menuitem", { name: /react with applause/i })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("does not show reaction controls for deductions", () => {

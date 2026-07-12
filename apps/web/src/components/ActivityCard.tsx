@@ -46,16 +46,28 @@ export function ActivityCard({
   onViewReactions,
 }: ActivityCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [reactionsOpen, setReactionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
+  const reactionsRef = useRef<HTMLDivElement>(null);
   const isDeduction = item.type === "DEDUCTION";
   const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
   const actionLabel = isDeduction ? "deducted" : "recognized";
   const actionsMenuId = `activity-actions-${item.id}`;
+  const reactionsMenuId = `activity-reactions-${item.id}`;
   const hasActions = canDelete || canViewReactions;
   const canShowReactions = canReact && !isDeduction && Boolean(onReact);
   const reactionCounts = new Map(
     (item.reactions ?? []).map((reaction) => [reaction.reactionKey, reaction.count]),
   );
+  const totalReactions = (item.reactions ?? []).reduce(
+    (sum, reaction) => sum + reaction.count,
+    0,
+  );
+  const topReactionKeys = [...reactionCounts.entries()]
+    .filter(([, count]) => count > 0)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 2)
+    .map(([reactionKey]) => reactionKey);
   const pointTone = isDeduction
     ? {
         badge: "border-destructive/20 bg-destructive/10 text-destructive",
@@ -67,19 +79,24 @@ export function ActivityCard({
       };
 
   useEffect(() => {
-    if (!actionsOpen) {
+    if (!actionsOpen && !reactionsOpen) {
       return;
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!actionsRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (actionsOpen && !actionsRef.current?.contains(target)) {
         setActionsOpen(false);
+      }
+      if (reactionsOpen && !reactionsRef.current?.contains(target)) {
+        setReactionsOpen(false);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setActionsOpen(false);
+        setReactionsOpen(false);
       }
     }
 
@@ -90,7 +107,7 @@ export function ActivityCard({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [actionsOpen]);
+  }, [actionsOpen, reactionsOpen]);
 
   return (
     <motion.div
@@ -180,37 +197,73 @@ export function ActivityCard({
         <div className="flex items-start justify-between gap-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
           {canShowReactions ? (
             <div
-              className="grid min-w-0 grid-cols-2 gap-1.5"
+              ref={reactionsRef}
+              className="relative min-w-0"
               aria-label={`Reactions for ${item.targetUserName}`}
             >
-              {VISIBLE_REACTION_KEYS.map((reactionKey) => {
-                const selected = item.myReactionKey === reactionKey;
-                const count = reactionCounts.get(reactionKey) ?? 0;
-                const label = selected
-                  ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
-                  : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
+              <button
+                type="button"
+                onClick={() => setReactionsOpen((current) => !current)}
+                aria-label={`Open reactions for ${item.targetUserName}`}
+                aria-haspopup="menu"
+                aria-expanded={reactionsOpen}
+                aria-controls={reactionsMenuId}
+                className="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+              >
+                {topReactionKeys.length > 0 ? (
+                  <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                    {topReactionKeys.map((reactionKey) => (
+                      <span key={reactionKey}>{REACTION_EMOJI[reactionKey]}</span>
+                    ))}
+                  </span>
+                ) : null}
+                {item.myReactionKey ? (
+                  <span className="text-primary">
+                    {REACTION_EMOJI[item.myReactionKey]} You
+                  </span>
+                ) : null}
+                <span>{totalReactions > 0 ? totalReactions : "React"}</span>
+              </button>
+              {reactionsOpen ? (
+                <div
+                  id={reactionsMenuId}
+                  role="menu"
+                  aria-label={`Reaction picker for ${item.targetUserName}`}
+                  className="absolute left-0 top-full z-20 mt-2 w-52 rounded-xl border bg-card p-2 shadow-lg"
+                >
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {VISIBLE_REACTION_KEYS.map((reactionKey) => {
+                      const selected = item.myReactionKey === reactionKey;
+                      const count = reactionCounts.get(reactionKey) ?? 0;
+                      const label = selected
+                        ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
+                        : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
 
-                return (
-                  <button
-                    key={reactionKey}
-                    type="button"
-                    aria-label={label}
-                    aria-pressed={selected}
-                    disabled={isReacting}
-                    onClick={() => onReact?.(reactionKey)}
-                    className={[
-                      "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
-                      selected
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
-                      "disabled:cursor-wait disabled:opacity-60",
-                    ].join(" ")}
-                  >
-                    <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
-                    {count > 0 ? <span>{count}</span> : null}
-                  </button>
-                );
-              })}
+                      return (
+                        <button
+                          key={reactionKey}
+                          type="button"
+                          role="menuitem"
+                          aria-label={label}
+                          aria-pressed={selected}
+                          disabled={isReacting}
+                          onClick={() => onReact?.(reactionKey)}
+                          className={[
+                            "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
+                            selected
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
+                            "disabled:cursor-wait disabled:opacity-60",
+                          ].join(" ")}
+                        >
+                          <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
+                          {count > 0 ? <span>{count}</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="min-w-0" />
