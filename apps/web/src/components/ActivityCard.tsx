@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, CaretDown, DotsThreeVertical, Eye, Trash } from "@phosphor-icons/react";
+import { ArrowRight, DotsThreeVertical, Eye, Smiley, Trash } from "@phosphor-icons/react";
 import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
 import { POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
 import { REACTION_EMOJI, VISIBLE_REACTION_KEYS } from "./point-reactions";
@@ -66,7 +66,7 @@ export function ActivityCard({
   const topReactionKeys = [...reactionCounts.entries()]
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1])
-    .slice(0, 2)
+    .slice(0, 3)
     .map(([reactionKey]) => reactionKey);
   const pointTone = isDeduction
     ? {
@@ -115,9 +115,9 @@ export function ActivityCard({
       initial={{ opacity: 0, x: -16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04, duration: 0.2 }}
-      className="rounded-xl border bg-card/70 p-4 transition-colors hover:bg-muted/20"
+      className="group rounded-xl border bg-card/70 p-3 transition-colors hover:bg-muted/20"
     >
-      <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_7rem_9rem] lg:items-center">
+      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)_6.25rem_3.25rem] lg:items-center">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex flex-shrink-0 flex-col items-center gap-2 pt-1">
             <div className="flex items-center gap-1.5">
@@ -158,7 +158,7 @@ export function ActivityCard({
           </div>
         </div>
 
-        <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+        <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
           <p className="line-clamp-2 text-sm text-muted-foreground">{item.reason}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {item.trait ? (
@@ -175,11 +175,35 @@ export function ActivityCard({
               {relativeTime(item.createdAt)}
             </span>
           </div>
+          {topReactionKeys.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label={`Reaction summary for ${item.targetUserName}`}>
+              {topReactionKeys.map((reactionKey) => {
+                const count = reactionCounts.get(reactionKey) ?? 0;
+                const mine = item.myReactionKey === reactionKey;
+
+                return (
+                  <span
+                    key={reactionKey}
+                    className={[
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold",
+                      mine
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "bg-background/80 text-muted-foreground",
+                    ].join(" ")}
+                    title={POINT_REACTION_LABELS[reactionKey]}
+                  >
+                    <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
+                    <span>{count}</span>
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
 
         <div
           className={[
-            "flex items-center justify-between rounded-2xl border px-3 py-2 lg:min-h-20 lg:flex-col lg:justify-center lg:text-center",
+            "flex items-center justify-between rounded-2xl border px-3 py-2 lg:min-h-16 lg:flex-col lg:justify-center lg:text-center",
             pointTone.badge,
           ].join(" ")}
         >
@@ -194,131 +218,121 @@ export function ActivityCard({
           </div>
         </div>
 
-        <div className="flex items-start justify-between gap-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          {canShowReactions ? (
-            <div
-              ref={reactionsRef}
-              className="relative min-w-0"
-              aria-label={`Reactions for ${item.targetUserName}`}
-            >
-              <button
-                type="button"
-                onClick={() => setReactionsOpen((current) => !current)}
-                aria-label={`Open reactions for ${item.targetUserName}`}
-                aria-haspopup="menu"
-                aria-expanded={reactionsOpen}
-                aria-controls={reactionsMenuId}
-                className="inline-flex h-8 min-w-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
-              >
-                {topReactionKeys.length > 0 ? (
-                  <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-                    {topReactionKeys.map((reactionKey) => (
-                      <span key={reactionKey}>{REACTION_EMOJI[reactionKey]}</span>
-                    ))}
-                  </span>
-                ) : null}
-                {item.myReactionKey ? (
-                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-primary">
-                    {REACTION_EMOJI[item.myReactionKey]} you
-                  </span>
-                ) : null}
-                <span>{totalReactions > 0 ? `${totalReactions}` : "React"}</span>
-                <CaretDown size={12} weight="bold" aria-hidden="true" />
-              </button>
-              {reactionsOpen ? (
-                <div
-                  id={reactionsMenuId}
-                  role="menu"
-                  aria-label={`Reaction picker for ${item.targetUserName}`}
-                  className="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-xl border bg-card p-2 shadow-lg"
-                >
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {VISIBLE_REACTION_KEYS.map((reactionKey) => {
-                      const selected = item.myReactionKey === reactionKey;
-                      const count = reactionCounts.get(reactionKey) ?? 0;
-                      const label = selected
-                        ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
-                        : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
-
-                      return (
-                        <button
-                          key={reactionKey}
-                          type="button"
-                          role="menuitem"
-                          aria-label={label}
-                          aria-pressed={selected}
-                          disabled={isReacting}
-                          onClick={() => onReact?.(reactionKey)}
-                          className={[
-                            "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
-                            selected
-                              ? "border-primary/40 bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
-                            "disabled:cursor-wait disabled:opacity-60",
-                          ].join(" ")}
-                        >
-                          <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
-                          {count > 0 ? <span>{count}</span> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="min-w-0" />
-          )}
+        <div className="flex items-start justify-end border-t pt-3 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
           <div className="flex flex-shrink-0 items-start">
-            {hasActions ? (
-              <div ref={actionsRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setActionsOpen((current) => !current)}
-                  aria-label={`Activity actions for ${item.targetUserName}`}
-                  aria-haspopup="menu"
-                  aria-expanded={actionsOpen}
-                  aria-controls={actionsMenuId}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-                >
-                  <DotsThreeVertical size={18} weight="bold" />
-                </button>
-                {actionsOpen ? (
-                  <div
-                    id={actionsMenuId}
-                    role="menu"
-                    aria-label={`Activity actions for ${item.targetUserName}`}
-                    className="absolute right-0 z-20 mt-2 w-52 rounded-xl border bg-card p-1 shadow-lg"
-                  >
-                    {canViewReactions ? (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setActionsOpen(false);
-                          onViewReactions?.();
-                        }}
-                        disabled={isLoadingReactions}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-50"
+            {(canShowReactions || hasActions) ? (
+              <div className="relative flex flex-row gap-1 lg:flex-col" ref={reactionsRef}>
+                {canShowReactions ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setReactionsOpen((current) => !current)}
+                      aria-label={`Open reactions for ${item.targetUserName}`}
+                      aria-haspopup="menu"
+                      aria-expanded={reactionsOpen}
+                      aria-controls={reactionsMenuId}
+                      className={[
+                        "inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors",
+                        "hover:border-primary/40 hover:bg-primary/10 hover:text-primary",
+                        totalReactions > 0 ? "border-primary/30 text-primary" : "",
+                        "lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100",
+                      ].join(" ")}
+                    >
+                      <Smiley size={16} weight="duotone" />
+                    </button>
+                    {reactionsOpen ? (
+                      <div
+                        id={reactionsMenuId}
+                        role="menu"
+                        aria-label={`Reaction picker for ${item.targetUserName}`}
+                        className="absolute bottom-full right-0 z-20 mb-2 w-44 rounded-xl border bg-card p-2 shadow-lg lg:bottom-auto lg:right-full lg:top-1/2 lg:mb-0 lg:mr-2 lg:-translate-y-1/2"
                       >
-                        <Eye size={16} />
-                        View reactions
-                      </button>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {VISIBLE_REACTION_KEYS.map((reactionKey) => {
+                            const selected = item.myReactionKey === reactionKey;
+                            const count = reactionCounts.get(reactionKey) ?? 0;
+                            const label = selected
+                              ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
+                              : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
+
+                            return (
+                              <button
+                                key={reactionKey}
+                                type="button"
+                                role="menuitem"
+                                aria-label={label}
+                                aria-pressed={selected}
+                                disabled={isReacting}
+                                onClick={() => onReact?.(reactionKey)}
+                                className={[
+                                  "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
+                                  selected
+                                    ? "border-primary/40 bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
+                                  "disabled:cursor-wait disabled:opacity-60",
+                                ].join(" ")}
+                              >
+                                <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
+                                {count > 0 ? <span>{count}</span> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     ) : null}
-                    {canDelete ? (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setActionsOpen(false);
-                          onDelete();
-                        }}
-                        disabled={isDeleting}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-wait disabled:opacity-50"
+                  </>
+                ) : null}
+                {hasActions ? (
+                  <div ref={actionsRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActionsOpen((current) => !current)}
+                      aria-label={`Activity actions for ${item.targetUserName}`}
+                      aria-haspopup="menu"
+                      aria-expanded={actionsOpen}
+                      aria-controls={actionsMenuId}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                    >
+                      <DotsThreeVertical size={18} weight="bold" />
+                    </button>
+                    {actionsOpen ? (
+                      <div
+                        id={actionsMenuId}
+                        role="menu"
+                        aria-label={`Activity actions for ${item.targetUserName}`}
+                        className="absolute right-0 z-20 mt-2 w-52 rounded-xl border bg-card p-1 shadow-lg"
                       >
-                        <Trash size={16} />
-                        Delete point transaction
-                      </button>
+                        {canViewReactions ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setActionsOpen(false);
+                              onViewReactions?.();
+                            }}
+                            disabled={isLoadingReactions}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-50"
+                          >
+                            <Eye size={16} />
+                            View reactions
+                          </button>
+                        ) : null}
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setActionsOpen(false);
+                              onDelete();
+                            }}
+                            disabled={isDeleting}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-wait disabled:opacity-50"
+                          >
+                            <Trash size={16} />
+                            Delete point transaction
+                          </button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 ) : null}

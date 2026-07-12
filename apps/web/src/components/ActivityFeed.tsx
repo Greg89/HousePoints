@@ -267,117 +267,121 @@ export function ActivityFeed({
   return (
     <div className="rounded-xl border bg-card">
       <div className="border-b p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
-              <Clock size={24} />
-              Team Activity
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Recognition, deductions, and teammate moments across the organization.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:items-end">
-            <div className="flex flex-wrap gap-2" aria-label="Activity filters">
-              {FILTER_OPTIONS.map((option) => {
-                const selected = option.value === activeFilter;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => void handleFilterChange(option.value)}
-                    aria-pressed={selected}
-                    disabled={isLoadingMore}
-                    title={option.description}
-                    className={[
-                      "rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
-                      selected
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:border-primary/30 hover:text-foreground",
-                      "disabled:cursor-wait disabled:opacity-60",
-                    ].join(" ")}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-            <label className="flex w-full flex-col gap-1 text-sm font-semibold text-muted-foreground sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              Member
-              <select
-                value={activeMemberId}
-                onChange={(event) => void handleMemberChange(event.target.value)}
-                disabled={isLoadingMore}
-                className="min-w-56 rounded-full border bg-background px-3 py-1.5 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
-              >
-                <option value="ALL">All members</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <div>
+          <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
+            <Clock size={24} />
+            Team Activity
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Recognition, deductions, and teammate moments across the organization.
+          </p>
         </div>
       </div>
-      <div className="overflow-y-auto max-h-[500px] p-4 space-y-3">
-        {visibleItems.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8 text-sm">
-            {!hasActiveFilters
-              ? "No team activity yet. Award some points!"
-              : "No activity matches this filter yet."}
+      <div className="grid gap-4 p-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
+        <aside className="rounded-xl border bg-background/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Filters
           </p>
-        ) : (
-          visibleItems.map((item, index) => (
-            <ActivityCard
-              key={item.id}
-              item={item}
-              index={index}
-              canDelete={canDelete && Boolean(onDelete)}
-              isDeleting={deletingIds.has(item.id)}
-              onDelete={() => handleDelete(item)}
-              canReact={Boolean(onReact)}
-              isReacting={reactingIds.has(item.id)}
-              onReact={(reactionKey) => handleReact(item, reactionKey)}
-              canViewReactions={
-                Boolean(onReadReactions)
-                && item.type === "AWARD"
-                && (item.reactions ?? []).some((reaction) => reaction.count > 0)
-              }
-              isLoadingReactions={loadingReactionDetailsId === item.id}
-              onViewReactions={() => void handleViewReactions(item)}
-            />
-          ))
-        )}
-        {loadMoreError ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {loadMoreError}
-          </p>
-        ) : null}
-        {deleteError ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {deleteError}
-          </p>
-        ) : null}
-        {reactionError ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {reactionError}
-          </p>
-        ) : null}
-        {cursor ? (
-          <div className="flex justify-center pt-2">
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              disabled={isLoadingMore}
-              className="rounded-lg border px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
-            >
-              {isLoadingMore ? "Loading..." : "Load more activity"}
-            </button>
+          <div className="mt-2 grid gap-2" aria-label="Activity filters">
+            {FILTER_OPTIONS.map((option) => {
+              const selected = option.value === activeFilter;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => void handleFilterChange(option.value)}
+                  aria-pressed={selected}
+                  disabled={isLoadingMore}
+                  title={option.description}
+                  className={[
+                    "w-full rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors",
+                    selected
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                    "disabled:cursor-wait disabled:opacity-60",
+                  ].join(" ")}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
-        ) : null}
+          <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Member
+            <select
+              value={activeMemberId}
+              onChange={(event) => void handleMemberChange(event.target.value)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="ALL">All members</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+        </aside>
+
+        <div className="overflow-y-auto max-h-[540px] space-y-3 pr-1">
+          {visibleItems.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">
+              {!hasActiveFilters
+                ? "No team activity yet. Award some points!"
+                : "No activity matches this filter yet."}
+            </p>
+          ) : (
+            visibleItems.map((item, index) => (
+              <ActivityCard
+                key={item.id}
+                item={item}
+                index={index}
+                canDelete={canDelete && Boolean(onDelete)}
+                isDeleting={deletingIds.has(item.id)}
+                onDelete={() => handleDelete(item)}
+                canReact={Boolean(onReact)}
+                isReacting={reactingIds.has(item.id)}
+                onReact={(reactionKey) => handleReact(item, reactionKey)}
+                canViewReactions={
+                  Boolean(onReadReactions)
+                  && item.type === "AWARD"
+                  && (item.reactions ?? []).some((reaction) => reaction.count > 0)
+                }
+                isLoadingReactions={loadingReactionDetailsId === item.id}
+                onViewReactions={() => void handleViewReactions(item)}
+              />
+            ))
+          )}
+          {loadMoreError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {loadMoreError}
+            </p>
+          ) : null}
+          {deleteError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {deleteError}
+            </p>
+          ) : null}
+          {reactionError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {reactionError}
+            </p>
+          ) : null}
+          {cursor ? (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="rounded-lg border px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
+              >
+                {isLoadingMore ? "Loading..." : "Load more activity"}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
       <Dialog.Root
         open={reactionDetailsOpen}
