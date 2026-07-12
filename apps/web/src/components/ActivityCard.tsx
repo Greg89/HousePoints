@@ -222,66 +222,6 @@ export function ActivityCard({
           <div className="flex flex-shrink-0 items-start">
             {(canShowReactions || hasActions) ? (
               <div className="relative flex flex-row gap-1 lg:flex-col" ref={reactionsRef}>
-                {canShowReactions ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setReactionsOpen((current) => !current)}
-                      aria-label={`Open reactions for ${item.targetUserName}`}
-                      aria-haspopup="menu"
-                      aria-expanded={reactionsOpen}
-                      aria-controls={reactionsMenuId}
-                      className={[
-                        "inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors",
-                        "hover:border-primary/40 hover:bg-primary/10 hover:text-primary",
-                        totalReactions > 0 ? "border-primary/30 text-primary" : "",
-                        "lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100",
-                      ].join(" ")}
-                    >
-                      <Smiley size={16} weight="duotone" />
-                    </button>
-                    {reactionsOpen ? (
-                      <div
-                        id={reactionsMenuId}
-                        role="menu"
-                        aria-label={`Reaction picker for ${item.targetUserName}`}
-                        className="absolute bottom-full right-0 z-20 mb-2 w-44 rounded-xl border bg-card p-2 shadow-lg lg:bottom-auto lg:right-full lg:top-1/2 lg:mb-0 lg:mr-2 lg:-translate-y-1/2"
-                      >
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {VISIBLE_REACTION_KEYS.map((reactionKey) => {
-                            const selected = item.myReactionKey === reactionKey;
-                            const count = reactionCounts.get(reactionKey) ?? 0;
-                            const label = selected
-                              ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
-                              : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
-
-                            return (
-                              <button
-                                key={reactionKey}
-                                type="button"
-                                role="menuitem"
-                                aria-label={label}
-                                aria-pressed={selected}
-                                disabled={isReacting}
-                                onClick={() => onReact?.(reactionKey)}
-                                className={[
-                                  "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
-                                  selected
-                                    ? "border-primary/40 bg-primary/10 text-primary"
-                                    : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
-                                  "disabled:cursor-wait disabled:opacity-60",
-                                ].join(" ")}
-                              >
-                                <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
-                                {count > 0 ? <span>{count}</span> : null}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                ) : null}
                 {hasActions ? (
                   <div ref={actionsRef} className="relative">
                     <button
@@ -335,6 +275,65 @@ export function ActivityCard({
                       </div>
                     ) : null}
                   </div>
+                ) : null}
+                {canShowReactions ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setReactionsOpen((current) => !current)}
+                      aria-label={`Open reactions for ${item.targetUserName}`}
+                      aria-haspopup="menu"
+                      aria-expanded={reactionsOpen}
+                      aria-controls={reactionsMenuId}
+                      className={[
+                        "inline-flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground transition-colors",
+                        "hover:border-primary/40 hover:bg-primary/10 hover:text-primary",
+                        totalReactions > 0 ? "border-primary/30 text-primary" : "",
+                      ].join(" ")}
+                    >
+                      <Smiley size={16} weight="duotone" />
+                    </button>
+                    {reactionsOpen ? (
+                      <div
+                        id={reactionsMenuId}
+                        role="menu"
+                        aria-label={`Reaction picker for ${item.targetUserName}`}
+                        className="absolute bottom-full right-0 z-20 mb-2 w-44 rounded-xl border bg-card p-2 shadow-lg lg:bottom-auto lg:right-full lg:top-1/2 lg:mb-0 lg:mr-2 lg:-translate-y-1/2"
+                      >
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {VISIBLE_REACTION_KEYS.map((reactionKey) => {
+                            const selected = item.myReactionKey === reactionKey;
+                            const count = reactionCounts.get(reactionKey) ?? 0;
+                            const label = selected
+                              ? `Remove ${POINT_REACTION_LABELS[reactionKey]} reaction`
+                              : `React with ${POINT_REACTION_LABELS[reactionKey]}`;
+
+                            return (
+                              <button
+                                key={reactionKey}
+                                type="button"
+                                role="menuitem"
+                                aria-label={label}
+                                aria-pressed={selected}
+                                disabled={isReacting}
+                                onClick={() => onReact?.(reactionKey)}
+                                className={[
+                                  "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
+                                  selected
+                                    ? "border-primary/40 bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary",
+                                  "disabled:cursor-wait disabled:opacity-60",
+                                ].join(" ")}
+                              >
+                                <span aria-hidden="true">{REACTION_EMOJI[reactionKey]}</span>
+                                {count > 0 ? <span>{count}</span> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             ) : null}
