@@ -117,7 +117,7 @@ export function ActivityCard({
       transition={{ delay: index * 0.04, duration: 0.2 }}
       className="group rounded-xl border bg-card/70 p-3 transition-colors hover:bg-muted/20"
     >
-      <div className="grid gap-3 lg:grid-cols-[12rem_minmax(0,1fr)_6.25rem_3.25rem] lg:items-center">
+      <div className="grid gap-3 lg:grid-cols-[14rem_minmax(0,1fr)_6.25rem_3.25rem] lg:items-center">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex flex-shrink-0 flex-col items-center gap-2 pt-1">
             <div className="flex items-center gap-1.5">
@@ -147,19 +147,19 @@ export function ActivityCard({
             ) : null}
           </div>
           <div className="min-w-0 leading-tight">
-            <p className="truncate text-sm font-semibold">{item.actorName}</p>
+            <p className="text-sm font-semibold break-words">{item.actorName}</p>
             <p
               className={["text-xs font-semibold uppercase tracking-wide", pointTone.label].join(" ")}
             >
               {actionLabel}
             </p>
-            <p className="truncate text-sm font-semibold">{item.targetUserName}</p>
+            <p className="text-sm font-semibold break-words">{item.targetUserName}</p>
             <p className="truncate text-xs text-muted-foreground">{item.targetHouseName}</p>
           </div>
         </div>
 
         <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
-          <p className="line-clamp-2 text-sm text-muted-foreground">{item.reason}</p>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{item.reason}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {item.trait ? (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
