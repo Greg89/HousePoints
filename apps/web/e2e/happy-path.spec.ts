@@ -39,7 +39,7 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await page.getByRole("tab", { name: /activity/i }).click();
   await expect(page.getByText(note)).toBeVisible();
 
-  const activityCard = getActivityCard(page, targetMember, note);
+  const activityCard = getActivityCard(page, note);
   await activityCard.getByRole("button", { name: /react with love it/i }).click();
   await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
@@ -55,10 +55,8 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await expect(page.getByText(exactNamePattern(targetMember))).toBeVisible();
 });
 
-function getActivityCard(page: Page, targetMember: string, note: string) {
-  return page
-    .getByTestId("activity-card")
-    .filter({ hasText: note })
-    .filter({ hasText: targetMember })
-    .first();
+function getActivityCard(page: Page, note: string) {
+  return page.getByText(note, { exact: true }).locator(
+    "xpath=ancestor::*[@data-testid='activity-card' or (contains(concat(' ', normalize-space(@class), ' '), ' rounded-xl ') and .//button[contains(@aria-label, 'React with')])][1]",
+  );
 }

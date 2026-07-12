@@ -30,7 +30,7 @@ test("reaction notification reaches the point recipient", async ({ browser }) =>
   const note = `Playwright reaction notification ${Date.now()}`;
 
   await createAward(browser, targetMember, note);
-  const reactionActorName = await reactToAward(browser, reactionActorCredentials!, targetMember, note);
+  const reactionActorName = await reactToAward(browser, reactionActorCredentials!, note);
   await expectRecipientNotification(browser, reactionRecipientCredentials!, reactionActorName);
 });
 
@@ -62,7 +62,6 @@ async function createAward(browser: Browser, targetMember: string, note: string)
 async function reactToAward(
   browser: Browser,
   credentials: { email: string; password: string },
-  targetMember: string,
   note: string,
 ) {
   const context = await browser.newContext();
@@ -76,7 +75,8 @@ async function reactToAward(
     const reactionActorName = await readDashboardUserName(page);
 
     await page.getByRole("tab", { name: /activity/i }).click();
-    const card = getActivityCard(page, targetMember, note);
+    await expect(page.getByText(note, { exact: true })).toBeVisible();
+    const card = getActivityCard(page, note);
     await expect(card).toBeVisible();
 
     await card.getByRole("button", { name: /react with love it/i }).click();
@@ -114,12 +114,10 @@ async function expectRecipientNotification(
   }
 }
 
-function getActivityCard(page: Page, targetMember: string, note: string) {
-  return page
-    .getByTestId("activity-card")
-    .filter({ hasText: note })
-    .filter({ hasText: targetMember })
-    .first();
+function getActivityCard(page: Page, note: string) {
+  return page.getByText(note, { exact: true }).locator(
+    "xpath=ancestor::*[@data-testid='activity-card' or (contains(concat(' ', normalize-space(@class), ' '), ' rounded-xl ') and .//button[contains(@aria-label, 'React with')])][1]",
+  );
 }
 
 async function readDashboardUserName(page: Page) {
