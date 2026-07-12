@@ -3,7 +3,6 @@ import {
   missingRequiredEnv,
   readE2EReactionActorCredentials,
   readE2EReactionRecipientCredentials,
-  readTargetMemberName,
   requiredStagingEnv,
 } from "./support/config";
 import { signInIfNeeded } from "./support/auth";
@@ -26,10 +25,10 @@ test("reaction notification reaches the point recipient", async ({ browser }) =>
     "Missing optional E2E_REACTION_ACTOR_* or E2E_REACTION_RECIPIENT_* credentials.",
   );
 
-  const targetMember = readTargetMemberName();
   const note = `Playwright reaction notification ${Date.now()}`;
 
-  await createAward(browser, targetMember, note);
+  const reactionRecipientName = await readE2EUserDisplayName(browser, reactionRecipientCredentials!);
+  await createAward(browser, reactionRecipientName, note);
   const reactionActorName = await reactToAward(browser, reactionActorCredentials!, note);
   await expectRecipientNotification(browser, reactionRecipientCredentials!, reactionActorName);
 });
@@ -83,6 +82,24 @@ async function reactToAward(
     await expect(card.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
 
     return reactionActorName;
+  } finally {
+    await context.close();
+  }
+}
+
+async function readE2EUserDisplayName(
+  browser: Browser,
+  credentials: { email: string; password: string },
+) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    await gotoE2EStart(page);
+    await signInIfNeeded(page, credentials);
+    await expectDashboardReady(page);
+
+    return readDashboardUserName(page);
   } finally {
     await context.close();
   }

@@ -76,7 +76,7 @@ Required staging state when configured:
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
 - The user has a house assignment so the dashboard renders normally.
-- The user's display name matches `E2E_TARGET_MEMBER`, because the reaction notification smoke awards points to that configured target and then verifies the target's notification tray.
+- The user is selectable in the Award Points member picker. The reaction notification smoke reads this user's display name from the dashboard, awards points to that display name, and then verifies this user's notification tray.
 
 ### Target Member
 
@@ -130,7 +130,8 @@ The admin and owner credentials remain optional so local runs and partially conf
 
 Dedicated reaction-notification smoke coverage is intentionally optional because it requires two extra Auth0 users. When `E2E_REACTION_ACTOR_EMAIL`, `E2E_REACTION_ACTOR_PASSWORD`, `E2E_REACTION_RECIPIENT_EMAIL`, and `E2E_REACTION_RECIPIENT_PASSWORD` are configured, Playwright:
 
-- signs in as the primary E2E user and awards points to `E2E_TARGET_MEMBER`;
+- signs in as the reaction recipient to read the recipient's current display name;
+- signs in as the primary E2E user and awards points to that recipient;
 - signs in as the reaction actor and reacts to that exact award from Activity;
 - signs in as the reaction recipient and verifies the notification tray contains the reaction notification with the actor's display name and final reaction label.
 
