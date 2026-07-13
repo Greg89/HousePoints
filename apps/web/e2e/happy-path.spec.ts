@@ -40,12 +40,15 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   await expect(page.getByText(note)).toBeVisible();
 
   const activityCard = getActivityCard(page, note);
-  await activityCard.getByRole("button", { name: /open reactions for/i }).click();
+  const reactionButton = activityCard.getByRole("button", { name: /open reactions for/i });
+  await reactionButton.click();
   await activityCard.getByRole("menuitem", { name: /react with love it/i }).click();
   await expect(activityCard.getByRole("menuitem", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
+  await reactionButton.click();
+  await expect(activityCard.getByRole("menu", { name: /reaction picker for/i })).toHaveCount(0);
 
   await activityCard.getByRole("button", { name: /activity actions/i }).click();
-  await page.getByRole("menuitem", { name: /view reactions/i }).click();
+  await activityCard.getByRole("menuitem", { name: /view reactions/i }).click();
   const reactionsDialog = page.getByRole("dialog", { name: /reactions/i });
   await expect(reactionsDialog).toBeVisible();
   await expect(reactionsDialog.getByRole("img", { name: "Love it" })).toBeVisible();
