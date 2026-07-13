@@ -123,10 +123,14 @@ async function expectRecipientNotification(
     const notificationsDialog = page.getByRole("dialog", { name: /notifications/i });
     await expect(notificationsDialog).toBeVisible();
 
-    await expect(notificationsDialog.getByText("Someone reacted to your recognition")).toBeVisible();
-    await expect(
-      notificationsDialog.getByText(new RegExp(`${escapeRegExp(reactionActorName)} reacted with Love it\\.`, "i")),
-    ).toBeVisible();
+    const reactionNotification = notificationsDialog
+      .getByRole("article")
+      .filter({ hasText: /someone reacted to your recognition/i })
+      .filter({ hasText: new RegExp(`${escapeRegExp(reactionActorName)} reacted with Love it\\.`, "i") })
+      .first();
+
+    await expect(reactionNotification).toBeVisible();
+    await expect(reactionNotification.getByRole("heading", { name: /someone reacted to your recognition/i })).toBeVisible();
   } finally {
     await context.close();
   }
