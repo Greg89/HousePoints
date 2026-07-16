@@ -22,6 +22,11 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
   minute: "2-digit",
 });
 
+const READ_ARCHIVED_NOTIFICATION_TYPES = new Set<Notification["type"]>([
+  "POINT_AWARD_RECEIVED",
+  "RELEASE_ANNOUNCEMENT",
+]);
+
 export function NotificationsMenu({
   notifications,
   onNotificationsChange,
@@ -103,7 +108,7 @@ export function NotificationsMenu({
         unreadIds.add(item.id);
       }
 
-      if (item.type === "RELEASE_ANNOUNCEMENT") {
+      if (shouldArchiveAfterRead(item)) {
         archivedIds.add(item.id);
       }
     }
@@ -148,7 +153,7 @@ export function NotificationsMenu({
     setError(null);
 
     startTransition(async () => {
-      const shouldArchiveOnOpen = notification.type === "RELEASE_ANNOUNCEMENT";
+      const shouldArchiveOnOpen = shouldArchiveAfterRead(notification);
       const canNavigate = notification.readAt && !shouldArchiveOnOpen
         ? true
         : await markNotificationLocally(notification.id);
@@ -173,7 +178,7 @@ export function NotificationsMenu({
 
       if (result.ok) {
         const locallyUpdatedIds = notifications.items
-          .filter((item) => !item.readAt || item.type === "RELEASE_ANNOUNCEMENT")
+          .filter((item) => !item.readAt || shouldArchiveAfterRead(item))
           .map((item) => item.id);
         markLocalRead(locallyUpdatedIds);
         return;
@@ -309,6 +314,10 @@ export function NotificationsMenu({
       ) : null}
     </div>
   );
+}
+
+function shouldArchiveAfterRead(notification: Notification) {
+  return READ_ARCHIVED_NOTIFICATION_TYPES.has(notification.type);
 }
 
 function getOrderedNotifications(notifications: Notification[]) {

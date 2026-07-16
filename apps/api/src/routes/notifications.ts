@@ -24,6 +24,11 @@ const NOTIFICATION_SELECT = {
   createdAt: true,
 } as const;
 
+const READ_ARCHIVED_NOTIFICATION_TYPES = [
+  "POINT_AWARD_RECEIVED",
+  "RELEASE_ANNOUNCEMENT",
+] as const;
+
 function mapNotification(notification: Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>) {
   return {
     id: notification.id,
@@ -40,14 +45,14 @@ function mapNotification(notification: Prisma.NotificationGetPayload<{ select: t
   };
 }
 
-async function archiveReadReleaseAnnouncements(actor: ActorRecord, archivedAt = new Date()) {
+async function archiveReadTransientNotifications(actor: ActorRecord, archivedAt = new Date()) {
   await prisma.notification.updateMany({
     where: {
       organizationId: actor.organizationId,
       recipientUserId: actor.id,
       archivedAt: null,
       readAt: { not: null },
-      type: "RELEASE_ANNOUNCEMENT",
+      type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
     },
     data: { archivedAt },
   });
@@ -57,7 +62,7 @@ export async function listNotifications(
   actor: ActorRecord,
   params: { limit: number; unreadOnly: boolean; cursor?: string },
 ) {
-  await archiveReadReleaseAnnouncements(actor);
+  await archiveReadTransientNotifications(actor);
 
   const where = {
     organizationId: actor.organizationId,
@@ -115,7 +120,7 @@ export async function markNotificationsRead(
       recipientUserId: actor.id,
       archivedAt: null,
       readAt: { not: null },
-      type: "RELEASE_ANNOUNCEMENT",
+      type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
     },
     data: { archivedAt: readAt },
   });
@@ -141,7 +146,7 @@ export async function markAllNotificationsRead(actor: ActorRecord) {
       recipientUserId: actor.id,
       archivedAt: null,
       readAt: { not: null },
-      type: "RELEASE_ANNOUNCEMENT",
+      type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
     },
     data: { archivedAt: readAt },
   });

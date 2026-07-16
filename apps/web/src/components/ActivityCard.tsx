@@ -282,7 +282,6 @@ export function ActivityCard({
                       type="button"
                       onClick={() => setReactionsOpen((current) => !current)}
                       aria-label={`Open reactions for ${item.targetUserName}`}
-                      aria-haspopup="menu"
                       aria-expanded={reactionsOpen}
                       aria-controls={reactionsMenuId}
                       className={[
@@ -296,7 +295,6 @@ export function ActivityCard({
                     {reactionsOpen ? (
                       <div
                         id={reactionsMenuId}
-                        role="menu"
                         aria-label={`Reaction picker for ${item.targetUserName}`}
                         className="absolute bottom-full right-0 z-20 mb-2 w-44 rounded-xl border bg-card p-2 shadow-lg lg:bottom-auto lg:right-full lg:top-1/2 lg:mb-0 lg:mr-2 lg:-translate-y-1/2"
                       >
@@ -312,7 +310,6 @@ export function ActivityCard({
                               <button
                                 key={reactionKey}
                                 type="button"
-                                role="menuitem"
                                 aria-label={label}
                                 aria-pressed={selected}
                                 disabled={isReacting}

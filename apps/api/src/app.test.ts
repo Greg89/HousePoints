@@ -7394,7 +7394,7 @@ describe("POST /notifications/list", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7455,7 +7455,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7464,7 +7464,7 @@ describe("POST /notifications/mark-read", () => {
     await app.close();
   });
 
-  it("archives release announcements after marking them read", async () => {
+  it("archives transient notifications after marking them read", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
     mockNotificationUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 });
     const app = await buildTestApp("auth0|admin");
@@ -7486,7 +7486,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7543,7 +7543,7 @@ describe("POST /notifications/mark-all-read", () => {
         recipientUserId: "user-owner",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
