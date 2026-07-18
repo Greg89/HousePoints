@@ -26,6 +26,7 @@ import type {
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
 import { ManageEmptyState } from "./ManageEmptyState";
+import { ManageToolbar } from "./ManageToolbar";
 
 type MemberFilter = "all" | "unassigned" | "members" | "admins";
 
@@ -268,7 +269,25 @@ export function TeamManagement({
       }
     >
 
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+      <ManageToolbar
+        label="Member controls"
+        secondary={
+          <label className="relative block sm:w-64">
+            <MagnifyingGlass
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <span className="sr-only">Search members</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search members"
+              className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </label>
+        }
+      >
         <div className="flex flex-wrap gap-1" aria-label="Member filters">
           {FILTERS.map((option) => {
             const count =
@@ -296,21 +315,7 @@ export function TeamManagement({
             );
           })}
         </div>
-        <label className="relative block sm:w-64">
-          <MagnifyingGlass
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
-          <span className="sr-only">Search members</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search members"
-            className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </label>
-      </div>
+      </ManageToolbar>
 
       {filteredUsers.length > 0 ? (
         <div className="overflow-hidden rounded-xl border bg-card">

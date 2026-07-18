@@ -15,6 +15,7 @@ import {
 import { useMemo, useState, useTransition } from "react";
 import type { AdminAuditAction, PagedAdminAuditActions } from "@housepoints/contracts";
 import { ManageEmptyState } from "./ManageEmptyState";
+import { ManageToolbar } from "./ManageToolbar";
 
 interface RecentAdminActionsReportProps {
   actions: AdminAuditAction[];
@@ -126,13 +127,19 @@ export function RecentAdminActionsReport({
 
   return (
     <section aria-labelledby="audit-history-heading">
-      <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-        <div>
-          <h3 id="audit-history-heading" className="font-display text-xl font-semibold">History</h3>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-            Full history of important organization changes, including deleted point awards.
-          </p>
-        </div>
+      <div>
+        <h3 id="audit-history-heading" className="font-display text-xl font-semibold">History</h3>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Full history of important organization changes, including deleted point awards.
+        </p>
+      </div>
+
+      <ManageToolbar
+        label="Audit controls"
+        className="mt-5"
+        status={actionCountLabel}
+        error={loadError}
+      >
         <label className="grid gap-2 text-sm font-medium">
           Filter history
           <select
@@ -148,12 +155,7 @@ export function RecentAdminActionsReport({
             ))}
           </select>
         </label>
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{actionCountLabel}</span>
-        {loadError ? <span className="font-medium text-destructive">{loadError}</span> : null}
-      </div>
+      </ManageToolbar>
 
       <div className="mt-3 overflow-hidden rounded-xl border">
         {visibleActions.length === 0 ? (

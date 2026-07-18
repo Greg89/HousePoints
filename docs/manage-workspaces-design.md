@@ -424,8 +424,9 @@ All new queries and mutations must preserve organization scoping and multi-organ
 The six workspaces now use a shared shell for their landmark, title, description, contextual
 count, and primary-action slot. Members, Houses, and Seasons also use accessible modal detail
 surfaces with focus containment, Escape handling, and focus restoration. Filters and empty
-states remain composed by each workspace because their behavior differs by resource, while true
-empty and no-result states share a consistent labelled presentation and optional recovery action.
+states retain resource-specific behavior, while Members and Audit use a shared responsive control
+row for filters, search, counts, and inline errors. True empty and no-result states share a
+consistent labelled presentation and optional recovery action.
 
 ### Phase 1: Members
 
