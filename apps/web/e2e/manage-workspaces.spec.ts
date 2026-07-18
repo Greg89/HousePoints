@@ -29,7 +29,7 @@ test("admin can use shared workspaces while owner-only destinations stay underst
     await expect(destination).toHaveAttribute("aria-disabled", "true");
     await destination.focus();
     await expect(destination).toBeFocused();
-    await destination.click();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("region", { name: "Manage overview" })).toBeVisible();
   }
 
