@@ -306,13 +306,17 @@ describe("AdminForms", () => {
     expect(settingsTab).toBeVisible();
     expect(housesTab).toBeVisible();
     expect(seasonsTab).toBeVisible();
-    expect(settingsTab).toBeDisabled();
-    expect(housesTab).toBeDisabled();
-    expect(seasonsTab).toBeDisabled();
+    expect(settingsTab).toBeEnabled();
+    expect(housesTab).toBeEnabled();
+    expect(seasonsTab).toBeEnabled();
     expect(settingsTab).toHaveAttribute("aria-disabled", "true");
     expect(housesTab).toHaveAttribute("aria-disabled", "true");
     expect(seasonsTab).toHaveAttribute("aria-disabled", "true");
     expect(screen.getAllByText("Owner only")).toHaveLength(3);
+
+    housesTab.focus();
+    expect(housesTab).toHaveFocus();
+    expect(housesTab).toHaveAccessibleDescription("Owner only");
 
     await user.click(settingsTab);
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");

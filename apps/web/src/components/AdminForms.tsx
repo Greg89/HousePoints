@@ -227,9 +227,9 @@ export function AdminForms({
                       role="tab"
                       aria-selected={isActive}
                       aria-disabled={isDisabled}
+                      aria-describedby={isDisabled ? `manage-restriction-${section.id}` : undefined}
                       aria-controls={`manage-section-${section.id}`}
                       id={`manage-tab-${section.id}`}
-                      disabled={isDisabled}
                       title={isDisabled ? `${section.label} is owner-only` : undefined}
                       onClick={() => handleSectionChange(section.id)}
                       className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${
@@ -244,7 +244,10 @@ export function AdminForms({
                         <Icon size={15} aria-hidden="true" />
                         <span className="flex-1">{section.label}</span>
                         {isDisabled ? (
-                          <span className="rounded-full border px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide">
+                          <span
+                            id={`manage-restriction-${section.id}`}
+                            className="rounded-full border px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide"
+                          >
                             Owner only
                           </span>
                         ) : null}

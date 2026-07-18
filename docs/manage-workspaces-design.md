@@ -421,6 +421,10 @@ All new queries and mutations must preserve organization scoping and multi-organ
 - Remove the persistent metrics strip or keep it only until the new Overview ships. Implemented.
 - Preserve all current workflows during the transition.
 
+The shared interaction patterns are implemented within the resource workspaces. Extracting
+additional presentation-only primitives remains optional and should be driven by future reuse
+rather than treated as a release blocker.
+
 ### Phase 1: Members
 
 - Replace the form gallery with the member list and filters. Implemented.
