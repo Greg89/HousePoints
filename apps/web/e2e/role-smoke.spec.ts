@@ -44,9 +44,13 @@ test("admin role can reach admin sections but not owner-only tabs", async ({ pag
   await expect(manageSections.getByRole("tab", { name: /^members$/i })).toBeEnabled();
   await expect(manageSections.getByRole("tab", { name: /^audit$/i })).toBeEnabled();
 
-  for (const ownerOnlyTab of [/^roles$/i, /^houses$/i, /^seasons$/i, /^settings$/i]) {
+  for (const ownerOnlyTab of [/^houses\b/i, /^seasons\b/i, /^organization\b/i]) {
     await expectOwnerOnlyTabBlockedForAdmin(manageSections, ownerOnlyTab);
   }
+
+  await expect(manageSections.getByRole("tab")).toHaveCount(6);
+  await expect(manageSections.getByRole("tab", { name: /^roles$/i })).toHaveCount(0);
+  await expect(manageSections.getByRole("tab", { name: /^settings$/i })).toHaveCount(0);
 });
 
 test("owner role can reach owner-only manage tabs", async ({ page }) => {
@@ -62,20 +66,21 @@ test("owner role can reach owner-only manage tabs", async ({ page }) => {
   const manageSections = page.getByRole("navigation", { name: /manage sections/i });
   await expect(manageSections).toBeVisible();
 
-  for (const ownerOnlyTab of [/^roles$/i, /^houses$/i, /^seasons$/i, /^settings$/i]) {
+  for (const ownerOnlyTab of [/^houses$/i, /^seasons$/i, /^organization$/i]) {
     const tab = manageSections.getByRole("tab", { name: ownerOnlyTab });
     await expect(tab).toBeVisible();
-    await expect(tab).toBeEnabled();
+    await expect(tab).toHaveAttribute("aria-disabled", "false");
   }
+
+  await expect(manageSections.getByRole("tab")).toHaveCount(6);
 });
 
 async function expectOwnerOnlyTabBlockedForAdmin(manageSections: Locator, name: RegExp) {
   const tab = manageSections.getByRole("tab", { name });
-  if ((await tab.count()) === 0) {
-    return;
-  }
-
   await expect(tab).toBeVisible();
   await expect(tab).toHaveAttribute("aria-disabled", "true");
-  await expect(tab).toBeDisabled();
+  await tab.focus();
+  await expect(tab).toBeFocused();
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "false");
 }

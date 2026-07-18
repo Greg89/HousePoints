@@ -148,12 +148,18 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_BASE_URL`
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
+- `E2E_ADMIN_EMAIL`
+- `E2E_ADMIN_PASSWORD`
+- `E2E_OWNER_EMAIL`
+- `E2E_OWNER_PASSWORD`
 - `E2E_TARGET_MEMBER`
 - `E2E_ORG_SLUG`
 
 `E2E_ORG_SLUG` routes tests directly to `/o/{slug}`. The scheduled staging workflow requires it so the test account always lands in the known-good E2E organization.
 
-The current required secrets are intentionally limited to the tests that exist today. Future owner/admin/member actors should be added only when those tests are implemented.
+The elevated actors are required because the deployed Manage suite verifies both the admin
+restriction model and the complete owner workspace experience. Local Playwright runs may omit
+those credentials, in which case elevated specs skip.
 
 The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).
 

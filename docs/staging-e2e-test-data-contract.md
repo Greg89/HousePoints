@@ -21,28 +21,28 @@ Required staging state:
 - The user can award points to the configured target member. Members can award points, so elevated access is not required for this user.
 - The user can react to point awards in Activity. The happy-path smoke reacts to the award it creates and opens the reaction detail dialog.
 
-### Optional Admin E2E User
+### Admin E2E User
 
 GitHub Environment secrets:
 
 - `E2E_ADMIN_EMAIL`
 - `E2E_ADMIN_PASSWORD`
 
-Required staging state when configured:
+Required staging state:
 
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
 - The user has an `ADMIN` role so Manage and Audit are visible while owner-only tabs remain disabled.
 - The user has a house assignment so the dashboard renders normally.
 
-### Optional Owner E2E User
+### Owner E2E User
 
 GitHub Environment secrets:
 
 - `E2E_OWNER_EMAIL`
 - `E2E_OWNER_PASSWORD`
 
-Required staging state when configured:
+Required staging state:
 
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
@@ -114,17 +114,22 @@ The mutating happy-path test intentionally creates point activity and one reacti
 
 The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. The What's New link is asserted only when that control is visible in the target environment, so staging can enable that product surface without adding new required secrets.
 
-The read-only Manage Audit smoke test uses `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` when they are configured. If those optional secrets are missing, that spec skips cleanly while the member-level smoke and happy-path tests continue to run.
+The read-only Manage suite requires both elevated actors in the staging workflow. Local runs still
+skip elevated specs when their credentials are absent, but staging configuration validation fails
+when either actor is missing so permission regressions cannot silently pass.
 
 ## Role Smoke Coverage
 
 Dedicated owner/admin/member smoke coverage is intentionally split by actor:
 
 - Primary member actor: dashboard read path and member-level point award access.
-- Optional admin actor: admin Manage sections, including members and audit, with owner-only tabs either omitted or visible but disabled.
-- Optional owner actor: owner-only Manage tabs enabled.
+- Admin actor: all six Manage destinations remain visible, with Members and Audit enabled and owner-only destinations focusable but unavailable.
+- Owner actor: all six Manage destinations are enabled.
 
-The admin and owner credentials remain optional so local runs and partially configured environments skip those slices cleanly. In the staging GitHub Environment, configure both optional actors when you want the full permission smoke suite to run.
+The admin and owner credentials remain optional for local development, but both are required in
+the staging GitHub Environment. The Manage workspace suite also verifies deep-link URL state,
+refresh and browser history, member filtering and detail-sheet focus restoration, Audit modes,
+owner tool sheets, and the admin mobile picker without submitting mutations.
 
 ## Reaction Notification Smoke Coverage
 

@@ -11,6 +11,15 @@ export const requiredDashboardSmokeEnv = [
   "E2E_USER_PASSWORD",
 ] as const;
 
+export const requiredManageEnv = [
+  "E2E_BASE_URL",
+  "E2E_ADMIN_EMAIL",
+  "E2E_ADMIN_PASSWORD",
+  "E2E_OWNER_EMAIL",
+  "E2E_OWNER_PASSWORD",
+  "E2E_TARGET_MEMBER",
+] as const;
+
 export function missingRequiredEnv(names: readonly string[]) {
   return names.filter((name) => !process.env[name]);
 }

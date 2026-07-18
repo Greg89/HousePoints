@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           missing=()
-          for name in E2E_BASE_URL E2E_USER_EMAIL E2E_USER_PASSWORD E2E_TARGET_MEMBER E2E_ORG_SLUG; do
+          for name in E2E_BASE_URL E2E_USER_EMAIL E2E_USER_PASSWORD E2E_ADMIN_EMAIL E2E_ADMIN_PASSWORD E2E_OWNER_EMAIL E2E_OWNER_PASSWORD E2E_TARGET_MEMBER E2E_ORG_SLUG; do
             if [ -z "${!name}" ]; then
               missing+=("$name")
             fi
