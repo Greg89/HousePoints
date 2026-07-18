@@ -290,6 +290,9 @@ describe("ActivityFeed", () => {
     await user.click(screen.getByRole("button", { name: /react with love it/i }));
 
     await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", "heart"));
+    expect(screen.queryByRole("button", { name: /remove love it reaction/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
     const selectedReaction = await screen.findByRole("button", { name: /remove love it reaction/i });
     expect(selectedReaction).toHaveAttribute("aria-pressed", "true");
     expect(selectedReaction).toHaveTextContent("1");
@@ -431,6 +434,9 @@ describe("ActivityFeed", () => {
     await user.click(screen.getByRole("button", { name: /remove love it reaction/i }));
 
     await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", null));
+    expect(screen.queryByRole("button", { name: /react with love it/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
     expect(await screen.findByRole("button", { name: /react with love it/i })).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -456,6 +462,9 @@ describe("ActivityFeed", () => {
     await user.click(screen.getByRole("button", { name: /react with applause/i }));
 
     expect(await screen.findByText("Point transaction was not found")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /react with applause/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
     expect(screen.getByRole("button", { name: /react with applause/i })).toHaveAttribute("aria-pressed", "false");
   });
 

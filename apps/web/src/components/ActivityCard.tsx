@@ -313,7 +313,10 @@ export function ActivityCard({
                                 aria-label={label}
                                 aria-pressed={selected}
                                 disabled={isReacting}
-                                onClick={() => onReact?.(reactionKey)}
+                                onClick={() => {
+                                  setReactionsOpen(false);
+                                  onReact?.(reactionKey);
+                                }}
                                 className={[
                                   "inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors",
                                   selected
