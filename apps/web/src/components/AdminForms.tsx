@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Calendar,
@@ -8,9 +8,6 @@ import {
   ClipboardText,
   Gear,
   House,
-  Trash,
-  TrendDown,
-  UserSwitch,
   UsersThree,
 } from "@phosphor-icons/react";
 import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
@@ -29,8 +26,8 @@ import type {
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { HouseManagement } from "./HouseManagement";
 import { ManageOverview } from "./ManageOverview";
+import { ManageAudit } from "./ManageAudit";
 import { OrgSettingsManagement } from "./OrgSettingsManagement";
-import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
 import { SeasonManagement } from "./SeasonManagement";
 import { TeamManagement } from "./TeamManagement";
 
@@ -78,7 +75,7 @@ const MANAGE_SECTIONS: Array<{
   {
     id: "overview",
     label: "Overview",
-    description: "Point adjustment activity and deduction reporting.",
+    description: "Organization attention, status, and recent administration.",
     icon: ChartBar,
   },
   {
@@ -133,6 +130,7 @@ function getManageSectionFromSearchParams(
 function syncManageSectionToUrl(
   section: ManageSectionId,
   searchParams: ReadableSearchParams,
+  options?: { memberStatus?: "unassigned" },
 ): string {
   const nextParams = new URLSearchParams(searchParams.toString());
 
@@ -140,6 +138,11 @@ function syncManageSectionToUrl(
     nextParams.delete("manage");
   } else {
     nextParams.set("manage", section);
+  }
+  if (section === "members" && options?.memberStatus) {
+    nextParams.set("memberStatus", options.memberStatus);
+  } else {
+    nextParams.delete("memberStatus");
   }
 
   const nextQuery = nextParams.toString();
@@ -155,7 +158,6 @@ export function AdminForms({
   activeSeason,
   organization,
   actorRole,
-  recentDeletedPoints,
   recentAdminActions,
   pointAdjustmentStats,
   adminAuditNextCursor,
@@ -195,31 +197,18 @@ export function AdminForms({
     selection.query === manageQuery && canUseSelectedSection
       ? selection.section
       : urlSection;
-  const unassignedUsers = users.filter((user) => !user.houseId);
-  const unassignedCount = unassignedUsers.length;
-
-  function handleSectionChange(id: ManageSectionId) {
+  function handleSectionChange(
+    id: ManageSectionId,
+    options?: { memberStatus?: "unassigned" },
+  ) {
     const section = MANAGE_SECTIONS.find((s) => s.id === id);
     if (section?.ownerOnly && !isOwner) return;
-    const nextQuery = syncManageSectionToUrl(id, searchParams);
+    const nextQuery = syncManageSectionToUrl(id, searchParams, options);
     setSelection({ query: nextQuery, section: id });
   }
 
   return (
     <div className="space-y-4">
-      {/* Persistent metrics strip */}
-      <div className="flex flex-wrap gap-2 rounded-xl border bg-card px-4 py-3">
-        <MetricPill icon={<UsersThree size={14} />} label="Members" value={users.length} />
-        <MetricPill icon={<House size={14} />} label="Houses" value={houses.length} />
-        <MetricPill icon={<UserSwitch size={14} />} label="Unassigned" value={unassignedCount} />
-        <MetricPill icon={<Trash size={14} />} label="Deleted pts" value={recentDeletedPoints.length} />
-        <MetricPill
-          icon={<TrendDown size={14} />}
-          label="Deductions"
-          value={pointAdjustmentStats.totalDeductionCount}
-        />
-      </div>
-
       {/* Sidebar layout */}
       <div className="lg:grid lg:grid-cols-[200px_1fr] lg:gap-6">
         {/* Desktop sidebar nav */}
@@ -295,9 +284,12 @@ export function AdminForms({
         >
           {activeSection === "overview" ? (
             <ManageOverview
-              pointAdjustmentStats={pointAdjustmentStats}
-              seasons={seasons}
-              onLoadPointAdjustmentStats={onLoadPointAdjustmentStats}
+              users={users}
+              houses={houses}
+              activeSeason={activeSeason}
+              actorRole={actorRole}
+              recentAdminActions={recentAdminActions}
+              onNavigate={(section, options) => handleSectionChange(section, options)}
             />
           ) : null}
 
@@ -343,32 +335,17 @@ export function AdminForms({
           ) : null}
 
           {activeSection === "audit" ? (
-            <RecentAdminActionsReport
+            <ManageAudit
               actions={recentAdminActions}
               nextCursor={adminAuditNextCursor}
               onLoadPage={onLoadAdminAudit}
+              pointAdjustmentStats={pointAdjustmentStats}
+              seasons={seasons}
+              onLoadPointAdjustmentStats={onLoadPointAdjustmentStats}
             />
           ) : null}
         </div>
       </div>
-    </div>
-  );
-}
-
-function MetricPill({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-1.5">
-      <span className="text-muted-foreground">{icon}</span>
-      <span className="font-number text-sm font-bold">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }

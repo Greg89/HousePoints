@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Check,
@@ -64,7 +65,10 @@ export function TeamManagement({
   onRemoveOrgMember,
   onCreateInvite,
 }: TeamManagementProps) {
-  const [filter, setFilter] = useState<MemberFilter>("all");
+  const searchParams = useSearchParams();
+  const requestedFilter =
+    searchParams.get("memberStatus") === "unassigned" ? "unassigned" : "all";
+  const [filter, setFilter] = useState<MemberFilter>(requestedFilter);
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);

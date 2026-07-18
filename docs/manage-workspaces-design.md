@@ -418,7 +418,7 @@ All new queries and mutations must preserve organization scoping and multi-organ
 
 - Add deep-linkable Manage workspace state. Implemented.
 - Add the shared workspace header, filter row, empty state, and drawer/sheet primitives.
-- Remove the persistent metrics strip or keep it only until the new Overview ships.
+- Remove the persistent metrics strip or keep it only until the new Overview ships. Implemented.
 - Preserve all current workflows during the transition.
 
 ### Phase 1: Members
@@ -432,10 +432,10 @@ This phase establishes the reusable resource-workspace pattern.
 
 ### Phase 2: Overview
 
-- Add actionable attention items.
-- Move useful metrics into organization status.
-- Add the compact recent-administration feed.
-- Move point-adjustment reporting to Audit.
+- Add actionable attention items. Implemented.
+- Move useful metrics into organization status. Implemented.
+- Add the compact recent-administration feed. Implemented.
+- Move point-adjustment reporting to Audit. Implemented.
 
 ### Phase 3: Houses and Seasons
 

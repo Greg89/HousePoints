@@ -258,14 +258,14 @@ describe("AdminForms", () => {
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByLabelText("Point adjustment activity")).toBeInTheDocument();
-    const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
-    expect(adjustmentActivity.getByText("Season: Q3 2026")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("Points deducted")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("Deduction events")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("Slytherin")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("2 deductions")).toBeInTheDocument();
-    expect(adjustmentActivity.getAllByText("20")[0]).toBeInTheDocument();
+    const overview = within(screen.getByLabelText("Manage overview"));
+    expect(overview.getByText("Needs attention")).toBeInTheDocument();
+    expect(overview.getByText("1 member needs a house assignment")).toBeInTheDocument();
+    expect(overview.getByText("Ravenclaw has no members")).toBeInTheDocument();
+    expect(overview.getByText("Organization status")).toBeInTheDocument();
+    expect(overview.getByText("Q3 2026")).toBeInTheDocument();
+    expect(overview.getByText("Recent administration")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Point adjustment activity")).not.toBeInTheDocument();
 
     switchToManageSection("Settings");
     expect(screen.getByRole("tab", { name: /Settings/ })).toHaveAttribute("aria-selected", "true");
@@ -276,7 +276,20 @@ describe("AdminForms", () => {
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Audit history")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Point adjustments" })).toBeInTheDocument();
     expect(screen.queryByText("Recently deleted point awards")).not.toBeInTheDocument();
+  });
+
+  it("opens the unassigned member view from Overview", async () => {
+    const { user } = setupAdminForms();
+
+    await user.click(screen.getByRole("button", { name: "Review members" }));
+
+    expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Unassigned 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Manage Ben Unassigned" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage Alice Assigned" })).not.toBeInTheDocument();
+    expect(window.location.search).toContain("memberStatus=unassigned");
   });
 
   it("shows owner-only manage sections to admins without making them clickable", async () => {
@@ -592,6 +605,8 @@ describe("AdminForms", () => {
         })),
       },
     });
+    switchToManageSection("Audit");
+    fireEvent.click(screen.getByRole("button", { name: "Point adjustments" }));
 
     expect(screen.getByText("No point deductions have been recorded for this season.")).toBeInTheDocument();
   });
@@ -622,6 +637,8 @@ describe("AdminForms", () => {
     const { user, props } = setupAdminForms({
       onLoadPointAdjustmentStats: vi.fn().mockResolvedValue(historicalStats),
     });
+    switchToManageSection("Audit");
+    await user.click(screen.getByRole("button", { name: "Point adjustments" }));
     const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
 
     await user.selectOptions(adjustmentActivity.getByLabelText("Reporting season"), "season-0");
