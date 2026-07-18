@@ -429,6 +429,8 @@ row for filters, search, counts, and inline errors. True empty and no-result sta
 consistent labelled presentation and optional recovery action. Consequential inline workflows
 use a shared two-step confirmation panel with consistent pending and cancellation behavior;
 member removal remains a modal confirmation and typed organization confirmations remain in context.
+Members, season history, and audit history use the same labelled, bordered resource-list surface
+while retaining resource-specific rows and responsive content.
 
 ### Phase 1: Members
 

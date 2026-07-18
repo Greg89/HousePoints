@@ -16,6 +16,7 @@ import { useMemo, useState, useTransition } from "react";
 import type { AdminAuditAction, PagedAdminAuditActions } from "@housepoints/contracts";
 import { ManageEmptyState } from "./ManageEmptyState";
 import { ManageToolbar } from "./ManageToolbar";
+import { ManageResourceList } from "./ManageResourceList";
 
 interface RecentAdminActionsReportProps {
   actions: AdminAuditAction[];
@@ -157,7 +158,7 @@ export function RecentAdminActionsReport({
         </label>
       </ManageToolbar>
 
-      <div className="mt-3 overflow-hidden rounded-xl border">
+      <ManageResourceList label="Audit history" className="mt-3">
         {visibleActions.length === 0 ? (
           <ManageEmptyState
             title="No audit history matches this filter yet."
@@ -167,7 +168,7 @@ export function RecentAdminActionsReport({
             className="rounded-none border-0 bg-transparent"
           />
         ) : (
-          <div className="divide-y">
+          <>
             {visibleActions.map((action) => {
               const Icon = actionIcons[action.type];
 
@@ -196,9 +197,9 @@ export function RecentAdminActionsReport({
                 </article>
               );
             })}
-          </div>
+          </>
         )}
-      </div>
+      </ManageResourceList>
 
       {currentNextCursor ? (
         <div className="mt-5 flex justify-center">

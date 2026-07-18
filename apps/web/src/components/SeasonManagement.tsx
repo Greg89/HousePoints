@@ -8,6 +8,7 @@ import type { RenameSeasonResult, StartSeasonResult } from "@/lib/action-results
 import { ManageWorkspace } from "./ManageWorkspace";
 import { ManageDetailSheet } from "./ManageDetailSheet";
 import { ManageConfirmationPanel } from "./ManageConfirmationPanel";
+import { ManageResourceList } from "./ManageResourceList";
 
 interface SeasonManagementProps {
   seasons: Season[];
@@ -154,7 +155,7 @@ export function SeasonManagement({
 
       <section aria-labelledby="season-history-heading">
         <h5 id="season-history-heading" className="text-sm font-semibold">Season history</h5>
-        <div className="mt-3 divide-y overflow-hidden rounded-xl border bg-card">
+        <ManageResourceList className="mt-3">
           {seasonList.map((season) => (
             <div key={season.id} className="flex items-center gap-3 px-4 py-3">
               <Calendar size={17} className="shrink-0 text-muted-foreground" />
@@ -186,7 +187,7 @@ export function SeasonManagement({
               </button>
             </div>
           ))}
-        </div>
+        </ManageResourceList>
       </section>
 
       <ManageDetailSheet

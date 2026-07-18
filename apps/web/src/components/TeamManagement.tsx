@@ -27,6 +27,7 @@ import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
 import { ManageEmptyState } from "./ManageEmptyState";
 import { ManageToolbar } from "./ManageToolbar";
+import { ManageResourceList } from "./ManageResourceList";
 
 type MemberFilter = "all" | "unassigned" | "members" | "admins";
 
@@ -318,14 +319,15 @@ export function TeamManagement({
       </ManageToolbar>
 
       {filteredUsers.length > 0 ? (
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_8rem_2rem] gap-4 border-b bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+        <ManageResourceList
+          label="Members"
+          header={<div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_8rem_2rem] gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
             <span>Member</span>
             <span>House</span>
             <span>Role</span>
             <span className="sr-only">Open</span>
-          </div>
-          <div className="divide-y">
+          </div>}
+        >
             {filteredUsers.map((user) => {
               const house = user.houseId ? houseById.get(user.houseId) : null;
               return (
@@ -366,8 +368,7 @@ export function TeamManagement({
                 </button>
               );
             })}
-          </div>
-        </div>
+        </ManageResourceList>
       ) : (
         <ManageEmptyState
           title="No members match this view"
