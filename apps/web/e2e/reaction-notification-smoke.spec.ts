@@ -143,9 +143,14 @@ function getActivityCard(page: Page, note: string) {
 }
 
 async function readDashboardUserName(page: Page) {
-  const userName = (await page.locator("main h2").first().innerText()).trim();
+  await page.getByRole("button", { name: /account menu/i }).click();
+
+  const accountMenu = page.getByRole("dialog", { name: /^account$/i });
+  await expect(accountMenu).toBeVisible();
+
+  const userName = (await accountMenu.getByTestId("account-menu-user-name").innerText()).trim();
   if (!userName) {
-    throw new Error("Could not read the reaction actor display name from the dashboard.");
+    throw new Error("Could not read the reaction actor display name from the account menu.");
   }
 
   return userName;

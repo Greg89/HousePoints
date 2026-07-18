@@ -105,7 +105,12 @@ export function AccountMenu({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Signed in
             </p>
-            <p className="mt-1 font-display text-lg font-semibold leading-tight">{session.userName}</p>
+            <p
+              data-testid="account-menu-user-name"
+              className="mt-1 font-display text-lg font-semibold leading-tight"
+            >
+              {session.userName}
+            </p>
             <p className="mt-1 text-xs font-medium text-muted-foreground">{formatRole(session.role)}</p>
             {currentOrganization ? (
               <p className="mt-2 text-xs font-semibold text-primary">
