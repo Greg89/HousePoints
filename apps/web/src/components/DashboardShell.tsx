@@ -320,6 +320,14 @@ export function DashboardShell({
             House Points
           </Link>
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="hidden min-w-0 text-right sm:block">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Signed in
+              </p>
+              <p className="max-w-48 truncate text-sm font-semibold text-foreground">
+                {session.userName}
+              </p>
+            </div>
             <NotificationsMenu
               notifications={currentNotifications}
               onNotificationsChange={setCurrentNotifications}
@@ -396,12 +404,6 @@ export function DashboardShell({
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Welcome */}
-        <div className={cn("mb-8 rounded-2xl border bg-card/80 p-5 shadow-sm", houseThemeStyle ? "house-theme-card" : "")}>
-          <p className="text-muted-foreground text-sm">Welcome back,</p>
-          <h2 className="font-display text-3xl font-semibold">{session.userName}</h2>
-        </div>
-
         <Tabs.Root
           value={activeTab}
           onValueChange={handleTabChange}
