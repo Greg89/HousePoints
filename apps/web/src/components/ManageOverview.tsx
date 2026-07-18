@@ -10,6 +10,8 @@ import {
 import type { AdminAuditAction, Season, UserRole } from "@housepoints/contracts";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageEmptyState } from "./ManageEmptyState";
+import { ManageResourceList } from "./ManageResourceList";
 
 interface ManageOverviewProps {
   users: AdminUser[];
@@ -74,7 +76,7 @@ export function ManageOverview({
             </div>
           </div>
         ) : (
-          <div className="mt-3 divide-y overflow-hidden rounded-xl border bg-card">
+          <ManageResourceList className="mt-3">
             {unassignedCount > 0 ? (
               <AttentionItem
                 icon={<UserSwitch size={18} />}
@@ -106,7 +108,7 @@ export function ManageOverview({
                 onAction={() => onNavigate("members")}
               />
             )) : null}
-          </div>
+          </ManageResourceList>
         )}
       </section>
 
@@ -161,9 +163,9 @@ export function ManageOverview({
             <ArrowRight size={13} />
           </button>
         </div>
-        <div className="mt-3 overflow-hidden rounded-xl border bg-card">
+        <ManageResourceList className="mt-3">
           {recentAdminActions.length > 0 ? (
-            <div className="divide-y">
+            <>
               {recentAdminActions.slice(0, 5).map((action) => (
                 <article key={action.id} className="flex gap-3 px-4 py-3">
                   <ClockCounterClockwise size={17} className="mt-0.5 shrink-0 text-primary" />
@@ -175,13 +177,17 @@ export function ManageOverview({
                   </div>
                 </article>
               ))}
-            </div>
+            </>
           ) : (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No administrative changes have been recorded yet.
-            </p>
+            <ManageEmptyState
+              title="No administrative changes yet"
+              description="Important organization changes will appear here as they happen."
+              icon={<ClockCounterClockwise size={24} />}
+              compact
+              className="rounded-none border-0 bg-transparent"
+            />
           )}
-        </div>
+        </ManageResourceList>
       </section>
     </ManageWorkspace>
   );

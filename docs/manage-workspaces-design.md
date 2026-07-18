@@ -431,6 +431,8 @@ use a shared two-step confirmation panel with consistent pending and cancellatio
 member removal remains a modal confirmation and typed organization confirmations remain in context.
 Members, season history, and audit history use the same labelled, bordered resource-list surface
 while retaining resource-specific rows and responsive content.
+Overview attention and recent-administration collections use that same surface, and the recent
+feed uses the shared empty-state treatment before the first administrative event is recorded.
 
 ### Phase 1: Members
 

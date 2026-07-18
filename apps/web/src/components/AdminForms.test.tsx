@@ -284,6 +284,14 @@ describe("AdminForms", () => {
     expect(screen.queryByText("Recently deleted point awards")).not.toBeInTheDocument();
   });
 
+  it("shows the shared empty state before any recent administration is recorded", () => {
+    setupAdminForms({ recentAdminActions: [] });
+
+    expect(
+      screen.getByRole("region", { name: "No administrative changes yet" }),
+    ).toHaveTextContent("Important organization changes will appear here as they happen.");
+  });
+
   it("opens the unassigned member view from Overview", async () => {
     const { user } = setupAdminForms();
 
