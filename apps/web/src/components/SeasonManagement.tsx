@@ -7,6 +7,7 @@ import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts"
 import type { RenameSeasonResult, StartSeasonResult } from "@/lib/action-results";
 import { ManageWorkspace } from "./ManageWorkspace";
 import { ManageDetailSheet } from "./ManageDetailSheet";
+import { ManageConfirmationPanel } from "./ManageConfirmationPanel";
 
 interface SeasonManagementProps {
   seasons: Season[];
@@ -219,22 +220,15 @@ export function SeasonManagement({
                 Starting a season closes {currentSeason.name} and resets current-season scoring.
               </p>
               {pendingStartName ? (
-                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-sm font-semibold text-amber-900">
-                    Start &ldquo;{pendingStartName}&rdquo; now?
-                  </p>
-                  <p className="text-xs text-amber-700">
-                    This will close {currentSeason.name} and reset current-season scoring.
-                  </p>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={confirmStartSeason} disabled={startSeasonPending} className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">
-                      Confirm
-                    </button>
-                    <button type="button" onClick={() => setPendingStartName(null)} className="h-8 rounded-lg border px-3 text-xs font-semibold">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <ManageConfirmationPanel
+                  title={<>Start &ldquo;{pendingStartName}&rdquo; now?</>}
+                  description={<>This will close {currentSeason.name} and reset current-season scoring.</>}
+                  onConfirm={confirmStartSeason}
+                  onCancel={() => setPendingStartName(null)}
+                  confirmLabel="Start season"
+                  pendingLabel="Starting..."
+                  pending={startSeasonPending}
+                />
               ) : (
                 <button type="submit" disabled={startSeasonPending} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
                   {startSeasonPending ? "Starting..." : "Continue"}

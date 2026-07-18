@@ -407,7 +407,7 @@ describe("AdminForms", () => {
     await user.click(transferForm.getByRole("button", { name: "Transfer ownership" }));
 
     await screen.findByText("Transfer ownership to Ben Unassigned?");
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Transfer ownership" }));
 
     await waitFor(() => expect(props.onTransferOwnership).toHaveBeenCalledOnce());
     const transferMock = props.onTransferOwnership as ReturnType<typeof vi.fn>;
@@ -725,7 +725,7 @@ describe("AdminForms", () => {
     await user.click(startSeasonForm.getByRole("button", { name: "Continue" }));
 
     await screen.findByText(/Start .Q4 2026. now\?/);
-    await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
 
     await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
     const startSeasonMock = props.onStartSeason as ReturnType<typeof vi.fn>;
@@ -750,7 +750,7 @@ describe("AdminForms", () => {
     await user.click(startSeasonForm.getByRole("button", { name: "Continue" }));
 
     await screen.findByText(/Start .Q4 2026. now\?/);
-    await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
 
     await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");

@@ -426,7 +426,9 @@ count, and primary-action slot. Members, Houses, and Seasons also use accessible
 surfaces with focus containment, Escape handling, and focus restoration. Filters and empty
 states retain resource-specific behavior, while Members and Audit use a shared responsive control
 row for filters, search, counts, and inline errors. True empty and no-result states share a
-consistent labelled presentation and optional recovery action.
+consistent labelled presentation and optional recovery action. Consequential inline workflows
+use a shared two-step confirmation panel with consistent pending and cancellation behavior;
+member removal remains a modal confirmation and typed organization confirmations remain in context.
 
 ### Phase 1: Members
 

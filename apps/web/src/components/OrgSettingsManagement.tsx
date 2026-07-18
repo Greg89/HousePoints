@@ -6,6 +6,7 @@ import type { OrgSettings } from "@housepoints/contracts";
 import type { ArchiveOrganizationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import type { AdminUser } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageConfirmationPanel } from "./ManageConfirmationPanel";
 
 interface OrgSettingsManagementProps {
   users: AdminUser[];
@@ -371,31 +372,16 @@ export function OrgSettingsManagement({
           </div>
 
           {pendingTransferName ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
-              <p className="text-sm font-semibold text-destructive">
-                Transfer ownership to {pendingTransferName}?
-              </p>
-              <p className="text-xs text-muted-foreground">
-                You will become an admin after this change.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={confirmOwnerTransfer}
-                  disabled={isOwnerPending}
-                  className="h-8 rounded-lg bg-destructive px-3 text-xs font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
-                >
-                  Confirm
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingTransferId(null)}
-                  className="h-8 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-muted"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <ManageConfirmationPanel
+              title={<>Transfer ownership to {pendingTransferName}?</>}
+              description="You will become an admin after this change."
+              onConfirm={confirmOwnerTransfer}
+              onCancel={() => setPendingTransferId(null)}
+              confirmLabel="Transfer ownership"
+              pendingLabel="Transferring..."
+              pending={isOwnerPending}
+              tone="destructive"
+            />
           ) : (
             <button
               type="submit"
