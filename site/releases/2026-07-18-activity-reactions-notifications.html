@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HousePoints Activity, Reactions, and Notification Cleanup Release Notes</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">Released 2026-07-18</p>
+        <h1>Activity, Reactions, and Notification Cleanup</h1>
+        <p class="summary">
+          This release makes the Activity page more useful as the team hub for recognition,
+          adds reactions to point awards, and cleans up point notifications after they are read.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          <ul class="section-list">
+            <li>Refactored the Activity page into a clearer team activity hub with improved recognition cards.</li>
+            <li>Added reactions so teammates can respond to point awards without creating notification spam.</li>
+            <li>Added reaction details so users can see who reacted and when.</li>
+            <li>Improved Activity filters for type, giver, recognized member, and season.</li>
+            <li>Fixed point-award notifications so they archive after the recipient reads them.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>What's New</h2>
+          <ul class="section-list">
+            <li>The Activity page is easier to scan, with award details, points, season context, and actions arranged more intentionally.</li>
+            <li>Members can react to recognition with a small set of lightweight reactions.</li>
+            <li>Users can change their selected reaction without sending repeated notifications.</li>
+            <li>Admins and owners can still access point actions from the activity card actions menu.</li>
+            <li>Activity history can now be narrowed by recognition vs deductions, who gave points, who received points, and season.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Fixes</h2>
+          <ul class="section-list">
+            <li>Point-award notifications now behave like other read-once notifications and leave the notification tray after being read.</li>
+            <li>Reaction selection closes the picker after a reaction is saved.</li>
+            <li>Reaction detail views support longer reaction lists without expanding beyond the screen.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li>Run the release notes workflow with this page as <code>releases/2026-07-18-activity-reactions-notifications.html</code>.</li>
+            <li>Record the release first, verify production health and notification behavior, then broadcast to users.</li>
+            <li>No new Railway environment variables are required for this release beyond the existing release automation configuration.</li>
+            <li>Confirm <code>APP_RELEASE_NOTES_URL</code> remains configured on the production web app so users can reopen What's New later.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          <ul class="section-list">
+            <li>CI validation should pass before production promotion.</li>
+            <li>Staging E2E should pass before broadcast.</li>
+            <li>Verify a user can react to an activity item and view reaction details.</li>
+            <li>Verify a point-award notification disappears from the tray after being read.</li>
+            <li>Verify Activity filters return expected results for type, giver, recognized member, and season.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
