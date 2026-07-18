@@ -697,23 +697,24 @@ describe("AdminForms", () => {
     expect(screen.queryByRole("button", { name: "Load more audit history" })).not.toBeInTheDocument();
   });
 
-  it("shows season management controls with the current active season", () => {
+  it("shows current season state and history before management controls", () => {
     setupAdminForms();
     switchToManageSection("Seasons");
 
-    expect(screen.getByRole("form", { name: "Start season" })).toHaveTextContent(
-      "Current active season: Q3 2026",
-    );
-    expect(screen.getByRole("form", { name: "Rename season" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
+    expect(screen.getByRole("region", { name: "Season history" })).toHaveTextContent("Season 0");
+    expect(screen.getByRole("button", { name: "Start next season" })).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
   });
 
   it("confirms and starts a new season for owners", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Start next season" }));
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
-    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Continue" }));
 
     await screen.findByText(/Start .Q4 2026. now\?/);
     await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
@@ -722,8 +723,7 @@ describe("AdminForms", () => {
     const startSeasonMock = props.onStartSeason as ReturnType<typeof vi.fn>;
     const formData = startSeasonMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({ name: "Q4 2026" });
-    await screen.findByText(/Current active season:/);
-    expect(startSeasonForm.getByText("Q4 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q4 2026");
   });
 
   it("shows a safe toast when start-season returns an expected failure", async () => {
@@ -735,10 +735,11 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Start next season" }));
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
-    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Continue" }));
 
     await screen.findByText(/Start .Q4 2026. now\?/);
     await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
@@ -748,17 +749,18 @@ describe("AdminForms", () => {
     expect(toast.error).toHaveBeenCalledWith("Failed to start season", {
       description: "The season could not be started. Please try again.",
     });
-    expect(startSeasonForm.getByText("Q3 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
   });
 
   it("submits rename-season data", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Rename Season 0" }));
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
 
-    await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
-    await user.type(renameSeasonForm.getByPlaceholderText("Updated season name"), "Launch Season");
-    await user.click(renameSeasonForm.getByRole("button", { name: "Rename season" }));
+    await user.clear(renameSeasonForm.getByLabelText("Season name"));
+    await user.type(renameSeasonForm.getByLabelText("Season name"), "Launch Season");
+    await user.click(renameSeasonForm.getByRole("button", { name: "Save name" }));
 
     await waitFor(() => expect(props.onRenameSeason).toHaveBeenCalledOnce());
     const renameSeasonMock = props.onRenameSeason as ReturnType<typeof vi.fn>;
@@ -778,11 +780,12 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Rename Season 0" }));
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
 
-    await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
-    await user.type(renameSeasonForm.getByPlaceholderText("Updated season name"), "Launch Season");
-    await user.click(renameSeasonForm.getByRole("button", { name: "Rename season" }));
+    await user.clear(renameSeasonForm.getByLabelText("Season name"));
+    await user.type(renameSeasonForm.getByLabelText("Season name"), "Launch Season");
+    await user.click(renameSeasonForm.getByRole("button", { name: "Save name" }));
 
     await waitFor(() => expect(props.onRenameSeason).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
@@ -791,24 +794,23 @@ describe("AdminForms", () => {
     });
   });
 
-  it("uses compact, labelled color controls for house forms", () => {
-    setupAdminForms();
+  it("uses compact, labelled color controls in focused house editors", async () => {
+    const { user } = setupAdminForms();
     switchToManageSection("Houses");
 
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     expect(screen.getByLabelText(/House color/)).toHaveAttribute("type", "color");
+    expect(screen.getByText("Choose a house accent color")).toBeInTheDocument();
+    expect(screen.getByText("House theme preview")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close house editor" }));
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     expect(screen.getByLabelText(/New color/)).toHaveAttribute("type", "color");
-    expect(screen.getAllByText("Choose a house accent color")).toHaveLength(2);
-    expect(screen.getAllByText("House theme preview")).toHaveLength(2);
-    expect(screen.getAllByText("Theme ready")).toHaveLength(2);
-    expect(screen.getAllByText("This color is ready for readable house themes.")).toHaveLength(2);
-    expect(screen.getAllByRole("group", { name: /generated house theme preview/i })).toHaveLength(2);
-    expect(screen.getAllByText("Selected surface")).toHaveLength(2);
-    expect(screen.getAllByText("Dashboard card preview")).toHaveLength(2);
   });
 
   it("shows a warning when a house color would make a muted app theme", () => {
     setupAdminForms();
     switchToManageSection("Houses");
+    fireEvent.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     fireEvent.change(createHouseForm.getByLabelText(/House color/), {
@@ -822,6 +824,7 @@ describe("AdminForms", () => {
   it("submits create-house data and shows success when the typed result succeeds", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
@@ -856,6 +859,7 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
@@ -871,28 +875,27 @@ describe("AdminForms", () => {
   it("sets edit fields to the selected house values", async () => {
     const { user } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
     const colorInput = editHouseForm.getByLabelText(/New color/) as HTMLInputElement;
     const descriptionInput = editHouseForm.getByPlaceholderText("Description (optional)") as HTMLInputElement;
 
-    expect(colorInput.value).toBe("#7c3aed");
-    expect(descriptionInput.value).toBe("");
-
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     expect(colorInput.value).toBe("#1d4ed8");
     expect(descriptionInput.value).toBe("Curious problem solvers");
 
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Slytherin");
-    expect(colorInput.value).toBe("#22c55e");
-    expect(descriptionInput.value).toBe("Ambitious builders");
+    await user.click(screen.getByRole("button", { name: "Close house editor" }));
+    await user.click(screen.getByRole("button", { name: "Edit Slytherin" }));
+    const slytherinForm = within(screen.getByRole("form", { name: "Edit house" }));
+    expect((slytherinForm.getByLabelText(/New color/) as HTMLInputElement).value).toBe("#22c55e");
+    expect((slytherinForm.getByPlaceholderText("Description (optional)") as HTMLInputElement).value).toBe("Ambitious builders");
   });
 
   it("preserves the selected house description when only changing the edit color", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
 
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     fireEvent.change(editHouseForm.getByLabelText(/New color/), {
       target: { value: "#9333ea" },
     });
@@ -912,6 +915,7 @@ describe("AdminForms", () => {
   it("submits custom house palette data when custom mode is selected", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Gryffindor");
@@ -947,9 +951,9 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
 
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     await user.click(editHouseForm.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());

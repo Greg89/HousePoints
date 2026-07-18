@@ -1,5 +1,5 @@
 import { useState, useTransition, type FormEvent } from "react";
-import { PencilSimple, Plus } from "@phosphor-icons/react";
+import { PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { HouseMutationResult } from "@/lib/action-results";
 import { assessHouseThemeColor, resolveHouseThemeStyle } from "@/lib/house-theme";
@@ -245,6 +245,7 @@ function ThemePaletteControls({
 }
 
 export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps) {
+  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [createPending, startCreate] = useTransition();
   const [editPending, startEdit] = useTransition();
   const [createHouseColor, setCreateHouseColor] = useState(DEFAULT_HOUSE_COLOR);
@@ -280,6 +281,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         setCreateSecondaryColor(DEFAULT_SECONDARY_COLOR);
         setCreateSurfaceColor(DEFAULT_SURFACE_COLOR);
         form.reset();
+        setEditorMode(null);
       } catch (err) {
         toast.error("Failed to create house", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -312,6 +314,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         setEditSecondaryColor(DEFAULT_SECONDARY_COLOR);
         setEditSurfaceColor(DEFAULT_SURFACE_COLOR);
         form.reset();
+        setEditorMode(null);
       } catch (err) {
         toast.error("Failed to update house", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -322,17 +325,103 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
 
   return (
     <section className="space-y-6">
-      <div>
-        <h4 className="font-display text-lg font-semibold">Houses</h4>
-        <p className="text-sm text-muted-foreground">
-          Create new houses or update the details shown on the scoreboard.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h4 className="font-display text-xl font-semibold">Houses</h4>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+              {houses.length}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review each house, then create or update its identity and theme.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditorMode("create")}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          <Plus size={16} />
+          Create house
+        </button>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+
+      {houses.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {houses.map((house) => (
+            <button
+              key={house.id}
+              type="button"
+              aria-label={`Edit ${house.name}`}
+              onClick={() => {
+                setEditHouseName(house.name);
+                setEditHouseColor(getHouseColor(house));
+                setEditHouseDescription(house.description ?? "");
+                setEditThemeMode(getHouseThemeMode(house));
+                setEditSecondaryColor(getOptionalHouseColor(house.themeSecondaryColor, DEFAULT_SECONDARY_COLOR));
+                setEditSurfaceColor(getOptionalHouseColor(house.themeSurfaceColor, DEFAULT_SURFACE_COLOR));
+                setEditorMode("edit");
+              }}
+              className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+            >
+              <span
+                className="mt-0.5 h-10 w-10 shrink-0 rounded-full border shadow-sm"
+                style={{ backgroundColor: getHouseColor(house) }}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-lg font-semibold">{house.name}</span>
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  {house.description || "No description yet"}
+                </span>
+                <span className="mt-2 block text-xs font-medium text-muted-foreground">
+                  {getHouseThemeMode(house) === "CUSTOM" ? "Custom palette" : "Generated palette"}
+                </span>
+              </span>
+              <PencilSimple size={16} className="shrink-0 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed bg-card px-6 py-10 text-center">
+          <p className="text-sm font-semibold">No houses yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Create the first house before assigning members.
+          </p>
+          <button
+            type="button"
+            onClick={() => setEditorMode("create")}
+            className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Create the first house
+          </button>
+        </div>
+      )}
+
+      {editorMode ? (
+      <div className="max-w-2xl rounded-2xl border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h5 className="font-display text-lg font-semibold">
+              {editorMode === "create" ? "Create house" : `Edit ${editHouseName}`}
+            </h5>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {editorMode === "create"
+                ? "Set the identity used throughout the organization."
+                : "Update this house without affecting its members or score history."}
+            </p>
+          </div>
+          <button type="button" onClick={() => setEditorMode(null)} aria-label="Close house editor" className="rounded-lg p-2 hover:bg-muted">
+            <X size={17} />
+          </button>
+        </div>
+        <div>
+        {editorMode === "create" ? (
         <form
           aria-label="Create house"
           onSubmit={handleCreate}
-          className="grid gap-3 rounded-xl border p-5 bg-card"
+          className="grid gap-3"
         >
           <h5 className="text-sm font-semibold flex items-center gap-2">
             <Plus size={16} />
@@ -378,39 +467,17 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             {createPending ? "Creating..." : "Create"}
           </button>
         </form>
-
+        ) : (
         <form
           aria-label="Edit house"
           onSubmit={handleEdit}
-          className="grid gap-3 rounded-xl border p-5 bg-card"
+          className="grid gap-3"
         >
           <h5 className="text-sm font-semibold flex items-center gap-2">
             <PencilSimple size={16} />
             Edit House
           </h5>
-          <select
-            name="name"
-            aria-label="House to edit"
-            className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
-            required
-            value={editHouseName}
-            onChange={(event) => {
-              const selectedHouseName = event.target.value;
-              const selectedHouse = houses.find((house) => house.name === selectedHouseName);
-
-              setEditHouseName(selectedHouseName);
-              setEditHouseColor(getHouseColor(selectedHouse));
-              setEditHouseDescription(selectedHouse?.description ?? "");
-              setEditThemeMode(getHouseThemeMode(selectedHouse));
-              setEditSecondaryColor(getOptionalHouseColor(selectedHouse?.themeSecondaryColor, DEFAULT_SECONDARY_COLOR));
-              setEditSurfaceColor(getOptionalHouseColor(selectedHouse?.themeSurfaceColor, DEFAULT_SURFACE_COLOR));
-            }}
-          >
-            <option value="" disabled>Select house...</option>
-            {houses.map((house) => (
-              <option key={house.id} value={house.name}>{house.name}</option>
-            ))}
-          </select>
+          <input type="hidden" name="name" value={editHouseName} />
           <ColorField
             id="edit-house-color"
             label="New color"
@@ -447,7 +514,10 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             {editPending ? "Saving..." : "Save changes"}
           </button>
         </form>
+        )}
+        </div>
       </div>
+      ) : null}
     </section>
   );
 }

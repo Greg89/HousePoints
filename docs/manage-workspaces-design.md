@@ -439,8 +439,8 @@ This phase establishes the reusable resource-workspace pattern.
 
 ### Phase 3: Houses and Seasons
 
-- Convert Houses to list plus create/edit details.
-- Convert Seasons to current-state summary plus season history and focused operations.
+- Convert Houses to list plus create/edit details. Implemented.
+- Convert Seasons to current-state summary plus season history and focused operations. Implemented.
 
 ### Phase 4: Organization and Audit
 
