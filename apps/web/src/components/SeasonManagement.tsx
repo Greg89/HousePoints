@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState, useTransition, type FormEvent } from "react";
-import { Calendar, PencilSimple, Plus, X } from "@phosphor-icons/react";
+import { Calendar, PencilSimple, Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type { RenameSeasonResult, StartSeasonResult } from "@/lib/action-results";
 import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageDetailSheet } from "./ManageDetailSheet";
 
 interface SeasonManagementProps {
   seasons: Season[];
@@ -187,32 +188,22 @@ export function SeasonManagement({
         </div>
       </section>
 
-      {editorMode ? (
-        <div className="max-w-xl rounded-2xl border bg-card p-5 shadow-sm">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h5 className="font-display text-lg font-semibold">
-                {editorMode === "start" ? "Start next season" : `Rename ${renameSeason.name}`}
-              </h5>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {editorMode === "start"
-                  ? `Starting a new season immediately closes ${currentSeason.name}.`
-                  : "Renaming changes display text only; scores and dates stay the same."}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPendingStartName(null);
-                setEditorMode(null);
-              }}
-              aria-label="Close season editor"
-              className="rounded-lg p-2 hover:bg-muted"
-            >
-              <X size={17} />
-            </button>
-          </div>
-
+      <ManageDetailSheet
+        open={Boolean(editorMode)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingStartName(null);
+            setEditorMode(null);
+          }
+        }}
+        title={editorMode === "start" ? "Start next season" : `Rename ${renameSeason.name}`}
+        description={
+          editorMode === "start"
+            ? `Starting a new season immediately closes ${currentSeason.name}.`
+            : "Renaming changes display text only; scores and dates stay the same."
+        }
+        closeLabel="Close season editor"
+      >
           {editorMode === "start" ? (
             <form ref={startFormRef} aria-label="Start season" onSubmit={handleStartSeason} className="grid gap-3">
               <input
@@ -269,8 +260,7 @@ export function SeasonManagement({
               </button>
             </form>
           )}
-        </div>
-      ) : null}
+      </ManageDetailSheet>
     </ManageWorkspace>
   );
 }

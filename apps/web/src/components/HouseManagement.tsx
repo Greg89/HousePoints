@@ -1,10 +1,11 @@
 import { useState, useTransition, type FormEvent } from "react";
-import { PencilSimple, Plus, X } from "@phosphor-icons/react";
+import { PencilSimple, Plus } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { HouseMutationResult } from "@/lib/action-results";
 import { assessHouseThemeColor, resolveHouseThemeStyle } from "@/lib/house-theme";
 import type { AdminHouse } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageDetailSheet } from "./ManageDetailSheet";
 
 interface HouseManagementProps {
   houses: AdminHouse[];
@@ -394,24 +395,20 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         </div>
       )}
 
-      {editorMode ? (
-      <div className="max-w-2xl rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h5 className="font-display text-lg font-semibold">
-              {editorMode === "create" ? "Create house" : `Edit ${editHouseName}`}
-            </h5>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {editorMode === "create"
-                ? "Set the identity used throughout the organization."
-                : "Update this house without affecting its members or score history."}
-            </p>
-          </div>
-          <button type="button" onClick={() => setEditorMode(null)} aria-label="Close house editor" className="rounded-lg p-2 hover:bg-muted">
-            <X size={17} />
-          </button>
-        </div>
-        <div>
+      <ManageDetailSheet
+        open={Boolean(editorMode)}
+        onOpenChange={(open) => {
+          if (!open) setEditorMode(null);
+        }}
+        title={editorMode === "create" ? "Create house" : `Edit ${editHouseName}`}
+        description={
+          editorMode === "create"
+            ? "Set the identity used throughout the organization."
+            : "Update this house without affecting its members or score history."
+        }
+        closeLabel="Close house editor"
+        maxWidthClassName="max-w-2xl"
+      >
         {editorMode === "create" ? (
         <form
           aria-label="Create house"
@@ -510,9 +507,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
           </button>
         </form>
         )}
-        </div>
-      </div>
-      ) : null}
+      </ManageDetailSheet>
     </ManageWorkspace>
   );
 }

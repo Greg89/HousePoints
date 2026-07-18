@@ -422,8 +422,9 @@ All new queries and mutations must preserve organization scoping and multi-organ
 - Preserve all current workflows during the transition.
 
 The six workspaces now use a shared shell for their landmark, title, description, contextual
-count, and primary-action slot. Filters, empty states, and detail surfaces remain composed by
-each workspace because their behavior differs by resource.
+count, and primary-action slot. Members, Houses, and Seasons also use accessible modal detail
+surfaces with focus containment, Escape handling, and focus restoration. Filters and empty
+states remain composed by each workspace because their behavior differs by resource.
 
 ### Phase 1: Members
 
