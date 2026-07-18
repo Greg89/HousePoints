@@ -8,7 +8,6 @@ import {
   ClipboardText,
   Gear,
   House,
-  ShieldCheck,
   Trash,
   TrendDown,
   UserSwitch,
@@ -32,7 +31,6 @@ import { HouseManagement } from "./HouseManagement";
 import { ManageOverview } from "./ManageOverview";
 import { OrgSettingsManagement } from "./OrgSettingsManagement";
 import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
-import { RoleManagement } from "./RoleManagement";
 import { SeasonManagement } from "./SeasonManagement";
 import { TeamManagement } from "./TeamManagement";
 
@@ -67,7 +65,7 @@ interface AdminFormsProps {
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
 }
 
-type ManageSectionId = "overview" | "members" | "roles" | "houses" | "seasons" | "settings" | "audit";
+type ManageSectionId = "overview" | "members" | "houses" | "seasons" | "settings" | "audit";
 type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const MANAGE_SECTIONS: Array<{
@@ -88,13 +86,6 @@ const MANAGE_SECTIONS: Array<{
     label: "Members",
     description: "Invite members, assign houses, and manage access.",
     icon: UsersThree,
-  },
-  {
-    id: "roles",
-    label: "Roles",
-    description: "Promote members or remove admin access.",
-    icon: ShieldCheck,
-    ownerOnly: true,
   },
   {
     id: "houses",
@@ -166,7 +157,6 @@ export function AdminForms({
   actorRole,
   recentDeletedPoints,
   recentAdminActions,
-  inviteStats,
   pointAdjustmentStats,
   adminAuditNextCursor,
   onCreateHouse,
@@ -206,10 +196,7 @@ export function AdminForms({
       ? selection.section
       : urlSection;
   const unassignedUsers = users.filter((user) => !user.houseId);
-  const assignedUsers = users.filter((user) => user.houseId);
   const unassignedCount = unassignedUsers.length;
-  const unassignedSummary =
-    unassignedCount === 1 ? "1 needs assignment" : `${unassignedCount} need assignment`;
 
   function handleSectionChange(id: ManageSectionId) {
     const section = MANAGE_SECTIONS.find((s) => s.id === id);
@@ -318,24 +305,12 @@ export function AdminForms({
             <TeamManagement
               users={users}
               houses={houses}
-              unassignedUsers={unassignedUsers}
-              assignedUsers={assignedUsers}
-              unassignedSummary={unassignedSummary}
-              recentAdminActions={recentAdminActions}
-              inviteStats={inviteStats}
               actorRole={actorRole}
               onAssignHouse={onAssignHouse}
               onUpdateMemberDisplayName={onUpdateMemberDisplayName}
+              onPromoteUser={onPromoteUser}
               onRemoveOrgMember={onRemoveOrgMember}
               onCreateInvite={onCreateInvite}
-            />
-          ) : null}
-
-          {activeSection === "roles" ? (
-            <RoleManagement
-              users={users}
-              actorRole={actorRole}
-              onPromoteUser={onPromoteUser}
             />
           ) : null}
 

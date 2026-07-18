@@ -114,7 +114,7 @@ Changes from the current navigation:
 | Invite members | Yes | Yes |
 | Edit member display name | Yes | Yes |
 | Assign member to a house | Yes | Yes |
-| Remove ordinary member | Yes | Yes |
+| Remove ordinary member | Visible, disabled | Yes |
 | Change admin roles | Visible, disabled | Yes |
 | View Houses | Visible, disabled | Yes |
 | Create or edit a house | Visible, disabled | Yes |
@@ -423,10 +423,10 @@ All new queries and mutations must preserve organization scoping and multi-organ
 
 ### Phase 1: Members
 
-- Replace the form gallery with the member list and filters.
-- Move display name, house assignment, role, and removal into member details.
-- Move invite generation into a focused dialog/sheet.
-- Remove the Roles navigation entry after parity is verified.
+- Replace the form gallery with the member list and filters. Implemented.
+- Move display name, house assignment, role, and removal into member details. Implemented.
+- Move invite generation into a focused dialog/sheet. Implemented.
+- Remove the Roles navigation entry after parity is verified. Implemented.
 
 This phase establishes the reusable resource-workspace pattern.
 
