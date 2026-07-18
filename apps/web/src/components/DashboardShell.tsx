@@ -66,7 +66,9 @@ interface DashboardShellProps {
   members: OrgMember[];
   activity: ActivityItem[];
   activityNextCursor: string | null;
-  onLoadMoreActivity: (request: Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId">) => Promise<PagedActivityFeed>;
+  onLoadMoreActivity: (
+    request: Pick<ActivityFeedRequest, "cursor" | "type" | "actorUserId" | "targetUserId" | "seasonId">,
+  ) => Promise<PagedActivityFeed>;
   /** Computed per-member point totals from activity */
   memberPoints: MemberScore[];
   dashboardSummary: DashboardSummary;
@@ -597,6 +599,7 @@ export function DashboardShell({
               key={activityFeedKey}
               items={activity}
               members={members}
+              seasons={seasonContext.seasons}
               nextCursor={activityNextCursor}
               onLoadMore={onLoadMoreActivity}
               canDelete={session.role === "ADMIN" || session.role === "OWNER"}

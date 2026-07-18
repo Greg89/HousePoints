@@ -22,6 +22,11 @@ import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import type { PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 
+type ActivityPageRequest = Pick<
+  ActivityFeedRequest,
+  "cursor" | "type" | "actorUserId" | "targetUserId" | "seasonId"
+>;
+
 export async function readLeaderboard(requestId: string = randomUUID()) {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/houses/leaderboard", requestId, {
@@ -65,7 +70,7 @@ export async function readMembers(requestId: string = randomUUID()) {
 }
 
 export async function readActivityPage(
-  request: Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId"> = {},
+  request: ActivityPageRequest = {},
   requestId: string = randomUUID(),
 ): Promise<PagedActivityFeed> {
   await getCurrentUserForRequest(requestId);

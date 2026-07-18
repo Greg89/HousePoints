@@ -210,7 +210,9 @@ export const activityFeedRequestSchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).default(50),
   type: pointTransactionTypeSchema.optional(),
+  actorUserId: z.string().min(1).optional(),
   targetUserId: z.string().min(1).optional(),
+  seasonId: z.string().min(1).optional(),
 }).strict();
 
 export type ActivityFeedRequest = z.infer<typeof activityFeedRequestSchema>;

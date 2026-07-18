@@ -332,13 +332,17 @@ export async function listTransactions(params: {
   limit: number;
   cursor?: string;
   type?: PointTransactionType;
+  actorUserId?: string;
   targetUserId?: string;
+  seasonId?: string;
 }) {
   const where: Prisma.PointTransactionWhereInput = {
     organizationId: params.organizationId,
     deletedAt: null,
     ...(params.type ? { type: params.type } : {}),
+    ...(params.actorUserId ? { actorUserId: params.actorUserId } : {}),
     ...(params.targetUserId ? { targetUserId: params.targetUserId } : {}),
+    ...(params.seasonId ? { seasonId: params.seasonId } : {}),
   };
 
   const transactions = await prisma.pointTransaction.findMany({
@@ -978,7 +982,9 @@ export async function registerPointRoutes(
       limit: parsed.limit,
       cursor: parsed.cursor,
       type: parsed.type,
+      actorUserId: parsed.actorUserId,
       targetUserId: parsed.targetUserId,
+      seasonId: parsed.seasonId,
     });
     const nextCursor = hasNextPage ? items.at(-1)?.id ?? null : null;
 

@@ -19,9 +19,18 @@ import { ActivityCard } from "./ActivityCard";
 import { REACTION_EMOJI } from "./point-reactions";
 
 type ActivityTypeFilter = "ALL" | PointTransactionType;
+type ActivityFilterRequest = Pick<
+  ActivityFeedRequest,
+  "cursor" | "type" | "actorUserId" | "targetUserId" | "seasonId"
+>;
+type ActivityFeedSeason = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
 
 const FILTER_OPTIONS: Array<{ value: ActivityTypeFilter; label: string; description: string }> = [
-  { value: "ALL", label: "All", description: "Recognition and deductions" },
+  { value: "ALL", label: "All activity", description: "Recognition and deductions" },
   { value: "AWARD", label: "Recognition", description: "Points awarded by teammates" },
   { value: "DEDUCTION", label: "Deductions", description: "Admin point deductions" },
 ];
@@ -37,8 +46,9 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en", {
 interface ActivityFeedProps {
   items: ActivityItem[];
   members: OrgMember[];
+  seasons?: ActivityFeedSeason[];
   nextCursor: string | null;
-  onLoadMore: (request: Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId">) => Promise<PagedActivityFeed>;
+  onLoadMore: (request: ActivityFilterRequest) => Promise<PagedActivityFeed>;
   canDelete?: boolean;
   onDelete?: (transactionId: string) => Promise<DeletePointResult>;
   onReact?: (
@@ -53,6 +63,7 @@ interface ActivityFeedProps {
 export function ActivityFeed({
   items,
   members,
+  seasons = [],
   nextCursor,
   onLoadMore,
   canDelete = false,
@@ -77,21 +88,45 @@ export function ActivityFeed({
   const [reactionDetailsError, setReactionDetailsError] = useState<string | null>(null);
   const [loadingReactionDetailsId, setLoadingReactionDetailsId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ActivityTypeFilter>("ALL");
-  const [activeMemberId, setActiveMemberId] = useState("ALL");
+  const [activeActorMemberId, setActiveActorMemberId] = useState("ALL");
+  const [activeTargetMemberId, setActiveTargetMemberId] = useState("ALL");
+  const [activeSeasonId, setActiveSeasonId] = useState("ALL");
 
   function buildActivityRequest(options: {
     cursor?: string;
     type?: ActivityTypeFilter;
+    actorUserId?: string;
     targetUserId?: string;
-  } = {}): Pick<ActivityFeedRequest, "cursor" | "type" | "targetUserId"> {
+    seasonId?: string;
+  } = {}): ActivityFilterRequest {
     const typeFilter = options.type ?? activeFilter;
-    const memberId = options.targetUserId ?? activeMemberId;
+    const actorMemberId = options.actorUserId ?? activeActorMemberId;
+    const targetMemberId = options.targetUserId ?? activeTargetMemberId;
+    const seasonId = options.seasonId ?? activeSeasonId;
 
     return {
       ...(options.cursor ? { cursor: options.cursor } : {}),
       ...(typeFilter === "ALL" ? {} : { type: typeFilter }),
-      ...(memberId === "ALL" ? {} : { targetUserId: memberId }),
+      ...(actorMemberId === "ALL" ? {} : { actorUserId: actorMemberId }),
+      ...(targetMemberId === "ALL" ? {} : { targetUserId: targetMemberId }),
+      ...(seasonId === "ALL" ? {} : { seasonId }),
     };
+  }
+
+  async function reloadActivity(request: ActivityFilterRequest) {
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    setDeleteError(null);
+
+    try {
+      const page = await onLoadMore(request);
+      setVisibleItems(page.items);
+      setCursor(page.nextCursor);
+    } catch {
+      setLoadMoreError("Activity could not be filtered. Please try again.");
+    } finally {
+      setIsLoadingMore(false);
+    }
   }
 
   async function handleFilterChange(nextFilter: ActivityTypeFilter) {
@@ -100,40 +135,34 @@ export function ActivityFeed({
     }
 
     setActiveFilter(nextFilter);
-    setIsLoadingMore(true);
-    setLoadMoreError(null);
-    setDeleteError(null);
-
-    try {
-      const page = await onLoadMore(buildActivityRequest({ type: nextFilter }));
-      setVisibleItems(page.items);
-      setCursor(page.nextCursor);
-    } catch {
-      setLoadMoreError("Activity could not be filtered. Please try again.");
-    } finally {
-      setIsLoadingMore(false);
-    }
+    await reloadActivity(buildActivityRequest({ type: nextFilter }));
   }
 
-  async function handleMemberChange(nextMemberId: string) {
-    if (nextMemberId === activeMemberId || isLoadingMore) {
+  async function handleActorMemberChange(nextMemberId: string) {
+    if (nextMemberId === activeActorMemberId || isLoadingMore) {
       return;
     }
 
-    setActiveMemberId(nextMemberId);
-    setIsLoadingMore(true);
-    setLoadMoreError(null);
-    setDeleteError(null);
+    setActiveActorMemberId(nextMemberId);
+    await reloadActivity(buildActivityRequest({ actorUserId: nextMemberId }));
+  }
 
-    try {
-      const page = await onLoadMore(buildActivityRequest({ targetUserId: nextMemberId }));
-      setVisibleItems(page.items);
-      setCursor(page.nextCursor);
-    } catch {
-      setLoadMoreError("Activity could not be filtered. Please try again.");
-    } finally {
-      setIsLoadingMore(false);
+  async function handleTargetMemberChange(nextMemberId: string) {
+    if (nextMemberId === activeTargetMemberId || isLoadingMore) {
+      return;
     }
+
+    setActiveTargetMemberId(nextMemberId);
+    await reloadActivity(buildActivityRequest({ targetUserId: nextMemberId }));
+  }
+
+  async function handleSeasonChange(nextSeasonId: string) {
+    if (nextSeasonId === activeSeasonId || isLoadingMore) {
+      return;
+    }
+
+    setActiveSeasonId(nextSeasonId);
+    await reloadActivity(buildActivityRequest({ seasonId: nextSeasonId }));
   }
 
   async function handleLoadMore() {
@@ -261,7 +290,11 @@ export function ActivityFeed({
     }
   }
 
-  const hasActiveFilters = activeFilter !== "ALL" || activeMemberId !== "ALL";
+  const hasActiveFilters =
+    activeFilter !== "ALL"
+    || activeActorMemberId !== "ALL"
+    || activeTargetMemberId !== "ALL"
+    || activeSeasonId !== "ALL";
   const reactionDetailsOpen = Boolean(reactionDetailsContext);
 
   return (
@@ -282,36 +315,26 @@ export function ActivityFeed({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Filters
           </p>
-          <div className="mt-2 grid gap-2" aria-label="Activity filters">
-            {FILTER_OPTIONS.map((option) => {
-              const selected = option.value === activeFilter;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => void handleFilterChange(option.value)}
-                  aria-pressed={selected}
-                  disabled={isLoadingMore}
-                  title={option.description}
-                  className={[
-                    "w-full rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors",
-                    selected
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:border-primary/30 hover:text-foreground",
-                    "disabled:cursor-wait disabled:opacity-60",
-                  ].join(" ")}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-          <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Member
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Activity type
             <select
-              value={activeMemberId}
-              onChange={(event) => void handleMemberChange(event.target.value)}
+              value={activeFilter}
+              onChange={(event) => void handleFilterChange(event.target.value as ActivityTypeFilter)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              {FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Given by
+            <select
+              value={activeActorMemberId}
+              onChange={(event) => void handleActorMemberChange(event.target.value)}
               disabled={isLoadingMore}
               className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
             >
@@ -319,6 +342,38 @@ export function ActivityFeed({
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Recognized member
+            <select
+              value={activeTargetMemberId}
+              onChange={(event) => void handleTargetMemberChange(event.target.value)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="ALL">All members</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Season
+            <select
+              value={activeSeasonId}
+              onChange={(event) => void handleSeasonChange(event.target.value)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="ALL">All seasons</option>
+              {seasons.map((season) => (
+                <option key={season.id} value={season.id}>
+                  {season.name}{season.isActive ? " (current)" : ""}
                 </option>
               ))}
             </select>

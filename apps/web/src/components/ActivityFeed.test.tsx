@@ -62,6 +62,11 @@ const members: OrgMember[] = [
   },
 ];
 
+const seasons = [
+  { id: "season-active", name: "Q3 2026", isActive: true },
+  { id: "season-previous", name: "Q2 2026", isActive: false },
+];
+
 describe("ActivityFeed", () => {
   it("shows an empty state without a load-more button", () => {
     render(
@@ -149,7 +154,7 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /deductions/i }));
+    await user.selectOptions(screen.getByLabelText(/activity type/i), "DEDUCTION");
 
     expect(onLoadMore).toHaveBeenCalledWith({ type: "DEDUCTION" });
     expect(await screen.findByText("Missed handoff")).toBeInTheDocument();
@@ -200,7 +205,7 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.selectOptions(screen.getByLabelText(/member/i), "user-ben");
+    await user.selectOptions(screen.getByLabelText(/recognized member/i), "user-ben");
 
     expect(onLoadMore).toHaveBeenCalledWith({ targetUserId: "user-ben" });
     expect(await screen.findByText("Helped onboard the team")).toBeInTheDocument();
@@ -213,6 +218,77 @@ describe("ActivityFeed", () => {
       targetUserId: "user-ben",
     });
     expect(await screen.findByText("Made the sprint smoother")).toBeInTheDocument();
+  });
+
+  it("loads server-backed giver and season filters and keeps them for pagination", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "giver-page-1",
+            actorName: "Cara",
+            reason: "Called out a strong handoff",
+            season: seasons[1],
+          },
+        ],
+        nextCursor: "giver-page-1",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "giver-page-2",
+            actorName: "Cara",
+            reason: "Kept the momentum going",
+            season: seasons[1],
+          },
+        ],
+        nextCursor: "giver-page-2",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "giver-page-3",
+            actorName: "Cara",
+            reason: "Finished the follow-up",
+            season: seasons[1],
+          },
+        ],
+        nextCursor: null,
+      });
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        seasons={seasons}
+        nextCursor={null}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText(/given by/i), "user-cara");
+    await screen.findByText("Called out a strong handoff");
+    await user.selectOptions(screen.getByLabelText(/season/i), "season-previous");
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      actorUserId: "user-cara",
+      seasonId: "season-previous",
+    });
+    expect(await screen.findByText("Kept the momentum going")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /load more activity/i }));
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      cursor: "giver-page-2",
+      actorUserId: "user-cara",
+      seasonId: "season-previous",
+    });
+    expect(await screen.findByText("Finished the follow-up")).toBeInTheDocument();
   });
 
   it("keeps the cursor available and shows a safe error when loading fails", async () => {
