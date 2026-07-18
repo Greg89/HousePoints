@@ -20,6 +20,7 @@ The documents in this folder serve three purposes:
 
 - [Roadmap](./roadmap.md): current production-readiness tiers and feature work.
 - [Upcoming features](./upcoming-features.md): unscheduled product concepts and open design questions.
+- [Manage resource workspaces design](./manage-workspaces-design.md): phased refactor from administrative form galleries to Overview, Members, Houses, Seasons, Organization, and Audit workspaces.
 - [Seasons design plan](./seasons-design.md): proposed product and technical plan for season-scoped scoring.
 - [Organization settings design](./org-settings-design.md): owner-only organization settings, slug-change safety, and future URL alias planning.
 - [Organization lifecycle and archive design](./org-lifecycle-archive-design.md): owner-only org archive/restore rules and hard-delete non-goals.
