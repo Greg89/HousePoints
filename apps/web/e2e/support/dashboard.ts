@@ -15,14 +15,14 @@ export async function expectDashboardReady(page: Page) {
     throw new Error("E2E user reached the app error boundary. Check web/API logs for the staging request.");
   }
 
-  await expect(page.getByText(/welcome back/i)).toBeVisible();
+  await expect(page.getByRole("tab", { name: /overview/i })).toBeVisible();
 }
 
 async function ensureDashboardState(page: Page) {
   await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
 
   await Promise.any([
-    page.getByText(/welcome back/i).waitFor({ state: "visible", timeout: 30_000 }),
+    page.getByText(/house standings/i).waitFor({ state: "visible", timeout: 30_000 }),
     page.getByText(/waiting for assignment/i).waitFor({ state: "visible", timeout: 30_000 }),
     page.getByText(/create organisation/i).waitFor({ state: "visible", timeout: 30_000 }),
     page.getByText(/something went wrong/i).waitFor({ state: "visible", timeout: 30_000 }),
