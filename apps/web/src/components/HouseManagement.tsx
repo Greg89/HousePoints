@@ -6,6 +6,7 @@ import { assessHouseThemeColor, resolveHouseThemeStyle } from "@/lib/house-theme
 import type { AdminHouse } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
 import { ManageDetailSheet } from "./ManageDetailSheet";
+import { ManageEmptyState } from "./ManageEmptyState";
 
 interface HouseManagementProps {
   houses: AdminHouse[];
@@ -380,19 +381,19 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed bg-card px-6 py-10 text-center">
-          <p className="text-sm font-semibold">No houses yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create the first house before assigning members.
-          </p>
-          <button
-            type="button"
-            onClick={() => setEditorMode("create")}
-            className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            Create the first house
-          </button>
-        </div>
+        <ManageEmptyState
+          title="No houses yet"
+          description="Create the first house before assigning members."
+          action={
+            <button
+              type="button"
+              onClick={() => setEditorMode("create")}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              Create the first house
+            </button>
+          }
+        />
       )}
 
       <ManageDetailSheet

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { TrendDown } from "@phosphor-icons/react";
 import type { PointAdjustmentStats, Season } from "@housepoints/contracts";
+import { ManageEmptyState } from "./ManageEmptyState";
 
 interface PointAdjustmentReportProps {
   pointAdjustmentStats: PointAdjustmentStats;
@@ -100,9 +101,13 @@ export function PointAdjustmentReport({
           ))}
         </div>
       ) : (
-        <div className="mt-3 rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
-          No point deductions have been recorded for this season.
-        </div>
+        <ManageEmptyState
+          title="No point deductions"
+          description="No point deductions have been recorded for this season."
+          icon={<TrendDown size={24} />}
+          compact
+          className="mt-3 bg-background"
+        />
       )}
     </section>
   );

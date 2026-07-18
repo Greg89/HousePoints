@@ -25,6 +25,7 @@ import type {
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageEmptyState } from "./ManageEmptyState";
 
 type MemberFilter = "all" | "unassigned" | "members" | "admins";
 
@@ -363,13 +364,11 @@ export function TeamManagement({
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed bg-card px-6 py-10 text-center">
-          <UsersThree size={28} className="mx-auto text-muted-foreground" />
-          <p className="mt-3 text-sm font-semibold">No members match this view</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Try another filter or clear the search.
-          </p>
-        </div>
+        <ManageEmptyState
+          title="No members match this view"
+          description="Try another filter or clear the search."
+          icon={<UsersThree size={28} />}
+        />
       )}
 
       <Dialog.Root

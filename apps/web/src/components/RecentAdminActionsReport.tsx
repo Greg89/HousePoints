@@ -1,6 +1,7 @@
 import {
   Buildings,
   Calendar,
+  ClipboardText,
   LinkSimple,
   ShieldCheck,
   TrendDown,
@@ -13,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMemo, useState, useTransition } from "react";
 import type { AdminAuditAction, PagedAdminAuditActions } from "@housepoints/contracts";
+import { ManageEmptyState } from "./ManageEmptyState";
 
 interface RecentAdminActionsReportProps {
   actions: AdminAuditAction[];
@@ -155,9 +157,13 @@ export function RecentAdminActionsReport({
 
       <div className="mt-3 overflow-hidden rounded-xl border">
         {visibleActions.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No audit history matches this filter yet.
-          </p>
+          <ManageEmptyState
+            title="No audit history matches this filter yet."
+            description="Choose another event type or check back after an administrative change."
+            icon={<ClipboardText size={24} />}
+            compact
+            className="rounded-none border-0 bg-transparent"
+          />
         ) : (
           <div className="divide-y">
             {visibleActions.map((action) => {
