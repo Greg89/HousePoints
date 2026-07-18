@@ -416,7 +416,7 @@ All new queries and mutations must preserve organization scoping and multi-organ
 
 ### Phase 0: Shared foundations
 
-- Add deep-linkable Manage workspace state.
+- Add deep-linkable Manage workspace state. Implemented.
 - Add the shared workspace header, filter row, empty state, and drawer/sheet primitives.
 - Remove the persistent metrics strip or keep it only until the new Overview ships.
 - Preserve all current workflows during the transition.
@@ -515,4 +515,3 @@ These decisions should be made during the relevant phase rather than blocking th
 3. Whether Houses use rows or cards. Use cards only if the theme preview materially helps identification; otherwise prefer rows for density.
 4. Whether Audit uses a segmented control or secondary tabs for History and Point adjustments.
 5. What organization size triggers server-side member pagination and search.
-

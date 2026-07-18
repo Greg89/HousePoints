@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Calendar,
   ChartBar,
@@ -67,6 +68,7 @@ interface AdminFormsProps {
 }
 
 type ManageSectionId = "overview" | "members" | "roles" | "houses" | "seasons" | "settings" | "audit";
+type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const MANAGE_SECTIONS: Array<{
   id: ManageSectionId;
@@ -123,6 +125,38 @@ const MANAGE_SECTIONS: Array<{
   },
 ];
 
+function getManageSectionFromSearchParams(
+  searchParams: ReadableSearchParams,
+  isOwner: boolean,
+): ManageSectionId | null {
+  const requestedSection = searchParams.get("manage");
+  const section = MANAGE_SECTIONS.find(({ id }) => id === requestedSection);
+
+  if (!section || (section.ownerOnly && !isOwner)) {
+    return null;
+  }
+
+  return section.id;
+}
+
+function syncManageSectionToUrl(
+  section: ManageSectionId,
+  searchParams: ReadableSearchParams,
+): string {
+  const nextParams = new URLSearchParams(searchParams.toString());
+
+  if (section === "overview") {
+    nextParams.delete("manage");
+  } else {
+    nextParams.set("manage", section);
+  }
+
+  const nextQuery = nextParams.toString();
+  const nextUrl = nextQuery ? `?${nextQuery}` : window.location.pathname;
+  window.history.pushState(null, "", nextUrl);
+  return nextQuery;
+}
+
 export function AdminForms({
   users,
   houses,
@@ -150,8 +184,27 @@ export function AdminForms({
   onStartSeason,
   onRenameSeason,
 }: AdminFormsProps) {
-  const [activeSection, setActiveSection] = useState<ManageSectionId>("overview");
+  const searchParams = useSearchParams();
   const isOwner = actorRole === "OWNER";
+  const manageQuery = searchParams.toString();
+  const urlSection =
+    getManageSectionFromSearchParams(searchParams, isOwner) ?? "overview";
+  const [selection, setSelection] = useState<{
+    query: string;
+    section: ManageSectionId;
+  }>(() => ({
+    query: manageQuery,
+    section: urlSection,
+  }));
+  const selectedSectionDefinition = MANAGE_SECTIONS.find(
+    ({ id }) => id === selection.section,
+  );
+  const canUseSelectedSection =
+    selectedSectionDefinition && (!selectedSectionDefinition.ownerOnly || isOwner);
+  const activeSection =
+    selection.query === manageQuery && canUseSelectedSection
+      ? selection.section
+      : urlSection;
   const unassignedUsers = users.filter((user) => !user.houseId);
   const assignedUsers = users.filter((user) => user.houseId);
   const unassignedCount = unassignedUsers.length;
@@ -161,7 +214,8 @@ export function AdminForms({
   function handleSectionChange(id: ManageSectionId) {
     const section = MANAGE_SECTIONS.find((s) => s.id === id);
     if (section?.ownerOnly && !isOwner) return;
-    setActiveSection(id);
+    const nextQuery = syncManageSectionToUrl(id, searchParams);
+    setSelection({ query: nextQuery, section: id });
   }
 
   return (

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AdminAuditAction, PointAdjustmentStats } from "@housepoints/contracts";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminForms } from "./AdminForms";
 
 vi.mock("sonner", () => ({
@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     replace: routerReplaceMock,
   }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 const users = [
@@ -248,6 +249,10 @@ function switchToManageSection(sectionName: string) {
 }
 
 describe("AdminForms", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
   it("defaults to the Manage overview and exposes focused section navigation", () => {
     setupAdminForms();
 
@@ -401,6 +406,49 @@ describe("AdminForms", () => {
     expect(toast.success).toHaveBeenCalledWith("Ownership transferred", {
       description: "Ben Unassigned is now the organization owner.",
     });
+  });
+
+  it("opens a deep-linked Manage section and preserves other query parameters when navigating", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?tab=manage&manage=members&season=season-active",
+    );
+    const pushState = vi.spyOn(window.history, "pushState");
+
+    setupAdminForms();
+
+    expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Members" })).toBeInTheDocument();
+
+    switchToManageSection("Audit");
+
+    expect(pushState).toHaveBeenLastCalledWith(
+      null,
+      "",
+      "?tab=manage&manage=audit&season=season-active",
+    );
+    expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("falls back to Overview when an admin deep-links to an owner-only section", () => {
+    window.history.replaceState(null, "", "/?tab=manage&manage=settings");
+
+    setupAdminForms({ actorRole: "ADMIN" });
+
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("form", { name: "Organization settings" })).not.toBeInTheDocument();
+  });
+
+  it("removes the Manage section parameter when returning to Overview", () => {
+    window.history.replaceState(null, "", "/?tab=manage&manage=audit");
+    const pushState = vi.spyOn(window.history, "pushState");
+
+    setupAdminForms();
+    switchToManageSection("Overview");
+
+    expect(pushState).toHaveBeenLastCalledWith(null, "", "?tab=manage");
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
   });
 
   it("lets owners archive the organization only after typing the current slug", async () => {
