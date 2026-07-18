@@ -6,7 +6,7 @@ import {
   Calendar,
   ChartBar,
   ClipboardText,
-  Gear,
+  Buildings,
   House,
   UsersThree,
 } from "@phosphor-icons/react";
@@ -62,7 +62,7 @@ interface AdminFormsProps {
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
 }
 
-type ManageSectionId = "overview" | "members" | "houses" | "seasons" | "settings" | "audit";
+type ManageSectionId = "overview" | "members" | "houses" | "seasons" | "organization" | "audit";
 type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const MANAGE_SECTIONS: Array<{
@@ -99,10 +99,10 @@ const MANAGE_SECTIONS: Array<{
     ownerOnly: true,
   },
   {
-    id: "settings",
-    label: "Settings",
-    description: "Update organization-level details.",
-    icon: Gear,
+    id: "organization",
+    label: "Organization",
+    description: "Manage organization identity, URL, ownership, and lifecycle.",
+    icon: Buildings,
     ownerOnly: true,
   },
   {
@@ -306,7 +306,7 @@ export function AdminForms({
             />
           ) : null}
 
-          {activeSection === "settings" ? (
+          {activeSection === "organization" ? (
             <OrgSettingsManagement
               users={users}
               organization={organization}

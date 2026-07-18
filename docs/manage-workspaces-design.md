@@ -444,9 +444,9 @@ This phase establishes the reusable resource-workspace pattern.
 
 ### Phase 4: Organization and Audit
 
-- Rename Settings to Organization and flatten its section hierarchy.
-- Add History and Point adjustments views to Audit.
-- Complete navigation labels and remove transitional UI.
+- Rename Settings to Organization and flatten its section hierarchy. Implemented.
+- Add History and Point adjustments views to Audit. Implemented.
+- Complete navigation labels and remove transitional UI. Implemented.
 
 Each phase should be independently releasable and retain the current authorization boundaries.
 

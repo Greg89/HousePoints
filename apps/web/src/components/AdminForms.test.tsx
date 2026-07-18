@@ -267,15 +267,19 @@ describe("AdminForms", () => {
     expect(overview.getByText("Recent administration")).toBeInTheDocument();
     expect(screen.queryByLabelText("Point adjustment activity")).not.toBeInTheDocument();
 
-    switchToManageSection("Settings");
-    expect(screen.getByRole("tab", { name: /Settings/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Organization Settings")).toBeInTheDocument();
+    switchToManageSection("Organization");
+    expect(screen.getByRole("tab", { name: /Organization/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Organization", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Organization identity" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "URL and slug" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ownership" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Danger zone" })).toBeInTheDocument();
 
     switchToManageSection("Audit");
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Audit history")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "History" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Point adjustments" })).toBeInTheDocument();
     expect(screen.queryByText("Recently deleted point awards")).not.toBeInTheDocument();
   });
@@ -297,7 +301,7 @@ describe("AdminForms", () => {
 
     const housesTab = screen.getByRole("tab", { name: /Houses/ });
     const seasonsTab = screen.getByRole("tab", { name: /Seasons/ });
-    const settingsTab = screen.getByRole("tab", { name: /Settings/ });
+    const settingsTab = screen.getByRole("tab", { name: /Organization/ });
 
     expect(settingsTab).toBeVisible();
     expect(housesTab).toBeVisible();
@@ -326,7 +330,7 @@ describe("AdminForms", () => {
 
   it("lets owners update organization settings", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const settingsForm = within(screen.getByRole("form", { name: "Organization settings" }));
     const nameInput = settingsForm.getByLabelText("Organization name") as HTMLInputElement;
 
@@ -351,7 +355,7 @@ describe("AdminForms", () => {
 
   it("lets owners change the organization slug with confirmation", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
 
     expect(slugForm.getByText("Previous slugs stay reserved so old links cannot be claimed by another organization.")).toBeInTheDocument();
@@ -375,7 +379,7 @@ describe("AdminForms", () => {
 
   it("does not submit slug changes when confirmation does not match", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
 
     await user.type(slugForm.getByLabelText("New slug"), "acme-corp");
@@ -389,9 +393,9 @@ describe("AdminForms", () => {
     });
   });
 
-  it("lets owners transfer ownership from the Settings section", async () => {
+  it("lets owners transfer ownership from the Organization workspace", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
 
     await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
@@ -438,7 +442,7 @@ describe("AdminForms", () => {
   });
 
   it("falls back to Overview when an admin deep-links to an owner-only section", () => {
-    window.history.replaceState(null, "", "/?tab=manage&manage=settings");
+    window.history.replaceState(null, "", "/?tab=manage&manage=organization");
 
     setupAdminForms({ actorRole: "ADMIN" });
 
@@ -459,7 +463,7 @@ describe("AdminForms", () => {
 
   it("lets owners archive the organization only after typing the current slug", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const archiveForm = within(screen.getByRole("form", { name: "Archive organization" }));
     const archiveButton = archiveForm.getByRole("button", { name: "Archive organization" });
 
@@ -492,7 +496,7 @@ describe("AdminForms", () => {
         message: "The organization could not be archived. Please try again.",
       }),
     });
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const archiveForm = within(screen.getByRole("form", { name: "Archive organization" }));
 
     await user.type(archiveForm.getByLabelText("Confirm archive"), "acme");
@@ -507,7 +511,7 @@ describe("AdminForms", () => {
 
   it("does not submit ownership transfer when confirmation does not match", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
 
     await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
@@ -529,7 +533,7 @@ describe("AdminForms", () => {
         message: "That organization slug is already reserved. Choose a different one.",
       }),
     });
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
 
     await user.type(slugForm.getByLabelText("New slug"), "reserved-slug");
@@ -551,7 +555,7 @@ describe("AdminForms", () => {
         message: "The organization settings could not be updated. Please try again.",
       }),
     });
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const settingsForm = within(screen.getByRole("form", { name: "Organization settings" }));
     const nameInput = settingsForm.getByLabelText("Organization name");
 

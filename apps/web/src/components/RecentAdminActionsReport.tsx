@@ -123,11 +123,10 @@ export function RecentAdminActionsReport({
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-6">
+    <section aria-labelledby="audit-history-heading">
       <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="text-sm font-medium text-primary">Admin audit</p>
-          <h4 className="font-display text-xl font-semibold mt-1">Audit history</h4>
+          <h3 id="audit-history-heading" className="font-display text-xl font-semibold">History</h3>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
             Full history of important organization changes, including deleted point awards.
           </p>

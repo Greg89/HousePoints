@@ -1,6 +1,6 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Buildings, Crown, Warning } from "@phosphor-icons/react";
+import { Buildings, Crown, LinkSimple, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { OrgSettings } from "@housepoints/contracts";
 import type { ArchiveOrganizationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
@@ -194,24 +194,24 @@ export function OrgSettingsManagement({
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-8" aria-labelledby="organization-heading">
       <div>
-        <h4 className="font-display text-lg font-semibold">Organization Settings</h4>
+        <h2 id="organization-heading" className="font-display text-2xl font-semibold">Organization</h2>
         <p className="text-sm text-muted-foreground">
-          Update the organization details shown throughout House Points and future invite links.
+          Manage your organization identity, URL, ownership, and lifecycle.
         </p>
       </div>
 
       <form
         aria-label="Organization settings"
         onSubmit={handleNameSubmit}
-        className="grid max-w-xl gap-4 rounded-xl border bg-card p-5"
+        className="grid max-w-xl gap-4 border-b pb-8"
       >
         <div>
-          <h5 className="flex items-center gap-2 text-sm font-semibold">
+          <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
             <Buildings size={16} />
-            Organization Details
-          </h5>
+            Organization identity
+          </h3>
           <p className="mt-2 text-xs text-muted-foreground">
             Rename the organization without changing its URL slug or membership.
           </p>
@@ -248,27 +248,23 @@ export function OrgSettingsManagement({
         </button>
       </form>
 
-      <div className="max-w-xl space-y-4 rounded-xl border border-destructive/30 p-5">
+      <div className="max-w-xl divide-y">
         <div>
-          <h5 className="flex items-center gap-2 text-sm font-semibold text-destructive">
-            <Warning size={16} />
-            Danger Zone
-          </h5>
+          <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
+            <LinkSimple size={16} />
+            URL and slug
+          </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            These actions affect your organization URL or ownership. Proceed with care.
+            Control the URL-safe identifier used by organization and invite links.
           </p>
         </div>
 
         <form
           aria-label="Organization slug"
           onSubmit={handleSlugSubmit}
-          className="grid gap-4 rounded-xl border bg-card p-4"
+          className="grid gap-4 py-6"
         >
           <div>
-            <h5 className="flex items-center gap-2 text-sm font-semibold">
-              <Buildings size={16} />
-              Organization Slug
-            </h5>
             <p className="mt-2 text-xs text-muted-foreground">
               Change the URL-safe identifier that will appear in future organization links and invite URLs.
             </p>
@@ -326,13 +322,13 @@ export function OrgSettingsManagement({
         <form
           aria-label="Transfer ownership"
           onSubmit={handleOwnerSubmit}
-          className="grid gap-4 rounded-xl border bg-card p-4"
+          className="grid gap-4 py-6"
         >
           <div>
-            <h5 className="flex items-center gap-2 text-sm font-semibold">
+            <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
               <Crown size={16} />
-              Transfer Ownership
-            </h5>
+              Ownership
+            </h3>
             <p className="mt-2 text-xs text-muted-foreground">
               Move organization ownership to another member. Your account will become an admin after the transfer.
             </p>
@@ -415,13 +411,13 @@ export function OrgSettingsManagement({
         <form
           aria-label="Archive organization"
           onSubmit={handleArchiveSubmit}
-          className="grid gap-4 rounded-xl border border-destructive/30 bg-card p-4"
+          className="mt-2 grid gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-5"
         >
           <div>
-            <h5 className="flex items-center gap-2 text-sm font-semibold text-destructive">
+            <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-destructive">
               <Warning size={16} />
-              Archive Organization
-            </h5>
+              Danger zone
+            </h3>
             <p className="mt-2 text-xs text-muted-foreground">
               Archive this organization for every member. Historical records stay preserved, but the
               organization will no longer appear as an active workspace.

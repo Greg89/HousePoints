@@ -72,16 +72,16 @@ For an internal team app the simplest approach is enabling Railway's built-in PI
 
 ## 5.5 Org settings, owner transfer, deeper admin removal, and org deletion [doing]
 
-The app supports creating and joining organizations. Owners can update organization settings from Manage Settings, and sensitive changes are audited. Broader organization administration remains future work.
+The app supports creating and joining organizations. Owners can update organization settings from the Manage Organization workspace, and sensitive changes are audited. Broader organization administration remains future work.
 
 Deferred sub-features:
 
-- Rename organization display name. Implemented for owners in Manage Settings.
+- Rename organization display name. Implemented for owners in Manage Organization.
 - Change organization slug safely. Alias/reservation support, owner-only slug changes, slug-bearing invite URLs, and slug-based dashboard routes are implemented. Design guidance lives in [Organization Settings Design](./org-settings-design.md).
-- Transfer owner role. Implemented for owners in Manage Settings. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
+- Transfer owner role. Implemented for owners in Manage Organization. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
-- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, archive actions are audited, archived organization routes render a neutral archived-state page instead of the dashboard, and owners can launch the archive action from the Manage Settings danger zone with slug confirmation. Successful archives now send the owner to that neutral archived-state page.
+- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, archive actions are audited, archived organization routes render a neutral archived-state page instead of the dashboard, and owners can launch the archive action from the Manage Organization danger zone with slug confirmation. Successful archives now send the owner to that neutral archived-state page.
 
 Recommended remaining order:
 
