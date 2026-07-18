@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { HouseMutationResult } from "@/lib/action-results";
 import { assessHouseThemeColor, resolveHouseThemeStyle } from "@/lib/house-theme";
 import type { AdminHouse } from "./AdminManageTypes";
+import { ManageWorkspace } from "./ManageWorkspace";
 
 interface HouseManagementProps {
   houses: AdminHouse[];
@@ -324,19 +325,12 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
   }
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h4 className="font-display text-xl font-semibold">Houses</h4>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-              {houses.length}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review each house, then create or update its identity and theme.
-          </p>
-        </div>
+    <ManageWorkspace
+      id="houses"
+      title="Houses"
+      description="Review each house, then create or update its identity and theme."
+      count={houses.length}
+      action={
         <button
           type="button"
           onClick={() => setEditorMode("create")}
@@ -345,7 +339,8 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
           <Plus size={16} />
           Create house
         </button>
-      </div>
+      }
+    >
 
       {houses.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -518,6 +513,6 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         </div>
       </div>
       ) : null}
-    </section>
+    </ManageWorkspace>
   );
 }

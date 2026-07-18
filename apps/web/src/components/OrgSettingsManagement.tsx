@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { OrgSettings } from "@housepoints/contracts";
 import type { ArchiveOrganizationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import type { AdminUser } from "./AdminManageTypes";
+import { ManageWorkspace } from "./ManageWorkspace";
 
 interface OrgSettingsManagementProps {
   users: AdminUser[];
@@ -194,14 +195,12 @@ export function OrgSettingsManagement({
   }
 
   return (
-    <section className="space-y-8" aria-labelledby="organization-heading">
-      <div>
-        <h2 id="organization-heading" className="font-display text-2xl font-semibold">Organization</h2>
-        <p className="text-sm text-muted-foreground">
-          Manage your organization identity, URL, ownership, and lifecycle.
-        </p>
-      </div>
-
+    <ManageWorkspace
+      id="organization"
+      title="Organization"
+      description="Manage your organization identity, URL, ownership, and lifecycle."
+      className="space-y-8"
+    >
       <form
         aria-label="Organization settings"
         onSubmit={handleNameSubmit}
@@ -456,6 +455,6 @@ export function OrgSettingsManagement({
           </button>
         </form>
       </div>
-    </section>
+    </ManageWorkspace>
   );
 }

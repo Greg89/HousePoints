@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import type { AdminAuditAction, Season, UserRole } from "@housepoints/contracts";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
+import { ManageWorkspace } from "./ManageWorkspace";
 
 interface ManageOverviewProps {
   users: AdminUser[];
@@ -41,14 +42,12 @@ export function ManageOverview({
     (houses.length > 0 ? emptyHouses.length : 0);
 
   return (
-    <section className="space-y-6" aria-label="Manage overview">
-      <div>
-        <h4 className="font-display text-xl font-semibold">Organization overview</h4>
-        <p className="mt-1 text-sm text-muted-foreground">
-          See what needs attention and the current operating state of your organization.
-        </p>
-      </div>
-
+    <ManageWorkspace
+      id="overview"
+      title="Organization overview"
+      description="See what needs attention and the current operating state of your organization."
+      ariaLabel="Manage overview"
+    >
       <section aria-labelledby="manage-attention-heading">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -184,7 +183,7 @@ export function ManageOverview({
           )}
         </div>
       </section>
-    </section>
+    </ManageWorkspace>
   );
 }
 

@@ -5,6 +5,7 @@ import { Calendar, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type { RenameSeasonResult, StartSeasonResult } from "@/lib/action-results";
+import { ManageWorkspace } from "./ManageWorkspace";
 
 interface SeasonManagementProps {
   seasons: Season[];
@@ -105,14 +106,11 @@ export function SeasonManagement({
   }
 
   return (
-    <section className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h4 className="font-display text-xl font-semibold">Seasons</h4>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review the current competition window and historical seasons.
-          </p>
-        </div>
+    <ManageWorkspace
+      id="seasons"
+      title="Seasons"
+      description="Review the current competition window and historical seasons."
+      action={
         <button
           type="button"
           onClick={() => setEditorMode("start")}
@@ -122,7 +120,8 @@ export function SeasonManagement({
           <Plus size={16} />
           Start next season
         </button>
-      </div>
+      }
+    >
 
       <section aria-label="Current season" className="rounded-xl border border-primary/20 bg-primary/5 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -272,6 +271,6 @@ export function SeasonManagement({
           )}
         </div>
       ) : null}
-    </section>
+    </ManageWorkspace>
   );
 }

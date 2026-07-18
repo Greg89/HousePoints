@@ -9,6 +9,7 @@ import type {
 } from "@housepoints/contracts";
 import { PointAdjustmentReport } from "./PointAdjustmentReport";
 import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
+import { ManageWorkspace } from "./ManageWorkspace";
 
 interface ManageAuditProps {
   actions: AdminAuditAction[];
@@ -26,14 +27,12 @@ export function ManageAudit(props: ManageAuditProps) {
   const [view, setView] = useState<"history" | "adjustments">("history");
 
   return (
-    <section className="space-y-5" aria-labelledby="audit-heading">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 id="audit-heading" className="font-display text-2xl font-semibold">Audit</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review administrative history and point-adjustment reporting.
-          </p>
-        </div>
+    <ManageWorkspace
+      id="audit"
+      title="Audit"
+      description="Review administrative history and point-adjustment reporting."
+      className="space-y-5"
+      action={
         <div className="flex gap-1 rounded-xl border bg-card p-1" aria-label="Audit views">
         <button
           type="button"
@@ -56,7 +55,8 @@ export function ManageAudit(props: ManageAuditProps) {
           Point adjustments
         </button>
         </div>
-      </div>
+      }
+    >
       {view === "history" ? (
         <RecentAdminActionsReport
           actions={props.actions}
@@ -70,6 +70,6 @@ export function ManageAudit(props: ManageAuditProps) {
           onLoadPointAdjustmentStats={props.onLoadPointAdjustmentStats}
         />
       )}
-    </section>
+    </ManageWorkspace>
   );
 }

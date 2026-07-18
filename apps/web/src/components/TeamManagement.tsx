@@ -24,6 +24,7 @@ import type {
   RoleChangeResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
+import { ManageWorkspace } from "./ManageWorkspace";
 
 type MemberFilter = "all" | "unassigned" | "members" | "admins";
 
@@ -248,19 +249,13 @@ export function TeamManagement({
   }
 
   return (
-    <section className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h4 className="font-display text-xl font-semibold">Members</h4>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-              {users.length}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Find a member, then manage their house, profile, role, or access.
-          </p>
-        </div>
+    <ManageWorkspace
+      id="members"
+      title="Members"
+      description="Find a member, then manage their house, profile, role, or access."
+      count={users.length}
+      className="space-y-5"
+      action={
         <button
           type="button"
           onClick={() => setInviteOpen(true)}
@@ -269,7 +264,8 @@ export function TeamManagement({
           <LinkSimple size={16} />
           Invite member
         </button>
-      </div>
+      }
+    >
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1" aria-label="Member filters">
@@ -674,6 +670,6 @@ export function TeamManagement({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </section>
+    </ManageWorkspace>
   );
 }
