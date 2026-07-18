@@ -27,7 +27,7 @@ import { OverviewReports } from "./OverviewReports";
 import { SeasonComparisonReport } from "./SeasonComparisonReport";
 import { AwardPointsDialog } from "./AwardPointsDialog";
 import { DeductPointsDialog } from "./DeductPointsDialog";
-import type { AwardPointsResult, DeductPointsResult, DeletePointResult, NotificationMutationResult } from "@/lib/action-results";
+import type { AwardPointsResult, DeductPointsResult, DeletePointResult, NotificationMutationResult, PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { resolveHouseThemeStyle } from "@/lib/house-theme";
 import type {
   DashboardSummary,
@@ -40,7 +40,11 @@ import type {
   SeasonComparison,
   SeasonContext,
   Trait,
+  PointReactionKey,
+  PointReactionDetailsResponse,
+  PointReactionResponse,
   AppUserOrganizationContext,
+  ActivityFeedRequest,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -62,7 +66,9 @@ interface DashboardShellProps {
   members: OrgMember[];
   activity: ActivityItem[];
   activityNextCursor: string | null;
-  onLoadMoreActivity: (cursor: string) => Promise<PagedActivityFeed>;
+  onLoadMoreActivity: (
+    request: Pick<ActivityFeedRequest, "cursor" | "type" | "actorUserId" | "targetUserId" | "seasonId">,
+  ) => Promise<PagedActivityFeed>;
   /** Computed per-member point totals from activity */
   memberPoints: MemberScore[];
   dashboardSummary: DashboardSummary;
@@ -81,6 +87,13 @@ interface DashboardShellProps {
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
+  onReactToPoint: (
+    transactionId: string,
+    reactionKey: PointReactionKey | null,
+  ) => Promise<PointReactionResult<PointReactionResponse>>;
+  onReadPointReactionDetails?: (
+    transactionId: string,
+  ) => Promise<PointReactionDetailsResult<PointReactionDetailsResponse>>;
   dashboardHref: string;
   loginUrl: string;
   logoutUrl: string;
@@ -189,6 +202,8 @@ export function DashboardShell({
   onAward,
   onDeduct,
   onDeletePoint,
+  onReactToPoint,
+  onReadPointReactionDetails,
   dashboardHref,
   logoutUrl,
   releaseNotesUrl,
@@ -307,6 +322,14 @@ export function DashboardShell({
             House Points
           </Link>
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="hidden min-w-0 text-right sm:block">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Signed in
+              </p>
+              <p className="max-w-48 truncate text-sm font-semibold text-foreground">
+                {session.userName}
+              </p>
+            </div>
             <NotificationsMenu
               notifications={currentNotifications}
               onNotificationsChange={setCurrentNotifications}
@@ -383,12 +406,6 @@ export function DashboardShell({
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Welcome */}
-        <div className={cn("mb-8 rounded-2xl border bg-card/80 p-5 shadow-sm", houseThemeStyle ? "house-theme-card" : "")}>
-          <p className="text-muted-foreground text-sm">Welcome back,</p>
-          <h2 className="font-display text-3xl font-semibold">{session.userName}</h2>
-        </div>
-
         <Tabs.Root
           value={activeTab}
           onValueChange={handleTabChange}
@@ -581,10 +598,14 @@ export function DashboardShell({
             <ActivityFeed
               key={activityFeedKey}
               items={activity}
+              members={members}
+              seasons={seasonContext.seasons}
               nextCursor={activityNextCursor}
               onLoadMore={onLoadMoreActivity}
               canDelete={session.role === "ADMIN" || session.role === "OWNER"}
               onDelete={onDeletePoint}
+              onReact={onReactToPoint}
+              onReadReactions={onReadPointReactionDetails}
             />
           </Tabs.Content>
 

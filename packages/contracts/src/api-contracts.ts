@@ -50,6 +50,10 @@ import {
   activityFeedRequestSchema,
   pagedActivityFeedSchema,
   memberScoresSchema,
+  reactToPointTransactionSchema,
+  pointReactionDetailsRequestSchema,
+  pointReactionDetailsResponseSchema,
+  pointReactionResponseSchema,
 } from "./point-schemas.js";
 import {
   appUserSchema,
@@ -153,6 +157,14 @@ export const apiContracts = {
   "/transactions/recent": defineContract(
     activityFeedRequestSchema,
     pagedActivityFeedSchema,
+  ),
+  "/transactions/react": defineContract(
+    reactToPointTransactionSchema,
+    pointReactionResponseSchema,
+  ),
+  "/transactions/reactions": defineContract(
+    pointReactionDetailsRequestSchema,
+    pointReactionDetailsResponseSchema,
   ),
   "/users/bootstrap": defineContract(bootstrapUserSchema, appUserSchema),
   "/users/profile": defineContract(

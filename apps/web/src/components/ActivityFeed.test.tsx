@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { ActivityItem } from "@housepoints/contracts";
+import type { ActivityItem, OrgMember } from "@housepoints/contracts";
 import { ActivityFeed } from "./ActivityFeed";
 
 vi.mock("framer-motion", () => ({
@@ -43,17 +43,42 @@ const baseActivity: ActivityItem = {
   },
 };
 
+const members: OrgMember[] = [
+  {
+    id: "user-ben",
+    displayName: "Ben",
+    role: "MEMBER",
+    houseId: "house-1",
+    houseName: "Phoenix",
+    houseColor: "#7c3aed",
+  },
+  {
+    id: "user-cara",
+    displayName: "Cara",
+    role: "MEMBER",
+    houseId: "house-2",
+    houseName: "Orion",
+    houseColor: "#0ea5e9",
+  },
+];
+
+const seasons = [
+  { id: "season-active", name: "Q3 2026", isActive: true },
+  { id: "season-previous", name: "Q2 2026", isActive: false },
+];
+
 describe("ActivityFeed", () => {
   it("shows an empty state without a load-more button", () => {
     render(
       <ActivityFeed
         items={[]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("No activity yet. Award some points!")).toBeInTheDocument();
+    expect(screen.getByText("No team activity yet. Award some points!")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
   });
 
@@ -74,6 +99,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor="activity-1"
         onLoadMore={onLoadMore}
       />,
@@ -81,9 +107,188 @@ describe("ActivityFeed", () => {
 
     await user.click(screen.getByRole("button", { name: /load more/i }));
 
-    expect(onLoadMore).toHaveBeenCalledWith("activity-1");
-    expect(await screen.findByText("Cara")).toBeInTheDocument();
+    expect(onLoadMore).toHaveBeenCalledWith({ cursor: "activity-1" });
+    expect(await screen.findByText("Unblocked the release")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it("loads a server-backed filtered page and keeps the filter for pagination", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "deduction-1",
+            type: "DEDUCTION",
+            targetUserName: "Dana",
+            delta: -10,
+            reason: "Missed handoff",
+            trait: null,
+          },
+        ],
+        nextCursor: "deduction-1",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "deduction-2",
+            type: "DEDUCTION",
+            targetUserName: "Evan",
+            delta: -10,
+            reason: "Late follow-up",
+            trait: null,
+          },
+        ],
+        nextCursor: null,
+      });
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText(/activity type/i), "DEDUCTION");
+
+    expect(onLoadMore).toHaveBeenCalledWith({ type: "DEDUCTION" });
+    expect(await screen.findByText("Missed handoff")).toBeInTheDocument();
+    expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /load more activity/i }));
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      cursor: "deduction-1",
+      type: "DEDUCTION",
+    });
+    expect(await screen.findByText("Late follow-up")).toBeInTheDocument();
+  });
+
+  it("loads a server-backed member filtered page and keeps the filter for pagination", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "member-page-1",
+            targetUserName: "Ben",
+            reason: "Helped onboard the team",
+          },
+        ],
+        nextCursor: "member-page-1",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "member-page-2",
+            targetUserName: "Ben",
+            reason: "Made the sprint smoother",
+          },
+        ],
+        nextCursor: null,
+      });
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText(/recognized member/i), "user-ben");
+
+    expect(onLoadMore).toHaveBeenCalledWith({ targetUserId: "user-ben" });
+    expect(await screen.findByText("Helped onboard the team")).toBeInTheDocument();
+    expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /load more activity/i }));
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      cursor: "member-page-1",
+      targetUserId: "user-ben",
+    });
+    expect(await screen.findByText("Made the sprint smoother")).toBeInTheDocument();
+  });
+
+  it("loads server-backed giver and season filters and keeps them for pagination", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "giver-page-1",
+            actorName: "Cara",
+            reason: "Called out a strong handoff",
+            season: seasons[1],
+          },
+        ],
+        nextCursor: "giver-page-1",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "giver-page-2",
+            actorName: "Cara",
+            reason: "Kept the momentum going",
+            season: seasons[1],
+          },
+        ],
+        nextCursor: "giver-page-2",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            ...baseActivity,
+            id: "giver-page-3",
+            actorName: "Cara",
+            reason: "Finished the follow-up",
+            season: seasons[1],
+          },
+        ],
+        nextCursor: null,
+      });
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        seasons={seasons}
+        nextCursor={null}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    await user.selectOptions(screen.getByLabelText(/given by/i), "user-cara");
+    await screen.findByText("Called out a strong handoff");
+    await user.selectOptions(screen.getByLabelText(/season/i), "season-previous");
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      actorUserId: "user-cara",
+      seasonId: "season-previous",
+    });
+    expect(await screen.findByText("Kept the momentum going")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /load more activity/i }));
+
+    expect(onLoadMore).toHaveBeenLastCalledWith({
+      cursor: "giver-page-2",
+      actorUserId: "user-cara",
+      seasonId: "season-previous",
+    });
+    expect(await screen.findByText("Finished the follow-up")).toBeInTheDocument();
   });
 
   it("keeps the cursor available and shows a safe error when loading fails", async () => {
@@ -95,6 +300,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor="activity-1"
         onLoadMore={onLoadMore}
       />,
@@ -116,6 +322,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
         canDelete
@@ -123,7 +330,8 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /delete point transaction for ben/i }));
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
 
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith("activity-1"));
     expect(confirmSpy).toHaveBeenCalledWith(
@@ -131,6 +339,230 @@ describe("ActivityFeed", () => {
     );
     expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
     confirmSpy.mockRestore();
+  });
+
+  it("lets a user react to an award and updates the card summary", async () => {
+    const user = userEvent.setup();
+    const onReact = vi.fn(async () => ({
+      ok: true as const,
+      reaction: {
+        transactionId: "activity-1",
+        myReactionKey: "heart" as const,
+        reactions: [{ reactionKey: "heart" as const, count: 1 }],
+      },
+    }));
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={onReact}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    await user.click(screen.getByRole("button", { name: /react with love it/i }));
+
+    await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", "heart"));
+    expect(screen.queryByRole("button", { name: /remove love it reaction/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    const selectedReaction = await screen.findByRole("button", { name: /remove love it reaction/i });
+    expect(selectedReaction).toHaveAttribute("aria-pressed", "true");
+    expect(selectedReaction).toHaveTextContent("1");
+  });
+
+  it("shows the compact reaction picker with the full positive reaction set", async () => {
+    const user = userEvent.setup();
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /react with applause/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open reactions for ben/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+
+    expect(screen.getByRole("button", { name: /react with applause/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with love it/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with great work/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with sparkles/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with raised hands/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with 100/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with celebrate/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with on fire/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with rocket/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /react with trophy/i })).toBeInTheDocument();
+  });
+
+  it("shows reaction details from the activity actions menu", async () => {
+    const user = userEvent.setup();
+    const onReadReactions = vi.fn(async () => ({
+      ok: true as const,
+      details: {
+        transactionId: "activity-1",
+        reactions: [
+          {
+            id: "reaction-1",
+            reactionKey: "party" as const,
+            actorUserId: "user-cara",
+            actorName: "Cara",
+            createdAt: "2026-06-25T12:00:00.000Z",
+            updatedAt: "2026-06-25T12:05:00.000Z",
+          },
+        ],
+      },
+    }));
+
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            reactions: [{ reactionKey: "party", count: 1 }],
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReadReactions={onReadReactions}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /view reactions/i }));
+
+    await waitFor(() => expect(onReadReactions).toHaveBeenCalledWith("activity-1"));
+    const dialog = await screen.findByRole("dialog", { name: /reactions/i });
+    expect(within(dialog).getByText("Cara")).toBeInTheDocument();
+    expect(within(dialog).getByRole("img", { name: "Celebrate" })).toBeInTheDocument();
+    expect(within(dialog).queryByText("Celebrate")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Great collaboration")).toBeInTheDocument();
+    expect(within(dialog).getByRole("region", { name: /reaction details list/i })).toHaveClass("overflow-y-auto");
+  });
+
+  it("shows a safe error when reaction details fail to load", async () => {
+    const user = userEvent.setup();
+    const onReadReactions = vi.fn(async () => ({
+      ok: false as const,
+      code: "POINT_TRANSACTION_NOT_FOUND",
+      message: "Point transaction was not found",
+    }));
+
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            reactions: [{ reactionKey: "heart", count: 1 }],
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReadReactions={onReadReactions}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /view reactions/i }));
+
+    const dialog = await screen.findByRole("dialog", { name: /reactions/i });
+    expect(await within(dialog).findByText("Point transaction was not found")).toBeInTheDocument();
+  });
+
+  it("sends null when the selected reaction is clicked again", async () => {
+    const user = userEvent.setup();
+    const onReact = vi.fn(async () => ({
+      ok: true as const,
+      reaction: {
+        transactionId: "activity-1",
+        myReactionKey: null,
+        reactions: [],
+      },
+    }));
+
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            myReactionKey: "heart",
+            reactions: [{ reactionKey: "heart", count: 1 }],
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={onReact}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    await user.click(screen.getByRole("button", { name: /remove love it reaction/i }));
+
+    await waitFor(() => expect(onReact).toHaveBeenCalledWith("activity-1", null));
+    expect(screen.queryByRole("button", { name: /react with love it/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    expect(await screen.findByRole("button", { name: /react with love it/i })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shows a safe error when a reaction mutation fails", async () => {
+    const user = userEvent.setup();
+    const onReact = vi.fn(async () => ({
+      ok: false as const,
+      code: "POINT_TRANSACTION_NOT_FOUND",
+      message: "Point transaction was not found",
+    }));
+
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={onReact}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    await user.click(screen.getByRole("button", { name: /react with applause/i }));
+
+    expect(await screen.findByText("Point transaction was not found")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /react with applause/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open reactions for ben/i }));
+    expect(screen.getByRole("button", { name: /react with applause/i })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("does not show reaction controls for deductions", () => {
+    render(
+      <ActivityFeed
+        items={[
+          {
+            ...baseActivity,
+            type: "DEDUCTION",
+            delta: -10,
+            trait: null,
+          },
+        ]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+        onReact={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /react with/i })).not.toBeInTheDocument();
   });
 
   it("shows a safe error when deletion returns an expected failure", async () => {
@@ -145,6 +577,7 @@ describe("ActivityFeed", () => {
     render(
       <ActivityFeed
         items={[baseActivity]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
         canDelete
@@ -152,7 +585,8 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /delete point transaction for ben/i }));
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
 
     expect(await screen.findByText("Point transaction is already deleted")).toBeInTheDocument();
     expect(screen.getByText("Great collaboration")).toBeInTheDocument();
@@ -171,6 +605,7 @@ describe("ActivityFeed", () => {
             trait: null,
           },
         ]}
+        members={members}
         nextCursor={null}
         onLoadMore={vi.fn()}
       />,

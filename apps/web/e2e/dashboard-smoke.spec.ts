@@ -24,7 +24,7 @@ test("login and navigate the core dashboard tabs", async ({ page }) => {
   await expect(page.getByText(/organization report/i)).toBeVisible();
 
   await page.getByRole("tab", { name: /activity/i }).click();
-  await expect(page.getByText(/recent activity/i)).toBeVisible();
+  await expect(page.getByText(/team activity/i)).toBeVisible();
 
   await page.getByRole("tab", { name: /leaderboard/i }).click();
   await expect(page.getByText(/top contributors/i)).toBeVisible();

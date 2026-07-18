@@ -61,7 +61,14 @@ import {
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
   pointAdjustmentResponseSchema,
+  pointReactionKeySchema,
+  POINT_REACTION_KEYS,
+  POINT_REACTION_LABELS,
+  pointReactionDetailsRequestSchema,
+  pointReactionDetailsResponseSchema,
+  pointReactionResponseSchema,
   pointTransactionTypeSchema,
+  reactToPointTransactionSchema,
   redactLogContext,
   serializeErrorForLog,
   traitSchema,
@@ -102,6 +109,8 @@ const webConsumedApiEndpoints = [
   "/seasons/compare",
   "/seasons/rename",
   "/seasons/start",
+  "/transactions/react",
+  "/transactions/reactions",
   "/transactions/recent",
   "/users/bootstrap",
   "/users/profile",
@@ -278,6 +287,156 @@ describe("pointTransactionTypeSchema", () => {
   });
 });
 
+describe("point reaction schemas", () => {
+  it("accepts every supported reaction key and has a label for each", () => {
+    for (const reactionKey of POINT_REACTION_KEYS) {
+      expect(pointReactionKeySchema.safeParse(reactionKey).success).toBe(true);
+      expect(POINT_REACTION_LABELS[reactionKey]).toBeTruthy();
+    }
+  });
+
+  it("rejects unknown reaction keys", () => {
+    expect(pointReactionKeySchema.safeParse("confetti").success).toBe(false);
+  });
+
+  it("accepts a reaction mutation request", () => {
+    expect(
+      reactToPointTransactionSchema.parse({
+        transactionId: "tx-1",
+        reactionKey: "clap",
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      reactionKey: "clap",
+    });
+  });
+
+  it("accepts null reaction keys for removal", () => {
+    expect(
+      reactToPointTransactionSchema.parse({
+        transactionId: "tx-1",
+        reactionKey: null,
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      reactionKey: null,
+    });
+  });
+
+  it("rejects malformed reaction mutation requests", () => {
+    expect(
+      reactToPointTransactionSchema.safeParse({
+        transactionId: "",
+        reactionKey: "clap",
+      }).success,
+    ).toBe(false);
+    expect(
+      reactToPointTransactionSchema.safeParse({
+        transactionId: "tx-1",
+        reactionKey: "confetti",
+      }).success,
+    ).toBe(false);
+    expect(
+      reactToPointTransactionSchema.safeParse({
+        transactionId: "tx-1",
+        reactionKey: "clap",
+        extra: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts reaction mutation responses", () => {
+    expect(
+      pointReactionResponseSchema.parse({
+        transactionId: "tx-1",
+        myReactionKey: "heart",
+        reactions: [
+          { reactionKey: "heart", count: 2 },
+          { reactionKey: "star", count: 1 },
+        ],
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      myReactionKey: "heart",
+      reactions: [
+        { reactionKey: "heart", count: 2 },
+        { reactionKey: "star", count: 1 },
+      ],
+    });
+  });
+
+  it("rejects empty reaction counts", () => {
+    expect(
+      pointReactionResponseSchema.safeParse({
+        transactionId: "tx-1",
+        myReactionKey: null,
+        reactions: [{ reactionKey: "clap", count: 0 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts reaction detail requests", () => {
+    expect(
+      pointReactionDetailsRequestSchema.parse({
+        transactionId: "tx-1",
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+    });
+  });
+
+  it("accepts reaction detail responses", () => {
+    const createdAt = new Date("2026-06-25T12:00:00.000Z").toISOString();
+    const updatedAt = new Date("2026-06-25T12:05:00.000Z").toISOString();
+
+    expect(
+      pointReactionDetailsResponseSchema.parse({
+        transactionId: "tx-1",
+        reactions: [
+          {
+            id: "reaction-1",
+            reactionKey: "party",
+            actorUserId: "user-2",
+            actorName: "Caitlin Swanson",
+            createdAt,
+            updatedAt,
+          },
+        ],
+      }),
+    ).toEqual({
+      transactionId: "tx-1",
+      reactions: [
+        {
+          id: "reaction-1",
+          reactionKey: "party",
+          actorUserId: "user-2",
+          actorName: "Caitlin Swanson",
+          createdAt,
+          updatedAt,
+        },
+      ],
+    });
+  });
+
+  it("rejects malformed reaction detail responses", () => {
+    expect(
+      pointReactionDetailsResponseSchema.safeParse({
+        transactionId: "tx-1",
+        reactions: [
+          {
+            id: "reaction-1",
+            reactionKey: "confetti",
+            actorUserId: "user-2",
+            actorName: "Caitlin Swanson",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // activityItemSchema
 // ---------------------------------------------------------------------------
@@ -302,6 +461,33 @@ describe("activityItemSchema", () => {
   it("accepts a valid item with a known trait", () => {
     const result = activityItemSchema.safeParse({ ...base, trait: "LEADERSHIP" });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts older activity item payloads without reaction fields", () => {
+    expect(activityItemSchema.parse({ ...base, trait: "LEADERSHIP" })).toEqual({
+      ...base,
+      trait: "LEADERSHIP",
+    });
+  });
+
+  it("accepts reaction summaries and the current user's selected reaction", () => {
+    expect(
+      activityItemSchema.parse({
+        ...base,
+        trait: "LEADERSHIP",
+        myReactionKey: "heart",
+        reactions: [
+          { reactionKey: "heart", count: 2 },
+          { reactionKey: "clap", count: 1 },
+        ],
+      }),
+    ).toMatchObject({
+      myReactionKey: "heart",
+      reactions: [
+        { reactionKey: "heart", count: 2 },
+        { reactionKey: "clap", count: 1 },
+      ],
+    });
   });
 
   it("accepts a valid item with trait: null", () => {
@@ -958,9 +1144,26 @@ describe("dashboard response schemas", () => {
       cursor: "tx-1",
       limit: 25,
     });
+    expect(activityFeedRequestSchema.parse({ type: "DEDUCTION" })).toEqual({
+      limit: 50,
+      type: "DEDUCTION",
+    });
+    expect(activityFeedRequestSchema.parse({ targetUserId: "user-1" })).toEqual({
+      limit: 50,
+      targetUserId: "user-1",
+    });
+    expect(activityFeedRequestSchema.parse({ actorUserId: "user-2", seasonId: "season-1" })).toEqual({
+      limit: 50,
+      actorUserId: "user-2",
+      seasonId: "season-1",
+    });
     expect(activityFeedRequestSchema.safeParse({ limit: 0 }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ limit: 101 }).success).toBe(false);
     expect(activityFeedRequestSchema.safeParse({ cursor: "" }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ type: "BONUS" }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ actorUserId: "" }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ targetUserId: "" }).success).toBe(false);
+    expect(activityFeedRequestSchema.safeParse({ seasonId: "" }).success).toBe(false);
   });
 
   it("accepts soft-deleted point audit records", () => {

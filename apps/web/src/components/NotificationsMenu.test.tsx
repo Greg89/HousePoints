@@ -221,6 +221,41 @@ describe("NotificationsMenu", () => {
     expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
   });
 
+  it("archives a point award notification locally after marking it read", async () => {
+    const user = userEvent.setup();
+    const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));
+    const pointAwardNotification = {
+      ...unreadNotification,
+      id: "notification-point-award",
+      type: "POINT_AWARD_RECEIVED" as const,
+      severity: "INFO" as const,
+      title: "Points awarded",
+      body: "Morgan awarded you 5 points for Collaboration.",
+      actionLabel: "View activity",
+      actionHref: "/?tab=activity",
+      entityType: "PointTransaction",
+      entityId: "point-transaction-1",
+    };
+
+    render(
+      <NotificationsMenuHarness
+        notifications={{
+          items: [pointAwardNotification],
+          unreadCount: 1,
+          nextCursor: null,
+        }}
+        onMarkNotificationRead={onMarkNotificationRead}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /notifications menu/i }));
+    await user.click(screen.getByRole("button", { name: /mark read/i }));
+
+    expect(onMarkNotificationRead).toHaveBeenCalledWith("notification-point-award");
+    expect(screen.queryByText("Points awarded")).not.toBeInTheDocument();
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
+  });
+
   it("marks a single notification read from the row action", async () => {
     const user = userEvent.setup();
     const onMarkNotificationRead = vi.fn(async () => ({ ok: true as const, updatedCount: 1 }));

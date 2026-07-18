@@ -351,7 +351,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       monthlyStandout: seasonStandout,
       monthlyStandoutsByHouse: seasonStandoutsByHouse,
       traitLeaders,
-      recentActivity: recentTransactions.map(mapActivityItem),
+      recentActivity: recentTransactions.map((transaction) => mapActivityItem(transaction)),
       pointsVelocity: houses.map((house) => ({
         houseId: house.id,
         houseName: house.name,

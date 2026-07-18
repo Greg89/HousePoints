@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run build -w @housepoints/contracts",
     "dev": "tsx watch src/server.ts",
     "build": "npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run build:app",
     "build:app": "tsc -p tsconfig.json",
+    "prestart": "npm run build -w @housepoints/contracts",
     "start": "node dist/server.js",
+    "pretest": "npm run build -w @housepoints/contracts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

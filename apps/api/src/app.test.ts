@@ -81,6 +81,12 @@ vi.mock("@housepoints/db", () => ({
       groupBy: vi.fn(),
       update: vi.fn(),
     },
+    pointReaction: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }));
 
@@ -144,6 +150,10 @@ const mockTxFindFirst = prisma.pointTransaction.findFirst as ReturnType<typeof v
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
 const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
+const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof vi.fn>;
+const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
+const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
+const mockPointReactionUpdate = prisma.pointReaction.update as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -271,6 +281,10 @@ beforeEach(() => {
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
+  mockPointReactionCreate.mockResolvedValue({ id: "reaction-1", reactionKey: "clap" });
+  mockPointReactionFindFirst.mockResolvedValue(null);
+  mockPointReactionFindMany.mockResolvedValue([]);
+  mockPointReactionUpdate.mockResolvedValue({ id: "reaction-1", reactionKey: "clap" });
   mockUserFindMany.mockResolvedValue([]);
   mockMembershipFindFirst.mockResolvedValue(null);
   mockMembershipFindMany.mockResolvedValue([]);
@@ -4444,6 +4458,12 @@ describe("POST /transactions/recent", () => {
         targetUser: { displayName: "Alice" },
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
         season: { id: "season-active", name: "Q3 2026", isActive: true },
+        reactions: [
+          { actorUserId: "user-1", reactionKey: "heart" },
+          { actorUserId: "user-2", reactionKey: "heart" },
+          { actorUserId: "user-3", reactionKey: "clap" },
+          { actorUserId: "user-4", reactionKey: "unknown-reaction" },
+        ],
       },
       {
         id: "tx-2",
@@ -4456,6 +4476,7 @@ describe("POST /transactions/recent", () => {
         targetUser: { displayName: "Alice" },
         targetHouse: { name: "Phoenix", color: "#7c3aed" },
         season: { id: "season-active", name: "Q3 2026", isActive: true },
+        reactions: [],
       },
     ]);
     const app = await buildTestApp();
@@ -4476,6 +4497,11 @@ describe("POST /transactions/recent", () => {
     });
     expect(items[0].actorName).toBe("Bob");
     expect(items[0].delta).toBe(10);
+    expect(items[0].myReactionKey).toBe("heart");
+    expect(items[0].reactions).toEqual([
+      { reactionKey: "heart", count: 2 },
+      { reactionKey: "clap", count: 1 },
+    ]);
     expect(page.nextCursor).toBe("tx-1");
     expect(mockTxFindMany).toHaveBeenCalledWith({
       where: { organizationId: "org-1", deletedAt: null },
@@ -4507,6 +4533,82 @@ describe("POST /transactions/recent", () => {
         cursor: { id: "tx-1" },
         skip: 1,
         take: 26,
+      }),
+    );
+    await app.close();
+  });
+
+  it("filters activity by transaction type before paging", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { type: "DEDUCTION", limit: 10 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTxFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-1",
+          deletedAt: null,
+          type: "DEDUCTION",
+        },
+        take: 11,
+      }),
+    );
+    await app.close();
+  });
+
+  it("filters activity by target member before paging", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { targetUserId: "user-target", limit: 10 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTxFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-1",
+          deletedAt: null,
+          targetUserId: "user-target",
+        },
+        take: 11,
+      }),
+    );
+    await app.close();
+  });
+
+  it("filters activity by actor member and season before paging", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { actorUserId: "user-actor", seasonId: "season-1", limit: 10 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTxFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-1",
+          deletedAt: null,
+          actorUserId: "user-actor",
+          seasonId: "season-1",
+        },
+        take: 11,
       }),
     );
     await app.close();
@@ -4823,6 +4925,343 @@ describe("POST /transactions/recent", () => {
       _count: { _all: true },
       _sum: { delta: true },
     });
+    await app.close();
+  });
+});
+
+describe("POST /transactions/react", () => {
+  const awardTransaction = {
+    id: "tx-1",
+    organizationId: "org-1",
+    targetUserId: "user-target",
+    type: "AWARD",
+    deletedAt: null,
+  };
+
+  it("creates a reaction and notifies the award recipient", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue(awardTransaction);
+    mockPointReactionCreate.mockResolvedValue({ id: "reaction-1", reactionKey: "clap" });
+    mockPointReactionFindMany.mockResolvedValue([
+      { actorUserId: "user-1", reactionKey: "clap" },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: "clap" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      transactionId: "tx-1",
+      myReactionKey: "clap",
+      reactions: [{ reactionKey: "clap", count: 1 }],
+    });
+    expect(mockPointReactionCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        pointTransactionId: "tx-1",
+        actorUserId: "user-1",
+        reactionKey: "clap",
+      },
+      select: { id: true, reactionKey: true },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recipientUserId: "user-target",
+          type: "POINT_REACTION_RECEIVED",
+          entityType: "PointReaction",
+          entityId: "reaction-1",
+          dedupeKey: "point-reaction-received:org-1:tx-1:user-1",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    await app.close();
+  });
+
+  it("updates an existing reaction and refreshes the deduped notification", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue(awardTransaction);
+    mockPointReactionFindFirst.mockResolvedValue({ id: "reaction-1", reactionKey: "clap" });
+    mockPointReactionUpdate.mockResolvedValue({ id: "reaction-1", reactionKey: "fire" });
+    mockPointReactionFindMany.mockResolvedValue([
+      { actorUserId: "user-1", reactionKey: "fire" },
+    ]);
+    mockNotificationUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: "fire" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().myReactionKey).toBe("fire");
+    expect(mockPointReactionCreate).not.toHaveBeenCalled();
+    expect(mockPointReactionUpdate).toHaveBeenCalledWith({
+      where: { id: "reaction-1" },
+      data: { reactionKey: "fire" },
+      select: { id: true, reactionKey: true },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        recipientUserId: "user-target",
+        dedupeKey: "point-reaction-received:org-1:tx-1:user-1",
+      },
+      data: expect.objectContaining({
+        body: "Alice reacted with On fire.",
+        entityId: "reaction-1",
+        archivedAt: null,
+      }),
+    });
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("removes an existing reaction and archives the deduped notification", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue(awardTransaction);
+    mockPointReactionFindFirst.mockResolvedValue({ id: "reaction-1", reactionKey: "heart" });
+    mockPointReactionUpdate.mockResolvedValue({ id: "reaction-1", reactionKey: "heart" });
+    mockPointReactionFindMany.mockResolvedValue([]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: null },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      transactionId: "tx-1",
+      myReactionKey: null,
+      reactions: [],
+    });
+    expect(mockPointReactionUpdate).toHaveBeenCalledWith({
+      where: { id: "reaction-1" },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(mockNotificationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        recipientUserId: "user-target",
+        dedupeKey: "point-reaction-received:org-1:tx-1:user-1",
+        archivedAt: null,
+      },
+      data: { archivedAt: expect.any(Date) },
+    });
+    await app.close();
+  });
+
+  it("does not notify when the recipient reacts to their own award", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, targetUserId: "user-1" });
+    mockPointReactionFindMany.mockResolvedValue([
+      { actorUserId: "user-1", reactionKey: "star" },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: "star" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects deductions without writing a reaction", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, type: "DEDUCTION" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: "clap" },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().code).toBe("POINT_REACTION_UNSUPPORTED_TRANSACTION_TYPE");
+    expect(mockPointReactionCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns not found for missing, deleted, or cross-org transactions", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, organizationId: "org-other" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: "clap" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("POINT_TRANSACTION_NOT_FOUND");
+    expect(mockPointReactionCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects unknown reaction keys at the request boundary", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/react",
+      payload: { transactionId: "tx-1", reactionKey: "confetti" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /transactions/reactions", () => {
+  const awardTransaction = {
+    id: "tx-1",
+    organizationId: "org-1",
+    targetUserId: "user-target",
+    type: "AWARD",
+    deletedAt: null,
+  };
+
+  it("returns active reaction details for an award in the actor's organization", async () => {
+    const createdAt = new Date("2026-06-25T12:00:00.000Z");
+    const updatedAt = new Date("2026-06-25T12:05:00.000Z");
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue(awardTransaction);
+    mockPointReactionFindMany.mockResolvedValue([
+      {
+        id: "reaction-1",
+        actorUserId: "user-2",
+        reactionKey: "party",
+        createdAt,
+        updatedAt,
+        actor: { displayName: "Caitlin Swanson" },
+      },
+      {
+        id: "reaction-2",
+        actorUserId: "user-3",
+        reactionKey: "unknown-reaction",
+        createdAt,
+        updatedAt,
+        actor: { displayName: "Skipped User" },
+      },
+    ]);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      transactionId: "tx-1",
+      reactions: [
+        {
+          id: "reaction-1",
+          reactionKey: "party",
+          actorUserId: "user-2",
+          actorName: "Caitlin Swanson",
+          createdAt: createdAt.toISOString(),
+          updatedAt: updatedAt.toISOString(),
+        },
+      ],
+    });
+    expect(mockTxFindUnique).toHaveBeenCalledWith({
+      where: { id: "tx-1" },
+      select: {
+        id: true,
+        organizationId: true,
+        targetUserId: true,
+        type: true,
+        deletedAt: true,
+      },
+    });
+    expect(mockPointReactionFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        pointTransactionId: "tx-1",
+        deletedAt: null,
+      },
+      orderBy: [
+        { updatedAt: "desc" },
+        { id: "desc" },
+      ],
+      select: {
+        id: true,
+        actorUserId: true,
+        reactionKey: true,
+        createdAt: true,
+        updatedAt: true,
+        actor: { select: { displayName: true } },
+      },
+    });
+    await app.close();
+  });
+
+  it("returns not found for missing, deleted, or cross-org transactions", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, organizationId: "org-other" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("POINT_TRANSACTION_NOT_FOUND");
+    expect(mockPointReactionFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects deduction reaction details", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindUnique.mockResolvedValue({ ...awardTransaction, type: "DEDUCTION" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "tx-1" },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().code).toBe("POINT_REACTION_UNSUPPORTED_TRANSACTION_TYPE");
+    expect(mockPointReactionFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects malformed detail requests", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/transactions/reactions",
+      payload: { transactionId: "" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(mockTxFindUnique).not.toHaveBeenCalled();
     await app.close();
   });
 });
@@ -6981,7 +7420,7 @@ describe("POST /notifications/list", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7042,7 +7481,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7051,7 +7490,7 @@ describe("POST /notifications/mark-read", () => {
     await app.close();
   });
 
-  it("archives release announcements after marking them read", async () => {
+  it("archives transient notifications after marking them read", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
     mockNotificationUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 });
     const app = await buildTestApp("auth0|admin");
@@ -7073,7 +7512,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7130,7 +7569,7 @@ describe("POST /notifications/mark-all-read", () => {
         recipientUserId: "user-owner",
         archivedAt: null,
         readAt: { not: null },
-        type: "RELEASE_ANNOUNCEMENT",
+        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
       },
       data: {
         archivedAt: expect.any(Date),

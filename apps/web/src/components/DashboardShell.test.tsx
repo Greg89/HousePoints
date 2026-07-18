@@ -278,6 +278,14 @@ const baseProps = {
     items: [],
     nextCursor: null,
   })),
+  onReactToPoint: vi.fn(async () => ({
+    ok: true as const,
+    reaction: {
+      transactionId: "activity-1",
+      myReactionKey: null,
+      reactions: [],
+    },
+  })),
   memberPoints: [
     { memberId: "member-2", points: 25 },
     { memberId: "member-1", points: 5 },
@@ -618,6 +626,9 @@ describe("DashboardShell", () => {
     expect(screen.queryByRole("tab", { name: /manage/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /deduct points/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "House Points" })).toHaveAttribute("href", "/o/acme");
+    expect(within(screen.getByRole("banner")).getByText("Signed in")).toBeInTheDocument();
+    expect(within(screen.getByRole("banner")).getByText("Gregory Dodson")).toBeInTheDocument();
+    expect(screen.queryByText("Welcome back,")).not.toBeInTheDocument();
   });
 
   it("shows the deduction action for admins", () => {
@@ -654,7 +665,8 @@ describe("DashboardShell", () => {
     expect(container.firstElementChild).toHaveStyle({ "--primary": "#22c55e" });
     expect(container.firstElementChild).toHaveClass("house-theme-shell");
     expect(screen.getByRole("banner")).toHaveClass("house-theme-header");
-    expect(screen.getByText("Welcome back,").closest("div")).toHaveClass("house-theme-card");
+    expect(within(screen.getByRole("banner")).getByText("Gregory Dodson")).toBeInTheDocument();
+    expect(screen.queryByText("Welcome back,")).not.toBeInTheDocument();
   });
 
   it.each(houseThemeQaCases)("keeps the dashboard shell themed for representative $label themes", ({ color }) => {

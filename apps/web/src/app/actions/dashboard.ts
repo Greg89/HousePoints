@@ -7,11 +7,25 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  pointReactionDetailsRequestSchema,
+  pointReactionDetailsResponseSchema,
+  pointReactionResponseSchema,
+  type PointReactionKey,
+  type PointReactionDetailsResponse,
+  type PointReactionResponse,
+  type ActivityFeedRequest,
   type DashboardSummary,
   type PagedActivityFeed,
 } from "@housepoints/contracts";
-import { apiFetch, parseApiResponse } from "@/lib/api-client";
+import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
+import type { PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { getCurrentUserForRequest } from "@/lib/current-user";
+
+type ActivityPageRequest = Pick<
+  ActivityFeedRequest,
+  "cursor" | "type" | "actorUserId" | "targetUserId" | "seasonId"
+>;
 
 export async function readLeaderboard(requestId: string = randomUUID()) {
   await getCurrentUserForRequest(requestId);
@@ -56,13 +70,13 @@ export async function readMembers(requestId: string = randomUUID()) {
 }
 
 export async function readActivityPage(
-  cursor?: string,
+  request: ActivityPageRequest = {},
   requestId: string = randomUUID(),
 ): Promise<PagedActivityFeed> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
-    body: JSON.stringify(cursor ? { cursor } : {}),
+    body: JSON.stringify(request),
   });
   return parseApiResponse(
     response,
@@ -72,8 +86,109 @@ export async function readActivityPage(
 }
 
 export async function readActivityFeed(requestId: string = randomUUID()) {
-  const page = await readActivityPage(undefined, requestId);
+  const page = await readActivityPage({}, requestId);
   return activityFeedSchema.parse(page.items);
+}
+
+export async function reactToPointTransaction(
+  transactionId: string,
+  reactionKey: PointReactionKey | null,
+): Promise<PointReactionResult<PointReactionResponse>> {
+  return runServerAction("reactToPointTransaction", async (context) => {
+    const { requestId } = context;
+    const trimmedTransactionId = transactionId.trim();
+
+    if (!trimmedTransactionId) {
+      return {
+        ok: false,
+        code: "POINT_TRANSACTION_REQUIRED",
+        message: "Point transaction is required.",
+      };
+    }
+
+    await getCurrentUserForRequest(requestId);
+    const response = await apiFetch("/transactions/react", requestId, {
+      method: "POST",
+      body: JSON.stringify({
+        transactionId: trimmedTransactionId,
+        reactionKey,
+      }),
+    });
+
+    try {
+      const reaction = await parseApiResponse(
+        response,
+        pointReactionResponseSchema,
+        "Reaction could not be saved. Please try again.",
+      );
+
+      return { ok: true, reaction };
+    } catch (error) {
+      if (!(error instanceof ApiResponseError) || error.statusCode < 400 || error.statusCode >= 500) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        transactionId: trimmedTransactionId,
+        reactionKey,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
+}
+
+export async function readPointReactionDetails(
+  transactionId: string,
+): Promise<PointReactionDetailsResult<PointReactionDetailsResponse>> {
+  return runServerAction("readPointReactionDetails", async (context) => {
+    const { requestId } = context;
+    const parsed = pointReactionDetailsRequestSchema.safeParse({
+      transactionId: transactionId.trim(),
+    });
+
+    if (!parsed.success) {
+      return {
+        ok: false,
+        code: "POINT_TRANSACTION_REQUIRED",
+        message: "Point transaction is required.",
+      };
+    }
+
+    await getCurrentUserForRequest(requestId);
+    const response = await apiFetch("/transactions/reactions", requestId, {
+      method: "POST",
+      body: JSON.stringify(parsed.data),
+    });
+
+    try {
+      const details = await parseApiResponse(
+        response,
+        pointReactionDetailsResponseSchema,
+        "Reactions could not be loaded. Please try again.",
+      );
+
+      return { ok: true, details };
+    } catch (error) {
+      if (!(error instanceof ApiResponseError) || error.statusCode < 400 || error.statusCode >= 500) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        transactionId: parsed.data.transactionId,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+  });
 }
 
 export async function readDashboardSummary(

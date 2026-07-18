@@ -23,14 +23,19 @@ export function readE2EUserCredentials() {
 }
 
 export function readE2EAdminCredentials() {
-  const email = process.env.E2E_ADMIN_EMAIL?.trim();
-  const password = process.env.E2E_ADMIN_PASSWORD?.trim();
+  return readOptionalCredentials("E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD");
+}
 
-  if (!email || !password) {
-    return null;
-  }
+export function readE2EOwnerCredentials() {
+  return readOptionalCredentials("E2E_OWNER_EMAIL", "E2E_OWNER_PASSWORD");
+}
 
-  return { email, password };
+export function readE2EReactionActorCredentials() {
+  return readOptionalCredentials("E2E_REACTION_ACTOR_EMAIL", "E2E_REACTION_ACTOR_PASSWORD");
+}
+
+export function readE2EReactionRecipientCredentials() {
+  return readOptionalCredentials("E2E_REACTION_RECIPIENT_EMAIL", "E2E_REACTION_RECIPIENT_PASSWORD");
 }
 
 export function readTargetMemberName() {
@@ -40,4 +45,15 @@ export function readTargetMemberName() {
 export function readE2EStartPath() {
   const slug = process.env.E2E_ORG_SLUG?.trim();
   return slug ? `/o/${encodeURIComponent(slug)}` : "/";
+}
+
+function readOptionalCredentials(emailName: string, passwordName: string) {
+  const email = process.env[emailName]?.trim();
+  const password = process.env[passwordName]?.trim();
+
+  if (!email || !password) {
+    return null;
+  }
+
+  return { email, password };
 }

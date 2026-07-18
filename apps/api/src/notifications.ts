@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { TRAIT_LABELS } from "@housepoints/contracts";
+import { POINT_REACTION_LABELS, TRAIT_LABELS, type PointReactionKey } from "@housepoints/contracts";
 
 type NotificationRow = Prisma.NotificationCreateManyInput;
 
@@ -45,6 +45,30 @@ export function buildPointDeductionNotificationData(input: {
     entityType: "PointTransaction",
     entityId: input.transactionId,
     dedupeKey: `point-deduction-received:${input.organizationId}:${input.transactionId}`,
+  };
+}
+
+export function buildPointReactionNotificationData(input: {
+  organizationId: string;
+  recipientUserId: string;
+  actorUserId: string;
+  actorDisplayName: string;
+  reactionKey: PointReactionKey;
+  transactionId: string;
+  reactionId: string;
+}): NotificationRow {
+  return {
+    organizationId: input.organizationId,
+    recipientUserId: input.recipientUserId,
+    type: "POINT_REACTION_RECEIVED",
+    severity: "INFO",
+    title: "Someone reacted to your recognition",
+    body: `${input.actorDisplayName} reacted with ${POINT_REACTION_LABELS[input.reactionKey]}.`,
+    actionLabel: "View activity",
+    actionHref: "/?tab=activity",
+    entityType: "PointReaction",
+    entityId: input.reactionId,
+    dedupeKey: `point-reaction-received:${input.organizationId}:${input.transactionId}:${input.actorUserId}`,
   };
 }
 

@@ -1,37 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Clock, ArrowRight, X } from "@phosphor-icons/react";
-import type { ActivityItem, PagedActivityFeed } from "@housepoints/contracts";
-import { TRAIT_LABELS } from "@housepoints/contracts";
-import type { DeletePointResult } from "@/lib/action-results";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Clock } from "@phosphor-icons/react";
+import type {
+  ActivityFeedRequest,
+  ActivityItem,
+  OrgMember,
+  PagedActivityFeed,
+  PointReactionDetailsResponse,
+  PointReactionKey,
+  PointReactionResponse,
+  PointTransactionType,
+} from "@housepoints/contracts";
+import { POINT_REACTION_LABELS } from "@housepoints/contracts";
+import type { DeletePointResult, PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
+import { ActivityCard } from "./ActivityCard";
+import { REACTION_EMOJI } from "./point-reactions";
+
+type ActivityTypeFilter = "ALL" | PointTransactionType;
+type ActivityFilterRequest = Pick<
+  ActivityFeedRequest,
+  "cursor" | "type" | "actorUserId" | "targetUserId" | "seasonId"
+>;
+type ActivityFeedSeason = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
+const FILTER_OPTIONS: Array<{ value: ActivityTypeFilter; label: string; description: string }> = [
+  { value: "ALL", label: "All activity", description: "Recognition and deductions" },
+  { value: "AWARD", label: "Recognition", description: "Points awarded by teammates" },
+  { value: "DEDUCTION", label: "Deductions", description: "Admin point deductions" },
+];
+
+const dateTimeFormatter = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 interface ActivityFeedProps {
   items: ActivityItem[];
+  members: OrgMember[];
+  seasons?: ActivityFeedSeason[];
   nextCursor: string | null;
-  onLoadMore: (cursor: string) => Promise<PagedActivityFeed>;
+  onLoadMore: (request: ActivityFilterRequest) => Promise<PagedActivityFeed>;
   canDelete?: boolean;
   onDelete?: (transactionId: string) => Promise<DeletePointResult>;
-}
-
-function relativeTime(isoString: string) {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const min = Math.floor(diff / 60_000);
-  const hr = Math.floor(diff / 3_600_000);
-  const day = Math.floor(diff / 86_400_000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
-  if (hr < 24) return `${hr}h ago`;
-  return `${day}d ago`;
+  onReact?: (
+    transactionId: string,
+    reactionKey: PointReactionKey | null,
+  ) => Promise<PointReactionResult<PointReactionResponse>>;
+  onReadReactions?: (
+    transactionId: string,
+  ) => Promise<PointReactionDetailsResult<PointReactionDetailsResponse>>;
 }
 
 export function ActivityFeed({
   items,
+  members,
+  seasons = [],
   nextCursor,
   onLoadMore,
   canDelete = false,
   onDelete,
+  onReact,
+  onReadReactions,
 }: ActivityFeedProps) {
   const [visibleItems, setVisibleItems] = useState(items);
   const [cursor, setCursor] = useState(nextCursor);
@@ -39,6 +77,93 @@ export function ActivityFeed({
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reactingIds, setReactingIds] = useState<Set<string>>(() => new Set());
+  const [reactionError, setReactionError] = useState<string | null>(null);
+  const [reactionDetailsContext, setReactionDetailsContext] = useState<{
+    transactionId: string;
+    targetUserName: string;
+    reason: string;
+  } | null>(null);
+  const [reactionDetails, setReactionDetails] = useState<PointReactionDetailsResponse | null>(null);
+  const [reactionDetailsError, setReactionDetailsError] = useState<string | null>(null);
+  const [loadingReactionDetailsId, setLoadingReactionDetailsId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<ActivityTypeFilter>("ALL");
+  const [activeActorMemberId, setActiveActorMemberId] = useState("ALL");
+  const [activeTargetMemberId, setActiveTargetMemberId] = useState("ALL");
+  const [activeSeasonId, setActiveSeasonId] = useState("ALL");
+
+  function buildActivityRequest(options: {
+    cursor?: string;
+    type?: ActivityTypeFilter;
+    actorUserId?: string;
+    targetUserId?: string;
+    seasonId?: string;
+  } = {}): ActivityFilterRequest {
+    const typeFilter = options.type ?? activeFilter;
+    const actorMemberId = options.actorUserId ?? activeActorMemberId;
+    const targetMemberId = options.targetUserId ?? activeTargetMemberId;
+    const seasonId = options.seasonId ?? activeSeasonId;
+
+    return {
+      ...(options.cursor ? { cursor: options.cursor } : {}),
+      ...(typeFilter === "ALL" ? {} : { type: typeFilter }),
+      ...(actorMemberId === "ALL" ? {} : { actorUserId: actorMemberId }),
+      ...(targetMemberId === "ALL" ? {} : { targetUserId: targetMemberId }),
+      ...(seasonId === "ALL" ? {} : { seasonId }),
+    };
+  }
+
+  async function reloadActivity(request: ActivityFilterRequest) {
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    setDeleteError(null);
+
+    try {
+      const page = await onLoadMore(request);
+      setVisibleItems(page.items);
+      setCursor(page.nextCursor);
+    } catch {
+      setLoadMoreError("Activity could not be filtered. Please try again.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  async function handleFilterChange(nextFilter: ActivityTypeFilter) {
+    if (nextFilter === activeFilter || isLoadingMore) {
+      return;
+    }
+
+    setActiveFilter(nextFilter);
+    await reloadActivity(buildActivityRequest({ type: nextFilter }));
+  }
+
+  async function handleActorMemberChange(nextMemberId: string) {
+    if (nextMemberId === activeActorMemberId || isLoadingMore) {
+      return;
+    }
+
+    setActiveActorMemberId(nextMemberId);
+    await reloadActivity(buildActivityRequest({ actorUserId: nextMemberId }));
+  }
+
+  async function handleTargetMemberChange(nextMemberId: string) {
+    if (nextMemberId === activeTargetMemberId || isLoadingMore) {
+      return;
+    }
+
+    setActiveTargetMemberId(nextMemberId);
+    await reloadActivity(buildActivityRequest({ targetUserId: nextMemberId }));
+  }
+
+  async function handleSeasonChange(nextSeasonId: string) {
+    if (nextSeasonId === activeSeasonId || isLoadingMore) {
+      return;
+    }
+
+    setActiveSeasonId(nextSeasonId);
+    await reloadActivity(buildActivityRequest({ seasonId: nextSeasonId }));
+  }
 
   async function handleLoadMore() {
     if (!cursor || isLoadingMore) {
@@ -49,7 +174,7 @@ export function ActivityFeed({
     setLoadMoreError(null);
 
     try {
-      const page = await onLoadMore(cursor);
+      const page = await onLoadMore(buildActivityRequest({ cursor }));
       setVisibleItems((current) => [...current, ...page.items]);
       setCursor(page.nextCursor);
     } catch {
@@ -96,127 +221,318 @@ export function ActivityFeed({
     }
   }
 
+  async function handleReact(item: ActivityItem, reactionKey: PointReactionKey) {
+    if (!onReact || reactingIds.has(item.id) || item.type !== "AWARD") {
+      return;
+    }
+
+    const nextReactionKey = item.myReactionKey === reactionKey ? null : reactionKey;
+    setReactionError(null);
+    setReactingIds((current) => new Set(current).add(item.id));
+
+    try {
+      const result = await onReact(item.id, nextReactionKey);
+
+      if (!result.ok) {
+        setReactionError(result.message);
+        return;
+      }
+
+      setVisibleItems((current) =>
+        current.map((visibleItem) =>
+          visibleItem.id === item.id
+            ? {
+                ...visibleItem,
+                myReactionKey: result.reaction.myReactionKey,
+                reactions: result.reaction.reactions,
+              }
+            : visibleItem,
+        ),
+      );
+    } catch {
+      setReactionError("Reaction could not be saved. Please try again.");
+    } finally {
+      setReactingIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }
+
+  async function handleViewReactions(item: ActivityItem) {
+    if (!onReadReactions || loadingReactionDetailsId === item.id) {
+      return;
+    }
+
+    setReactionDetailsContext({
+      transactionId: item.id,
+      targetUserName: item.targetUserName,
+      reason: item.reason,
+    });
+    setReactionDetails(null);
+    setReactionDetailsError(null);
+    setLoadingReactionDetailsId(item.id);
+
+    try {
+      const result = await onReadReactions(item.id);
+
+      if (!result.ok) {
+        setReactionDetailsError(result.message);
+        return;
+      }
+
+      setReactionDetails(result.details);
+    } catch {
+      setReactionDetailsError("Reactions could not be loaded. Please try again.");
+    } finally {
+      setLoadingReactionDetailsId(null);
+    }
+  }
+
+  const hasActiveFilters =
+    activeFilter !== "ALL"
+    || activeActorMemberId !== "ALL"
+    || activeTargetMemberId !== "ALL"
+    || activeSeasonId !== "ALL";
+  const reactionDetailsOpen = Boolean(reactionDetailsContext);
+
   return (
     <div className="rounded-xl border bg-card">
-      <div className="p-6 border-b">
-        <h2 className="font-display text-xl font-semibold flex items-center gap-2">
-          <Clock size={22} />
-          Recent Activity
-        </h2>
-      </div>
-      <div className="overflow-y-auto max-h-[500px] p-4 space-y-3">
-        {visibleItems.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8 text-sm">
-            No activity yet. Award some points!
+      <div className="border-b p-6">
+        <div>
+          <h2 className="font-display text-2xl font-semibold flex items-center gap-2">
+            <Clock size={24} />
+            Team Activity
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Recognition, deductions, and teammate moments across the organization.
           </p>
-        ) : (
-          visibleItems.map((item, index) => {
-            const isDeduction = item.type === "DEDUCTION";
-            const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
+        </div>
+      </div>
+      <div className="grid gap-4 p-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
+        <aside className="rounded-xl border bg-background/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Filters
+          </p>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Activity type
+            <select
+              value={activeFilter}
+              onChange={(event) => void handleFilterChange(event.target.value as ActivityTypeFilter)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              {FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Given by
+            <select
+              value={activeActorMemberId}
+              onChange={(event) => void handleActorMemberChange(event.target.value)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="ALL">All members</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Recognized member
+            <select
+              value={activeTargetMemberId}
+              onChange={(event) => void handleTargetMemberChange(event.target.value)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="ALL">All members</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Season
+            <select
+              value={activeSeasonId}
+              onChange={(event) => void handleSeasonChange(event.target.value)}
+              disabled={isLoadingMore}
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm font-semibold text-foreground disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="ALL">All seasons</option>
+              {seasons.map((season) => (
+                <option key={season.id} value={season.id}>
+                  {season.name}{season.isActive ? " (current)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </aside>
 
-            return (
-              <motion.div
+        <div className="overflow-y-auto max-h-[540px] space-y-3 pr-1">
+          {visibleItems.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">
+              {!hasActiveFilters
+                ? "No team activity yet. Award some points!"
+                : "No activity matches this filter yet."}
+            </p>
+          ) : (
+            visibleItems.map((item, index) => (
+              <ActivityCard
                 key={item.id}
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.04, duration: 0.2 }}
-                className="relative flex items-start gap-3 rounded-lg border p-3 pr-28 transition-colors hover:bg-muted/20 sm:pr-36"
+                item={item}
+                index={index}
+                canDelete={canDelete && Boolean(onDelete)}
+                isDeleting={deletingIds.has(item.id)}
+                onDelete={() => handleDelete(item)}
+                canReact={Boolean(onReact)}
+                isReacting={reactingIds.has(item.id)}
+                onReact={(reactionKey) => handleReact(item, reactionKey)}
+                canViewReactions={
+                  Boolean(onReadReactions)
+                  && item.type === "AWARD"
+                  && (item.reactions ?? []).some((reaction) => reaction.count > 0)
+                }
+                isLoadingReactions={loadingReactionDetailsId === item.id}
+                onViewReactions={() => void handleViewReactions(item)}
+              />
+            ))
+          )}
+          {loadMoreError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {loadMoreError}
+            </p>
+          ) : null}
+          {deleteError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {deleteError}
+            </p>
+          ) : null}
+          {reactionError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {reactionError}
+            </p>
+          ) : null}
+          {cursor ? (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="rounded-lg border px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
               >
-              {item.season ? (
-                <span
-                  className={[
-                    "absolute right-3 top-3 rounded-full px-2 py-0.5 text-xs font-medium",
-                    item.season.isActive
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-amber-50 text-amber-700",
-                  ].join(" ")}
-                >
-                  {item.season.name}
-                </span>
-              ) : null}
-              {canDelete && onDelete ? (
+                {isLoadingMore ? "Loading..." : "Load more activity"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <Dialog.Root
+        open={reactionDetailsOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReactionDetailsContext(null);
+            setReactionDetails(null);
+            setReactionDetailsError(null);
+            setLoadingReactionDetailsId(null);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-4rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border bg-card p-6 shadow-2xl">
+            <div className="shrink-0 flex items-start justify-between gap-4">
+              <div>
+                <Dialog.Title className="font-display text-2xl font-semibold">
+                  Reactions
+                </Dialog.Title>
+                <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                  {reactionDetailsContext
+                    ? `People who reacted to ${reactionDetailsContext.targetUserName}'s recognition.`
+                    : "People who reacted to this recognition."}
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
                 <button
                   type="button"
-                  onClick={() => handleDelete(item)}
-                  disabled={deletingIds.has(item.id)}
-                  aria-label={`Delete point transaction for ${item.targetUserName}`}
-                  title="Delete point transaction"
-                  className="absolute right-3 bottom-3 inline-flex h-7 w-7 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:cursor-wait disabled:opacity-50"
+                  className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Close reaction details"
                 >
-                  <X size={14} />
+                  x
                 </button>
-              ) : null}
-              {/* Actor initial avatar */}
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
-                {item.actorName[0]?.toUpperCase()}
+              </Dialog.Close>
+            </div>
+
+            {reactionDetailsContext ? (
+              <div className="mt-4 shrink-0 rounded-xl border bg-muted/20 p-3">
+                <p className="line-clamp-2 text-sm text-muted-foreground">
+                  {reactionDetailsContext.reason}
+                </p>
               </div>
-              <ArrowRight className="text-muted-foreground mt-2 flex-shrink-0" size={14} />
-              {/* Target house colored badge */}
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
-                style={{ backgroundColor: item.targetHouseColor }}
-              >
-                {item.targetHouseName[0]?.toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1 text-sm">
-                  <span className="font-semibold">{item.actorName}</span>
-                  <span className="text-muted-foreground">{isDeduction ? "deducted" : "awarded"}</span>
-                  {isDeduction ? (
-                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
-                      Deducted
-                    </span>
-                  ) : null}
-                  <span
-                    className="font-number font-bold px-1.5 py-0.5 rounded text-xs"
-                    style={{
-                      backgroundColor: isDeduction ? "rgb(254 226 226)" : `${item.targetHouseColor}20`,
-                      color: isDeduction ? "rgb(185 28 28)" : item.targetHouseColor,
-                    }}
-                  >
-                    {deltaLabel}
-                  </span>
-                  <span className="text-muted-foreground">to</span>
-                  <span className="font-semibold">{item.targetUserName}</span>
-                  <span className="text-muted-foreground text-xs">({item.targetHouseName})</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{item.reason}</p>
-                {item.trait && (
-                  <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {TRAIT_LABELS[item.trait]}
-                  </span>
-                )}
-                <span className="text-xs text-muted-foreground mt-1 block">
-                  {relativeTime(item.createdAt)}
-                </span>
-              </div>
-              </motion.div>
-            );
-          })
-        )}
-        {loadMoreError ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {loadMoreError}
-          </p>
-        ) : null}
-        {deleteError ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {deleteError}
-          </p>
-        ) : null}
-        {cursor ? (
-          <div className="flex justify-center pt-2">
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              disabled={isLoadingMore}
-              className="rounded-lg border px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
+            ) : null}
+
+            <div
+              className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+              role="region"
+              aria-label="Reaction details list"
             >
-              {isLoadingMore ? "Loading..." : "Load more"}
-            </button>
-          </div>
-        ) : null}
-      </div>
+              {loadingReactionDetailsId ? (
+                <p className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  Loading reactions...
+                </p>
+              ) : null}
+
+              {reactionDetailsError ? (
+                <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                  {reactionDetailsError}
+                </p>
+              ) : null}
+
+              {!loadingReactionDetailsId && !reactionDetailsError && reactionDetails?.reactions.length === 0 ? (
+                <p className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  No active reactions yet.
+                </p>
+              ) : null}
+
+              {reactionDetails?.reactions.map((reaction) => (
+                <div
+                  key={reaction.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="shrink-0 text-lg leading-none"
+                      title={POINT_REACTION_LABELS[reaction.reactionKey]}
+                      role="img"
+                      aria-label={POINT_REACTION_LABELS[reaction.reactionKey]}
+                    >
+                      {REACTION_EMOJI[reaction.reactionKey]}
+                    </span>
+                    <p className="truncate font-semibold">{reaction.actorName}</p>
+                  </div>
+                  <time
+                    dateTime={reaction.updatedAt}
+                    className="shrink-0 text-right text-xs text-muted-foreground"
+                  >
+                    {dateTimeFormatter.format(new Date(reaction.updatedAt))}
+                  </time>
+                </div>
+              ))}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildPointAwardNotificationData,
   buildPointDeductionNotificationData,
+  buildPointReactionNotificationData,
   buildSeasonStartedNotificationData,
   buildRoleChangedNotificationData,
   buildMemberNeedsAssignmentNotificationData,
@@ -69,6 +70,41 @@ describe("buildPointDeductionNotificationData", () => {
   it("generates the correct dedupeKey", () => {
     const result = buildPointDeductionNotificationData(base);
     expect(result.dedupeKey).toBe("point-deduction-received:org-1:txn-9");
+  });
+});
+
+describe("buildPointReactionNotificationData", () => {
+  const base = {
+    organizationId: "org-1",
+    recipientUserId: "user-2",
+    actorUserId: "user-3",
+    actorDisplayName: "Casey",
+    reactionKey: "clap" as const,
+    transactionId: "txn-1",
+    reactionId: "reaction-1",
+  };
+
+  it("sets the correct notification type and severity", () => {
+    const result = buildPointReactionNotificationData(base);
+    expect(result.type).toBe("POINT_REACTION_RECEIVED");
+    expect(result.severity).toBe("INFO");
+  });
+
+  it("generates user-facing copy from the reaction label", () => {
+    const result = buildPointReactionNotificationData(base);
+    expect(result.title).toBe("Someone reacted to your recognition");
+    expect(result.body).toBe("Casey reacted with Applause.");
+  });
+
+  it("dedupes by org, transaction, and reacting actor", () => {
+    const result = buildPointReactionNotificationData(base);
+    expect(result.dedupeKey).toBe("point-reaction-received:org-1:txn-1:user-3");
+  });
+
+  it("sets entityType and entityId to the reaction", () => {
+    const result = buildPointReactionNotificationData(base);
+    expect(result.entityType).toBe("PointReaction");
+    expect(result.entityId).toBe("reaction-1");
   });
 });
 

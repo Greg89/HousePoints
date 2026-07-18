@@ -21,6 +21,8 @@ import {
   readDashboardSummary,
   readLeaderboard,
   readMembers,
+  readPointReactionDetails,
+  reactToPointTransaction,
 } from "./actions/dashboard";
 import {
   markAllNotificationsRead,
@@ -124,7 +126,7 @@ export async function renderDashboardPage(route: string) {
   const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
-    readActivityPage(undefined, requestId),
+    readActivityPage({}, requestId),
     readMemberScores(undefined, requestId),
     readDashboardSummary(undefined, requestId),
     readSeasonContext(requestId),
@@ -214,6 +216,8 @@ export async function renderDashboardPage(route: string) {
       onAward={awardPoints}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
+      onReactToPoint={reactToPointTransaction}
+      onReadPointReactionDetails={readPointReactionDetails}
       dashboardHref={dashboardHref}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
