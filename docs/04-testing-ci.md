@@ -134,6 +134,8 @@ Reversible Manage mutation:
 2. Capture the member's current house and move them to another existing house.
 3. Verify the new assignment persists across fresh navigation.
 4. Restore the original house in cleanup and verify that restoration also persists.
+5. As the owner, toggle the target member between member/admin access.
+6. Verify the role persists, then restore and verify the original access level.
 
 Run locally or against staging:
 

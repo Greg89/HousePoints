@@ -89,6 +89,7 @@ Required staging state:
 - The value must match the target member's display name as rendered in the Award Points member picker.
 - The target member belongs to the same staging E2E organization as the primary E2E user.
 - The target member has a house assignment.
+- The target member has the `MEMBER` or `ADMIN` role and is not the organization owner.
 - The target member should remain active and should not be removed from the organization.
 
 ### Organization Scope
@@ -133,11 +134,15 @@ owner tool sheets, and the admin mobile picker without submitting mutations.
 
 ## Reversible Team Mutation Coverage
 
-The admin Manage mutation smoke reassigns `E2E_TARGET_MEMBER` to a different existing house,
-verifies the assignment survives a fresh navigation, and restores the member's original house in
-a `finally` cleanup. The target member must begin assigned to a house, and the organization must
-retain at least two active houses. A cleanup failure fails the run so staging fixture drift is
-visible rather than silently accumulating.
+The Manage mutation smoke covers two reversible operations:
+
+- the admin reassigns `E2E_TARGET_MEMBER` to a different existing house;
+- the owner toggles that target between member and admin access.
+
+Each test verifies the mutation survives fresh navigation and restores the original state in a
+`finally` cleanup. The target member must begin assigned to a house, must not be the organization
+owner, and the organization must retain at least two active houses. A cleanup failure fails the run
+so staging fixture drift is visible rather than silently accumulating.
 
 ## Reaction Notification Smoke Coverage
 

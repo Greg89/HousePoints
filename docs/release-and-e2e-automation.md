@@ -146,9 +146,9 @@ Grow the suite slowly:
 2. Core: award points, Activity shows the transaction, Leaderboard shows the target.
 3. Manage: six-workspace navigation, role restrictions, URL history, responsive picker, detail
    surfaces, Audit modes, and non-mutating confirmation flows. Read-only coverage implemented.
-4. Team mutations: reversible house assignment is implemented with persistence verification and
-   `finally` cleanup. Invite generation and promote/demote coverage remain after dedicated fixture
-   and reset expectations are defined.
+4. Team mutations: reversible house assignment and owner promote/demote coverage are implemented
+   with persistence verification and `finally` cleanup. Invite generation remains deferred until
+   invite records have a safe cleanup expectation.
 5. Seasons: switch historical season and verify reports/standings update.
 6. Notifications: receive, preview, mark read.
 7. Manage Audit pagination: filter coverage is implemented; pagination remains future coverage.
@@ -174,4 +174,4 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
 | B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; owner/admin actors and two active houses support reversible Manage coverage. |
-| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, role access, complete Manage workspace, responsive picker, Manage Audit, and reversible house-assignment coverage added. Invite and role mutation fixtures remain. |
+| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, role access, complete Manage workspace, responsive picker, Manage Audit, and reversible house-assignment and role coverage added. Invite cleanup and later domain paths remain. |
