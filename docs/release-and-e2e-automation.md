@@ -146,9 +146,9 @@ Grow the suite slowly:
 2. Core: award points, Activity shows the transaction, Leaderboard shows the target.
 3. Manage: six-workspace navigation, role restrictions, URL history, responsive picker, detail
    surfaces, Audit modes, and non-mutating confirmation flows. Read-only coverage implemented.
-4. Team mutations: reversible house assignment and owner promote/demote coverage are implemented
-   with persistence verification and `finally` cleanup. Invite generation remains deferred until
-   invite records have a safe cleanup expectation.
+4. Team mutations: reversible house assignment and optional dedicated-target owner promote/demote
+   coverage are implemented with persistence verification and `finally` cleanup. Invite generation
+   remains deferred until invite records have a safe cleanup expectation.
 5. Seasons: historical Overview report, season recap, and Leaderboard switching are implemented
    when the optional completed-season staging fixture exists.
 6. Notifications: receive, preview, mark read.

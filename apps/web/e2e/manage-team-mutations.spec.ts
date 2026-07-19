@@ -4,6 +4,7 @@ import {
   missingRequiredEnv,
   readE2EAdminCredentials,
   readE2EOwnerCredentials,
+  readE2ERoleTargetMemberName,
   readTargetMemberName,
   requiredManageEnv,
 } from "./support/config";
@@ -48,22 +49,27 @@ test("admin can reassign a member and restore the original house", async ({ page
 
 test("owner can change a member role and restore the original access", async ({ page }) => {
   const credentials = readE2EOwnerCredentials()!;
-  const targetMember = readTargetMemberName();
+  const targetMember = readE2ERoleTargetMemberName();
+  test.skip(
+    !targetMember,
+    "Missing optional E2E_ROLE_TARGET_MEMBER dedicated role-mutation fixture.",
+  );
+
   let originalRole: ManageableRole | null = null;
   let roleChangeAttempted = false;
 
-  await openTargetMember(page, credentials, targetMember);
+  await openTargetMember(page, credentials, targetMember!);
   originalRole = await readManageableRole(page);
   const temporaryRole: ManageableRole = originalRole === "MEMBER" ? "ADMIN" : "MEMBER";
 
   try {
     roleChangeAttempted = true;
     await saveRoleChange(page, temporaryRole);
-    await assertPersistedRole(page, credentials, targetMember, temporaryRole);
+    await assertPersistedRole(page, credentials, targetMember!, temporaryRole);
   } finally {
     if (roleChangeAttempted && originalRole) {
-      await ensureMemberRole(page, credentials, targetMember, originalRole);
-      await assertPersistedRole(page, credentials, targetMember, originalRole);
+      await ensureMemberRole(page, credentials, targetMember!, originalRole);
+      await assertPersistedRole(page, credentials, targetMember!, originalRole);
     }
   }
 });
@@ -124,7 +130,7 @@ async function readManageableRole(page: Page): Promise<ManageableRole> {
   }
 
   throw new Error(
-    "E2E_TARGET_MEMBER must be a manageable member or admin, not the organization owner.",
+    "E2E_ROLE_TARGET_MEMBER must be a manageable member or admin, not the organization owner.",
   );
 }
 

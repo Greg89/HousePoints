@@ -137,6 +137,10 @@ Reversible Manage mutation:
 5. As the owner, toggle the target member between member/admin access.
 6. Verify the role persists, then restore and verify the original access level.
 
+Role mutation uses the optional `E2E_ROLE_TARGET_MEMBER` fixture. It must identify a member who is
+not used to sign into any E2E scenario; otherwise changing live permissions can destabilize later
+authenticated tests.
+
 Historical season reports:
 
 1. Select a completed season from the Overview reporting-season control.
@@ -172,6 +176,10 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_OWNER_PASSWORD`
 - `E2E_TARGET_MEMBER`
 - `E2E_ORG_SLUG`
+
+Optional mutation fixture:
+
+- `E2E_ROLE_TARGET_MEMBER`
 
 `E2E_ORG_SLUG` routes tests directly to `/o/{slug}`. The scheduled staging workflow requires it so the test account always lands in the known-good E2E organization.
 

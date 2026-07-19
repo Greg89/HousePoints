@@ -92,6 +92,20 @@ Required staging state:
 - The target member has the `MEMBER` or `ADMIN` role and is not the organization owner.
 - The target member should remain active and should not be removed from the organization.
 
+### Optional Role-Mutation Target
+
+GitHub Environment secret:
+
+- `E2E_ROLE_TARGET_MEMBER`
+
+Required staging state when configured:
+
+- The value matches a stable member display name in the staging E2E organization.
+- The target has the `MEMBER` or `ADMIN` role and is not the organization owner.
+- The target is distinct from the primary, admin, owner, reaction actor, and reaction recipient
+  accounts used to sign into the suite.
+- The target does not need separate Auth0 credentials because the owner performs the mutation.
+
 ### Organization Scope
 
 GitHub Environment secret:
@@ -137,12 +151,15 @@ owner tool sheets, and the admin mobile picker without submitting mutations.
 The Manage mutation smoke covers two reversible operations:
 
 - the admin reassigns `E2E_TARGET_MEMBER` to a different existing house;
-- the owner toggles that target between member and admin access.
+- when `E2E_ROLE_TARGET_MEMBER` is configured, the owner toggles that dedicated target between
+  member and admin access.
 
 Each test verifies the mutation survives fresh navigation and restores the original state in a
 `finally` cleanup. The target member must begin assigned to a house, must not be the organization
-owner, and the organization must retain at least two active houses. A cleanup failure fails the run
-so staging fixture drift is visible rather than silently accumulating.
+owner, and the organization must retain at least two active houses. The role target must not be an
+account used for E2E login; changing a test actor's live permissions can invalidate its session or
+cached dashboard state even after restoration. A cleanup failure fails the run so staging fixture
+drift is visible rather than silently accumulating.
 
 ## Historical Season Coverage
 
@@ -186,6 +203,7 @@ $env:E2E_REACTION_ACTOR_PASSWORD = "test-password"
 $env:E2E_REACTION_RECIPIENT_EMAIL = "stable-target-member@example.com"
 $env:E2E_REACTION_RECIPIENT_PASSWORD = "test-password"
 $env:E2E_TARGET_MEMBER = "Stable Target Member"
+$env:E2E_ROLE_TARGET_MEMBER = "Dedicated Role Target"
 $env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
 ```
