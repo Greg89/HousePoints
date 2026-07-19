@@ -149,7 +149,7 @@ Grow the suite slowly:
 4. Team mutations: reversible house assignment and owner promote/demote coverage are implemented
    with persistence verification and `finally` cleanup. Invite generation remains deferred until
    invite records have a safe cleanup expectation.
-5. Seasons: switch historical season and verify reports/standings update.
+5. Seasons: historical Overview report, season recap, and Leaderboard switching are implemented.
 6. Notifications: receive, preview, mark read.
 7. Manage Audit pagination: filter coverage is implemented; pagination remains future coverage.
 
@@ -174,4 +174,4 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
 | B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; owner/admin actors and two active houses support reversible Manage coverage. |
-| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, role access, complete Manage workspace, responsive picker, Manage Audit, and reversible house-assignment and role coverage added. Invite cleanup and later domain paths remain. |
+| B3 - E2E coverage expansion | In progress | Dashboard, account-menu, role access, complete Manage workspace, Manage Audit, reversible team mutations, and historical season reporting coverage added. Notifications and Audit pagination remain. |

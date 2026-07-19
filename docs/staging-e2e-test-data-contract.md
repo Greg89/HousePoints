@@ -108,6 +108,7 @@ The staging E2E organization should contain:
 - at least two active members;
 - at least two active houses so team-assignment mutations can move and restore a member;
 - an active season;
+- at least one completed historical season for report and leaderboard switching;
 - the primary E2E user with permission to award points;
 - the configured target member with a stable display name.
 
@@ -143,6 +144,13 @@ Each test verifies the mutation survives fresh navigation and restores the origi
 `finally` cleanup. The target member must begin assigned to a house, must not be the organization
 owner, and the organization must retain at least two active houses. A cleanup failure fails the run
 so staging fixture drift is visible rather than silently accumulating.
+
+## Historical Season Coverage
+
+The season-report smoke discovers the first completed season from the Overview reporting selector.
+It verifies that the historical Overview report and season recap load, then confirms the
+Leaderboard uses the same historical season. This path is read-only and requires no additional
+secret, but staging must retain at least one completed season.
 
 ## Reaction Notification Smoke Coverage
 

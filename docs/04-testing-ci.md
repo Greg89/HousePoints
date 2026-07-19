@@ -137,6 +137,12 @@ Reversible Manage mutation:
 5. As the owner, toggle the target member between member/admin access.
 6. Verify the role persists, then restore and verify the original access level.
 
+Historical season reports:
+
+1. Select a completed season from the Overview reporting-season control.
+2. Confirm the historical report and season recap load.
+3. Open Leaderboard and confirm it remains scoped to the selected historical season.
+
 Run locally or against staging:
 
 ```powershell
