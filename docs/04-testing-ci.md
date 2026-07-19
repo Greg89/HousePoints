@@ -143,6 +143,9 @@ Historical season reports:
 2. Confirm the historical report and season recap load.
 3. Open Leaderboard and confirm it remains scoped to the selected historical season.
 
+This scenario skips when staging has no completed season. The suite must not start a new season to
+manufacture this fixture because doing so closes the active season and resets current scoring.
+
 Run locally or against staging:
 
 ```powershell
