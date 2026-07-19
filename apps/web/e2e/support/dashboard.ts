@@ -1,9 +1,15 @@
 import { expect, type Page } from "@playwright/test";
 
-import { getE2EDiagnostics } from "./navigation";
+import { getE2EDiagnostics, gotoE2EStart } from "./navigation";
 
 export async function expectDashboardReady(page: Page) {
   await ensureDashboardState(page);
+
+  if (await page.getByText(/upstream error/i).isVisible().catch(() => false)) {
+    // The staging organization switch can briefly return a proxy 502 after login.
+    await gotoE2EStart(page);
+    await ensureDashboardState(page);
+  }
 
   if (await page.getByText(/something went wrong/i).isVisible().catch(() => false)) {
     // Staging occasionally serves a transient error boundary after auth redirects.
@@ -28,6 +34,7 @@ async function ensureDashboardState(page: Page) {
     page.getByText(/waiting for assignment/i),
     page.getByText(/create organisation/i),
     page.getByText(/something went wrong/i),
+    page.getByText(/upstream error/i),
   ];
 
   const recognized = await expect.poll(

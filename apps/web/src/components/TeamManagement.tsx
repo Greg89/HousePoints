@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -75,6 +75,7 @@ export function TeamManagement({
   const [filter, setFilter] = useState<MemberFilter>(requestedFilter);
   const [search, setSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const selectedUserTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteJoinPath, setInviteJoinPath] = useState<string | null>(null);
   const [inviteExpiry, setInviteExpiry] = useState<string | null>(null);
@@ -334,7 +335,8 @@ export function TeamManagement({
                 <button
                   key={user.id}
                   type="button"
-                  onClick={() => {
+                  onClick={(event) => {
+                    selectedUserTriggerRef.current = event.currentTarget;
                     setPendingRole(null);
                     setSelectedUserId(user.id);
                   }}
@@ -388,7 +390,13 @@ export function TeamManagement({
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
-          <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-full max-w-lg overflow-y-auto border-l bg-card p-6 shadow-2xl">
+          <Dialog.Content
+            className="fixed inset-y-0 right-0 z-50 w-full max-w-lg overflow-y-auto border-l bg-card p-6 shadow-2xl"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              selectedUserTriggerRef.current?.focus();
+            }}
+          >
             {selectedUser ? (
               <>
                 <div className="flex items-start justify-between gap-4">

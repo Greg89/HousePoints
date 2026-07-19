@@ -1014,6 +1014,17 @@ describe("AdminForms", () => {
     expect(screen.getByRole("dialog", { name: "Ben Unassigned" })).toBeInTheDocument();
   });
 
+  it("returns focus to the member row after closing member details", async () => {
+    const { user } = setupAdminForms();
+    switchToManageSection("Members");
+    const memberButton = screen.getByRole("button", { name: "Manage Ben Unassigned" });
+
+    await user.click(memberButton);
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(memberButton).toHaveFocus());
+  });
+
   it("lets admins update member display names from the Members section", async () => {
     const { user, props } = setupAdminForms({ actorRole: "ADMIN" });
     switchToManageSection("Members");

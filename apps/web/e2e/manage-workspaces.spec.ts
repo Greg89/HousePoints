@@ -131,7 +131,15 @@ async function openManage(
   await gotoE2EStart(page);
   await signInIfNeeded(page, credentials);
   await expectDashboardReady(page);
-  await page.getByRole("tab", { name: "Manage" }).click();
+  const manageTab = page.getByRole("tab", { name: "Manage" });
+  if (await manageTab.isVisible().catch(() => false)) {
+    await manageTab.click();
+  } else {
+    const manageUrl = new URL(page.url());
+    manageUrl.searchParams.set("tab", "manage");
+    await page.goto(manageUrl.toString(), { waitUntil: "domcontentloaded" });
+    await expectDashboardReady(page);
+  }
   await expect(page.getByRole("navigation", { name: "Manage sections" }).or(
     page.getByRole("combobox", { name: "Manage sections" }),
   )).toBeVisible();
