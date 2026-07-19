@@ -391,6 +391,35 @@ describe("GET /health", () => {
   });
 });
 
+describe("rate limiting", () => {
+  it("returns a typed 429 when a mutation limit is exceeded", async () => {
+    const app = await buildTestApp();
+
+    for (let requestNumber = 0; requestNumber < 5; requestNumber += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/orgs/create",
+        payload: {},
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const limitedResponse = await app.inject({
+      method: "POST",
+      url: "/orgs/create",
+      payload: {},
+    });
+
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.json()).toEqual({
+      code: "RATE_LIMITED",
+      message: "Too many requests — please slow down.",
+    });
+
+    await app.close();
+  });
+});
+
 describe("POST /system/releases/record", () => {
   const releasePayload = {
     version: "v1.2.3",

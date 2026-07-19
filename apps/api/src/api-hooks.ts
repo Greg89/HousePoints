@@ -15,6 +15,15 @@ function getRequestPath(url: string): string {
   return url.split("?", 1)[0] ?? url;
 }
 
+function isRateLimitError(err: unknown): boolean {
+  if (!err || typeof err !== "object") {
+    return false;
+  }
+
+  const candidate = err as { code?: unknown; statusCode?: unknown };
+  return candidate.statusCode === 429 || candidate.code === "RATE_LIMITED";
+}
+
 export function isPublicRequestRoute(
   routeUrl: string | undefined,
   requestUrl: string,
@@ -78,6 +87,13 @@ export function registerRequestLifecycleHooks(app: FastifyInstance): void {
   });
 
   app.setErrorHandler(async (err, request, reply) => {
+    if (isRateLimitError(err)) {
+      return reply.status(429).send({
+        code: "RATE_LIMITED",
+        message: "Too many requests — please slow down.",
+      });
+    }
+
     error(request.log, "request.unhandled_error", { statusCode: 500 }, err);
     await reply.status(500).send({
       code: "INTERNAL_ERROR",

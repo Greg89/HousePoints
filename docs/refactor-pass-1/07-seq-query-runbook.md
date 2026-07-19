@@ -105,6 +105,60 @@ requestId = 'request-id-here'
 
 Unhandled API errors should be rare and should usually correspond to defects, unavailable dependencies, or unexpected database behavior.
 
+## Rate-Limited Requests
+
+Rate limiting is an expected warning, not an unhandled application error:
+
+```text
+service = 'housepoints-api' and event = 'request.rate_limited'
+```
+
+To inspect one rate-limited operation and the minute leading up to it, first find
+the event by request ID:
+
+```text
+requestId = 'request-id-here'
+```
+
+Open the event, copy its UTC timestamp, and query the same deployment and hashed
+limiter key over the preceding minute:
+
+```sql
+select @Timestamp, event, route, method, statusCode, requestId,
+       replicaId, rateLimitKeyType, rateLimitKeyHash, rateLimitMax,
+       rateLimitWindow
+from stream
+where service = 'housepoints-api'
+  and deploymentId = 'deployment-id-here'
+  and replicaId = 'replica-id-here'
+  and rateLimitKeyHash = 'hash-from-rate-limited-event'
+  and @Timestamp >= DateTime('2026-07-19T12:00:00.000Z') - 1m
+  and @Timestamp <= DateTime('2026-07-19T12:00:00.000Z')
+order by @Timestamp
+```
+
+The hash uses a random, process-local HMAC salt. After the improved logging has
+been deployed, it appears on both completed requests and the rate-limited
+warning from that replica, so it can correlate nearby traffic without recording
+an Auth0 subject or IP address. Include `replicaId` because each API process has
+its own in-memory limiter and correlation salt.
+
+Older events do not contain the hash. For those, use the deployment and
+timestamp window to compare request volume by route:
+
+```sql
+select route, method, count(*) as requestCount
+from stream
+where service = 'housepoints-api'
+  and deploymentId = 'deployment-id-here'
+  and replicaId = 'replica-id-here'
+  and event = 'request.received'
+  and @Timestamp >= DateTime('2026-07-19T12:00:00.000Z') - 1m
+  and @Timestamp <= DateTime('2026-07-19T12:00:00.000Z')
+group by route, method
+order by requestCount desc
+```
+
 ## Expected Warning Noise
 
 Expected user or setup failures should normally be warning-level:
