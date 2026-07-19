@@ -6,7 +6,7 @@ import {
   readTargetMemberName,
   requiredManageEnv,
 } from "./support/config";
-import { exactNamePattern } from "./support/auth";
+import { exactNamePattern, signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
 import { openManage } from "./support/manage";
 
@@ -61,7 +61,8 @@ test("admin can use shared workspaces while owner-only destinations stay underst
 });
 
 test("owner can traverse every workspace, preserve URLs, and open focused tools without mutating beta", async ({ page }) => {
-  await openManage(page, readE2EOwnerCredentials()!);
+  const ownerCredentials = readE2EOwnerCredentials()!;
+  await openManage(page, ownerCredentials);
 
   const navigation = page.getByRole("navigation", { name: "Manage sections" });
   await expectWorkspaceContract(navigation);
@@ -97,14 +98,17 @@ test("owner can traverse every workspace, preserve URLs, and open focused tools 
 
   await navigation.getByRole("tab", { name: "Audit" }).click();
   await expect(page).toHaveURL(/[?&]manage=audit(?:&|$)/);
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await expectDashboardReady(page);
-  await expect(page.getByRole("heading", { name: "Audit", level: 2 })).toBeVisible();
 
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Organization", level: 2 })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Seasons", level: 2 })).toBeVisible();
+
+  await navigation.getByRole("tab", { name: "Audit" }).click();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await signInIfNeeded(page, ownerCredentials);
+  await expectDashboardReady(page);
+  await expect(page.getByRole("heading", { name: "Audit", level: 2 })).toBeVisible();
 });
 
 test("admin mobile picker keeps owner-only workspaces visible and disabled", async ({ page }) => {
