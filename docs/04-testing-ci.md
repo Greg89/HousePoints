@@ -128,6 +128,13 @@ Mutating happy path:
 3. Activity feed - switch to Activity tab and confirm the new transaction appears.
 4. Leaderboard - switch to Leaderboard tab and confirm the target member appears.
 
+Reversible Manage mutation:
+
+1. Sign in as the staging admin and open the configured target member.
+2. Capture the member's current house and move them to another existing house.
+3. Verify the new assignment persists across fresh navigation.
+4. Restore the original house in cleanup and verify that restoration also persists.
+
 Run locally or against staging:
 
 ```powershell

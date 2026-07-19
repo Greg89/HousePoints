@@ -105,7 +105,7 @@ The staging E2E organization should contain:
 
 - one active organization;
 - at least two active members;
-- at least one active house;
+- at least two active houses so team-assignment mutations can move and restore a member;
 - an active season;
 - the primary E2E user with permission to award points;
 - the configured target member with a stable display name.
@@ -130,6 +130,14 @@ The admin and owner credentials remain optional for local development, but both 
 the staging GitHub Environment. The Manage workspace suite also verifies deep-link URL state,
 refresh and browser history, member filtering and detail-sheet focus restoration, Audit modes,
 owner tool sheets, and the admin mobile picker without submitting mutations.
+
+## Reversible Team Mutation Coverage
+
+The admin Manage mutation smoke reassigns `E2E_TARGET_MEMBER` to a different existing house,
+verifies the assignment survives a fresh navigation, and restores the member's original house in
+a `finally` cleanup. The target member must begin assigned to a house, and the organization must
+retain at least two active houses. A cleanup failure fails the run so staging fixture drift is
+visible rather than silently accumulating.
 
 ## Reaction Notification Smoke Coverage
 
