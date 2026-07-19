@@ -102,7 +102,7 @@ async function readE2EUserDisplayName(
     await signInIfNeeded(page, credentials);
     await expectDashboardReady(page);
 
-    return readDashboardUserName(page);
+    return await readDashboardUserName(page);
   } finally {
     await context.close();
   }

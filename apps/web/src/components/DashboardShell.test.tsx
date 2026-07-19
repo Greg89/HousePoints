@@ -697,6 +697,7 @@ describe("DashboardShell", () => {
     );
 
     const manageTab = screen.getByRole("tab", { name: /manage/i });
+    expect(manageTab).toHaveAttribute("aria-label", "Manage");
     expect(screen.queryByText("Manage organization tools")).not.toBeInTheDocument();
 
     await user.click(manageTab);

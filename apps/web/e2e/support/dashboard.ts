@@ -21,16 +21,28 @@ export async function expectDashboardReady(page: Page) {
 async function ensureDashboardState(page: Page) {
   await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
 
-  await Promise.any([
-    page.getByText(/house standings/i).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByRole("navigation", { name: /manage sections/i }).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByRole("combobox", { name: /manage sections/i }).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByText(/waiting for assignment/i).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByText(/create organisation/i).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByText(/something went wrong/i).waitFor({ state: "visible", timeout: 30_000 }),
-  ]).catch(async () => {
+  const recognizedStates = [
+    page.getByText(/house standings/i),
+    page.getByRole("navigation", { name: /manage sections/i }),
+    page.getByRole("combobox", { name: /manage sections/i }),
+    page.getByText(/waiting for assignment/i),
+    page.getByText(/create organisation/i),
+    page.getByText(/something went wrong/i),
+  ];
+
+  const recognized = await expect.poll(
+    async () => {
+      for (const state of recognizedStates) {
+        if (await state.isVisible().catch(() => false)) return true;
+      }
+      return false;
+    },
+    { timeout: 30_000 },
+  ).toBe(true).then(() => true).catch(() => false);
+
+  if (!recognized) {
     throw new Error(await buildDashboardTimeoutMessage(page));
-  });
+  }
 
   if (await page.getByText(/waiting for assignment/i).isVisible().catch(() => false)) {
     throw new Error(

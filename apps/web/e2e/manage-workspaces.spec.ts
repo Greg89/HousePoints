@@ -35,7 +35,7 @@ test("admin can use shared workspaces while owner-only destinations stay underst
 
   await navigation.getByRole("tab", { name: "Members" }).click();
   await expect(page).toHaveURL(/[?&]manage=members(?:&|$)/);
-  const search = page.getByPlaceholder("Search members...");
+  const search = page.getByRole("searchbox", { name: "Search members" });
   await search.fill(readTargetMemberName());
   const memberButton = page.getByRole("button", {
     name: new RegExp(`^Manage ${escapeRegExp(readTargetMemberName())}$`, "i"),
