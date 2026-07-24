@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HousePoints Manage Workspaces and Safer Operations Release Notes</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">Released 2026-07-24</p>
+        <h1>Manage Workspaces and Safer Operations</h1>
+        <p class="summary">
+          This release reorganizes administration into focused Manage workspaces,
+          makes common point and member operations clearer, and adds stronger API
+          safeguards and release-readiness coverage.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          <ul class="section-list">
+            <li>Redesigned Manage into focused Overview, Members, Houses, Seasons, Organization, and Audit workspaces.</li>
+            <li>Added deep links, browser history support, responsive navigation, and clearer owner-only permissions throughout Manage.</li>
+            <li>Improved member search, filtering, house assignment, profile editing, role management, and access removal.</li>
+            <li>Added clearer house, season, organization, audit, and point-adjustment management views.</li>
+            <li>Added API rate limiting with stricter safeguards for sensitive write operations.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>What's New</h2>
+          <ul class="section-list">
+            <li>The Manage overview now calls out unassigned members, missing or empty houses, organization status, and recent administrative activity.</li>
+            <li>Members can be searched and filtered by assignment or role before opening a focused detail panel.</li>
+            <li>House, season, ownership, organization lifecycle, and other consequential changes now use more consistent detail and confirmation surfaces.</li>
+            <li>Point-adjustment reporting can be reviewed by season and house.</li>
+            <li>The Award Points dialog now explains every unmet requirement and shows specific inline validation feedback.</li>
+            <li>Activity cards emphasize the recognized member and clearly identify who awarded or deducted the points.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Fixes</h2>
+          <ul class="section-list">
+            <li>Informational notifications for invitations, role changes, seasons, points, reactions, and releases now leave the tray after being read.</li>
+            <li>The notification tray scrolls more reliably on smaller screens.</li>
+            <li>Sign-in navigation handles missing destinations and cross-origin redirects more safely.</li>
+            <li>Manage navigation, search controls, dialogs, and account controls include improved accessibility labels and descriptions.</li>
+            <li>Dashboard loading and error handling are more resilient during navigation.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li>Run the release notes workflow with this page as <code>releases/2026-07-24-manage-workspaces-safer-operations.html</code>.</li>
+            <li>Use release version <code>2026.07.24</code> when recording and broadcasting this release.</li>
+            <li>Record the release first, verify the production deployment and core workflows, then broadcast to users.</li>
+            <li>No database migration or new production environment variable is required for this release.</li>
+            <li>API rate limits use an in-memory store and apply independently to each running API replica.</li>
+            <li>Confirm <code>APP_RELEASE_NOTES_URL</code>, <code>RELEASE_AUTOMATION_SECRET</code>, and <code>RELEASE_RECORD_API_BASE_URL</code> remain configured for release communication.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          <ul class="section-list">
+            <li>CI validation and the staging E2E workflow should pass before production promotion.</li>
+            <li>Verify member, admin, and owner Manage permissions and all six workspace destinations.</li>
+            <li>Verify awarding points, member search and filtering, house assignment, and season reporting.</li>
+            <li>Verify an informational notification disappears from the tray after being read.</li>
+            <li>Verify production API health and confirm ordinary traffic is not unexpectedly rate limited.</li>
+            <li>After recording and broadcasting, confirm the API logs include <code>releases.recorded</code> and <code>releases.broadcasted</code>.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
