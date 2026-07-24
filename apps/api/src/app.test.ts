@@ -3,6 +3,7 @@
  * Prisma is mocked per test so we control exactly what the DB "returns".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { READ_ARCHIVED_NOTIFICATION_TYPES } from "@housepoints/contracts";
 
 // Mock @housepoints/db before importing anything that uses it.
 vi.mock("@housepoints/db", () => ({
@@ -7449,7 +7450,7 @@ describe("POST /notifications/list", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7510,7 +7511,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7541,7 +7542,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7598,7 +7599,7 @@ describe("POST /notifications/mark-all-read", () => {
         recipientUserId: "user-owner",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),

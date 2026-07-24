@@ -14,6 +14,20 @@ export const NOTIFICATION_TYPES = [
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+export const READ_ARCHIVED_NOTIFICATION_TYPES = [
+  "INVITE_ACCEPTED",
+  "ROLE_CHANGED",
+  "SEASON_STARTED",
+  "POINT_AWARD_RECEIVED",
+  "POINT_DEDUCTION_RECEIVED",
+  "POINT_REACTION_RECEIVED",
+  "RELEASE_ANNOUNCEMENT",
+] as const satisfies readonly NotificationType[];
+
+export function shouldArchiveNotificationAfterRead(type: NotificationType) {
+  return (READ_ARCHIVED_NOTIFICATION_TYPES as readonly NotificationType[]).includes(type);
+}
+
 export const NOTIFICATION_SEVERITIES = [
   "INFO",
   "ACTION_REQUIRED",

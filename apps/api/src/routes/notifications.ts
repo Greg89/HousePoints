@@ -4,6 +4,7 @@ import {
   actorScopeSchema,
   markNotificationsReadSchema,
   notificationListRequestSchema,
+  READ_ARCHIVED_NOTIFICATION_TYPES,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { ActorRecord } from "../actor.js";
@@ -23,11 +24,6 @@ const NOTIFICATION_SELECT = {
   readAt: true,
   createdAt: true,
 } as const;
-
-const READ_ARCHIVED_NOTIFICATION_TYPES = [
-  "POINT_AWARD_RECEIVED",
-  "RELEASE_ANNOUNCEMENT",
-] as const;
 
 function mapNotification(notification: Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>) {
   return {

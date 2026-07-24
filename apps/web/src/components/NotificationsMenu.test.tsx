@@ -98,6 +98,7 @@ describe("NotificationsMenu", () => {
 
     expect(screen.getByRole("dialog", { name: /notifications/i })).toBeVisible();
     expect(screen.getByRole("dialog", { name: /notifications/i })).toHaveClass("max-h-[calc(100dvh-7rem)]");
+    expect(screen.getByRole("region", { name: /notifications feed/i })).toHaveClass("overflow-y-auto");
     expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /mark all read/i })).toBeDisabled();
   });
@@ -253,6 +254,36 @@ describe("NotificationsMenu", () => {
 
     expect(onMarkNotificationRead).toHaveBeenCalledWith("notification-point-award");
     expect(screen.queryByText("Points awarded")).not.toBeInTheDocument();
+    expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
+  });
+
+  it("archives informational notifications locally after marking them read", async () => {
+    const user = userEvent.setup();
+    const roleChangedNotification = {
+      ...unreadNotification,
+      id: "notification-role-changed",
+      type: "ROLE_CHANGED" as const,
+      severity: "INFO" as const,
+      title: "Role changed",
+      body: "Morgan changed Taylor from MEMBER to ADMIN.",
+      actionLabel: "View team",
+      actionHref: "/?tab=manage&section=team",
+    };
+
+    render(
+      <NotificationsMenuHarness
+        notifications={{
+          items: [roleChangedNotification],
+          unreadCount: 1,
+          nextCursor: null,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /notifications menu/i }));
+    await user.click(screen.getByRole("button", { name: /mark read/i }));
+
+    expect(screen.queryByText("Role changed")).not.toBeInTheDocument();
     expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
   });
 
