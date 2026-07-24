@@ -232,4 +232,25 @@ describe("AwardPointsDialog", () => {
     });
     expect(props.onOpenChange).not.toHaveBeenCalledWith(false);
   }, 10_000);
+
+  it("explains every requirement while the award action is disabled", () => {
+    setupDialog();
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "To enable Award Points: select a recipient, enter 1–100 whole points, select a trait, add a note (3–240 characters).",
+    );
+    expect(screen.getByRole("button", { name: "Award Points" })).toBeDisabled();
+  });
+
+  it("shows a specific inline error when points exceed the allowed maximum", async () => {
+    const { user } = setupDialog();
+    const pointsInput = screen.getByLabelText(/Points \(1–100\)/);
+
+    await user.type(pointsInput, "1000");
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Points cannot exceed 100.");
+    expect(pointsInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("enter 1–100 whole points");
+    expect(screen.getByRole("button", { name: "Award Points" })).toBeDisabled();
+  });
 });

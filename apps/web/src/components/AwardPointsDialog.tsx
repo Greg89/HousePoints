@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Select from "@radix-ui/react-select";
-import { Star, CaretDown, Check, X } from "@phosphor-icons/react";
+import { Star, CaretDown, Check, Info, X } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import type { OrgMember, LeaderboardEntry, Trait } from "@housepoints/contracts";
@@ -51,9 +51,45 @@ export function AwardPointsDialog({
     onOpenChange(value);
   }
 
+  const deltaNum = Number(delta);
+  const hasValidDelta =
+    delta !== "" &&
+    Number.isInteger(deltaNum) &&
+    deltaNum >= 1 &&
+    deltaNum <= 100;
+  const hasValidReason = reason.trim().length >= 3 && reason.length <= 240;
+  const canSubmit =
+    !!targetUserId &&
+    hasValidDelta &&
+    hasValidReason &&
+    !!trait;
+
+  const pointsError =
+    delta === ""
+      ? null
+      : !Number.isFinite(deltaNum) || !Number.isInteger(deltaNum)
+        ? "Enter a whole number of points."
+        : deltaNum < 1
+          ? "Points must be at least 1."
+          : deltaNum > 100
+            ? "Points cannot exceed 100."
+            : null;
+  const noteError =
+    reason.length > 0 && reason.trim().length < 3
+      ? "Add at least 3 characters."
+      : reason.length > 240
+        ? "Keep the note to 240 characters or fewer."
+        : null;
+
+  const remainingRequirements = [
+    !targetUserId ? "select a recipient" : null,
+    !hasValidDelta ? "enter 1–100 whole points" : null,
+    !trait ? "select a trait" : null,
+    !hasValidReason ? "add a note (3–240 characters)" : null,
+  ].filter((requirement): requirement is string => requirement !== null);
+
   function handleSubmit() {
-    const deltaNum = parseInt(delta, 10);
-    if (!targetUserId || !deltaNum || !reason.trim() || !trait) return;
+    if (!canSubmit) return;
     startTransition(async () => {
       try {
         const result = await onAward(targetUserId, deltaNum, reason, trait as Trait);
@@ -77,15 +113,6 @@ export function AwardPointsDialog({
       }
     });
   }
-
-  const deltaNum = parseInt(delta, 10);
-  const canSubmit =
-    !!targetUserId &&
-    !isNaN(deltaNum) &&
-    deltaNum >= 1 &&
-    deltaNum <= 100 &&
-    reason.trim().length >= 3 &&
-    !!trait;
 
   return (
     <Dialog.Root open={open} onOpenChange={handleClose}>
@@ -124,7 +151,9 @@ export function AwardPointsDialog({
 
             {/* Points input */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Points (1–100)</label>
+              <label htmlFor="award-points-delta" className="text-sm font-medium">
+                Points (1–100) <span className="text-destructive" aria-hidden="true">*</span>
+              </label>
               <div className="flex gap-2 flex-wrap mb-2">
                 {QUICK_AMOUNTS.map((n) => (
                   <button
@@ -143,22 +172,34 @@ export function AwardPointsDialog({
                 ))}
               </div>
               <input
+                id="award-points-delta"
                 type="number"
                 min={1}
                 max={100}
+                step={1}
                 placeholder="Custom…"
                 value={delta}
                 onChange={(e) => setDelta(e.target.value)}
+                aria-invalid={!!pointsError}
+                aria-describedby={pointsError ? "award-points-delta-error" : undefined}
                 className={cn(
                   "w-full rounded-lg border bg-background px-3 py-2.5 text-sm font-number",
-                  "focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                  "focus:outline-none focus:ring-2 focus:ring-ring transition-colors",
+                  pointsError && "border-destructive focus:ring-destructive"
                 )}
               />
+              {pointsError ? (
+                <p id="award-points-delta-error" className="text-sm text-destructive" role="alert">
+                  {pointsError}
+                </p>
+              ) : null}
             </div>
 
             {/* Reason */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Trait</label>
+              <label className="text-sm font-medium">
+                Trait <span className="text-destructive" aria-hidden="true">*</span>
+              </label>
               <Select.Root value={trait} onValueChange={(v) => setTrait(v as Trait)}>
                 <Select.Trigger
                   className={cn(
@@ -203,21 +244,49 @@ export function AwardPointsDialog({
 
             {/* Note */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Note</label>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="award-points-note" className="text-sm font-medium">
+                  Note <span className="text-destructive" aria-hidden="true">*</span>
+                </label>
+                <span className="text-xs text-muted-foreground">{reason.length}/240</span>
+              </div>
               <textarea
+                id="award-points-note"
                 rows={3}
                 placeholder="Describe what they did well…"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                maxLength={240}
+                aria-invalid={!!noteError}
+                aria-describedby={noteError ? "award-points-note-error" : undefined}
                 className={cn(
                   "w-full rounded-lg border bg-background px-3 py-2.5 text-sm resize-none",
-                  "focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                  "focus:outline-none focus:ring-2 focus:ring-ring transition-colors",
+                  noteError && "border-destructive focus:ring-destructive"
                 )}
               />
+              {noteError ? (
+                <p id="award-points-note-error" className="text-sm text-destructive" role="alert">
+                  {noteError}
+                </p>
+              ) : null}
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          {!canSubmit && !isPending ? (
+            <div
+              className="mt-6 flex items-start gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+              role="status"
+            >
+              <Info size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p>
+                <span className="font-medium text-foreground">To enable Award Points:</span>{" "}
+                {remainingRequirements.join(", ")}.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end gap-3 mt-4">
             <Dialog.Close asChild>
               <button className="px-4 py-2 rounded-lg border text-sm hover:bg-muted transition-colors">
                 Cancel
