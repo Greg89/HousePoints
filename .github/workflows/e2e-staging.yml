@@ -37,6 +37,7 @@ jobs:
       E2E_REACTION_RECIPIENT_EMAIL: ${{ secrets.E2E_REACTION_RECIPIENT_EMAIL }}
       E2E_REACTION_RECIPIENT_PASSWORD: ${{ secrets.E2E_REACTION_RECIPIENT_PASSWORD }}
       E2E_TARGET_MEMBER: ${{ secrets.E2E_TARGET_MEMBER }}
+      E2E_ROLE_TARGET_MEMBER: ${{ secrets.E2E_ROLE_TARGET_MEMBER }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
 
     steps:
@@ -54,7 +55,7 @@ jobs:
         shell: bash
         run: |
           missing=()
-          for name in E2E_BASE_URL E2E_USER_EMAIL E2E_USER_PASSWORD E2E_TARGET_MEMBER E2E_ORG_SLUG; do
+          for name in E2E_BASE_URL E2E_USER_EMAIL E2E_USER_PASSWORD E2E_ADMIN_EMAIL E2E_ADMIN_PASSWORD E2E_OWNER_EMAIL E2E_OWNER_PASSWORD E2E_TARGET_MEMBER E2E_ORG_SLUG; do
             if [ -z "${!name}" ]; then
               missing+=("$name")
             fi
@@ -87,6 +88,7 @@ jobs:
           const ownerConfigured = Boolean(process.env.E2E_OWNER_EMAIL?.trim() && process.env.E2E_OWNER_PASSWORD?.trim());
           const reactionActorConfigured = Boolean(process.env.E2E_REACTION_ACTOR_EMAIL?.trim() && process.env.E2E_REACTION_ACTOR_PASSWORD?.trim());
           const reactionRecipientConfigured = Boolean(process.env.E2E_REACTION_RECIPIENT_EMAIL?.trim() && process.env.E2E_REACTION_RECIPIENT_PASSWORD?.trim());
+          const roleTargetConfigured = Boolean(process.env.E2E_ROLE_TARGET_MEMBER?.trim());
           console.log(`E2E base protocol: ${baseUrl.protocol}`);
           console.log(`E2E base host: ${baseUrl.host}`);
           console.log(`E2E base pathname: ${baseUrl.pathname}`);
@@ -95,6 +97,7 @@ jobs:
           console.log(`E2E owner actor configured: ${ownerConfigured ? "yes" : "no"}`);
           console.log(`E2E reaction actor configured: ${reactionActorConfigured ? "yes" : "no"}`);
           console.log(`E2E reaction recipient configured: ${reactionRecipientConfigured ? "yes" : "no"}`);
+          console.log(`E2E role mutation target configured: ${roleTargetConfigured ? "yes" : "no"}`);
           console.log(`E2E start pathname: ${targetUrl.pathname}`);
           console.log(`E2E start host: ${targetUrl.host}`);
           NODE

@@ -16,7 +16,14 @@ export async function signInIfNeeded(page: Page, credentials: E2ECredentials = r
 
   const signInLink = page.getByRole("link", { name: /sign in/i });
   if (await signInLink.isVisible().catch(() => false)) {
-    await signInLink.click();
+    const signInHref = await signInLink.getAttribute("href");
+    if (!signInHref) {
+      throw new Error("The staging sign-in link did not provide a navigation target.");
+    }
+
+    // Use a document navigation so the Auth0 redirect is not attempted as a
+    // cross-origin React Server Component request, which browsers reject via CORS.
+    await page.goto(signInHref, { waitUntil: "domcontentloaded" });
     await completeAuth0Login(page, credentials);
   }
 

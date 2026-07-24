@@ -42,10 +42,12 @@ test("login, award points, react, and see activity plus leaderboard updates", as
   const activityCard = getActivityCard(page, note);
   const reactionButton = activityCard.getByRole("button", { name: /open reactions for/i });
   await reactionButton.click();
-  await activityCard.getByRole("menuitem", { name: /react with love it/i }).click();
-  await expect(activityCard.getByRole("menuitem", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
+  await activityCard.getByRole("button", { name: /react with love it/i }).click();
+  await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveCount(0);
   await reactionButton.click();
-  await expect(activityCard.getByRole("menu", { name: /reaction picker for/i })).toHaveCount(0);
+  await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveAttribute("aria-pressed", "true");
+  await reactionButton.click();
+  await expect(activityCard.getByRole("button", { name: /remove love it reaction/i })).toHaveCount(0);
 
   await activityCard.getByRole("button", { name: /activity actions/i }).click();
   await activityCard.getByRole("menuitem", { name: /view reactions/i }).click();

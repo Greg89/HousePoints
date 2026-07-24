@@ -1,16 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Calendar,
   ChartBar,
   ClipboardText,
-  Gear,
+  Buildings,
   House,
-  ShieldCheck,
-  Trash,
-  TrendDown,
-  UserSwitch,
   UsersThree,
 } from "@phosphor-icons/react";
 import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
@@ -29,9 +26,8 @@ import type {
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { HouseManagement } from "./HouseManagement";
 import { ManageOverview } from "./ManageOverview";
+import { ManageAudit } from "./ManageAudit";
 import { OrgSettingsManagement } from "./OrgSettingsManagement";
-import { RecentAdminActionsReport } from "./RecentAdminActionsReport";
-import { RoleManagement } from "./RoleManagement";
 import { SeasonManagement } from "./SeasonManagement";
 import { TeamManagement } from "./TeamManagement";
 
@@ -66,7 +62,8 @@ interface AdminFormsProps {
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
 }
 
-type ManageSectionId = "overview" | "members" | "roles" | "houses" | "seasons" | "settings" | "audit";
+type ManageSectionId = "overview" | "members" | "houses" | "seasons" | "organization" | "audit";
+type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const MANAGE_SECTIONS: Array<{
   id: ManageSectionId;
@@ -78,7 +75,7 @@ const MANAGE_SECTIONS: Array<{
   {
     id: "overview",
     label: "Overview",
-    description: "Point adjustment activity and deduction reporting.",
+    description: "Organization attention, status, and recent administration.",
     icon: ChartBar,
   },
   {
@@ -86,13 +83,6 @@ const MANAGE_SECTIONS: Array<{
     label: "Members",
     description: "Invite members, assign houses, and manage access.",
     icon: UsersThree,
-  },
-  {
-    id: "roles",
-    label: "Roles",
-    description: "Promote members or remove admin access.",
-    icon: ShieldCheck,
-    ownerOnly: true,
   },
   {
     id: "houses",
@@ -109,10 +99,10 @@ const MANAGE_SECTIONS: Array<{
     ownerOnly: true,
   },
   {
-    id: "settings",
-    label: "Settings",
-    description: "Update organization-level details.",
-    icon: Gear,
+    id: "organization",
+    label: "Organization",
+    description: "Manage organization identity, URL, ownership, and lifecycle.",
+    icon: Buildings,
     ownerOnly: true,
   },
   {
@@ -123,6 +113,44 @@ const MANAGE_SECTIONS: Array<{
   },
 ];
 
+function getManageSectionFromSearchParams(
+  searchParams: ReadableSearchParams,
+  isOwner: boolean,
+): ManageSectionId | null {
+  const requestedSection = searchParams.get("manage");
+  const section = MANAGE_SECTIONS.find(({ id }) => id === requestedSection);
+
+  if (!section || (section.ownerOnly && !isOwner)) {
+    return null;
+  }
+
+  return section.id;
+}
+
+function syncManageSectionToUrl(
+  section: ManageSectionId,
+  searchParams: ReadableSearchParams,
+  options?: { memberStatus?: "unassigned" },
+): string {
+  const nextParams = new URLSearchParams(searchParams.toString());
+
+  if (section === "overview") {
+    nextParams.delete("manage");
+  } else {
+    nextParams.set("manage", section);
+  }
+  if (section === "members" && options?.memberStatus) {
+    nextParams.set("memberStatus", options.memberStatus);
+  } else {
+    nextParams.delete("memberStatus");
+  }
+
+  const nextQuery = nextParams.toString();
+  const nextUrl = nextQuery ? `?${nextQuery}` : window.location.pathname;
+  window.history.pushState(null, "", nextUrl);
+  return nextQuery;
+}
+
 export function AdminForms({
   users,
   houses,
@@ -130,9 +158,7 @@ export function AdminForms({
   activeSeason,
   organization,
   actorRole,
-  recentDeletedPoints,
   recentAdminActions,
-  inviteStats,
   pointAdjustmentStats,
   adminAuditNextCursor,
   onCreateHouse,
@@ -150,35 +176,39 @@ export function AdminForms({
   onStartSeason,
   onRenameSeason,
 }: AdminFormsProps) {
-  const [activeSection, setActiveSection] = useState<ManageSectionId>("overview");
+  const searchParams = useSearchParams();
   const isOwner = actorRole === "OWNER";
-  const unassignedUsers = users.filter((user) => !user.houseId);
-  const assignedUsers = users.filter((user) => user.houseId);
-  const unassignedCount = unassignedUsers.length;
-  const unassignedSummary =
-    unassignedCount === 1 ? "1 needs assignment" : `${unassignedCount} need assignment`;
-
-  function handleSectionChange(id: ManageSectionId) {
+  const manageQuery = searchParams.toString();
+  const urlSection =
+    getManageSectionFromSearchParams(searchParams, isOwner) ?? "overview";
+  const [selection, setSelection] = useState<{
+    query: string;
+    section: ManageSectionId;
+  }>(() => ({
+    query: manageQuery,
+    section: urlSection,
+  }));
+  const selectedSectionDefinition = MANAGE_SECTIONS.find(
+    ({ id }) => id === selection.section,
+  );
+  const canUseSelectedSection =
+    selectedSectionDefinition && (!selectedSectionDefinition.ownerOnly || isOwner);
+  const activeSection =
+    selection.query === manageQuery && canUseSelectedSection
+      ? selection.section
+      : urlSection;
+  function handleSectionChange(
+    id: ManageSectionId,
+    options?: { memberStatus?: "unassigned" },
+  ) {
     const section = MANAGE_SECTIONS.find((s) => s.id === id);
     if (section?.ownerOnly && !isOwner) return;
-    setActiveSection(id);
+    const nextQuery = syncManageSectionToUrl(id, searchParams, options);
+    setSelection({ query: nextQuery, section: id });
   }
 
   return (
     <div className="space-y-4">
-      {/* Persistent metrics strip */}
-      <div className="flex flex-wrap gap-2 rounded-xl border bg-card px-4 py-3">
-        <MetricPill icon={<UsersThree size={14} />} label="Members" value={users.length} />
-        <MetricPill icon={<House size={14} />} label="Houses" value={houses.length} />
-        <MetricPill icon={<UserSwitch size={14} />} label="Unassigned" value={unassignedCount} />
-        <MetricPill icon={<Trash size={14} />} label="Deleted pts" value={recentDeletedPoints.length} />
-        <MetricPill
-          icon={<TrendDown size={14} />}
-          label="Deductions"
-          value={pointAdjustmentStats.totalDeductionCount}
-        />
-      </div>
-
       {/* Sidebar layout */}
       <div className="lg:grid lg:grid-cols-[200px_1fr] lg:gap-6">
         {/* Desktop sidebar nav */}
@@ -197,9 +227,9 @@ export function AdminForms({
                       role="tab"
                       aria-selected={isActive}
                       aria-disabled={isDisabled}
+                      aria-describedby={isDisabled ? `manage-restriction-${section.id}` : undefined}
                       aria-controls={`manage-section-${section.id}`}
                       id={`manage-tab-${section.id}`}
-                      disabled={isDisabled}
                       title={isDisabled ? `${section.label} is owner-only` : undefined}
                       onClick={() => handleSectionChange(section.id)}
                       className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${
@@ -214,7 +244,10 @@ export function AdminForms({
                         <Icon size={15} aria-hidden="true" />
                         <span className="flex-1">{section.label}</span>
                         {isDisabled ? (
-                          <span className="rounded-full border px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide">
+                          <span
+                            id={`manage-restriction-${section.id}`}
+                            className="rounded-full border px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide"
+                          >
                             Owner only
                           </span>
                         ) : null}
@@ -254,9 +287,12 @@ export function AdminForms({
         >
           {activeSection === "overview" ? (
             <ManageOverview
-              pointAdjustmentStats={pointAdjustmentStats}
-              seasons={seasons}
-              onLoadPointAdjustmentStats={onLoadPointAdjustmentStats}
+              users={users}
+              houses={houses}
+              activeSeason={activeSeason}
+              actorRole={actorRole}
+              recentAdminActions={recentAdminActions}
+              onNavigate={(section, options) => handleSectionChange(section, options)}
             />
           ) : null}
 
@@ -264,28 +300,16 @@ export function AdminForms({
             <TeamManagement
               users={users}
               houses={houses}
-              unassignedUsers={unassignedUsers}
-              assignedUsers={assignedUsers}
-              unassignedSummary={unassignedSummary}
-              recentAdminActions={recentAdminActions}
-              inviteStats={inviteStats}
               actorRole={actorRole}
               onAssignHouse={onAssignHouse}
               onUpdateMemberDisplayName={onUpdateMemberDisplayName}
+              onPromoteUser={onPromoteUser}
               onRemoveOrgMember={onRemoveOrgMember}
               onCreateInvite={onCreateInvite}
             />
           ) : null}
 
-          {activeSection === "roles" ? (
-            <RoleManagement
-              users={users}
-              actorRole={actorRole}
-              onPromoteUser={onPromoteUser}
-            />
-          ) : null}
-
-          {activeSection === "settings" ? (
+          {activeSection === "organization" ? (
             <OrgSettingsManagement
               users={users}
               organization={organization}
@@ -314,32 +338,17 @@ export function AdminForms({
           ) : null}
 
           {activeSection === "audit" ? (
-            <RecentAdminActionsReport
+            <ManageAudit
               actions={recentAdminActions}
               nextCursor={adminAuditNextCursor}
               onLoadPage={onLoadAdminAudit}
+              pointAdjustmentStats={pointAdjustmentStats}
+              seasons={seasons}
+              onLoadPointAdjustmentStats={onLoadPointAdjustmentStats}
             />
           ) : null}
         </div>
       </div>
-    </div>
-  );
-}
-
-function MetricPill({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-1.5">
-      <span className="text-muted-foreground">{icon}</span>
-      <span className="font-number text-sm font-bold">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }

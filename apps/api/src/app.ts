@@ -24,6 +24,13 @@ import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { createApiLogger } from "./logging.js";
+import {
+  applyMutationRateLimit,
+  attachRateLimitLogContext,
+  GLOBAL_RATE_LIMIT,
+  logRateLimitExceeded,
+  rateLimitKey,
+} from "./rate-limits.js";
 
 type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
@@ -70,13 +77,22 @@ export async function buildApp(options: BuildAppOptions = {}) {
   registerAuthenticationHook(app, verifyAccessToken);
 
   if (!options.disableRateLimit) {
+    app.addHook("onRoute", applyMutationRateLimit);
+    app.addHook("preHandler", async (request) => {
+      attachRateLimitLogContext(request);
+    });
+
     await app.register(rateLimit, {
       global: true,
-      max: 60,
-      timeWindow: "1 minute",
-      errorResponseBuilder: () => ({
+      hook: "preHandler",
+      max: GLOBAL_RATE_LIMIT.max,
+      timeWindow: GLOBAL_RATE_LIMIT.timeWindow,
+      keyGenerator: rateLimitKey,
+      onExceeded: logRateLimitExceeded,
+      errorResponseBuilder: (_request, context) => ({
+        statusCode: context.statusCode,
         code: "RATE_LIMITED",
-        message: "Too many requests â€” please slow down.",
+        message: "Too many requests — please slow down.",
       }),
     });
   }

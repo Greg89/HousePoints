@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowSquareOut, Bell, Check } from "@phosphor-icons/react";
-import type { Notification, PagedNotifications } from "@housepoints/contracts";
+import {
+  shouldArchiveNotificationAfterRead,
+  type Notification,
+  type PagedNotifications,
+} from "@housepoints/contracts";
 import type { NotificationMutationResult } from "@/lib/action-results";
 import { cn } from "@/lib/cn";
 
@@ -21,11 +25,6 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
   hour: "numeric",
   minute: "2-digit",
 });
-
-const READ_ARCHIVED_NOTIFICATION_TYPES = new Set<Notification["type"]>([
-  "POINT_AWARD_RECEIVED",
-  "RELEASE_ANNOUNCEMENT",
-]);
 
 export function NotificationsMenu({
   notifications,
@@ -221,7 +220,7 @@ export function NotificationsMenu({
           tabIndex={-1}
           className="absolute right-0 z-40 mt-3 flex max-h-[calc(100dvh-7rem)] w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/10"
         >
-          <section className="p-3" aria-label="Notifications feed">
+          <section className="min-h-0 overflow-y-auto overscroll-contain p-3" aria-label="Notifications feed">
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
               <div>
                 <h2 className="text-sm font-bold">Notifications</h2>
@@ -317,7 +316,7 @@ export function NotificationsMenu({
 }
 
 function shouldArchiveAfterRead(notification: Notification) {
-  return READ_ARCHIVED_NOTIFICATION_TYPES.has(notification.type);
+  return shouldArchiveNotificationAfterRead(notification.type);
 }
 
 function getOrderedNotifications(notifications: Notification[]) {

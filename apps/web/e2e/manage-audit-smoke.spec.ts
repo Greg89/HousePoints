@@ -28,7 +28,8 @@ test("admin audit history is reachable and filterable", async ({ page }) => {
 
   await page.getByRole("tab", { name: /^audit$/i }).click();
 
-  await expect(page.getByRole("heading", { name: /audit history/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Audit", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
   await expect(page.getByText(/full history of important organization changes/i)).toBeVisible();
 
   const filter = page.getByLabel(/filter history/i);

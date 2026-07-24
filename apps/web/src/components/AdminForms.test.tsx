@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AdminAuditAction, PointAdjustmentStats } from "@housepoints/contracts";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminForms } from "./AdminForms";
 
 vi.mock("sonner", () => ({
@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     replace: routerReplaceMock,
   }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 const users = [
@@ -248,30 +249,59 @@ function switchToManageSection(sectionName: string) {
 }
 
 describe("AdminForms", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "", "/");
+  });
+
   it("defaults to the Manage overview and exposes focused section navigation", () => {
     setupAdminForms();
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByLabelText("Point adjustment activity")).toBeInTheDocument();
-    const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
-    expect(adjustmentActivity.getByText("Season: Q3 2026")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("Points deducted")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("Deduction events")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("Slytherin")).toBeInTheDocument();
-    expect(adjustmentActivity.getByText("2 deductions")).toBeInTheDocument();
-    expect(adjustmentActivity.getAllByText("20")[0]).toBeInTheDocument();
+    const overview = within(screen.getByLabelText("Manage overview"));
+    expect(overview.getByText("Needs attention")).toBeInTheDocument();
+    expect(overview.getByText("1 member needs a house assignment")).toBeInTheDocument();
+    expect(overview.getByText("Ravenclaw has no members")).toBeInTheDocument();
+    expect(overview.getByText("Organization status")).toBeInTheDocument();
+    expect(overview.getByText("Q3 2026")).toBeInTheDocument();
+    expect(overview.getByText("Recent administration")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Point adjustment activity")).not.toBeInTheDocument();
 
-    switchToManageSection("Settings");
-    expect(screen.getByRole("tab", { name: /Settings/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Organization Settings")).toBeInTheDocument();
+    switchToManageSection("Organization");
+    expect(screen.getByRole("tab", { name: /Organization/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Organization", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Organization identity" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "URL and slug" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ownership" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Danger zone" })).toBeInTheDocument();
 
     switchToManageSection("Audit");
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "false");
     expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Audit history")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Point adjustments" })).toBeInTheDocument();
     expect(screen.queryByText("Recently deleted point awards")).not.toBeInTheDocument();
+  });
+
+  it("shows the shared empty state before any recent administration is recorded", () => {
+    setupAdminForms({ recentAdminActions: [] });
+
+    expect(
+      screen.getByRole("region", { name: "No administrative changes yet" }),
+    ).toHaveTextContent("Important organization changes will appear here as they happen.");
+  });
+
+  it("opens the unassigned member view from Overview", async () => {
+    const { user } = setupAdminForms();
+
+    await user.click(screen.getByRole("button", { name: "Review members" }));
+
+    expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Unassigned 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Manage Ben Unassigned" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage Alice Assigned" })).not.toBeInTheDocument();
+    expect(window.location.search).toContain("memberStatus=unassigned");
   });
 
   it("shows owner-only manage sections to admins without making them clickable", async () => {
@@ -279,22 +309,22 @@ describe("AdminForms", () => {
 
     const housesTab = screen.getByRole("tab", { name: /Houses/ });
     const seasonsTab = screen.getByRole("tab", { name: /Seasons/ });
-    const settingsTab = screen.getByRole("tab", { name: /Settings/ });
-    const rolesTab = screen.getByRole("tab", { name: /Roles/ });
+    const settingsTab = screen.getByRole("tab", { name: /Organization/ });
 
     expect(settingsTab).toBeVisible();
     expect(housesTab).toBeVisible();
     expect(seasonsTab).toBeVisible();
-    expect(rolesTab).toBeVisible();
-    expect(settingsTab).toBeDisabled();
-    expect(housesTab).toBeDisabled();
-    expect(seasonsTab).toBeDisabled();
-    expect(rolesTab).toBeDisabled();
+    expect(settingsTab).toBeEnabled();
+    expect(housesTab).toBeEnabled();
+    expect(seasonsTab).toBeEnabled();
     expect(settingsTab).toHaveAttribute("aria-disabled", "true");
     expect(housesTab).toHaveAttribute("aria-disabled", "true");
     expect(seasonsTab).toHaveAttribute("aria-disabled", "true");
-    expect(rolesTab).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getAllByText("Owner only")).toHaveLength(4);
+    expect(screen.getAllByText("Owner only")).toHaveLength(3);
+
+    housesTab.focus();
+    expect(housesTab).toHaveFocus();
+    expect(housesTab).toHaveAccessibleDescription("Owner only");
 
     await user.click(settingsTab);
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
@@ -308,14 +338,11 @@ describe("AdminForms", () => {
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
 
-    await user.click(rolesTab);
-    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("form", { name: "Promote member" })).not.toBeInTheDocument();
   });
 
   it("lets owners update organization settings", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const settingsForm = within(screen.getByRole("form", { name: "Organization settings" }));
     const nameInput = settingsForm.getByLabelText("Organization name") as HTMLInputElement;
 
@@ -340,7 +367,7 @@ describe("AdminForms", () => {
 
   it("lets owners change the organization slug with confirmation", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
 
     expect(slugForm.getByText("Previous slugs stay reserved so old links cannot be claimed by another organization.")).toBeInTheDocument();
@@ -364,7 +391,7 @@ describe("AdminForms", () => {
 
   it("does not submit slug changes when confirmation does not match", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
 
     await user.type(slugForm.getByLabelText("New slug"), "acme-corp");
@@ -378,9 +405,9 @@ describe("AdminForms", () => {
     });
   });
 
-  it("lets owners transfer ownership from the Settings section", async () => {
+  it("lets owners transfer ownership from the Organization workspace", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
 
     await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
@@ -388,7 +415,7 @@ describe("AdminForms", () => {
     await user.click(transferForm.getByRole("button", { name: "Transfer ownership" }));
 
     await screen.findByText("Transfer ownership to Ben Unassigned?");
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Transfer ownership" }));
 
     await waitFor(() => expect(props.onTransferOwnership).toHaveBeenCalledOnce());
     const transferMock = props.onTransferOwnership as ReturnType<typeof vi.fn>;
@@ -403,9 +430,52 @@ describe("AdminForms", () => {
     });
   });
 
+  it("opens a deep-linked Manage section and preserves other query parameters when navigating", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?tab=manage&manage=members&season=season-active",
+    );
+    const pushState = vi.spyOn(window.history, "pushState");
+
+    setupAdminForms();
+
+    expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Members" })).toBeInTheDocument();
+
+    switchToManageSection("Audit");
+
+    expect(pushState).toHaveBeenLastCalledWith(
+      null,
+      "",
+      "?tab=manage&manage=audit&season=season-active",
+    );
+    expect(screen.getByRole("tab", { name: /Audit/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("falls back to Overview when an admin deep-links to an owner-only section", () => {
+    window.history.replaceState(null, "", "/?tab=manage&manage=organization");
+
+    setupAdminForms({ actorRole: "ADMIN" });
+
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("form", { name: "Organization settings" })).not.toBeInTheDocument();
+  });
+
+  it("removes the Manage section parameter when returning to Overview", () => {
+    window.history.replaceState(null, "", "/?tab=manage&manage=audit");
+    const pushState = vi.spyOn(window.history, "pushState");
+
+    setupAdminForms();
+    switchToManageSection("Overview");
+
+    expect(pushState).toHaveBeenLastCalledWith(null, "", "?tab=manage");
+    expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("lets owners archive the organization only after typing the current slug", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const archiveForm = within(screen.getByRole("form", { name: "Archive organization" }));
     const archiveButton = archiveForm.getByRole("button", { name: "Archive organization" });
 
@@ -438,7 +508,7 @@ describe("AdminForms", () => {
         message: "The organization could not be archived. Please try again.",
       }),
     });
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const archiveForm = within(screen.getByRole("form", { name: "Archive organization" }));
 
     await user.type(archiveForm.getByLabelText("Confirm archive"), "acme");
@@ -453,7 +523,7 @@ describe("AdminForms", () => {
 
   it("does not submit ownership transfer when confirmation does not match", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const transferForm = within(screen.getByRole("form", { name: "Transfer ownership" }));
 
     await user.selectOptions(transferForm.getByLabelText("New owner"), "user-2");
@@ -475,7 +545,7 @@ describe("AdminForms", () => {
         message: "That organization slug is already reserved. Choose a different one.",
       }),
     });
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const slugForm = within(screen.getByRole("form", { name: "Organization slug" }));
 
     await user.type(slugForm.getByLabelText("New slug"), "reserved-slug");
@@ -497,7 +567,7 @@ describe("AdminForms", () => {
         message: "The organization settings could not be updated. Please try again.",
       }),
     });
-    switchToManageSection("Settings");
+    switchToManageSection("Organization");
     const settingsForm = within(screen.getByRole("form", { name: "Organization settings" }));
     const nameInput = settingsForm.getByLabelText("Organization name");
 
@@ -551,6 +621,8 @@ describe("AdminForms", () => {
         })),
       },
     });
+    switchToManageSection("Audit");
+    fireEvent.click(screen.getByRole("button", { name: "Point adjustments" }));
 
     expect(screen.getByText("No point deductions have been recorded for this season.")).toBeInTheDocument();
   });
@@ -581,6 +653,8 @@ describe("AdminForms", () => {
     const { user, props } = setupAdminForms({
       onLoadPointAdjustmentStats: vi.fn().mockResolvedValue(historicalStats),
     });
+    switchToManageSection("Audit");
+    await user.click(screen.getByRole("button", { name: "Point adjustments" }));
     const adjustmentActivity = within(screen.getByLabelText("Point adjustment activity"));
 
     await user.selectOptions(adjustmentActivity.getByLabelText("Reporting season"), "season-0");
@@ -639,33 +713,33 @@ describe("AdminForms", () => {
     expect(screen.queryByRole("button", { name: "Load more audit history" })).not.toBeInTheDocument();
   });
 
-  it("shows season management controls with the current active season", () => {
+  it("shows current season state and history before management controls", () => {
     setupAdminForms();
     switchToManageSection("Seasons");
 
-    expect(screen.getByRole("form", { name: "Start season" })).toHaveTextContent(
-      "Current active season: Q3 2026",
-    );
-    expect(screen.getByRole("form", { name: "Rename season" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
+    expect(screen.getByRole("region", { name: "Season history" })).toHaveTextContent("Season 0");
+    expect(screen.getByRole("button", { name: "Start next season" })).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
   });
 
   it("confirms and starts a new season for owners", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Start next season" }));
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
-    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Continue" }));
 
     await screen.findByText(/Start .Q4 2026. now\?/);
-    await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
 
     await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
     const startSeasonMock = props.onStartSeason as ReturnType<typeof vi.fn>;
     const formData = startSeasonMock.mock.calls[0][0] as FormData;
     expect(Object.fromEntries(formData.entries())).toEqual({ name: "Q4 2026" });
-    await screen.findByText(/Current active season:/);
-    expect(startSeasonForm.getByText("Q4 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q4 2026");
   });
 
   it("shows a safe toast when start-season returns an expected failure", async () => {
@@ -677,30 +751,32 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Start next season" }));
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
-    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Continue" }));
 
     await screen.findByText(/Start .Q4 2026. now\?/);
-    await user.click(startSeasonForm.getByRole("button", { name: "Confirm" }));
+    await user.click(startSeasonForm.getByRole("button", { name: "Start season" }));
 
     await waitFor(() => expect(props.onStartSeason).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
     expect(toast.error).toHaveBeenCalledWith("Failed to start season", {
       description: "The season could not be started. Please try again.",
     });
-    expect(startSeasonForm.getByText("Q3 2026")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
   });
 
   it("submits rename-season data", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Rename Season 0" }));
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
 
-    await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
-    await user.type(renameSeasonForm.getByPlaceholderText("Updated season name"), "Launch Season");
-    await user.click(renameSeasonForm.getByRole("button", { name: "Rename season" }));
+    await user.clear(renameSeasonForm.getByLabelText("Season name"));
+    await user.type(renameSeasonForm.getByLabelText("Season name"), "Launch Season");
+    await user.click(renameSeasonForm.getByRole("button", { name: "Save name" }));
 
     await waitFor(() => expect(props.onRenameSeason).toHaveBeenCalledOnce());
     const renameSeasonMock = props.onRenameSeason as ReturnType<typeof vi.fn>;
@@ -720,11 +796,12 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Rename Season 0" }));
     const renameSeasonForm = within(screen.getByRole("form", { name: "Rename season" }));
 
-    await user.selectOptions(renameSeasonForm.getByLabelText("Season to rename"), "season-0");
-    await user.type(renameSeasonForm.getByPlaceholderText("Updated season name"), "Launch Season");
-    await user.click(renameSeasonForm.getByRole("button", { name: "Rename season" }));
+    await user.clear(renameSeasonForm.getByLabelText("Season name"));
+    await user.type(renameSeasonForm.getByLabelText("Season name"), "Launch Season");
+    await user.click(renameSeasonForm.getByRole("button", { name: "Save name" }));
 
     await waitFor(() => expect(props.onRenameSeason).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
@@ -733,24 +810,23 @@ describe("AdminForms", () => {
     });
   });
 
-  it("uses compact, labelled color controls for house forms", () => {
-    setupAdminForms();
+  it("uses compact, labelled color controls in focused house editors", async () => {
+    const { user } = setupAdminForms();
     switchToManageSection("Houses");
 
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     expect(screen.getByLabelText(/House color/)).toHaveAttribute("type", "color");
+    expect(screen.getByText("Choose a house accent color")).toBeInTheDocument();
+    expect(screen.getByText("House theme preview")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close house editor" }));
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     expect(screen.getByLabelText(/New color/)).toHaveAttribute("type", "color");
-    expect(screen.getAllByText("Choose a house accent color")).toHaveLength(2);
-    expect(screen.getAllByText("House theme preview")).toHaveLength(2);
-    expect(screen.getAllByText("Theme ready")).toHaveLength(2);
-    expect(screen.getAllByText("This color is ready for readable house themes.")).toHaveLength(2);
-    expect(screen.getAllByRole("group", { name: /generated house theme preview/i })).toHaveLength(2);
-    expect(screen.getAllByText("Selected surface")).toHaveLength(2);
-    expect(screen.getAllByText("Dashboard card preview")).toHaveLength(2);
   });
 
   it("shows a warning when a house color would make a muted app theme", () => {
     setupAdminForms();
     switchToManageSection("Houses");
+    fireEvent.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     fireEvent.change(createHouseForm.getByLabelText(/House color/), {
@@ -764,6 +840,7 @@ describe("AdminForms", () => {
   it("submits create-house data and shows success when the typed result succeeds", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
@@ -798,6 +875,7 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Hufflepuff");
@@ -813,28 +891,27 @@ describe("AdminForms", () => {
   it("sets edit fields to the selected house values", async () => {
     const { user } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
     const colorInput = editHouseForm.getByLabelText(/New color/) as HTMLInputElement;
     const descriptionInput = editHouseForm.getByPlaceholderText("Description (optional)") as HTMLInputElement;
 
-    expect(colorInput.value).toBe("#7c3aed");
-    expect(descriptionInput.value).toBe("");
-
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     expect(colorInput.value).toBe("#1d4ed8");
     expect(descriptionInput.value).toBe("Curious problem solvers");
 
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Slytherin");
-    expect(colorInput.value).toBe("#22c55e");
-    expect(descriptionInput.value).toBe("Ambitious builders");
+    await user.click(screen.getByRole("button", { name: "Close house editor" }));
+    await user.click(screen.getByRole("button", { name: "Edit Slytherin" }));
+    const slytherinForm = within(screen.getByRole("form", { name: "Edit house" }));
+    expect((slytherinForm.getByLabelText(/New color/) as HTMLInputElement).value).toBe("#22c55e");
+    expect((slytherinForm.getByPlaceholderText("Description (optional)") as HTMLInputElement).value).toBe("Ambitious builders");
   });
 
   it("preserves the selected house description when only changing the edit color", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
 
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     fireEvent.change(editHouseForm.getByLabelText(/New color/), {
       target: { value: "#9333ea" },
     });
@@ -854,6 +931,7 @@ describe("AdminForms", () => {
   it("submits custom house palette data when custom mode is selected", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Create house" }));
     const createHouseForm = within(screen.getByRole("form", { name: "Create house" }));
 
     await user.type(createHouseForm.getByPlaceholderText("House name"), "Gryffindor");
@@ -889,9 +967,9 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Houses");
+    await user.click(screen.getByRole("button", { name: "Edit Ravenclaw" }));
     const editHouseForm = within(screen.getByRole("form", { name: "Edit house" }));
 
-    await user.selectOptions(editHouseForm.getByLabelText("House to edit"), "Ravenclaw");
     await user.click(editHouseForm.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(props.onCreateHouse).toHaveBeenCalledOnce());
@@ -901,14 +979,14 @@ describe("AdminForms", () => {
     });
   });
 
-  it("submits assignment data from the team setup card", async () => {
+  it("submits a house assignment from the selected member details", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
 
-    await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
     await user.selectOptions(assignForm.getByLabelText("House assignment"), "house-2");
-    await user.click(assignForm.getByRole("button", { name: "Assign" }));
+    await user.click(assignForm.getByRole("button", { name: "Save house" }));
 
     await waitFor(() => expect(props.onAssignHouse).toHaveBeenCalledOnce());
 
@@ -924,27 +1002,38 @@ describe("AdminForms", () => {
     });
   });
 
-  it("stacks member assignment controls vertically inside the card", () => {
-    setupAdminForms();
+  it("shows member operations only after selecting a member", async () => {
+    const { user } = setupAdminForms();
     switchToManageSection("Members");
-    const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
-    const memberSelect = assignForm.getByLabelText("Member to assign");
-    const houseSelect = assignForm.getByLabelText("House assignment");
-    const assignButton = assignForm.getByRole("button", { name: "Assign" });
 
-    expect(memberSelect).toHaveClass("w-full", "min-w-0");
-    expect(houseSelect).toHaveClass("w-full", "min-w-0");
-    expect(assignButton).toHaveClass("w-full");
+    expect(screen.queryByRole("form", { name: "Assign user to house" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
+
+    const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
+    expect(assignForm.getByLabelText("House assignment")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Ben Unassigned" })).toBeInTheDocument();
+  });
+
+  it("returns focus to the member row after closing member details", async () => {
+    const { user } = setupAdminForms();
+    switchToManageSection("Members");
+    const memberButton = screen.getByRole("button", { name: "Manage Ben Unassigned" });
+
+    await user.click(memberButton);
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(memberButton).toHaveFocus());
   });
 
   it("lets admins update member display names from the Members section", async () => {
     const { user, props } = setupAdminForms({ actorRole: "ADMIN" });
     switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
     const displayNameForm = within(screen.getByRole("form", { name: "Update member display name" }));
 
-    await user.selectOptions(displayNameForm.getByLabelText("Member display name target"), "user-2");
+    await user.clear(displayNameForm.getByLabelText("New display name"));
     await user.type(displayNameForm.getByLabelText("New display name"), "Ben Updated");
-    await user.click(displayNameForm.getByRole("button", { name: "Update display name" }));
+    await user.click(displayNameForm.getByRole("button", { name: "Save display name" }));
 
     await waitFor(() => expect(props.onUpdateMemberDisplayName).toHaveBeenCalledOnce());
 
@@ -970,11 +1059,10 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
     const displayNameForm = within(screen.getByRole("form", { name: "Update member display name" }));
 
-    await user.selectOptions(displayNameForm.getByLabelText("Member display name target"), "user-2");
-    await user.type(displayNameForm.getByLabelText("New display name"), "Ben Unassigned");
-    await user.click(displayNameForm.getByRole("button", { name: "Update display name" }));
+    await user.click(displayNameForm.getByRole("button", { name: "Save display name" }));
 
     await waitFor(() => expect(props.onUpdateMemberDisplayName).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
@@ -983,16 +1071,14 @@ describe("AdminForms", () => {
     });
   });
 
-  it("lets owners promote members to admins from the Roles section", async () => {
+  it("lets owners promote members from member details", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Roles");
-    const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
-
-    await user.selectOptions(promoteForm.getByLabelText("Member to promote"), "user-2");
-    await user.click(promoteForm.getByRole("button", { name: "Promote to admin" }));
+    switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
+    await user.click(screen.getByRole("button", { name: "Promote to admin" }));
 
     expect(screen.getByText("Promote Ben Unassigned to admin?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Confirm role change" }));
 
     await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
     const promoteMock = props.onPromoteUser as ReturnType<typeof vi.fn>;
@@ -1003,16 +1089,14 @@ describe("AdminForms", () => {
     });
   });
 
-  it("lets owners remove admin access from the Roles section", async () => {
+  it("lets owners remove admin access from member details", async () => {
     const { user, props } = setupAdminForms();
-    switchToManageSection("Roles");
-    const demoteForm = within(screen.getByRole("form", { name: "Remove admin access" }));
-
-    await user.selectOptions(demoteForm.getByLabelText("Admin to demote"), "user-1");
-    await user.click(demoteForm.getByRole("button", { name: "Remove admin access" }));
+    switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Alice Assigned" }));
+    await user.click(screen.getByRole("button", { name: "Remove admin access" }));
 
     expect(screen.getByText("Remove admin access for Alice Assigned?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Confirm role change" }));
 
     await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
     const roleChangeMock = props.onPromoteUser as ReturnType<typeof vi.fn>;
@@ -1027,26 +1111,23 @@ describe("AdminForms", () => {
     });
   });
 
-  it("shows the Roles section as owner-only for admins", () => {
-    setupAdminForms({ actorRole: "ADMIN" });
-    const rolesTab = screen.getByRole("tab", { name: /Roles/ });
+  it("shows role controls in Members but keeps them owner-only for admins", async () => {
+    const { user } = setupAdminForms({ actorRole: "ADMIN" });
+    switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
 
-    expect(rolesTab).toBeVisible();
-    expect(rolesTab).toBeDisabled();
-    expect(rolesTab).toHaveAttribute("aria-disabled", "true");
-    expect(rolesTab).toHaveAttribute("aria-selected", "false");
-    expect(screen.queryByRole("form", { name: "Promote member" })).not.toBeInTheDocument();
+    const roleSection = within(screen.getByLabelText("Role management"));
+    expect(roleSection.getByText("Owner only")).toBeInTheDocument();
+    expect(roleSection.getByRole("button", { name: "Promote to admin" })).toBeDisabled();
+    expect(screen.queryByRole("tab", { name: /Roles/ })).not.toBeInTheDocument();
   });
 
   it("lets owners remove non-owner members from the Members section", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Members");
-    const removalForm = within(screen.getByRole("form", { name: "Remove organization member" }));
-
-    await user.selectOptions(removalForm.getByLabelText("Member to remove"), "user-2");
-    await user.click(removalForm.getByRole("button", { name: "Remove member" }));
-
-    expect(screen.getByText("Remove Ben Unassigned from the organization?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
+    await user.click(screen.getByRole("button", { name: "Remove member" }));
+    expect(screen.getByRole("dialog", { name: "Remove Ben Unassigned?" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Confirm removal" }));
 
     await waitFor(() => expect(props.onRemoveOrgMember).toHaveBeenCalledOnce());
@@ -1061,15 +1142,14 @@ describe("AdminForms", () => {
     });
   });
 
-  it("shows member removal to admins but keeps it owner-only", () => {
-    setupAdminForms({ actorRole: "ADMIN" });
+  it("shows member removal to admins but keeps it owner-only", async () => {
+    const { user } = setupAdminForms({ actorRole: "ADMIN" });
     switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
     const removalSection = within(screen.getByLabelText("Member removal"));
-    const removalForm = within(screen.getByRole("form", { name: "Remove organization member" }));
 
     expect(removalSection.getByText("Owner only")).toBeInTheDocument();
-    expect(removalForm.getByLabelText("Member to remove")).toBeDisabled();
-    expect(removalForm.getByRole("button", { name: "Remove member" })).toBeDisabled();
+    expect(removalSection.getByRole("button", { name: "Remove member" })).toBeDisabled();
   });
 
   it("shows a safe toast when role promotion returns an expected failure", async () => {
@@ -1080,14 +1160,11 @@ describe("AdminForms", () => {
         message: "The member role could not be updated. Please try again.",
       }),
     });
-    switchToManageSection("Roles");
-    const promoteForm = within(screen.getByRole("form", { name: "Promote member" }));
-
-    await user.selectOptions(promoteForm.getByLabelText("Member to promote"), "user-2");
-    await user.click(promoteForm.getByRole("button", { name: "Promote to admin" }));
-
+    switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
+    await user.click(screen.getByRole("button", { name: "Promote to admin" }));
     expect(screen.getByText("Promote Ben Unassigned to admin?")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Confirm role change" }));
 
     await waitFor(() => expect(props.onPromoteUser).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
@@ -1105,11 +1182,11 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Members");
+    await user.click(screen.getByRole("button", { name: "Manage Ben Unassigned" }));
     const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
 
-    await user.selectOptions(assignForm.getByLabelText("Member to assign"), "user-2");
     await user.selectOptions(assignForm.getByLabelText("House assignment"), "house-2");
-    await user.click(assignForm.getByRole("button", { name: "Assign" }));
+    await user.click(assignForm.getByRole("button", { name: "Save house" }));
 
     await waitFor(() => expect(props.onAssignHouse).toHaveBeenCalledOnce());
     const { toast } = await import("sonner");
@@ -1118,69 +1195,52 @@ describe("AdminForms", () => {
     });
   });
 
-  it("keeps unassigned members visible first in the assignment dropdown", () => {
-    setupAdminForms();
+  it("filters and searches the member resource list", async () => {
+    const { user } = setupAdminForms();
     switchToManageSection("Members");
-    const assignForm = within(screen.getByRole("form", { name: "Assign user to house" }));
-    const memberSelect = assignForm.getByLabelText("Member to assign") as HTMLSelectElement;
-    const groups = Array.from(memberSelect.querySelectorAll("optgroup"));
-    const options = Array.from(memberSelect.options).map((option) => option.textContent);
 
-    expect(groups.map((group) => group.label)).toEqual([
-      "Needs assignment (1)",
-      "Assigned members",
-    ]);
-    expect(options).toEqual([
-      "Select member... 1 needs assignment",
-      "Ben Unassigned - Needs assignment",
-      "Alice Assigned",
-    ]);
-    expect(assignForm.getByText("1 member needs a house. They appear first in this list.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Manage Alice Assigned" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Manage Ben Unassigned" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Unassigned 1" }));
+    expect(screen.queryByRole("button", { name: "Manage Alice Assigned" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Manage Ben Unassigned" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "All 2" }));
+    await user.type(screen.getByRole("searchbox", { name: "Search members" }), "Alice");
+    expect(screen.getByRole("button", { name: "Manage Alice Assigned" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage Ben Unassigned" })).not.toBeInTheDocument();
   });
 
-  it("shows invite generation and use reporting in the Members section", () => {
+  it("does not duplicate invite audit reporting in the Members workspace", () => {
     setupAdminForms();
     switchToManageSection("Members");
 
-    const inviteActivity = within(screen.getByLabelText("Invite activity"));
-
-    expect(inviteActivity.getByText("3")).toBeInTheDocument();
-    expect(inviteActivity.getByText("Tokens generated")).toBeInTheDocument();
-    expect(inviteActivity.getByText("2")).toBeInTheDocument();
-    expect(inviteActivity.getByText("Tokens used")).toBeInTheDocument();
-    expect(inviteActivity.getByText("Token generated")).toBeInTheDocument();
-    expect(inviteActivity.getByText("Token used")).toBeInTheDocument();
-    expect(inviteActivity.getByText("Alice Admin created an invite link.")).toBeInTheDocument();
-    expect(inviteActivity.getByText("Ben Unassigned joined with an invite link.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Invite activity")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Invite member" })).toBeInTheDocument();
   });
 
-  it("shows an empty invite activity state when no invite events exist", () => {
-    setupAdminForms({
-      recentAdminActions: recentAdminActions.filter(
-        (action) => action.type !== "INVITE_CREATED" && action.type !== "INVITE_USED",
-      ),
-    });
+  it("shows an intentional empty state for member filters with no matches", async () => {
+    const { user } = setupAdminForms();
     switchToManageSection("Members");
 
-    expect(screen.getByText("No invite activity has been recorded yet.")).toBeInTheDocument();
+    await user.type(screen.getByRole("searchbox", { name: "Search members" }), "Nobody");
+    expect(screen.getByText("No members match this view")).toBeInTheDocument();
   });
 
-  it("shows generated invite links in the invite card", async () => {
+  it("shows generated invite links in the invite dialog", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Members");
-
-    const inviteCard = within(screen.getByLabelText("Invite member"));
-
-    await user.click(
-      inviteCard.getByRole("button", { name: "Generate invite link" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Invite member" }));
+    const inviteDialog = within(screen.getByRole("dialog", { name: "Invite member" }));
+    await user.click(inviteDialog.getByRole("button", { name: "Generate invite link" }));
 
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());
-    expect(inviteCard.getByText(/\/o\/acme\/join\/invite-token$/)).toBeInTheDocument();
-    expect(inviteCard.getByTitle("Copy invite link")).toBeInTheDocument();
+    expect(inviteDialog.getByText(/\/o\/acme\/join\/invite-token$/)).toBeInTheDocument();
+    expect(inviteDialog.getByTitle("Copy invite link")).toBeInTheDocument();
   });
 
-  it("contains long generated invite links inside the invite card", async () => {
+  it("contains long generated invite links inside the invite dialog", async () => {
     const longToken = "5dfc1b66d5c131efdfdf0d4c28de4062ebaebd5e6db57e104f0a8f93c2d1";
     const longJoinPath = `/o/acme/join/${longToken}`;
     const { user } = setupAdminForms({
@@ -1192,17 +1252,14 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Members");
-    const inviteCard = within(screen.getByLabelText("Invite member"));
+    await user.click(screen.getByRole("button", { name: "Invite member" }));
+    const inviteDialog = within(screen.getByRole("dialog", { name: "Invite member" }));
+    await user.click(inviteDialog.getByRole("button", { name: "Generate invite link" }));
 
-    await user.click(
-      inviteCard.getByRole("button", { name: "Generate invite link" }),
-    );
-
-    const linkCode = inviteCard.getByText(new RegExp(`${longToken}$`));
+    const linkCode = inviteDialog.getByText(new RegExp(`${longToken}$`));
     expect(linkCode).toHaveClass("min-w-0", "truncate");
     expect(linkCode.parentElement).toHaveClass("min-w-0", "overflow-hidden");
-    expect(linkCode.parentElement?.parentElement).toHaveClass("min-w-0", "overflow-hidden");
-    expect(screen.getByLabelText("Invite member")).toHaveClass("min-w-0", "overflow-hidden");
+    expect(screen.getByRole("dialog", { name: "Invite member" })).toHaveClass("overflow-hidden");
   });
 
   it("shows a safe toast when invite generation returns an expected failure", async () => {
@@ -1214,12 +1271,9 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Members");
-
-    const inviteCard = within(screen.getByLabelText("Invite member"));
-
-    await user.click(
-      inviteCard.getByRole("button", { name: "Generate invite link" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Invite member" }));
+    const inviteDialog = within(screen.getByRole("dialog", { name: "Invite member" }));
+    await user.click(inviteDialog.getByRole("button", { name: "Generate invite link" }));
 
     await waitFor(() => expect(props.onCreateInvite).toHaveBeenCalledOnce());
     expect(screen.queryByText("invite-token")).not.toBeInTheDocument();

@@ -21,14 +21,14 @@ Still deferred: org archival/deletion, domain allow-list joining, and optional r
 - Implemented as a post-login onboarding flow.
 - The user who creates the org becomes the first `OWNER`.
 - They set org name, slug, first house name, and first house color.
-- Owner-only organization display-name and slug updates are implemented in Manage Settings. Additional org settings and ownership-management screens are deferred.
+- Owner-only organization display-name and slug updates are implemented in Manage Organization. Additional organization settings remain deferred.
 
 **Roles**
 - `OWNER` exists.
 - `OWNER` controls organization-level configuration, including houses and seasons.
 - `OWNER` and `ADMIN` can assign members, create invites, and manage day-to-day points interactions.
 - `OWNER` can promote members to `ADMIN`, demote admins back to `MEMBER`, and remove non-owner users from the organization from Manage Team. Role changes and removals are audited.
-- `OWNER` can rename the organization display name and change the organization slug from Manage Settings. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
+- `OWNER` can rename the organization display name and change the organization slug from Manage Organization. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
 - Org archival/deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
 - `MEMBER`s have no admin capability; they award points only.
@@ -132,7 +132,7 @@ The dashboard has three tabs: Overview, Activity, and Leaderboard. The Overview 
 - Elevated Manage reporting should expand from the current member/house/unassigned cards into a compact operational view: audit history, invite activity, season changes, unusual point volume, and data cleanup history.
 - The Manage tab has been split into focused overview, audit-history, season-management, house-management, and team-management components so future reporting widgets or admin workflows can move into clearer sections without inflating one mixed CRUD/reporting component.
 - The Manage tab now has internal Overview, Team, Houses, Seasons, and Audit sections. This keeps current CRUD workflows and the deletion audit available while creating obvious landing spots for future operational widgets. Houses and Seasons remain visible to admins, but are owner-only and disabled for non-owner admins.
-- Manage Settings is implemented for owner-only organization display-name and slug changes. Broader organization lifecycle controls remain deferred; see [Organization Settings Design](./org-settings-design.md) for the recommended alias-backed invite URL path.
+- Manage Organization is implemented for owner-only organization identity, slug, ownership transfer, and archive controls; see [Organization Settings Design](./org-settings-design.md) for the alias-backed invite URL path.
 - The Team section now uses compact assignment, invite, and owner-only role-management cards. It includes audit-backed invite activity reporting for recent token generation and use.
 - The Audit section now uses the persisted `AuditEvent` table as the single source of truth for administrative history. It supports event-type filtering, cursor pagination, and includes point deletion, invite creation/use, season starts, house assignment, and role changes. Legacy fallback rows are still merged into the initial context for older records that predate durable audit events.
 
@@ -184,7 +184,7 @@ Not implemented. The detailed product and technical plan lives in [Activity Reac
 A controlled admin action for deducting points when the product needs a correction. This replaces the earlier theme-specific concept with neutral language that works for any house theme.
 
 ### Current state
-The product supports positive point awards, soft deletion of mistaken awards, first-class deduction transactions, backend deduction guardrails, an admin/owner dashboard action for deducting points, and Manage Overview reporting for active and historical season deductions by house. The MVP policy is correction-first: no last-place-only eligibility, no direct targeted-member notifications, and no per-organization owner toggle yet. The deduction flow is guarded by `POINT_ADJUSTMENTS_ENABLED`; set it to `"true"` on both the API and web services to expose the feature. The detailed design and phase status live in [Point Adjustments Design](./point-adjustments-design.md).
+The product supports positive point awards, soft deletion of mistaken awards, first-class deduction transactions, backend deduction guardrails, an admin/owner dashboard action for deducting points, and Manage Audit reporting for active and historical season deductions by house. The MVP policy is correction-first: no last-place-only eligibility, no direct targeted-member notifications, and no per-organization owner toggle yet. The deduction flow is guarded by `POINT_ADJUSTMENTS_ENABLED`; set it to `"true"` on both the API and web services to expose the feature. The detailed design and phase status live in [Point Adjustments Design](./point-adjustments-design.md).
 
 ### Design intent
 - Keep the action transparent and auditable.

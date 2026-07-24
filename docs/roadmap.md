@@ -52,6 +52,7 @@ Each tier has its own file with detailed task breakdowns.
 | 3.7 | Admin/owner soft delete for point awards plus recent-deletions Manage report | [done] |
 | 3.8 | Seasons UX pass: selector, historical reports, Manage controls, and current-season status | [done] |
 | 3.9 | Manage Team layout cleanup plus invite-generation/use reporting | [done] |
+| 3.12 | Manage resource workspaces refactor | [doing] |
 
 ---
 

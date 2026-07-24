@@ -93,6 +93,13 @@ Leave `DATABASE_POOL_MAX` unset to use the default direct Postgres pool cap of `
 Set API `AUTH0_CLIENT_ID` to the same Auth0 application client ID used by the web service. The API uses it to verify the web session ID token when safely linking same-email Auth0 identities.
 Set `POINT_ADJUSTMENTS_ENABLED="true"` on both the API and web apps to enable the admin/owner `Deduct points` flow. Leave it unset or `"false"` to hide the web action and block the API endpoint.
 
+The API applies a 300-request-per-minute authenticated-user safety limit and
+stricter per-route limits to write operations. Public requests fall back to an
+IP-based key. Rate-limit responses remain typed HTTP 429 responses and are
+logged as `request.rate_limited` with a one-way key hash for safe SEQ
+correlation within the API replica. Limits use an in-memory store and therefore
+apply independently to each running API replica.
+
 ## Database
 
 For local development with Docker:

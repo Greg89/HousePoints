@@ -27,6 +27,7 @@ The app currently has:
 - Account-menu notification center in the dashboard header.
 - Unread count badge on the account menu trigger.
 - Explicit mark-read and mark-all-read actions.
+- Read informational and warning notifications are archived so the compact menu does not accumulate history indefinitely.
 - Active-session polling that shows one toast per newly observed unread action-required notification.
 - Automatic cleanup for resolved house-assignment notifications when a member is assigned to a house.
 - Admin Manage Team with unassigned-member counts and grouped assignment dropdowns.
@@ -376,6 +377,14 @@ Status: in progress. `SEASON_STARTED` is implemented as an org-wide `INFO` notif
 `POINT_DEDUCTION_RECEIVED` is implemented as a targeted `WARNING` notification created inside the point-deduction transaction. It notifies the deducted member, links to Activity, and stays durable without becoming an active-session action-required toast.
 
 `ROLE_CHANGED` is implemented as an informational notification created inside the owner role-management transaction. It notifies the changed user plus other owners in the organization, excluding the owner who performed the change, and links to Manage Team.
+
+### Read And Archive Policy
+
+The compact notification menu is an inbox, not a permanent history view:
+
+- Informational and warning notifications are archived when marked read: `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, and `RELEASE_ANNOUNCEMENT`.
+- `MEMBER_NEEDS_HOUSE_ASSIGNMENT` remains visible after a manual mark-read because the underlying work can still be outstanding. It is marked read and archived automatically when the member is assigned to a house.
+- The menu has a viewport-bounded, vertically scrollable feed for notification backlogs.
 
 ---
 

@@ -15,6 +15,7 @@ export type ApiLogEvent =
   | "owner.forbidden"
   | "request.received"
   | "request.completed"
+  | "request.rate_limited"
   | "request.validation_failed"
   | "request.unhandled_error"
   | "releases.automation_secret_invalid"

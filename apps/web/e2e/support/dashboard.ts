@@ -1,9 +1,15 @@
 import { expect, type Page } from "@playwright/test";
 
-import { getE2EDiagnostics } from "./navigation";
+import { getE2EDiagnostics, gotoE2EStart } from "./navigation";
 
 export async function expectDashboardReady(page: Page) {
   await ensureDashboardState(page);
+
+  if (await page.getByText(/upstream error/i).isVisible().catch(() => false)) {
+    // The staging organization switch can briefly return a proxy 502 after login.
+    await gotoE2EStart(page);
+    await ensureDashboardState(page);
+  }
 
   if (await page.getByText(/something went wrong/i).isVisible().catch(() => false)) {
     // Staging occasionally serves a transient error boundary after auth redirects.
@@ -15,20 +21,35 @@ export async function expectDashboardReady(page: Page) {
     throw new Error("E2E user reached the app error boundary. Check web/API logs for the staging request.");
   }
 
-  await expect(page.getByText(/welcome back/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /award points/i }).first()).toBeVisible();
 }
 
 async function ensureDashboardState(page: Page) {
   await page.waitForURL(/\/o\/[^/?#]+/, { timeout: 30_000 }).catch(() => undefined);
 
-  await Promise.any([
-    page.getByText(/welcome back/i).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByText(/waiting for assignment/i).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByText(/create organisation/i).waitFor({ state: "visible", timeout: 30_000 }),
-    page.getByText(/something went wrong/i).waitFor({ state: "visible", timeout: 30_000 }),
-  ]).catch(async () => {
+  const recognizedStates = [
+    page.getByText(/house standings/i),
+    page.getByRole("navigation", { name: /manage sections/i }),
+    page.getByRole("combobox", { name: /manage sections/i }),
+    page.getByText(/waiting for assignment/i),
+    page.getByText(/create organisation/i),
+    page.getByText(/something went wrong/i),
+    page.getByText(/upstream error/i),
+  ];
+
+  const recognized = await expect.poll(
+    async () => {
+      for (const state of recognizedStates) {
+        if (await state.isVisible().catch(() => false)) return true;
+      }
+      return false;
+    },
+    { timeout: 30_000 },
+  ).toBe(true).then(() => true).catch(() => false);
+
+  if (!recognized) {
     throw new Error(await buildDashboardTimeoutMessage(page));
-  });
+  }
 
   if (await page.getByText(/waiting for assignment/i).isVisible().catch(() => false)) {
     throw new Error(

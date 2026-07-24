@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, DotsThreeVertical, Eye, Smiley, Trash } from "@phosphor-icons/react";
+import { DotsThreeVertical, Eye, Smiley, Trash } from "@phosphor-icons/react";
 import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
 import { POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
 import { REACTION_EMOJI, VISIBLE_REACTION_KEYS } from "./point-reactions";
@@ -51,7 +51,7 @@ export function ActivityCard({
   const reactionsRef = useRef<HTMLDivElement>(null);
   const isDeduction = item.type === "DEDUCTION";
   const deltaLabel = `${item.delta > 0 ? "+" : ""}${item.delta}`;
-  const actionLabel = isDeduction ? "deducted" : "recognized";
+  const attributionLabel = isDeduction ? "Deducted by" : "Recognized by";
   const actionsMenuId = `activity-actions-${item.id}`;
   const reactionsMenuId = `activity-reactions-${item.id}`;
   const hasActions = canDelete || canViewReactions;
@@ -117,44 +117,22 @@ export function ActivityCard({
       transition={{ delay: index * 0.04, duration: 0.2 }}
       className="group rounded-xl border bg-card/70 p-3 transition-colors hover:bg-muted/20"
     >
-      <div className="grid gap-3 lg:grid-cols-[14rem_minmax(0,1fr)_6.25rem_3.25rem] lg:items-center">
+      <div className="grid gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_6.25rem_3.25rem] lg:items-center">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex flex-shrink-0 flex-col items-center gap-2 pt-1">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold text-primary">
-                {item.actorName[0]?.toUpperCase()}
-              </div>
-              <ArrowRight className="text-muted-foreground" size={13} />
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
-                style={{ backgroundColor: item.targetHouseColor }}
-              >
-                {item.targetHouseName[0]?.toUpperCase()}
-              </div>
-            </div>
-            {item.season ? (
-              <span
-                className={[
-                  "max-w-24 truncate rounded-full px-2 py-0.5 text-[0.65rem] font-medium",
-                  item.season.isActive
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-amber-50 text-amber-700",
-                ].join(" ")}
-                title={item.season.name}
-              >
-                {item.season.name}
-              </span>
-            ) : null}
+          <div
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+            style={{ backgroundColor: item.targetHouseColor }}
+            aria-hidden="true"
+          >
+            {item.targetUserName[0]?.toUpperCase()}
           </div>
           <div className="min-w-0 leading-tight">
-            <p className="text-sm font-semibold break-words">{item.actorName}</p>
-            <p
-              className={["text-xs font-semibold uppercase tracking-wide", pointTone.label].join(" ")}
-            >
-              {actionLabel}
-            </p>
-            <p className="text-sm font-semibold break-words">{item.targetUserName}</p>
+            <p className="text-base font-semibold break-words">{item.targetUserName}</p>
             <p className="truncate text-xs text-muted-foreground">{item.targetHouseName}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {attributionLabel}{" "}
+              <span className="font-medium text-foreground">{item.actorName}</span>
+            </p>
           </div>
         </div>
 
@@ -164,6 +142,19 @@ export function ActivityCard({
             {item.trait ? (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                 {TRAIT_LABELS[item.trait]}
+              </span>
+            ) : null}
+            {item.season ? (
+              <span
+                className={[
+                  "max-w-32 truncate rounded-full px-2 py-0.5 text-xs font-medium",
+                  item.season.isActive
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-amber-50 text-amber-700",
+                ].join(" ")}
+                title={item.season.name}
+              >
+                {item.season.name}
               </span>
             ) : null}
             {isDeduction ? (

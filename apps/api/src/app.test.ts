@@ -3,6 +3,7 @@
  * Prisma is mocked per test so we control exactly what the DB "returns".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { READ_ARCHIVED_NOTIFICATION_TYPES } from "@housepoints/contracts";
 
 // Mock @housepoints/db before importing anything that uses it.
 vi.mock("@housepoints/db", () => ({
@@ -387,6 +388,35 @@ describe("GET /health", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
     expect(app.server.listening).toBe(false);
+    await app.close();
+  });
+});
+
+describe("rate limiting", () => {
+  it("returns a typed 429 when a mutation limit is exceeded", async () => {
+    const app = await buildTestApp();
+
+    for (let requestNumber = 0; requestNumber < 5; requestNumber += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/orgs/create",
+        payload: {},
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const limitedResponse = await app.inject({
+      method: "POST",
+      url: "/orgs/create",
+      payload: {},
+    });
+
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.json()).toEqual({
+      code: "RATE_LIMITED",
+      message: "Too many requests — please slow down.",
+    });
+
     await app.close();
   });
 });
@@ -7420,7 +7450,7 @@ describe("POST /notifications/list", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7481,7 +7511,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7512,7 +7542,7 @@ describe("POST /notifications/mark-read", () => {
         recipientUserId: "user-2",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),
@@ -7569,7 +7599,7 @@ describe("POST /notifications/mark-all-read", () => {
         recipientUserId: "user-owner",
         archivedAt: null,
         readAt: { not: null },
-        type: { in: ["POINT_AWARD_RECEIVED", "RELEASE_ANNOUNCEMENT"] },
+        type: { in: [...READ_ARCHIVED_NOTIFICATION_TYPES] },
       },
       data: {
         archivedAt: expect.any(Date),

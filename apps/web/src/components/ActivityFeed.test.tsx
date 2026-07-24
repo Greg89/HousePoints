@@ -68,6 +68,27 @@ const seasons = [
 ];
 
 describe("ActivityFeed", () => {
+  it("presents the recipient as the primary identity and the giver as attribution", () => {
+    render(
+      <ActivityFeed
+        items={[baseActivity]}
+        members={members}
+        nextCursor={null}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByTestId("activity-card");
+    const recipient = within(card).getByText("Ben");
+    const attribution = within(card).getByText(/recognized by/i);
+
+    expect(recipient.compareDocumentPosition(attribution)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(attribution).toHaveTextContent("Recognized by Alice");
+    expect(within(card).getByText("Q3 2026")).toBeInTheDocument();
+  });
+
   it("shows an empty state without a load-more button", () => {
     render(
       <ActivityFeed
@@ -611,9 +632,9 @@ describe("ActivityFeed", () => {
       />,
     );
 
-    expect(screen.getByText("deducted")).toBeInTheDocument();
+    expect(screen.getByText(/deducted by/i)).toHaveTextContent("Deducted by Alice");
     expect(screen.getByText("Deducted")).toBeInTheDocument();
     expect(screen.getByText("-10")).toBeInTheDocument();
-    expect(screen.queryByText("awarded")).not.toBeInTheDocument();
+    expect(screen.queryByText(/recognized by/i)).not.toBeInTheDocument();
   });
 });

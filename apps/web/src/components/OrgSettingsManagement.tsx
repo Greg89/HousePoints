@@ -1,10 +1,12 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Buildings, Crown, Warning } from "@phosphor-icons/react";
+import { Buildings, Crown, LinkSimple, Warning } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { OrgSettings } from "@housepoints/contracts";
 import type { ArchiveOrganizationResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
 import type { AdminUser } from "./AdminManageTypes";
+import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageConfirmationPanel } from "./ManageConfirmationPanel";
 
 interface OrgSettingsManagementProps {
   users: AdminUser[];
@@ -194,24 +196,22 @@ export function OrgSettingsManagement({
   }
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h4 className="font-display text-lg font-semibold">Organization Settings</h4>
-        <p className="text-sm text-muted-foreground">
-          Update the organization details shown throughout House Points and future invite links.
-        </p>
-      </div>
-
+    <ManageWorkspace
+      id="organization"
+      title="Organization"
+      description="Manage your organization identity, URL, ownership, and lifecycle."
+      className="space-y-8"
+    >
       <form
         aria-label="Organization settings"
         onSubmit={handleNameSubmit}
-        className="grid max-w-xl gap-4 rounded-xl border bg-card p-5"
+        className="grid max-w-xl gap-4 border-b pb-8"
       >
         <div>
-          <h5 className="flex items-center gap-2 text-sm font-semibold">
+          <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
             <Buildings size={16} />
-            Organization Details
-          </h5>
+            Organization identity
+          </h3>
           <p className="mt-2 text-xs text-muted-foreground">
             Rename the organization without changing its URL slug or membership.
           </p>
@@ -248,27 +248,23 @@ export function OrgSettingsManagement({
         </button>
       </form>
 
-      <div className="max-w-xl space-y-4 rounded-xl border border-destructive/30 p-5">
+      <div className="max-w-xl divide-y">
         <div>
-          <h5 className="flex items-center gap-2 text-sm font-semibold text-destructive">
-            <Warning size={16} />
-            Danger Zone
-          </h5>
+          <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
+            <LinkSimple size={16} />
+            URL and slug
+          </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            These actions affect your organization URL or ownership. Proceed with care.
+            Control the URL-safe identifier used by organization and invite links.
           </p>
         </div>
 
         <form
           aria-label="Organization slug"
           onSubmit={handleSlugSubmit}
-          className="grid gap-4 rounded-xl border bg-card p-4"
+          className="grid gap-4 py-6"
         >
           <div>
-            <h5 className="flex items-center gap-2 text-sm font-semibold">
-              <Buildings size={16} />
-              Organization Slug
-            </h5>
             <p className="mt-2 text-xs text-muted-foreground">
               Change the URL-safe identifier that will appear in future organization links and invite URLs.
             </p>
@@ -326,13 +322,13 @@ export function OrgSettingsManagement({
         <form
           aria-label="Transfer ownership"
           onSubmit={handleOwnerSubmit}
-          className="grid gap-4 rounded-xl border bg-card p-4"
+          className="grid gap-4 py-6"
         >
           <div>
-            <h5 className="flex items-center gap-2 text-sm font-semibold">
+            <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
               <Crown size={16} />
-              Transfer Ownership
-            </h5>
+              Ownership
+            </h3>
             <p className="mt-2 text-xs text-muted-foreground">
               Move organization ownership to another member. Your account will become an admin after the transfer.
             </p>
@@ -376,31 +372,16 @@ export function OrgSettingsManagement({
           </div>
 
           {pendingTransferName ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
-              <p className="text-sm font-semibold text-destructive">
-                Transfer ownership to {pendingTransferName}?
-              </p>
-              <p className="text-xs text-muted-foreground">
-                You will become an admin after this change.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={confirmOwnerTransfer}
-                  disabled={isOwnerPending}
-                  className="h-8 rounded-lg bg-destructive px-3 text-xs font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
-                >
-                  Confirm
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingTransferId(null)}
-                  className="h-8 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-muted"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <ManageConfirmationPanel
+              title={<>Transfer ownership to {pendingTransferName}?</>}
+              description="You will become an admin after this change."
+              onConfirm={confirmOwnerTransfer}
+              onCancel={() => setPendingTransferId(null)}
+              confirmLabel="Transfer ownership"
+              pendingLabel="Transferring..."
+              pending={isOwnerPending}
+              tone="destructive"
+            />
           ) : (
             <button
               type="submit"
@@ -415,13 +396,13 @@ export function OrgSettingsManagement({
         <form
           aria-label="Archive organization"
           onSubmit={handleArchiveSubmit}
-          className="grid gap-4 rounded-xl border border-destructive/30 bg-card p-4"
+          className="mt-2 grid gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-5"
         >
           <div>
-            <h5 className="flex items-center gap-2 text-sm font-semibold text-destructive">
+            <h3 className="flex items-center gap-2 font-display text-lg font-semibold text-destructive">
               <Warning size={16} />
-              Archive Organization
-            </h5>
+              Danger zone
+            </h3>
             <p className="mt-2 text-xs text-muted-foreground">
               Archive this organization for every member. Historical records stay preserved, but the
               organization will no longer appear as an active workspace.
@@ -460,6 +441,6 @@ export function OrgSettingsManagement({
           </button>
         </form>
       </div>
-    </section>
+    </ManageWorkspace>
   );
 }

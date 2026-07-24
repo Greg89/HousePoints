@@ -128,6 +128,28 @@ Mutating happy path:
 3. Activity feed - switch to Activity tab and confirm the new transaction appears.
 4. Leaderboard - switch to Leaderboard tab and confirm the target member appears.
 
+Reversible Manage mutation:
+
+1. Sign in as the staging admin and open the configured target member.
+2. Capture the member's current house and move them to another existing house.
+3. Verify the new assignment persists across fresh navigation.
+4. Restore the original house in cleanup and verify that restoration also persists.
+5. As the owner, toggle the target member between member/admin access.
+6. Verify the role persists, then restore and verify the original access level.
+
+Role mutation uses the optional `E2E_ROLE_TARGET_MEMBER` fixture. It must identify a member who is
+not used to sign into any E2E scenario; otherwise changing live permissions can destabilize later
+authenticated tests.
+
+Historical season reports:
+
+1. Select a completed season from the Overview reporting-season control.
+2. Confirm the historical report and season recap load.
+3. Open Leaderboard and confirm it remains scoped to the selected historical season.
+
+This scenario skips when staging has no completed season. The suite must not start a new season to
+manufacture this fixture because doing so closes the active season and resets current scoring.
+
 Run locally or against staging:
 
 ```powershell
@@ -148,12 +170,22 @@ Required GitHub Environment secrets for `staging`:
 - `E2E_BASE_URL`
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
+- `E2E_ADMIN_EMAIL`
+- `E2E_ADMIN_PASSWORD`
+- `E2E_OWNER_EMAIL`
+- `E2E_OWNER_PASSWORD`
 - `E2E_TARGET_MEMBER`
 - `E2E_ORG_SLUG`
 
+Optional mutation fixture:
+
+- `E2E_ROLE_TARGET_MEMBER`
+
 `E2E_ORG_SLUG` routes tests directly to `/o/{slug}`. The scheduled staging workflow requires it so the test account always lands in the known-good E2E organization.
 
-The current required secrets are intentionally limited to the tests that exist today. Future owner/admin/member actors should be added only when those tests are implemented.
+The elevated actors are required because the deployed Manage suite verifies both the admin
+restriction model and the complete owner workspace experience. Local Playwright runs may omit
+those credentials, in which case elevated specs skip.
 
 The broader release-communication and E2E rollout plan is tracked in [Release And E2E Automation Plan](./release-and-e2e-automation.md).
 

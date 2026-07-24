@@ -111,15 +111,12 @@ Required staging environment secrets:
 - `E2E_BASE_URL`
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
-- `E2E_TARGET_MEMBER`
-- `E2E_ORG_SLUG`
-
-Optional staging environment secrets for full role smoke coverage:
-
 - `E2E_ADMIN_EMAIL`
 - `E2E_ADMIN_PASSWORD`
 - `E2E_OWNER_EMAIL`
 - `E2E_OWNER_PASSWORD`
+- `E2E_TARGET_MEMBER`
+- `E2E_ORG_SLUG`
 
 Optional manual input:
 
@@ -134,7 +131,7 @@ The staging test data contract is documented in [Staging E2E Test Data Contract]
 Current contract:
 
 - one member test user for scripted login;
-- optional admin credentials for elevated Manage/Audit smoke coverage;
+- required staging admin and owner credentials for Manage permission and workspace coverage;
 - at least one target member in a different account;
 - at least one house assignment for both users;
 - feature flags set to the same values expected in staging.
@@ -147,10 +144,15 @@ Grow the suite slowly:
 
 1. Smoke: login, dashboard render, primary tabs navigate, account menu renders, notifications are reachable, and role-specific Manage access is enforced.
 2. Core: award points, Activity shows the transaction, Leaderboard shows the target.
-3. Team: generate invite, assign house, promote/demote admin.
-4. Seasons: switch historical season and verify reports/standings update.
-5. Notifications: receive, preview, mark read.
-6. Manage Audit: filter and paginate audit history. First read-only filter smoke is implemented; pagination remains future coverage.
+3. Manage: six-workspace navigation, role restrictions, URL history, responsive picker, detail
+   surfaces, Audit modes, and non-mutating confirmation flows. Read-only coverage implemented.
+4. Team mutations: reversible house assignment and optional dedicated-target owner promote/demote
+   coverage are implemented with persistence verification and `finally` cleanup. Invite generation
+   remains deferred until invite records have a safe cleanup expectation.
+5. Seasons: historical Overview report, season recap, and Leaderboard switching are implemented
+   when the optional completed-season staging fixture exists.
+6. Notifications: receive, preview, mark read.
+7. Manage Audit pagination: filter coverage is implemented; pagination remains future coverage.
 
 Each added E2E path should be stable against real Auth0 and staging timing. Prefer fewer high-value tests over a broad brittle suite.
 
@@ -172,5 +174,5 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A3 - Production notification broadcast | Implemented | Secret-protected broadcast endpoint and manual workflow handoff implemented. |
 | A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
-| B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; optional owner/admin actors now power role smoke coverage. |
-| B3 - E2E coverage expansion | In progress | Read-only dashboard, account-menu, role access, and Manage Audit smoke coverage added. |
+| B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; owner/admin actors and two active houses support reversible Manage coverage. |
+| B3 - E2E coverage expansion | In progress | Dashboard, account-menu, role access, complete Manage workspace, Manage Audit, reversible team mutations, and optional historical season reporting coverage added. Notifications and Audit pagination remain. |

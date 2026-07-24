@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import type { HouseMutationResult } from "@/lib/action-results";
 import { assessHouseThemeColor, resolveHouseThemeStyle } from "@/lib/house-theme";
 import type { AdminHouse } from "./AdminManageTypes";
+import { ManageWorkspace } from "./ManageWorkspace";
+import { ManageDetailSheet } from "./ManageDetailSheet";
+import { ManageEmptyState } from "./ManageEmptyState";
 
 interface HouseManagementProps {
   houses: AdminHouse[];
@@ -245,6 +248,7 @@ function ThemePaletteControls({
 }
 
 export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps) {
+  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [createPending, startCreate] = useTransition();
   const [editPending, startEdit] = useTransition();
   const [createHouseColor, setCreateHouseColor] = useState(DEFAULT_HOUSE_COLOR);
@@ -280,6 +284,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         setCreateSecondaryColor(DEFAULT_SECONDARY_COLOR);
         setCreateSurfaceColor(DEFAULT_SURFACE_COLOR);
         form.reset();
+        setEditorMode(null);
       } catch (err) {
         toast.error("Failed to create house", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -312,6 +317,7 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
         setEditSecondaryColor(DEFAULT_SECONDARY_COLOR);
         setEditSurfaceColor(DEFAULT_SURFACE_COLOR);
         form.reset();
+        setEditorMode(null);
       } catch (err) {
         toast.error("Failed to update house", {
           description: err instanceof Error ? err.message : "Something went wrong",
@@ -321,18 +327,94 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
   }
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h4 className="font-display text-lg font-semibold">Houses</h4>
-        <p className="text-sm text-muted-foreground">
-          Create new houses or update the details shown on the scoreboard.
-        </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+    <ManageWorkspace
+      id="houses"
+      title="Houses"
+      description="Review each house, then create or update its identity and theme."
+      count={houses.length}
+      action={
+        <button
+          type="button"
+          onClick={() => setEditorMode("create")}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          <Plus size={16} />
+          Create house
+        </button>
+      }
+    >
+
+      {houses.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {houses.map((house) => (
+            <button
+              key={house.id}
+              type="button"
+              aria-label={`Edit ${house.name}`}
+              onClick={() => {
+                setEditHouseName(house.name);
+                setEditHouseColor(getHouseColor(house));
+                setEditHouseDescription(house.description ?? "");
+                setEditThemeMode(getHouseThemeMode(house));
+                setEditSecondaryColor(getOptionalHouseColor(house.themeSecondaryColor, DEFAULT_SECONDARY_COLOR));
+                setEditSurfaceColor(getOptionalHouseColor(house.themeSurfaceColor, DEFAULT_SURFACE_COLOR));
+                setEditorMode("edit");
+              }}
+              className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+            >
+              <span
+                className="mt-0.5 h-10 w-10 shrink-0 rounded-full border shadow-sm"
+                style={{ backgroundColor: getHouseColor(house) }}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-lg font-semibold">{house.name}</span>
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  {house.description || "No description yet"}
+                </span>
+                <span className="mt-2 block text-xs font-medium text-muted-foreground">
+                  {getHouseThemeMode(house) === "CUSTOM" ? "Custom palette" : "Generated palette"}
+                </span>
+              </span>
+              <PencilSimple size={16} className="shrink-0 text-muted-foreground" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <ManageEmptyState
+          title="No houses yet"
+          description="Create the first house before assigning members."
+          action={
+            <button
+              type="button"
+              onClick={() => setEditorMode("create")}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              Create the first house
+            </button>
+          }
+        />
+      )}
+
+      <ManageDetailSheet
+        open={Boolean(editorMode)}
+        onOpenChange={(open) => {
+          if (!open) setEditorMode(null);
+        }}
+        title={editorMode === "create" ? "Create house" : `Edit ${editHouseName}`}
+        description={
+          editorMode === "create"
+            ? "Set the identity used throughout the organization."
+            : "Update this house without affecting its members or score history."
+        }
+        closeLabel="Close house editor"
+        maxWidthClassName="max-w-2xl"
+      >
+        {editorMode === "create" ? (
         <form
           aria-label="Create house"
           onSubmit={handleCreate}
-          className="grid gap-3 rounded-xl border p-5 bg-card"
+          className="grid gap-3"
         >
           <h5 className="text-sm font-semibold flex items-center gap-2">
             <Plus size={16} />
@@ -378,39 +460,17 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             {createPending ? "Creating..." : "Create"}
           </button>
         </form>
-
+        ) : (
         <form
           aria-label="Edit house"
           onSubmit={handleEdit}
-          className="grid gap-3 rounded-xl border p-5 bg-card"
+          className="grid gap-3"
         >
           <h5 className="text-sm font-semibold flex items-center gap-2">
             <PencilSimple size={16} />
             Edit House
           </h5>
-          <select
-            name="name"
-            aria-label="House to edit"
-            className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none"
-            required
-            value={editHouseName}
-            onChange={(event) => {
-              const selectedHouseName = event.target.value;
-              const selectedHouse = houses.find((house) => house.name === selectedHouseName);
-
-              setEditHouseName(selectedHouseName);
-              setEditHouseColor(getHouseColor(selectedHouse));
-              setEditHouseDescription(selectedHouse?.description ?? "");
-              setEditThemeMode(getHouseThemeMode(selectedHouse));
-              setEditSecondaryColor(getOptionalHouseColor(selectedHouse?.themeSecondaryColor, DEFAULT_SECONDARY_COLOR));
-              setEditSurfaceColor(getOptionalHouseColor(selectedHouse?.themeSurfaceColor, DEFAULT_SURFACE_COLOR));
-            }}
-          >
-            <option value="" disabled>Select house...</option>
-            {houses.map((house) => (
-              <option key={house.id} value={house.name}>{house.name}</option>
-            ))}
-          </select>
+          <input type="hidden" name="name" value={editHouseName} />
           <ColorField
             id="edit-house-color"
             label="New color"
@@ -447,7 +507,8 @@ export function HouseManagement({ houses, onCreateHouse }: HouseManagementProps)
             {editPending ? "Saving..." : "Save changes"}
           </button>
         </form>
-      </div>
-    </section>
+        )}
+      </ManageDetailSheet>
+    </ManageWorkspace>
   );
 }

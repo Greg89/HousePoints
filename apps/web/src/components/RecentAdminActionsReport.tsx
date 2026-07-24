@@ -1,6 +1,7 @@
 import {
   Buildings,
   Calendar,
+  ClipboardText,
   LinkSimple,
   ShieldCheck,
   TrendDown,
@@ -13,6 +14,9 @@ import {
 } from "@phosphor-icons/react";
 import { useMemo, useState, useTransition } from "react";
 import type { AdminAuditAction, PagedAdminAuditActions } from "@housepoints/contracts";
+import { ManageEmptyState } from "./ManageEmptyState";
+import { ManageToolbar } from "./ManageToolbar";
+import { ManageResourceList } from "./ManageResourceList";
 
 interface RecentAdminActionsReportProps {
   actions: AdminAuditAction[];
@@ -123,15 +127,20 @@ export function RecentAdminActionsReport({
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-6">
-      <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-        <div>
-          <p className="text-sm font-medium text-primary">Admin audit</p>
-          <h4 className="font-display text-xl font-semibold mt-1">Audit history</h4>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-            Full history of important organization changes, including deleted point awards.
-          </p>
-        </div>
+    <section aria-labelledby="audit-history-heading">
+      <div>
+        <h3 id="audit-history-heading" className="font-display text-xl font-semibold">History</h3>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Full history of important organization changes, including deleted point awards.
+        </p>
+      </div>
+
+      <ManageToolbar
+        label="Audit controls"
+        className="mt-5"
+        status={actionCountLabel}
+        error={loadError}
+      >
         <label className="grid gap-2 text-sm font-medium">
           Filter history
           <select
@@ -147,20 +156,19 @@ export function RecentAdminActionsReport({
             ))}
           </select>
         </label>
-      </div>
+      </ManageToolbar>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{actionCountLabel}</span>
-        {loadError ? <span className="font-medium text-destructive">{loadError}</span> : null}
-      </div>
-
-      <div className="mt-3 overflow-hidden rounded-xl border">
+      <ManageResourceList label="Audit history" className="mt-3">
         {visibleActions.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No audit history matches this filter yet.
-          </p>
+          <ManageEmptyState
+            title="No audit history matches this filter yet."
+            description="Choose another event type or check back after an administrative change."
+            icon={<ClipboardText size={24} />}
+            compact
+            className="rounded-none border-0 bg-transparent"
+          />
         ) : (
-          <div className="divide-y">
+          <>
             {visibleActions.map((action) => {
               const Icon = actionIcons[action.type];
 
@@ -189,9 +197,9 @@ export function RecentAdminActionsReport({
                 </article>
               );
             })}
-          </div>
+          </>
         )}
-      </div>
+      </ManageResourceList>
 
       {currentNextCursor ? (
         <div className="mt-5 flex justify-center">

@@ -21,28 +21,28 @@ Required staging state:
 - The user can award points to the configured target member. Members can award points, so elevated access is not required for this user.
 - The user can react to point awards in Activity. The happy-path smoke reacts to the award it creates and opens the reaction detail dialog.
 
-### Optional Admin E2E User
+### Admin E2E User
 
 GitHub Environment secrets:
 
 - `E2E_ADMIN_EMAIL`
 - `E2E_ADMIN_PASSWORD`
 
-Required staging state when configured:
+Required staging state:
 
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
 - The user has an `ADMIN` role so Manage and Audit are visible while owner-only tabs remain disabled.
 - The user has a house assignment so the dashboard renders normally.
 
-### Optional Owner E2E User
+### Owner E2E User
 
 GitHub Environment secrets:
 
 - `E2E_OWNER_EMAIL`
 - `E2E_OWNER_PASSWORD`
 
-Required staging state when configured:
+Required staging state:
 
 - The user can authenticate through the staging Auth0 application.
 - The user belongs to the staging E2E organization.
@@ -89,7 +89,22 @@ Required staging state:
 - The value must match the target member's display name as rendered in the Award Points member picker.
 - The target member belongs to the same staging E2E organization as the primary E2E user.
 - The target member has a house assignment.
+- The target member has the `MEMBER` or `ADMIN` role and is not the organization owner.
 - The target member should remain active and should not be removed from the organization.
+
+### Optional Role-Mutation Target
+
+GitHub Environment secret:
+
+- `E2E_ROLE_TARGET_MEMBER`
+
+Required staging state when configured:
+
+- The value matches a stable member display name in the staging E2E organization.
+- The target has the `MEMBER` or `ADMIN` role and is not the organization owner.
+- The target is distinct from the primary, admin, owner, reaction actor, and reaction recipient
+  accounts used to sign into the suite.
+- The target does not need separate Auth0 credentials because the owner performs the mutation.
 
 ### Organization Scope
 
@@ -105,7 +120,7 @@ The staging E2E organization should contain:
 
 - one active organization;
 - at least two active members;
-- at least one active house;
+- at least two active houses so team-assignment mutations can move and restore a member;
 - an active season;
 - the primary E2E user with permission to award points;
 - the configured target member with a stable display name.
@@ -114,17 +129,46 @@ The mutating happy-path test intentionally creates point activity and one reacti
 
 The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. The What's New link is asserted only when that control is visible in the target environment, so staging can enable that product surface without adding new required secrets.
 
-The read-only Manage Audit smoke test uses `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` when they are configured. If those optional secrets are missing, that spec skips cleanly while the member-level smoke and happy-path tests continue to run.
+The read-only Manage suite requires both elevated actors in the staging workflow. Local runs still
+skip elevated specs when their credentials are absent, but staging configuration validation fails
+when either actor is missing so permission regressions cannot silently pass.
 
 ## Role Smoke Coverage
 
 Dedicated owner/admin/member smoke coverage is intentionally split by actor:
 
 - Primary member actor: dashboard read path and member-level point award access.
-- Optional admin actor: admin Manage sections, including members and audit, with owner-only tabs either omitted or visible but disabled.
-- Optional owner actor: owner-only Manage tabs enabled.
+- Admin actor: all six Manage destinations remain visible, with Members and Audit enabled and owner-only destinations focusable but unavailable.
+- Owner actor: all six Manage destinations are enabled.
 
-The admin and owner credentials remain optional so local runs and partially configured environments skip those slices cleanly. In the staging GitHub Environment, configure both optional actors when you want the full permission smoke suite to run.
+The admin and owner credentials remain optional for local development, but both are required in
+the staging GitHub Environment. The Manage workspace suite also verifies deep-link URL state,
+refresh and browser history, member filtering and detail-sheet focus restoration, Audit modes,
+owner tool sheets, and the admin mobile picker without submitting mutations.
+
+## Reversible Team Mutation Coverage
+
+The Manage mutation smoke covers two reversible operations:
+
+- the admin reassigns `E2E_TARGET_MEMBER` to a different existing house;
+- when `E2E_ROLE_TARGET_MEMBER` is configured, the owner toggles that dedicated target between
+  member and admin access.
+
+Each test verifies the mutation survives fresh navigation and restores the original state in a
+`finally` cleanup. The target member must begin assigned to a house, must not be the organization
+owner, and the organization must retain at least two active houses. The role target must not be an
+account used for E2E login; changing a test actor's live permissions can invalidate its session or
+cached dashboard state even after restoration. A cleanup failure fails the run so staging fixture
+drift is visible rather than silently accumulating.
+
+## Historical Season Coverage
+
+The season-report smoke discovers the first completed season from the Overview reporting selector.
+It verifies that the historical Overview report and season recap load, then confirms the
+Leaderboard uses the same historical season. This path is read-only and requires no additional
+secret. A completed historical season is an optional fixture: the test reports as skipped when the
+organization only has its active season. Do not create a historical season during E2E setup,
+because starting one would irreversibly close the current season and reset current scoring.
 
 ## Reaction Notification Smoke Coverage
 
@@ -159,6 +203,7 @@ $env:E2E_REACTION_ACTOR_PASSWORD = "test-password"
 $env:E2E_REACTION_RECIPIENT_EMAIL = "stable-target-member@example.com"
 $env:E2E_REACTION_RECIPIENT_PASSWORD = "test-password"
 $env:E2E_TARGET_MEMBER = "Stable Target Member"
+$env:E2E_ROLE_TARGET_MEMBER = "Dedicated Role Target"
 $env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
 ```
