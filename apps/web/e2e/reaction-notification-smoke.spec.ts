@@ -47,7 +47,7 @@ async function createAward(browser: Browser, targetMember: string, note: string)
 
     await selectMemberFromCombobox(page, dialog, /recipient/i, targetMember);
     await dialog.getByRole("button", { name: "+5", exact: true }).click();
-    await dialog.getByText(/select a trait/i).click();
+    await dialog.getByRole("combobox").filter({ hasText: /select a trait/i }).click();
     await page.getByRole("option", { name: /collaboration/i }).click();
     await dialog.getByPlaceholder(/describe what they did well/i).fill(note);
     await dialog.getByRole("button", { name: /^award points$/i }).click();
