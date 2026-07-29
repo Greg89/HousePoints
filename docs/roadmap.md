@@ -92,7 +92,7 @@ Each tier has its own file with detailed task breakdowns.
 |---|------|--------|
 | 6.0 | Triage open questions in the mobile design doc (push provider, bootstrap endpoint, shared theme, admin scope, bundle id/scheme, Expo Updates) | [done] |
 | 6.0a | Extract `packages/theme` (design tokens + house-color math) and refactor `apps/web` to consume it | [done] |
-| 6.1 | Spike: scaffold `apps/mobile` (Expo + TS) and prove Auth0 native PKCE against the existing API `AUTH0_AUDIENCE` | [todo] |
+| 6.1 | Spike: scaffold `apps/mobile` (Expo + TS) and prove Auth0 native PKCE against the existing API `AUTH0_AUDIENCE` | [doing] |
 | 6.2 | Phase 1 MVP - sign in, org picker, dashboard, leaderboard, activity feed with pagination, award points, profile display-name edit | [todo] |
 | 6.3 | Phase 1 MVP - in-app notifications list, mark-read, and pull-to-refresh across primary tabs | [todo] |
 | 6.4 | Phase 2 - `DeviceRegistration` model, `/devices` routes, and push dispatch hook alongside the existing notification writer | [todo] |
