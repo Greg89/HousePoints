@@ -1,5 +1,6 @@
 import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
 import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -88,6 +89,13 @@ export default function HomeScreen() {
           {activeMembership?.organizationName ?? "-"}
         </Text>
       </View>
+
+      <Pressable
+        style={styles.awardButton}
+        onPress={() => router.push("/award")}
+      >
+        <Text style={styles.awardLabel}>+ Award points</Text>
+      </Pressable>
 
       {initialLoading ? (
         <View style={styles.centered}>
@@ -225,6 +233,17 @@ const styles = StyleSheet.create({
   heading: { paddingTop: 8 },
   greeting: { fontSize: 24, fontWeight: "700", color: "#0f172a" },
   org: { fontSize: 15, color: "#475569", marginTop: 4 },
+  awardButton: {
+    backgroundColor: "#0f172a",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  awardLabel: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
   centered: {
     alignItems: "center",
     justifyContent: "center",
