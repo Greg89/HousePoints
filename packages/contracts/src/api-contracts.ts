@@ -82,13 +82,16 @@ import {
   releaseAnnouncementSchema,
 } from "./release-schemas.js";
 
-type ApiContract = {
-  request: z.ZodType;
-  response: z.ZodType;
+type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
+  request: Req;
+  response: Res;
   error: typeof apiErrorSchema;
 };
 
-function defineContract(request: z.ZodType, response: z.ZodType): ApiContract {
+function defineContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny>(
+  request: Req,
+  response: Res,
+): ApiContract<Req, Res> {
   return {
     request,
     response,

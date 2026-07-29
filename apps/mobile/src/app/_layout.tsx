@@ -1,16 +1,44 @@
-import { Stack } from "expo-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
+import { Stack } from "expo-router";
+import { useMemo } from "react";
+import { Auth0Provider } from "react-native-auth0";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Auth0Provider, auth0Config } from "@/lib/auth";
+
+import { AuthProvider } from "@/context/auth-provider";
+import { OrgProvider } from "@/context/org-provider";
+import { ToastProvider } from "@/context/toast-provider";
+import { auth0Config } from "@/lib/auth";
 
 export default function RootLayout() {
-  const { domain, clientId } = auth0Config();
+  const { domain, clientId } = useMemo(() => auth0Config(), []);
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: 1,
+            refetchOnWindowFocus: false,
+            staleTime: 30_000,
+          },
+        },
+      }),
+    [],
+  );
 
   return (
     <SafeAreaProvider>
       <Auth0Provider domain={domain} clientId={clientId}>
-        <StatusBar style="auto" />
-        <Stack screenOptions={{ headerShown: false }} />
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <OrgProvider>
+              <ToastProvider>
+                <StatusBar style="dark" />
+                <Stack screenOptions={{ headerShown: false }} />
+              </ToastProvider>
+            </OrgProvider>
+          </AuthProvider>
+        </QueryClientProvider>
       </Auth0Provider>
     </SafeAreaProvider>
   );
