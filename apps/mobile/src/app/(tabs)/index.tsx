@@ -64,6 +64,12 @@ export default function HomeScreen() {
 
   const failed = summaryQuery.error ?? housesQuery.error;
 
+  // Local annotations force TS to resolve the query response types. Without
+  // them TanStack Query's `data` degrades to `any` because `callApi<E>`'s
+  // `z.output` return type does not distribute through the generic boundary.
+  const summary: DashboardSummary | undefined = summaryQuery.data;
+  const houses: LeaderboardEntry[] | undefined = housesQuery.data;
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -91,15 +97,15 @@ export default function HomeScreen() {
         <ErrorCard error={failed} onRetry={onRefresh} />
       ) : (
         <>
-          {summaryQuery.data ? (
+          {summary ? (
             <SeasonHeader
-              seasonName={summaryQuery.data.selectedSeason.name}
-              startsAt={summaryQuery.data.selectedSeason.startsAt}
+              seasonName={summary.selectedSeason.name}
+              startsAt={summary.selectedSeason.startsAt}
             />
           ) : null}
-          {housesQuery.data ? <HousesSection houses={housesQuery.data} /> : null}
-          {summaryQuery.data?.seasonStandout ? (
-            <StandoutCard standout={summaryQuery.data.seasonStandout} />
+          {houses ? <HousesSection houses={houses} /> : null}
+          {summary?.seasonStandout ? (
+            <StandoutCard standout={summary.seasonStandout} />
           ) : null}
         </>
       )}
