@@ -57,6 +57,8 @@ import {
   adminAuditRequestSchema,
   archiveOrgResponseSchema,
   archiveOrgSchema,
+  restoreOrgResponseSchema,
+  restoreOrgSchema,
   adminContextSchema,
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
@@ -84,6 +86,7 @@ const webConsumedApiEndpoints = [
   "/admin/org/slug",
   "/admin/org/owner",
   "/admin/org/archive",
+  "/admin/org/restore",
   "/admin/point-adjustments/stats",
   "/admin/users/assign-house",
   "/admin/users/display-name",
@@ -2001,6 +2004,37 @@ describe("archiveOrgSchema", () => {
   });
 });
 
+describe("restoreOrgSchema", () => {
+  it("accepts a slug-scoped restore request and active response", () => {
+    expect(restoreOrgSchema.parse({ slug: "acme" })).toEqual({ slug: "acme" });
+    expect(
+      restoreOrgResponseSchema.parse({
+        id: "org-1",
+        name: "Acme Corp",
+        slug: "acme",
+        archivedAt: null,
+      }),
+    ).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    });
+  });
+
+  it("rejects unsafe slugs and non-null archived timestamps", () => {
+    expect(restoreOrgSchema.safeParse({ slug: "Acme Corp" }).success).toBe(false);
+    expect(
+      restoreOrgResponseSchema.safeParse({
+        id: "org-1",
+        name: "Acme Corp",
+        slug: "acme",
+        archivedAt: "2026-07-04T17:30:00.000Z",
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe("inviteLinkSchema", () => {
   const valid = {
     id: "invite-1",
@@ -2168,12 +2202,14 @@ describe("orgRouteContextSchema", () => {
       organizationSlug: "acme",
       organizationName: "Acme Corp",
       archivedAt: "2026-07-04T17:30:00.000Z",
+      canRestore: true,
     })).toEqual({
       status: "ARCHIVED",
       requestedSlug: "acme",
       organizationSlug: "acme",
       organizationName: "Acme Corp",
       archivedAt: "2026-07-04T17:30:00.000Z",
+      canRestore: true,
     });
 
     expect(orgRouteContextSchema.parse({

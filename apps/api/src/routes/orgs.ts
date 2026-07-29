@@ -465,6 +465,7 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
           organizationSlug: resolvedSlug.currentSlug,
           organizationName: requestedMembership.organizationName,
           archivedAt,
+          canRestore: requestedMembership.role === "OWNER",
         });
       }
 

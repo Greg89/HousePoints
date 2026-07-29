@@ -96,6 +96,7 @@ export type UserRouteMembershipContext = {
   organizationName: string;
   organizationSlug: string;
   organizationArchivedAt: Date | null;
+  role: UserRole;
 };
 
 export type UserRouteOrgContext = UserOrgContext & {
@@ -241,6 +242,7 @@ export async function getUserRouteOrgContextBySub(
       },
       select: {
         organizationId: true,
+        role: true,
         organization: {
           select: {
             name: true,
@@ -277,7 +279,68 @@ export async function getUserRouteOrgContextBySub(
           organizationName: requestedMembership.organization.name,
           organizationSlug: requestedMembership.organization.slug,
           organizationArchivedAt: requestedMembership.organization.archivedAt ?? null,
+          role: requestedMembership.role,
         }
       : null,
+  };
+}
+
+export async function getArchivedOwnerActorBySubAndSlug(
+  auth0Sub: string,
+  organizationSlug: string,
+): Promise<ActorRecord | null> {
+  const userSelect = {
+    id: true,
+    displayName: true,
+    memberships: {
+      where: {
+        isActive: true,
+        archivedAt: null,
+        role: "OWNER" as const,
+        organization: {
+          slug: organizationSlug,
+          archivedAt: { not: null },
+        },
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        role: true,
+        houseId: true,
+        organization: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
+      },
+      take: 1,
+    },
+  } as const;
+
+  const identity = await prisma.authIdentity.findUnique({
+    where: { providerSubject: auth0Sub },
+    select: { user: { select: userSelect } },
+  });
+  const user = identity?.user ?? await prisma.user.findUnique({
+    where: { auth0Sub },
+    select: userSelect,
+  });
+  const membership = user?.memberships[0];
+
+  if (!user || !membership) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    auth0Sub,
+    displayName: user.displayName,
+    membershipId: membership.id,
+    role: membership.role,
+    houseId: membership.houseId,
+    organizationId: membership.organizationId,
+    organizationName: membership.organization.name,
+    organizationSlug: membership.organization.slug,
   };
 }

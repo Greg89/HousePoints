@@ -20,6 +20,8 @@ import {
   adminUserSchema,
   archiveOrgResponseSchema,
   archiveOrgSchema,
+  restoreOrgResponseSchema,
+  restoreOrgSchema,
 } from "./admin-schemas.js";
 import {
   dashboardSummarySchema,
@@ -102,6 +104,7 @@ export const apiContracts = {
   "/admin/org/slug": defineContract(updateOrgSlugSchema, orgSettingsSchema),
   "/admin/org/owner": defineContract(transferOwnerSchema, adminUserSchema),
   "/admin/org/archive": defineContract(archiveOrgSchema, archiveOrgResponseSchema),
+  "/admin/org/restore": defineContract(restoreOrgSchema, restoreOrgResponseSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,

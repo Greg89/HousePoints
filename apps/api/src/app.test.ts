@@ -4312,6 +4312,90 @@ describe("POST /admin/org/archive", () => {
   });
 });
 
+describe("POST /admin/org/restore", () => {
+  it("allows an archived organization owner to restore it and writes an audit event", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-owner",
+        displayName: "Olivia",
+        memberships: [{
+          id: "membership-owner",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }],
+      },
+    });
+    mockOrgUpdate.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/restore",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockOrgUpdate).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      data: {
+        archivedAt: null,
+        archivedById: null,
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "ORG_RESTORED",
+        summary: "Olivia restored Acme Corp.",
+        metadata: {
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          restoredAt: expect.any(String),
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    });
+    await app.close();
+  });
+
+  it("rejects members and non-members without exposing archived organization details", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-member",
+        displayName: "Alice",
+        memberships: [],
+      },
+    });
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/restore",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /admin/users/remove", () => {
   it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
@@ -6109,6 +6193,7 @@ describe("POST /orgs/create", () => {
         memberships: [
           {
             organizationId: "org-1",
+            role: "MEMBER",
             role: "OWNER",
             houseId: "house-1",
             organization: { name: "Acme Corp", slug: "acme" },
@@ -6676,6 +6761,7 @@ describe("POST /orgs/route-context", () => {
       organizationSlug: "acme",
       organizationName: "Acme Corp",
       archivedAt: "2026-07-04T17:30:00.000Z",
+      canRestore: false,
     });
     await app.close();
   });

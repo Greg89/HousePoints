@@ -153,6 +153,9 @@ Grow the suite slowly:
    when the optional completed-season staging fixture exists.
 6. Notifications: receive, preview, mark read.
 7. Manage Audit pagination: filter coverage is implemented; pagination remains future coverage.
+8. Organization lifecycle: an optional dedicated staging organization validates multi-org switching,
+   owner archive, archived-state authorization, and owner restore with cleanup. It runs only when
+   `E2E_LIFECYCLE_ORG_SLUG` is configured so the primary staging organization is never archived.
 
 Each added E2E path should be stable against real Auth0 and staging timing. Prefer fewer high-value tests over a broad brittle suite.
 
@@ -174,5 +177,5 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 | A3 - Production notification broadcast | Implemented | Secret-protected broadcast endpoint and manual workflow handoff implemented. |
 | A4 - What's new UX | Implemented | Release notifications and the persistent account-menu What's New entry link to public release notes. |
 | B1 - Scheduled staging E2E workflow | Implemented | Manual and weekday scheduled workflow added. |
-| B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; owner/admin actors and two active houses support reversible Manage coverage. |
-| B3 - E2E coverage expansion | In progress | Dashboard, account-menu, role access, complete Manage workspace, Manage Audit, reversible team mutations, and optional historical season reporting coverage added. Notifications and Audit pagination remain. |
+| B2 - Test data contract | In progress | Staging data contract documented and centralized in Playwright config helpers; owner/admin actors, two active houses, and an optional dedicated lifecycle organization support reversible Manage coverage. |
+| B3 - E2E coverage expansion | In progress | Dashboard, account-menu, role access, complete Manage workspace, Manage Audit, reversible team mutations, optional lifecycle recovery, and optional historical season reporting coverage added. Notification read behavior and Audit pagination remain. |

@@ -52,7 +52,7 @@ Each tier has its own file with detailed task breakdowns.
 | 3.7 | Admin/owner soft delete for point awards plus recent-deletions Manage report | [done] |
 | 3.8 | Seasons UX pass: selector, historical reports, Manage controls, and current-season status | [done] |
 | 3.9 | Manage Team layout cleanup plus invite-generation/use reporting | [done] |
-| 3.12 | Manage resource workspaces refactor | [doing] |
+| 3.12 | Manage resource workspaces refactor | [done] |
 
 ---
 
@@ -79,6 +79,6 @@ Each tier has its own file with detailed task breakdowns.
 | 5.2 | Staging environment (Railway environments) | [done] |
 | 5.3 | Connection pooling via capped direct Postgres pool | [done] |
 | 5.4 | Self-serve org creation and single-use invite joining | [done] |
-| 5.5 | Org settings, owner transfer, admin removal, and org deletion | [doing] |
+| 5.5 | Org settings, owner transfer, member removal, and archive/restore lifecycle | [done] |
 | 5.6 | Multi-org membership model | [done] |
 | 5.7 | Query count and response-time baselines for empty, typical, and larger orgs | [done] |

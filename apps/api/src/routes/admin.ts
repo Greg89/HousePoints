@@ -10,6 +10,7 @@ import {
   createHouseSchema,
   promoteUserSchema,
   removeOrgMemberSchema,
+  restoreOrgSchema,
   seasonScopedRequestSchema,
   transferOwnerSchema,
   updateMemberDisplayNameSchema,
@@ -20,6 +21,7 @@ import { isOrganizationSlugReserved, prisma, updateUserDisplayName } from "@hous
 import { info, warn } from "../logging.js";
 import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapDeletedPoint, DELETED_POINT_SELECT } from "./points.js";
+import { getArchivedOwnerActorBySubAndSlug } from "../actor.js";
 
 export async function loadAdminContextData(organizationId: string) {
   const [
@@ -452,6 +454,43 @@ export async function archiveOrganizationInDb(params: {
     });
 
     return { ...organization, archivedAt };
+  });
+}
+
+export async function restoreOrganizationInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  organizationName: string;
+  organizationSlug: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const restoredAt = new Date();
+    const restoredAtIso = restoredAt.toISOString();
+    const organization = await tx.organization.update({
+      where: { id: params.organizationId },
+      data: {
+        archivedAt: null,
+        archivedById: null,
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "ORG_RESTORED",
+        summary: `${params.actorDisplayName} restored ${params.organizationName}.`,
+        metadata: {
+          organizationName: params.organizationName,
+          organizationSlug: params.organizationSlug,
+          restoredAt: restoredAtIso,
+        },
+      },
+    });
+
+    return organization;
   });
 }
 
@@ -951,6 +990,41 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       ...archivedOrganization,
       archivedAt: archivedOrganization.archivedAt.toISOString(),
     };
+  });
+
+  app.post("/admin/org/restore", async (request, reply) => {
+    const parsed = await parseBody(restoreOrgSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await getArchivedOwnerActorBySubAndSlug(
+      request.auth.subject,
+      parsed.slug,
+    );
+    if (!actor) {
+      warn(request.log, "owner.forbidden", {
+        organizationSlug: parsed.slug,
+      });
+      return reply.status(403).send({
+        code: "OWNER_REQUIRED",
+        message: "Owner access to the archived organization is required",
+      });
+    }
+
+    const restoredOrganization = await restoreOrganizationInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      organizationName: actor.organizationName,
+      organizationSlug: actor.organizationSlug,
+    });
+
+    info(request.log, "admin.org.restored", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      organizationSlug: actor.organizationSlug,
+    });
+
+    return restoredOrganization;
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {

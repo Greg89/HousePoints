@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { notFound, redirect } from "next/navigation";
 import { readOrgRouteContext } from "@/app/actions/orgs";
+import { restoreOrganization } from "@/app/actions/admin";
 import { renderDashboardPage } from "@/app/dashboard-page";
 import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { WebAuthenticationError } from "@/lib/api-client";
@@ -14,10 +15,17 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
+  useRouter: () => ({
+    replace: vi.fn(),
+  }),
 }));
 
 vi.mock("@/app/actions/orgs", () => ({
   readOrgRouteContext: vi.fn(),
+}));
+
+vi.mock("@/app/actions/admin", () => ({
+  restoreOrganization: vi.fn(),
 }));
 
 vi.mock("@/app/dashboard-page", () => ({
@@ -138,6 +146,7 @@ describe("OrganizationDashboardPage", () => {
       organizationSlug: "acme",
       organizationName: "Acme Corp",
       archivedAt: "2026-07-04T17:30:00.000Z",
+      canRestore: false,
     });
 
     render(await renderPage("acme"));
@@ -148,6 +157,23 @@ describe("OrganizationDashboardPage", () => {
     expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute("href", "/auth/logout");
     expect(readActiveOrganizationSlugMock).not.toHaveBeenCalled();
     expect(renderDashboardPageMock).not.toHaveBeenCalled();
+  });
+
+  it("offers restore only to an archived organization owner", async () => {
+    readOrgRouteContextMock.mockResolvedValue({
+      status: "ARCHIVED",
+      requestedSlug: "acme",
+      organizationSlug: "acme",
+      organizationName: "Acme Corp",
+      archivedAt: "2026-07-04T17:30:00.000Z",
+      canRestore: true,
+    });
+
+    render(await renderPage("acme"));
+
+    expect(screen.getByRole("form", { name: "Restore Acme Corp" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore organization" })).toBeDisabled();
+    expect(vi.mocked(restoreOrganization)).not.toHaveBeenCalled();
   });
 
   it("prompts signed-out users to log in with a return path", async () => {

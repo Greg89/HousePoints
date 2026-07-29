@@ -180,7 +180,7 @@ No database migration required unless custom colors are included in this phase.
 
 ### Phase 3: Persist Custom House Palettes
 
-Status: owner controls in progress.
+Status: complete.
 
 Requires a database migration and contract updates.
 

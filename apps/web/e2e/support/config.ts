@@ -55,6 +55,10 @@ export function readE2ERoleTargetMemberName() {
   return process.env.E2E_ROLE_TARGET_MEMBER?.trim() || null;
 }
 
+export function readE2ELifecycleOrgSlug() {
+  return process.env.E2E_LIFECYCLE_ORG_SLUG?.trim() || null;
+}
+
 export function readE2EStartPath() {
   const slug = process.env.E2E_ORG_SLUG?.trim();
   return slug ? `/o/${encodeURIComponent(slug)}` : "/";

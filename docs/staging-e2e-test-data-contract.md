@@ -114,6 +114,16 @@ GitHub Environment secret:
 
 Playwright starts from `/o/{E2E_ORG_SLUG}` instead of `/`. The scheduled staging workflow requires this value so the E2E account always targets the known-good staging E2E organization, especially when the account belongs to more than one organization.
 
+### Optional dedicated lifecycle organization
+
+- `E2E_LIFECYCLE_ORG_SLUG`
+
+When configured, the owner account must also own a second organization reserved exclusively for
+lifecycle testing. It must not contain production-like staging data or be used by another E2E
+scenario. The lifecycle smoke switches from the primary E2E organization to this dedicated
+organization, archives it, verifies the archived state, and restores it in the same test. Cleanup
+attempts restore if the scenario fails after archive. Never point this value at `E2E_ORG_SLUG`.
+
 ## Current Required Organization State
 
 The staging E2E organization should contain:
@@ -204,6 +214,7 @@ $env:E2E_REACTION_RECIPIENT_EMAIL = "stable-target-member@example.com"
 $env:E2E_REACTION_RECIPIENT_PASSWORD = "test-password"
 $env:E2E_TARGET_MEMBER = "Stable Target Member"
 $env:E2E_ROLE_TARGET_MEMBER = "Dedicated Role Target"
+$env:E2E_LIFECYCLE_ORG_SLUG = "staging-lifecycle"
 $env:E2E_ORG_SLUG = "staging-e2e"
 npm run test:e2e
 ```

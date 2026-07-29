@@ -10,6 +10,9 @@ export type AwardPointsResult = MutationResult;
 export type ArchiveOrganizationResult =
   | { ok: true; redirectTo: string }
   | Extract<MutationResult, { ok: false }>;
+export type RestoreOrganizationResult =
+  | { ok: true; redirectTo: string }
+  | Extract<MutationResult, { ok: false }>;
 export type CreateOrgResult =
   | { ok: true; redirectTo: string }
   | Extract<MutationResult, { ok: false }>;

@@ -13,7 +13,7 @@ Allow any user to create their own organisation, configure houses within it, and
 ### Current state
 The `Organization` model exists and every entity is scoped to it. Self-serve organization creation is implemented for authenticated users: a creator provides organization details plus a first house, becomes `OWNER`, and is assigned to that house atomically. Admin/owner invite links are implemented as single-use tokens, and invite consumption is atomic and concurrency-safe. The API derives actor identity from verified Auth0 credentials and supports multiple Auth0 provider subjects per internal user through `AuthIdentity`.
 
-Still deferred: org archival/deletion, domain allow-list joining, and optional root redirects for dashboard slug routes. Owner-only organization display-name updates, slug updates, ownership transfer, admin promotion/demotion, member removal, and existing-member create-new-org UX are implemented. Multi-org membership is implemented at the data and authorization layer through `OrganizationMembership`, and legacy user org/role/house columns have been removed from the Prisma schema. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md), and org archive rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md).
+Owner-controlled organization archive and restore, display-name updates, slug updates, ownership transfer, admin promotion/demotion, member removal, and existing-member create-new-org UX are implemented. Multi-org membership is implemented at the data and authorization layer through `OrganizationMembership`, and legacy user org/role/house columns have been removed from the Prisma schema. New invites display slug-bearing links and route through `/o/{slug}/join/{token}` while preserving token-hash join security. The dashboard can now render at `/o/{slug}` after authenticated route-context validation, with old slug aliases redirecting to the current slug, and dashboard navigation prefers the slugged route. Slug-change safety is specified in [Organization Settings Design](./org-settings-design.md), dashboard route behavior is specified in [Dashboard Slug Routes Design](./dashboard-slug-routes-design.md), and archive/restore rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). Domain allow-list joining, optional root redirects, and hard delete remain deferred.
 
 ### How it should work
 
@@ -30,7 +30,7 @@ Still deferred: org archival/deletion, domain allow-list joining, and optional r
 - `OWNER` can promote members to `ADMIN`, demote admins back to `MEMBER`, and remove non-owner users from the organization from Manage Team. Role changes and removals are audited.
 - `OWNER` can rename the organization display name and change the organization slug from Manage Organization. Alias/reservation is in place because slugs are intended to become visible in URLs and invite links; see [Organization Settings Design](./org-settings-design.md).
 - Admins can see owner-only Manage sections, but Houses and Seasons are disabled unless the actor is an owner.
-- Org archival/deletion, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented yet.
+- Archive and owner self-service restore are implemented. Hard delete, optional root redirects for dashboard slug routes, and domain allow-list joining are not implemented.
 - `MEMBER`s have no admin capability; they award points only.
 
 **Joining an org**
@@ -83,7 +83,7 @@ Seasons are implemented for the core product flow. `PointTransaction` remains th
 - Implemented season dropdown in Overview.
 - Implemented active-season status card in Overview behind `SHOW_SEASON_OVERVIEW_CARD`.
 - Implemented Manage season controls.
-- Future reporting: winner summary, season detail view, stats per season, and season comparison across houses.
+- Winner summaries and cross-season house comparisons are implemented. A dedicated season-detail page and additional per-season analytics remain optional future reporting.
 
 **Edge cases**
 - Transactions made before seasons were introduced are backfilled to `Season 0`.
@@ -165,7 +165,7 @@ Allow members to react to point-award activity cards with a small controlled emo
 
 ### Current state
 
-Not implemented. The detailed product and technical plan lives in [Activity Reactions Design](./activity-reactions-design.md).
+Implemented. Award activity cards support a controlled positive reaction set, one active reaction per actor, soft removal, aggregate counts, reaction details, and a deduped notification to the recognized member. Deductions remain reaction-free. Unit, component, happy-path, and optional dedicated notification E2E coverage are in place. The detailed product and technical record lives in [Activity Reactions Design](./activity-reactions-design.md).
 
 ### MVP direction
 
