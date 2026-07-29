@@ -90,12 +90,13 @@ Each tier has its own file with detailed task breakdowns.
 
 | # | Task | Status |
 |---|------|--------|
-| 6.0 | Triage open questions in the mobile design doc (push provider, bootstrap endpoint, shared theme, admin scope, bundle id/scheme, Expo Updates) | [todo] |
+| 6.0 | Triage open questions in the mobile design doc (push provider, bootstrap endpoint, shared theme, admin scope, bundle id/scheme, Expo Updates) | [done] |
+| 6.0a | Extract `packages/theme` (design tokens + house-color math) and refactor `apps/web` to consume it | [todo] |
 | 6.1 | Spike: scaffold `apps/mobile` (Expo + TS) and prove Auth0 native PKCE against the existing API `AUTH0_AUDIENCE` | [todo] |
 | 6.2 | Phase 1 MVP - sign in, org picker, dashboard, leaderboard, activity feed with pagination, award points, profile display-name edit | [todo] |
 | 6.3 | Phase 1 MVP - in-app notifications list, mark-read, and pull-to-refresh across primary tabs | [todo] |
 | 6.4 | Phase 2 - `DeviceRegistration` model, `/devices` routes, and push dispatch hook alongside the existing notification writer | [todo] |
-| 6.5 | Phase 2 - Expo push integration on device, deep links (`housepoints://o/<slug>/...`), and point reactions on activity feed | [todo] |
+| 6.5 | Phase 2 - Expo Push integration on device, deep links (`housepoints://o/<slug>/...`), and point reactions on activity feed | [todo] |
 | 6.6 | Phase 3 - admin subset: member house assignment, role changes, invite generation/share, point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`) | [todo] |
-| 6.7 | Mobile CI - typecheck/lint/test workspace gates, Maestro E2E flow against staging, EAS Build profiles for preview and production | [todo] |
+| 6.7 | Mobile CI - typecheck/lint/test workspace gates, Maestro E2E flow against staging, EAS Build profiles for preview and production, Expo Updates enabled on both channels | [todo] |
 | 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs | [todo] |

@@ -98,7 +98,7 @@ Root `package.json` gains:
 | `apps/api` | **No source reuse.** Consumed over HTTP. | Additive endpoints for device registration and push preferences (§7). |
 | `apps/web/src/lib/api-client.ts` | **Reference implementation.** The mobile client mirrors the header contract (`authorization`, `x-request-id`, `x-housepoints-organization-slug`, `content-type`) and Zod response parsing. | Do not import — the web client depends on Next.js `server-only` and Auth0 Node SDK. Port the small `createApiRequester` + `parseApiResponse` pattern. |
 | `apps/web/src/lib/action-results.ts`, `logging.ts`, `active-organization.ts` | **Reference implementations.** Reimplement thin native equivalents. | Persisted values move from cookies/headers to `expo-secure-store` / `AsyncStorage`. |
-| Design tokens in `apps/web/src/app/globals.css` and `apps/web/src/lib/house-theme.ts` | **Reuse conceptually.** Extract the color/token math into a shared JS module so both web and mobile compute the same house colors. | Candidate for a future `packages/theme` extraction if the duplication cost grows. |
+| Design tokens in `apps/web/src/app/globals.css` and `apps/web/src/lib/house-theme.ts` | **Full reuse via a new `packages/theme`.** Extract token set and house-color math there; refactor web to consume it as part of the mobile Phase 1 prerequisite work. | Decided in §17. Pure logic only; DOM/CSS bits stay in the web app, RN styling in mobile. |
 
 ## 6. Auth flow
 
@@ -217,9 +217,10 @@ Deferred (web-only for now): season creation/transition, org archive, release an
 
 ## 10. Design system
 
-- Extract the current CSS custom-property token set (colors, spacing scale, radii, elevation) from `apps/web/src/app/globals.css` into a small TS object exported from a new `packages/theme` (or inline in `apps/mobile/src/lib/tokens.ts` initially, extract later if web wants the same source of truth).
-- House colors and derived contrast pairs come from `house-theme.ts` — the pure logic there is safe to lift into a shared module. The DOM-specific bits stay in the web app.
-- Screens use light + dark automatic mode by respecting `useColorScheme()`; the same token set has light/dark variants.
+- Create a new `packages/theme` workspace that exports the token set (colors, spacing scale, radii, elevation, light/dark variants) as plain TS objects, plus the pure house-color math currently in `apps/web/src/lib/house-theme.ts`.
+- Refactor `apps/web` to consume `packages/theme`: `globals.css` derives its CSS custom properties from the shared token object; `house-theme.ts` becomes a thin re-export. This is a Phase 1 prerequisite so mobile and web launch from one source of truth.
+- Mobile consumes the same package via a small style helper (e.g. NativeWind config generated from the token object, or direct `StyleSheet` factories). DOM/CSS-specific code stays in `apps/web`; RN-specific code stays in `apps/mobile`.
+- Screens use light + dark automatic mode by respecting `useColorScheme()`; the same token set exposes light/dark variants.
 - Iconography: `@expo/vector-icons` (Feather) to match the web app's minimal outline style.
 
 ## 11. State, caching, and error handling
@@ -247,6 +248,16 @@ EXPO_PUBLIC_SEQ_INGEST_URL=""        # optional client-side breadcrumb ingest
 ```
 
 `eas.json` profiles map `development` → local API, `preview` → staging, `production` → prod. No secrets ship in the app bundle — Auth0 native flow does not use a client secret.
+
+App identity (decided in §17 and locked in before Auth0 native app registration + store reservation):
+
+- Display name: **HousePoints**
+- iOS bundle id / Android application id: **`com.housepoints.app`**
+- URL scheme: **`housepoints://`**
+- Auth0 callback: `housepoints://com.housepoints.app/callback`
+- Auth0 logout: `housepoints://com.housepoints.app/logout`
+
+**Expo Updates (OTA)** is enabled from day one on both `preview` and `production` channels via `expo-updates`. Native code changes still require a store submission; JS-only fixes ship OTA within the same release channel. Rollback is `eas update --branch <channel> --republish` to the previous known-good runtime version.
 
 ## 13. Observability
 
@@ -278,20 +289,25 @@ EXPO_PUBLIC_SEQ_INGEST_URL=""        # optional client-side breadcrumb ingest
 
 ## 16. Rollout plan
 
-1. **Spike (1 short iteration)**: bare Expo app + Auth0 sign-in + one authenticated API call (`GET /me`). Confirms Auth0 tenant + PKCE config end-to-end.
-2. **MVP Phase 1** feature set behind a staging Auth0 connection. TestFlight + Play internal testing tracks.
-3. **Phase 2** push + reactions. Enables device registration and push endpoints in staging first.
-4. **Phase 3** admin subset. Gated by feature flag `MOBILE_ADMIN_ENABLED` in the mobile app for a soak period.
-5. **Public release** on both stores after two consecutive clean staging E2E runs.
+1. **Prereq**: extract `packages/theme` and refactor web to consume it (see §10, §17 decision). Land this before the mobile spike so the mobile app pulls from a shared token source day one.
+2. **Spike (1 short iteration)**: bare Expo app + Auth0 sign-in + one authenticated API call (`GET /me`). Confirms Auth0 tenant + PKCE config end-to-end. Locks in bundle id `com.housepoints.app` and scheme `housepoints://`.
+3. **MVP Phase 1** feature set behind a staging Auth0 connection. TestFlight + Play internal testing tracks. Expo Updates (`preview` channel) enabled here.
+4. **Phase 2** push + reactions. Enables device registration and push endpoints in staging first. Expo Push API used as the dispatcher.
+5. **Phase 3** admin subset (member mgmt, invites, point deduction). Gated by feature flag `MOBILE_ADMIN_ENABLED` in the mobile app for a soak period. Deeper Manage flows deep-link to the web dashboard.
+6. **Public release** on both stores after two consecutive clean staging E2E runs. Expo Updates (`production` channel) becomes the hotfix path.
 
-Roadmap update: add a new "Tier 6 — Mobile" section in [docs/roadmap.md](docs/roadmap.md) that mirrors the phasing above, once we agree to schedule.
+Roadmap update: Tier 6 in [docs/roadmap.md](docs/roadmap.md) mirrors this phasing.
 
-## 17. Open questions
+## 17. Decisions
 
-- **Push provider**: Expo Push API for MVP is proposed. Do we anticipate needing rich notifications (images, actions) that would push us to native APNs/FCM sooner?
-- **Bootstrap endpoint**: do we accept the extra round-trips on cold-start, or add `GET /me/bootstrap` in Phase 1?
-- **Design tokens**: extract into a shared `packages/theme` now, or keep tokens inline in mobile and refactor when the third consumer appears?
-- **Web parity for admin surface**: which admin flows are must-have on mobile vs. "web-only, deep-link out" (opens the web dashboard)?
-- **App name / bundle id / scheme**: `com.housepoints.app` + `housepoints://` proposed — confirm before we register the Auth0 Native Application and reserve store identifiers.
-- **Update strategy**: do we adopt Expo Updates (OTA JS bundle updates for hotfixes) from day one, or ship binary-only until we have a release cadence baseline?
+Triaged 2026-07-29. These replace the previous open-questions list.
+
+| # | Question | Decision | Notes |
+|---|---|---|---|
+| 17.1 | Push provider | **Expo Push API for MVP.** | Single HTTP call, APNs + FCM handled. Kept behind a `PushDispatcher` interface so a swap to native providers stays cheap if we later need rich pushes (images, action buttons, silent/data). |
+| 17.2 | `GET /me/bootstrap` endpoint | **Not added for MVP.** Reuse existing per-resource calls. | Revisit only if launch profiling shows cold-start latency is user-visible on cell networks. |
+| 17.3 | Design tokens | **Extract `packages/theme` immediately** and refactor web to consume it. | Firm prerequisite for the mobile spike. Web refactor is small and unblocks a single source of truth for house colors. Roadmap gains task 6.0a for the extraction. |
+| 17.4 | Admin scope on mobile | **Match the design doc**: member house assignment, role changes, invite generation/share, point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`). Everything else deep-links to web. | Deferred to web-only: season creation/transition, org archive, release announcements, house theme QA, season comparison report. |
+| 17.5 | App identity | **Name: HousePoints. Bundle id: `com.housepoints.app`. Scheme: `housepoints://`.** | Locked before Auth0 Native Application registration and store identifier reservation. Callback + logout URLs recorded in §12. |
+| 17.6 | Expo Updates (OTA) | **Enabled from day one** on `preview` and `production` channels. | JS-only hotfixes ship without store review. Native code changes still require an EAS Build + store submission. Rollback via `eas update --republish` to the previous runtime version. |
 
