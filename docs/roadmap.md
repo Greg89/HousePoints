@@ -95,8 +95,30 @@ Each tier has its own file with detailed task breakdowns.
 | 6.1 | Spike: scaffold `apps/mobile` (Expo + TS) and prove Auth0 native PKCE against the existing API `AUTH0_AUDIENCE` | [done] |
 | 6.2 | Phase 1 MVP - sign in, org picker, dashboard, leaderboard, activity feed with pagination, award points, profile display-name edit | [done] |
 | 6.3 | Phase 1 MVP - in-app notifications list, mark-read, and pull-to-refresh across primary tabs | [done] |
-| 6.4 | Phase 2 - `DeviceRegistration` model, `/devices` routes, and push dispatch hook alongside the existing notification writer | [doing] |
-| 6.5 | Phase 2 - Expo Push integration on device, deep links (`housepoints://o/<slug>/...`), and point reactions on activity feed | [todo] |
-| 6.6 | Phase 3 - admin subset: member house assignment, role changes, invite generation/share, point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`) | [todo] |
-| 6.7 | Mobile CI - typecheck/lint/test workspace gates, Maestro E2E flow against staging, EAS Build profiles for preview and production, Expo Updates enabled on both channels | [todo] |
+| 6.4a | Phase 2 - `DeviceRegistration` Prisma model + migration, `device-schemas` contracts, `POST /devices/register` + `POST /devices/unregister` routes with tests | [done] |
+| 6.4b | Phase 2 - `PushDispatcher` interface + Expo Push implementation, wire into notification-writer call sites (points, admin, orgs, seasons, releases), structured logging (`notifications.push_dispatched`, `notifications.push_failed`), env config (`EXPO_ACCESS_TOKEN`, `PUSH_DISPATCH_ENABLED`). See §7.2 of [mobile-app-design.md](./mobile-app-design.md) | [todo] |
+| 6.5a | Phase 2 - Mobile-side device registration: request notification permission on first launch, obtain Expo push token, call `POST /devices/register` on sign-in and on active-org change; call `POST /devices/unregister` on sign-out | [todo] |
+| 6.5b | Phase 2 - Deep links: `expo-router` linking config for `housepoints://o/<slug>/dashboard`, `housepoints://o/<slug>/activity/<pointId>`, `housepoints://invite/<token>`. Notification tap → route through the same linking config | [todo] |
+| 6.5c | Phase 2 - Point reactions on activity feed (`POST /transactions/react`, `GET /transactions/reactions`) with optimistic updates and long-press affordance mirroring the web pattern | [todo] |
+| 6.6a | Phase 3 - Admin gate: `MOBILE_ADMIN_ENABLED` feature flag + admin tab that only renders for `ADMIN`/`OWNER` roles; empty-state that deep-links to web for out-of-scope flows | [todo] |
+| 6.6b | Phase 3 - Manage members: house assignment (`POST /admin/users/assign-house`), role changes (`POST /admin/users/role`), remove member (`POST /admin/users/remove`) | [todo] |
+| 6.6c | Phase 3 - Invite generation + native share sheet (`POST /orgs/invite` + `expo-sharing`) | [todo] |
+| 6.6d | Phase 3 - Point deduction flow (`POST /points/deduct`), gated by `POINT_ADJUSTMENTS_ENABLED` from `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED` | [todo] |
+| 6.7a | Mobile CI - GitHub Actions workflow mirroring api/web: typecheck + lint + test for `@housepoints/mobile` on PR; caching for Expo/EAS | [todo] |
+| 6.7b | Mobile CI - Maestro E2E flow (sign-in → dashboard → award-points) against staging on `develop`; secret + environment plumbing documented in [release-and-e2e-automation.md](./release-and-e2e-automation.md) | [todo] |
+| 6.7c | Mobile CI - EAS Build profiles (`development`, `preview`, `production`) + Expo Updates channels; document rollback via `eas update --republish` | [todo] |
 | 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs | [todo] |
+
+### Tier 6 handoff notes (2026-07-30)
+
+Phase 1 MVP is fully in place (6.0 – 6.3). Phase 2 backend is halfway done: 6.4a landed `DeviceRegistration` model + `/devices/register` + `/devices/unregister`; 6.4b is the next slice.
+
+Key context for whoever picks this up next:
+
+- **Server notification seams for 6.4b** — the notification writer call sites are `apps/api/src/routes/points.ts`, `admin.ts`, `orgs.ts`, `seasons.ts`, `releases.ts`. Each performs `prisma.notification.createMany({ data: [...], skipDuplicates: true })`. §7.2 of the design doc mandates a *synchronous best-effort* dispatch immediately after persist. Preferred shape: a `writeAndDispatchNotifications(actor, rows)` helper (or a `dispatchPushForNotifications` post-persist call) that fans out to `prisma.deviceRegistration.findMany({ where: { organizationId, userId: { in: [...] }, revokedAt: null } })` and calls the injected `PushDispatcher`. Keep the dispatcher behind an interface so the Expo Push implementation can be swapped later.
+- **Eligible notification types for push** — `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `RELEASE_ANNOUNCEMENT`, `MEMBER_NEEDS_HOUSE_ASSIGNMENT` (admins only). Non-pushable types should short-circuit before the HTTP call.
+- **Test approach** — mock `deviceRegistration.findMany` and the `PushDispatcher` in `apps/api/src/app.test.ts` (`deviceRegistration` delegate is already in the top-level `vi.mock` block). Assert both the persist happens and the dispatcher is called with the expected payload.
+- **Mobile screens shipped** — Home, Leaderboard, Activity (paginated), Award (modal), Profile (display-name edit), Notifications (list + mark-read + mark-all-read). All under `apps/mobile/src/app/`. The `AlertsHeaderButton` in `apps/mobile/src/components/` drives the Home-tab unread badge.
+- **TanStack Query gotcha (documented in `/memories/repo/ui-notes.md`)** — `z.output<generic>` collapses to `any` at the queryFn boundary. Workaround: destructure to a local with an explicit annotation, e.g. `const data: PagedNotifications | undefined = query.data`. Continue this pattern in 6.5c reactions and 6.6b admin screens.
+- **Working agreement (from `AGENTS.md`)** — one focused slice per commit; agent does not commit or push. Definition of done for a slice touching production runtime: typecheck + test + build + lint green for touched workspaces. Contracts must be rebuilt (`npm.cmd run build -w @housepoints/contracts`) after schema edits so downstream workspaces see them.
+
