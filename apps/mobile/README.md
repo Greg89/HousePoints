@@ -89,7 +89,12 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.6b: add native member assignment, role-change, and removal tools.
+- Task 6.6c: add invite generation and the native share sheet.
+
+The native Members section loads organization-scoped users and houses. Admins
+and owners can assign houses; only owners can promote, demote, or remove
+non-owner members. Permission-sensitive changes use native confirmation
+prompts, and pull-to-refresh reconciles the server state.
 
 The Admin tab appears only when `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED=true` and
 the active organization role is `ADMIN` or `OWNER`. The route repeats the same

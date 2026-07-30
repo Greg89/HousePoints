@@ -225,7 +225,8 @@ Deduction rows do not expose reaction controls.
 
 **Phase 3 — Admin subset**
 
-- Manage members: house assignment, role changes, remove member (all existing admin routes under `/admin/*`).
+- Manage members: house assignment, role changes, remove member (implemented
+  with `/admin/context` and the existing mutation routes under `/admin/*`).
 - Invite generation + share sheet.
 - Point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`, same feature flag the web app respects).
 - Recent admin actions read view.
