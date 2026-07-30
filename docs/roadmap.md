@@ -102,7 +102,7 @@ Each tier has its own file with detailed task breakdowns.
 | 6.5c | Phase 2 - Point reactions on activity feed (`POST /transactions/react`, `GET /transactions/reactions`) with optimistic updates and long-press affordance mirroring the web pattern | [done] |
 | 6.6a | Phase 3 - Admin gate: `MOBILE_ADMIN_ENABLED` feature flag + admin tab that only renders for `ADMIN`/`OWNER` roles; empty-state that deep-links to web for out-of-scope flows | [done] |
 | 6.6b | Phase 3 - Manage members: house assignment (`POST /admin/users/assign-house`), role changes (`POST /admin/users/role`), remove member (`POST /admin/users/remove`) | [done] |
-| 6.6c | Phase 3 - Invite generation + native share sheet (`POST /orgs/invite` + `expo-sharing`) | [todo] |
+| 6.6c | Phase 3 - Invite generation + native share sheet (`POST /orgs/invite` + React Native `Share`; `expo-sharing` is file-only) | [done] |
 | 6.6d | Phase 3 - Point deduction flow (`POST /points/deduct`), gated by `POINT_ADJUSTMENTS_ENABLED` from `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED` | [todo] |
 | 6.7a | Mobile CI - GitHub Actions workflow mirroring api/web: typecheck + lint + test for `@housepoints/mobile` on PR; caching for Expo/EAS | [todo] |
 | 6.7b | Mobile CI - Maestro E2E flow (sign-in → dashboard → award-points) against staging on `develop`; secret + environment plumbing documented in [release-and-e2e-automation.md](./release-and-e2e-automation.md) | [todo] |
@@ -115,8 +115,8 @@ Phase 1 MVP is fully in place (6.0 – 6.3). Phase 2 backend is complete:
 6.4a provides device registration and 6.4b provides best-effort Expo push
 dispatch after committed in-app notifications. Mobile-side device registration
 and deep links are complete. Phase 2 mobile activity reactions are complete;
-the role-aware mobile admin gate and native member management are complete.
-Invite generation and native sharing (6.6c) are the next slice.
+the role-aware mobile admin gate, member management, and invite sharing are
+complete. Feature-gated point deduction (6.6d) is the next slice.
 
 Key context for whoever picks this up next:
 

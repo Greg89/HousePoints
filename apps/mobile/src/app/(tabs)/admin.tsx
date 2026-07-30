@@ -1,4 +1,8 @@
-import type { AdminContext, AdminUser } from "@housepoints/contracts";
+import type {
+  AdminContext,
+  AdminUser,
+  InviteLink,
+} from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect } from "expo-router";
 import { useMemo, useState } from "react";
@@ -9,6 +13,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +25,11 @@ import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { env } from "@/lib/env";
+import {
+  buildInviteShareMessage,
+  buildInviteUrl,
+  formatInviteExpiration,
+} from "@/lib/invite-sharing";
 import { logger, serializeError } from "@/lib/logger";
 import {
   canManageMemberRole,
@@ -34,6 +44,11 @@ const OUT_OF_SCOPE_FLOWS = [
   "Audit and comparison reports",
   "Release announcements",
 ] as const;
+const INVITE_DURATIONS = [
+  { hours: 24, label: "24 hours" },
+  { hours: 72, label: "3 days" },
+  { hours: 168, label: "7 days" },
+] as const;
 
 export default function AdminScreen() {
   const { getAccessToken } = useAppAuth();
@@ -41,6 +56,9 @@ export default function AdminScreen() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [inviteDuration, setInviteDuration] = useState(72);
+  const [invite, setInvite] = useState<InviteLink | null>(null);
+  const [sharingInvite, setSharingInvite] = useState(false);
   const [openingWeb, setOpeningWeb] = useState(false);
   const allowed = canAccessMobileAdmin(
     env.mobileAdminEnabled,
@@ -150,6 +168,26 @@ export default function AdminScreen() {
     onError: (error) => showMutationError(error, showToast),
   });
 
+  const createInvite = useMutation({
+    mutationFn: async () => {
+      const accessToken = await getAccessToken();
+      return callApi(
+        "/orgs/invite",
+        { expiresInHours: inviteDuration },
+        { accessToken, organizationSlug: activeOrgSlug },
+      );
+    },
+    onSuccess: (created) => {
+      setInvite(created);
+      showToast({ message: "Invite created", variant: "success" });
+      logger.info("mobile.admin.invite_created", {
+        inviteId: created.id,
+        expiresAt: created.expiresAt,
+      });
+    },
+    onError: (error) => showMutationError(error, showToast),
+  });
+
   if (!allowed || !activeOrgSlug) {
     return <Redirect href="/(tabs)" />;
   }
@@ -202,6 +240,36 @@ export default function AdminScreen() {
     );
   };
 
+  const shareInvite = async () => {
+    if (!invite) {
+      return;
+    }
+
+    const inviteUrl = buildInviteUrl(env.webBaseUrl, invite.joinPath);
+    setSharingInvite(true);
+    try {
+      const result = await Share.share({
+        title: `Invite to ${activeMembership?.organizationName}`,
+        message: buildInviteShareMessage(
+          activeMembership?.organizationName ?? "this organization",
+          inviteUrl,
+        ),
+      });
+      logger.info("mobile.admin.invite_share_completed", {
+        inviteId: invite.id,
+        action: result.action,
+      });
+    } catch (error) {
+      logger.warn("mobile.admin.invite_share_failed", serializeError(error));
+      showToast({
+        message: "Unable to open the share sheet.",
+        variant: "error",
+      });
+    } finally {
+      setSharingInvite(false);
+    }
+  };
+
   const mutationPending =
     assignHouse.isPending || changeRole.isPending || removeMember.isPending;
 
@@ -222,6 +290,78 @@ export default function AdminScreen() {
         <Text style={styles.subtitle}>
           Manage {activeMembership?.organizationName} from your phone.
         </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Invite a member</Text>
+        <Text style={styles.body}>
+          Create a single-use link for this organization.
+        </Text>
+        <Text style={styles.controlLabel}>Link expires in</Text>
+        <View style={styles.chips}>
+          {INVITE_DURATIONS.map((duration) => {
+            const selected = duration.hours === inviteDuration;
+            return (
+              <Pressable
+                key={duration.hours}
+                style={[styles.chip, selected && styles.chipSelected]}
+                disabled={createInvite.isPending}
+                onPress={() => setInviteDuration(duration.hours)}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    selected && styles.chipTextSelected,
+                  ]}
+                >
+                  {duration.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable
+          style={[
+            styles.button,
+            createInvite.isPending && styles.buttonDisabled,
+          ]}
+          disabled={createInvite.isPending}
+          onPress={() => createInvite.mutate()}
+        >
+          {createInvite.isPending ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {invite ? "Create another invite" : "Create invite"}
+            </Text>
+          )}
+        </Pressable>
+        {invite ? (
+          <View style={styles.inviteResult}>
+            <Text style={styles.inviteReady}>Invite ready</Text>
+            <Text style={styles.inviteExpiry}>
+              Expires {formatInviteExpiration(invite.expiresAt)}
+            </Text>
+            <Text style={styles.inviteWarning}>
+              This link can be used once. Creating another link does not revoke
+              this one.
+            </Text>
+            <Pressable
+              style={[
+                styles.shareButton,
+                sharingInvite && styles.buttonDisabled,
+              ]}
+              disabled={sharingInvite}
+              onPress={() => void shareInvite()}
+            >
+              {sharingInvite ? (
+                <ActivityIndicator color="#0f172a" />
+              ) : (
+                <Text style={styles.shareButtonText}>Share invite</Text>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -393,6 +533,29 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 17, fontWeight: "700", color: "#0f172a" },
   body: { color: "#475569", fontSize: 14, lineHeight: 20 },
   listItem: { color: "#475569", fontSize: 14, paddingLeft: 4 },
+  inviteResult: {
+    marginTop: 4,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    gap: 5,
+  },
+  inviteReady: { color: "#166534", fontSize: 15, fontWeight: "700" },
+  inviteExpiry: { color: "#166534", fontSize: 13 },
+  inviteWarning: { color: "#475569", fontSize: 12, lineHeight: 17 },
+  shareButton: {
+    marginTop: 5,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#86efac",
+  },
+  shareButtonText: { color: "#0f172a", fontWeight: "700" },
   searchInput: {
     borderWidth: 1,
     borderColor: "#cbd5e1",

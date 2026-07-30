@@ -227,7 +227,8 @@ Deduction rows do not expose reaction controls.
 
 - Manage members: house assignment, role changes, remove member (implemented
   with `/admin/context` and the existing mutation routes under `/admin/*`).
-- Invite generation + share sheet.
+- Invite generation + platform-native share sheet (implemented with
+  `/orgs/invite` and React Native's link-capable `Share` API).
 - Point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`, same feature flag the web app respects).
 - Recent admin actions read view.
 

@@ -89,7 +89,11 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.6c: add invite generation and the native share sheet.
+- Task 6.6d: add the feature-gated native point-deduction flow.
+
+Admins and owners can generate 24-hour, 3-day, or 7-day single-use invite
+links from the Admin tab. The raw link is returned by the API only once and is
+kept in screen state for the platform-native share sheet.
 
 The native Members section loads organization-scoped users and houses. Admins
 and owners can assign houses; only owners can promote, demote, or remove
