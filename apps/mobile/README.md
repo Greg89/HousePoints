@@ -86,7 +86,12 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.5c: add activity reactions.
+- Task 6.6a: add the mobile admin feature gate and role-aware admin tab.
+
+Activity award rows support reactions through the visible **React** action or
+a long press on the row. Selection updates the displayed counts immediately,
+rolls back on API failure, and reconciles with the server response. Tapping a
+reaction summary loads the server-backed list of people who reacted.
 
 ## Deep links
 

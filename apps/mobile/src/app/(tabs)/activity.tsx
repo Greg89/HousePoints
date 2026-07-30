@@ -1,5 +1,12 @@
-import type { ActivityItem, PagedActivityFeed } from "@housepoints/contracts";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+  POINT_REACTION_LABELS,
+  type ActivityItem,
+  type PagedActivityFeed,
+  type PointReactionDetailsResponse,
+  type PointReactionKey,
+  type PointReactionResponse,
+} from "@housepoints/contracts";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,7 +21,15 @@ import {
 
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
+import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import {
+  nextReactionKey,
+  optimisticReactionResponse,
+  REACTION_EMOJI,
+} from "@/lib/activity-reactions";
+import { ReactionPickerModal } from "@/components/ReactionPickerModal";
+import { ReactionDetailsModal } from "@/components/ReactionDetailsModal";
 
 const PAGE_LIMIT = 20;
 
@@ -22,7 +37,14 @@ export default function ActivityScreen() {
   const { pointId } = useLocalSearchParams<{ pointId?: string }>();
   const { getAccessToken } = useAppAuth();
   const { activeOrgSlug } = useActiveOrg();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const listRef = useRef<FlatList<ActivityItem>>(null);
+  const [pickerItem, setPickerItem] = useState<ActivityItem | null>(null);
+  const [detailsPointId, setDetailsPointId] = useState<string | null>(null);
+  const [optimisticReactions, setOptimisticReactions] = useState<
+    Record<string, PointReactionResponse>
+  >({});
 
   const feedQuery = useInfiniteQuery({
     queryKey: ["activity", "recent", activeOrgSlug],
@@ -57,17 +79,92 @@ export default function ActivityScreen() {
     () => pages?.flatMap((page) => page.items) ?? [],
     [pages],
   );
+  const displayedItems = useMemo<ActivityItem[]>(
+    () => items.map((item) => {
+      const optimistic = optimisticReactions[item.id];
+      return optimistic
+        ? {
+            ...item,
+            myReactionKey: optimistic.myReactionKey,
+            reactions: optimistic.reactions,
+          }
+        : item;
+    }),
+    [items, optimisticReactions],
+  );
+
+  const reactionMutation = useMutation({
+    mutationFn: async (variables: {
+      item: ActivityItem;
+      nextKey: PointReactionKey | null;
+    }) => {
+      const accessToken = await getAccessToken();
+      return callApi(
+        "/transactions/react",
+        { transactionId: variables.item.id, reactionKey: variables.nextKey },
+        { accessToken, organizationSlug: activeOrgSlug },
+      );
+    },
+    onMutate: ({ item, nextKey }) => {
+      setOptimisticReactions((current) => ({
+        ...current,
+        [item.id]: optimisticReactionResponse(item, nextKey),
+      }));
+    },
+    onSuccess: (response) => {
+      setOptimisticReactions((current) => ({
+        ...current,
+        [response.transactionId]: response,
+      }));
+    },
+    onError: (error, { item }) => {
+      setOptimisticReactions((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      showToast({
+        message: error instanceof ApiResponseError
+          ? error.message
+          : "Unable to save your reaction.",
+        variant: "error",
+      });
+    },
+    onSettled: async (_data, _error, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["activity", "recent", activeOrgSlug],
+      });
+      setOptimisticReactions((current) => {
+        const next = { ...current };
+        delete next[variables.item.id];
+        return next;
+      });
+    },
+  });
+
+  const detailsMutation = useMutation({
+    mutationFn: async (transactionId: string) => {
+      const accessToken = await getAccessToken();
+      return callApi(
+        "/transactions/reactions",
+        { transactionId },
+        { accessToken, organizationSlug: activeOrgSlug },
+      );
+    },
+  });
+  const reactionDetails: PointReactionDetailsResponse | null =
+    detailsMutation.data ?? null;
 
   const failed = feedQuery.error;
   const initialLoading = feedQuery.isPending && items.length === 0;
 
   useEffect(() => {
     if (!pointId) return;
-    const index = items.findIndex((item) => item.id === pointId);
+    const index = displayedItems.findIndex((item) => item.id === pointId);
     if (index >= 0) {
       listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
     }
-  }, [items, pointId]);
+  }, [displayedItems, pointId]);
 
   const onEndReached = useCallback(() => {
     if (feedQuery.hasNextPage && !feedQuery.isFetchingNextPage) {
@@ -80,9 +177,21 @@ export default function ActivityScreen() {
       ref={listRef}
       style={styles.list}
       contentContainerStyle={styles.container}
-      data={items}
+      data={displayedItems}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ActivityRow item={item} focused={item.id === pointId} />}
+      renderItem={({ item }) => (
+        <ActivityRow
+          item={item}
+          focused={item.id === pointId}
+          reacting={reactionMutation.isPending && reactionMutation.variables?.item.id === item.id}
+          onOpenPicker={() => setPickerItem(item)}
+          onViewDetails={() => {
+            setDetailsPointId(item.id);
+            detailsMutation.reset();
+            detailsMutation.mutate(item.id);
+          }}
+        />
+      )}
       onScrollToIndexFailed={() => undefined}
       ItemSeparatorComponent={Separator}
       refreshControl={
@@ -116,11 +225,36 @@ export default function ActivityScreen() {
         )
       }
       ListFooterComponent={
-        feedQuery.isFetchingNextPage ? (
-          <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color="#64748b" />
-          </View>
-        ) : null
+        <>
+          {feedQuery.isFetchingNextPage ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color="#64748b" />
+            </View>
+          ) : null}
+          <ReactionPickerModal
+            visible={pickerItem !== null}
+            selected={pickerItem?.myReactionKey ?? null}
+            pending={reactionMutation.isPending}
+            onClose={() => setPickerItem(null)}
+            onSelect={(key) => {
+              if (!pickerItem) return;
+              const nextKey = nextReactionKey(pickerItem.myReactionKey, key);
+              reactionMutation.mutate({ item: pickerItem, nextKey });
+              setPickerItem(null);
+            }}
+          />
+          <ReactionDetailsModal
+            visible={detailsPointId !== null}
+            data={reactionDetails}
+            loading={detailsMutation.isPending}
+            error={detailsMutation.error
+              ? detailsMutation.error instanceof ApiResponseError
+                ? detailsMutation.error.message
+                : "Unable to load reactions."
+              : null}
+            onClose={() => setDetailsPointId(null)}
+          />
+        </>
       }
     />
   );
@@ -130,11 +264,27 @@ function Separator() {
   return <View style={styles.separator} />;
 }
 
-function ActivityRow({ item, focused }: { item: ActivityItem; focused: boolean }) {
+function ActivityRow({
+  item,
+  focused,
+  reacting,
+  onOpenPicker,
+  onViewDetails,
+}: {
+  item: ActivityItem;
+  focused: boolean;
+  reacting: boolean;
+  onOpenPicker: () => void;
+  onViewDetails: () => void;
+}) {
   const isDeduction = item.type === "DEDUCTION" || item.delta < 0;
   const displayDelta = Math.abs(item.delta);
   return (
-    <View style={[styles.row, focused && styles.rowFocused]}>
+    <Pressable
+      style={[styles.row, focused && styles.rowFocused]}
+      onLongPress={isDeduction ? undefined : onOpenPicker}
+      delayLongPress={350}
+    >
       <View style={[styles.dot, { backgroundColor: item.targetHouseColor }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>
@@ -157,6 +307,35 @@ function ActivityRow({ item, focused }: { item: ActivityItem; focused: boolean }
             {formatRelativeTime(item.createdAt)}
           </Text>
         </View>
+        {!isDeduction ? (
+          <View style={styles.reactionRow}>
+            {(item.reactions ?? []).map((reaction) => (
+              <Pressable
+                key={reaction.reactionKey}
+                style={[
+                  styles.reactionChip,
+                  item.myReactionKey === reaction.reactionKey && styles.reactionChipMine,
+                ]}
+                onPress={onViewDetails}
+                accessibilityLabel={`View ${POINT_REACTION_LABELS[reaction.reactionKey]} reactions`}
+              >
+                <Text>{REACTION_EMOJI[reaction.reactionKey]} {reaction.count}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={styles.reactButton}
+              onPress={onOpenPicker}
+              disabled={reacting}
+              accessibilityLabel="Open reaction picker"
+            >
+              <Text style={styles.reactButtonText}>
+                {reacting ? "Saving…" : item.myReactionKey
+                  ? `${REACTION_EMOJI[item.myReactionKey]} Reacted`
+                  : "＋ React"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
       <Text
         style={[styles.delta, isDeduction ? styles.deltaNeg : styles.deltaPos]}
@@ -164,7 +343,7 @@ function ActivityRow({ item, focused }: { item: ActivityItem; focused: boolean }
         {isDeduction ? "-" : "+"}
         {displayDelta}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -281,6 +460,24 @@ const styles = StyleSheet.create({
     color: "#334155",
   },
   timestamp: { fontSize: 12, color: "#64748b" },
+  reactionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  reactionChip: {
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#ffffff",
+  },
+  reactionChipMine: { borderColor: "#3b82f6", backgroundColor: "#eff6ff" },
+  reactButton: { paddingHorizontal: 8, paddingVertical: 5 },
+  reactButtonText: { color: "#2563eb", fontSize: 12, fontWeight: "700" },
   delta: {
     fontSize: 16,
     fontWeight: "700",

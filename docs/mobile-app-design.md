@@ -217,6 +217,12 @@ context. Notification responses use the same resolver when the app is running
 or cold-started, and invite tokens are accepted only through the authenticated
 server join endpoint after explicit confirmation.
 
+Activity reactions are also implemented using the current
+`/transactions/react` and `/transactions/reactions` contracts. Award rows
+provide a visible picker plus a long-press shortcut, update counts
+optimistically with rollback, and expose the server-backed reaction details.
+Deduction rows do not expose reaction controls.
+
 **Phase 3 — Admin subset**
 
 - Manage members: house assignment, role changes, remove member (all existing admin routes under `/admin/*`).
