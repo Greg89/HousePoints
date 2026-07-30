@@ -305,7 +305,10 @@ App identity (decided in §17 and locked in before Auth0 native app registration
 - `.github/workflows/ci.yml` publishes a dedicated mobile job on pushes and
   pull requests. It runs those three workspace commands and caches npm plus
   Expo/EAS state; no mobile secrets or native build credentials are required.
-- **Maestro** flows in `apps/mobile/e2e/` for sign-in → dashboard → award-points happy paths. Runs against staging in CI on `develop`.
+- **Maestro** flow in `apps/mobile/e2e/` covers sign-in → dashboard →
+  award-points. `.github/workflows/mobile-e2e-staging.yml` runs it in Maestro
+  Cloud against a prebuilt staging APK on pushes to `develop` and manual
+  dispatches.
 - EAS Build in CI: `preview` builds on every merge to `develop`, `production` builds on tag from `master`, matching the web release discipline described in [docs/release-and-e2e-automation.md](docs/release-and-e2e-automation.md).
 - Contract drift protection: the mobile Vitest suite imports the same Zod schemas and asserts a couple of representative fixtures parse — if a contract changes shape without a matching mobile update, CI fails.
 

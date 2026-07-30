@@ -168,6 +168,8 @@ export default function AwardPointsScreen() {
             ) : (
               <>
                 <TextInput
+                  testID="mobile.award.member-search"
+                  accessibilityLabel="Search members"
                   style={styles.searchInput}
                   placeholder="Search by name"
                   placeholderTextColor="#94a3b8"
@@ -193,6 +195,8 @@ export default function AwardPointsScreen() {
                     return (
                       <Pressable
                         key={trait}
+                        testID={`mobile.award.trait.${trait}`}
+                        accessibilityLabel={TRAIT_LABELS[trait]}
                         style={[styles.chip, active && styles.chipActive]}
                         onPress={() => setSelectedTrait(trait)}
                       >
@@ -241,6 +245,8 @@ export default function AwardPointsScreen() {
 
               <Section title="Reason">
                 <TextInput
+                  testID="mobile.award.reason"
+                  accessibilityLabel="Award reason"
                   style={styles.reasonInput}
                   placeholder={`At least ${REASON_MIN} characters`}
                   placeholderTextColor="#94a3b8"
@@ -260,6 +266,8 @@ export default function AwardPointsScreen() {
 
         <View style={styles.footer}>
           <Pressable
+            testID="mobile.award.submit"
+            accessibilityLabel={`Award ${delta} points`}
             style={[
               styles.submitButton,
               (!canSubmit || submitMutation.isPending) &&

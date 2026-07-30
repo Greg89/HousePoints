@@ -1,0 +1,98 @@
+name: Mobile Staging E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_app_url:
+        description: "Optional staging APK URL override"
+        required: false
+        type: string
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-staging-e2e
+  cancel-in-progress: false
+
+jobs:
+  maestro:
+    name: Maestro against staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+
+    env:
+      MOBILE_E2E_ANDROID_APP_URL: ${{ inputs.android_app_url || secrets.MOBILE_E2E_ANDROID_APP_URL }}
+      MOBILE_E2E_USER_EMAIL: ${{ secrets.MOBILE_E2E_USER_EMAIL }}
+      MOBILE_E2E_USER_PASSWORD: ${{ secrets.MOBILE_E2E_USER_PASSWORD }}
+      MOBILE_E2E_TARGET_MEMBER: ${{ secrets.MOBILE_E2E_TARGET_MEMBER }}
+      MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+      MAESTRO_PROJECT_ID: ${{ vars.MAESTRO_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate mobile E2E configuration
+        shell: bash
+        run: |
+          missing=()
+          for name in MOBILE_E2E_ANDROID_APP_URL MOBILE_E2E_USER_EMAIL MOBILE_E2E_USER_PASSWORD MOBILE_E2E_TARGET_MEMBER MAESTRO_CLOUD_API_KEY MAESTRO_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing required mobile E2E configuration: ${missing[*]}"
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const appUrl = new URL(process.env.MOBILE_E2E_ANDROID_APP_URL);
+          if (appUrl.protocol !== "https:") {
+            console.error("MOBILE_E2E_ANDROID_APP_URL must use HTTPS.");
+            process.exit(1);
+          }
+          console.log(`Mobile E2E APK host: ${appUrl.host}`);
+          console.log(`Mobile E2E target member configured: ${process.env.MOBILE_E2E_TARGET_MEMBER.trim() ? "yes" : "no"}`);
+          NODE
+
+      - name: Download staging Android app
+        shell: bash
+        run: |
+          curl --fail-with-body --location --show-error --silent \
+            "$MOBILE_E2E_ANDROID_APP_URL" \
+            --output housepoints-staging.apk
+          test -s housepoints-staging.apk
+
+      - name: Run Maestro staging flow
+        id: maestro
+        uses: mobile-dev-inc/action-maestro-cloud@v1
+        with:
+          api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+          project-id: ${{ vars.MAESTRO_PROJECT_ID }}
+          app-file: housepoints-staging.apk
+          workspace: apps/mobile/e2e
+          timeout: 20
+          env: |
+            MOBILE_E2E_USER_EMAIL=${{ secrets.MOBILE_E2E_USER_EMAIL }}
+            MOBILE_E2E_USER_PASSWORD=${{ secrets.MOBILE_E2E_USER_PASSWORD }}
+            MOBILE_E2E_TARGET_MEMBER=${{ secrets.MOBILE_E2E_TARGET_MEMBER }}
+
+      - name: Write Maestro run summary
+        if: ${{ always() }}
+        env:
+          MAESTRO_CONSOLE_URL: ${{ steps.maestro.outputs.MAESTRO_CLOUD_CONSOLE_URL }}
+          MAESTRO_UPLOAD_STATUS: ${{ steps.maestro.outputs.MAESTRO_CLOUD_UPLOAD_STATUS }}
+        shell: bash
+        run: |
+          {
+            echo "### Mobile staging E2E"
+            echo
+            echo "- Status: ${MAESTRO_UPLOAD_STATUS:-unavailable}"
+            echo "- Console: ${MAESTRO_CONSOLE_URL:-unavailable}"
+          } >> "$GITHUB_STEP_SUMMARY"

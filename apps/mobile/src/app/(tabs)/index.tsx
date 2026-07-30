@@ -73,6 +73,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
+      testID="mobile.home.dashboard"
       style={styles.scroll}
       contentContainerStyle={styles.container}
       refreshControl={
@@ -91,6 +92,8 @@ export default function HomeScreen() {
       </View>
 
       <Pressable
+        testID="mobile.home.award-points"
+        accessibilityLabel="Award points"
         style={styles.awardButton}
         onPress={() => router.push("/award")}
       >

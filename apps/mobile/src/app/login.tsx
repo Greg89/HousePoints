@@ -25,6 +25,8 @@ export default function LoginScreen() {
         </Text>
       </View>
       <Pressable
+        testID="mobile.login.sign-in"
+        accessibilityLabel="Sign in with Auth0"
         style={({ pressed }) => [
           styles.button,
           pressed && styles.buttonPressed,

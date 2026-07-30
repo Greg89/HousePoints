@@ -135,6 +135,21 @@ The staging E2E organization should contain:
 - the primary E2E user with permission to award points;
 - the configured target member with a stable display name.
 
+## Mobile Maestro Actor
+
+The mobile staging smoke uses separate GitHub Environment secrets so native
+Auth0 credentials can rotate independently from Playwright:
+
+- `MOBILE_E2E_USER_EMAIL`
+- `MOBILE_E2E_USER_PASSWORD`
+- `MOBILE_E2E_TARGET_MEMBER`
+
+The actor must authenticate through the Auth0 Native Application, belong to
+exactly one staging organization, and be assigned to a house. The target value
+must exactly match a different assigned member's display name in that same
+organization. Each run creates a five-point Teamwork award with the reason
+`Maestro staging award`; staging must tolerate that accumulated activity.
+
 The mutating happy-path test intentionally creates point activity and one reaction on that activity. The staging organization should tolerate this accumulated history. If that history becomes noisy, add a reset or cleanup job before making scheduled E2E failures block releases.
 
 The read-only account-menu smoke test also expects the primary E2E user to reach the normal dashboard and open the account menu. The What's New link is asserted only when that control is visible in the target environment, so staging can enable that product surface without adding new required secrets.

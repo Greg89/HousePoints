@@ -89,7 +89,14 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.7b: add the Maestro staging E2E flow.
+- Task 6.7c: add EAS Build profiles and Expo Updates channels.
+
+`apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
+readiness, and a point award using stable native test IDs. The
+`Mobile Staging E2E` workflow runs on pushes to `develop` or manually, uploads
+a configured staging APK to Maestro Cloud, and writes the cloud result to the
+workflow summary. See `docs/staging-e2e-test-data-contract.md` for required
+staging configuration.
 
 The main GitHub Actions CI now publishes a dedicated
 `Mobile Lint, Type-check & Test` result on pushes and pull requests. It uses
