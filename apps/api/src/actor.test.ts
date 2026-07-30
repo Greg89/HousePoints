@@ -397,6 +397,20 @@ describe("getActorBySubForOrganizationSlug", () => {
       getActorBySubForOrganizationSlug("auth0|member", "legacy-acme"),
     ).resolves.toBeNull();
   });
+
+  it("returns null when no user matches the subject for a scoped API call", async () => {
+    mockIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue(null);
+
+    await expect(
+      getActorBySubForOrganizationSlug("auth0|missing", "acme"),
+    ).resolves.toBeNull();
+
+    expect(mockFindUnique).toHaveBeenCalledWith({
+      where: { auth0Sub: "auth0|missing" },
+      select: actorUserSelect,
+    });
+  });
 });
 
 describe("getUserOrgContextBySub", () => {
