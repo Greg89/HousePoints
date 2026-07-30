@@ -197,6 +197,39 @@ Each added E2E path should be stable against real Auth0 and staging timing. Pref
 - Upload artifacts on success and failure so the last known browser behavior is visible.
 - Do not run production-user release notifications until release records and broadcast idempotency exist.
 
+## Mobile EAS build and update operations
+
+`apps/mobile/eas.json` defines:
+
+- `development`: internal development-client build using the EAS
+  `development` Environment;
+- `preview`: internal build on the `preview` update channel using the EAS
+  `preview` Environment; Android emits an APK for Maestro;
+- `production`: auto-incremented store build on the `production` update channel
+  using the EAS `production` Environment.
+
+Each EAS Environment must define the mobile values listed in
+`apps/mobile/.env.example`, including API/web origins, the native Auth0
+application settings, EAS project ID, and rollout flags. Public-prefixed values
+are embedded in the application and are configuration, not secrets. Store
+credentials and Expo access tokens stay in EAS/GitHub secret storage.
+
+Run EAS commands from `apps/mobile`. Publish preview and production updates
+separately with their matching `--environment` value. A preview bundle normally
+targets staging, so do not republish it to production. Validate the same commit
+with production configuration, then publish it directly to the production
+channel.
+
+Rollback procedure:
+
+1. Stop further publishes and identify the bad update and its runtime version.
+2. Use `eas update:rollback` to select the previous update, or run
+   `eas update:republish --group <known-good-group-id>
+   --destination-channel <channel>`.
+3. Confirm recovery on an installed build with the same runtime version.
+4. If native code/configuration changed, OTA rollback is insufficient; increment
+   the app version, build again, and release through the store track.
+
 ## Phase Status
 
 | Phase | Status | Notes |

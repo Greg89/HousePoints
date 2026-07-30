@@ -1,5 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+
 const config: ExpoConfig = {
   name: "HousePoints",
   slug: "housepoints",
@@ -8,6 +10,21 @@ const config: ExpoConfig = {
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
+  runtimeVersion: {
+    policy: "appVersion",
+  },
+  updates: easProjectId
+    ? {
+        url: `https://u.expo.dev/${easProjectId}`,
+        checkAutomatically: "ON_LOAD",
+        fallbackToCacheTimeout: 0,
+      }
+    : undefined,
+  extra: {
+    eas: {
+      projectId: easProjectId,
+    },
+  },
   ios: {
     bundleIdentifier: "com.housepoints.app",
     supportsTablet: true,
@@ -16,6 +33,7 @@ const config: ExpoConfig = {
     package: "com.housepoints.app",
   },
   plugins: [
+    "expo-dev-client",
     "expo-router",
     "expo-secure-store",
     "expo-notifications",

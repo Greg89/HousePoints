@@ -89,7 +89,46 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.7c: add EAS Build profiles and Expo Updates channels.
+- Task 6.8: rehearse internal-track releases and require two clean staging E2E
+  runs before public store submission.
+
+## EAS builds and updates
+
+Run EAS commands from `apps/mobile` so the adjacent `eas.json` is selected.
+
+```powershell
+eas build --profile development --platform android
+eas build --profile preview --platform all
+eas build --profile production --platform all
+
+eas update --channel preview --environment preview --message "Describe change"
+eas update --channel production --environment production --message "Describe hotfix"
+```
+
+- `development` creates an internal dev-client build and has no fixed update
+  channel.
+- `preview` creates internal builds on the `preview` channel. Android output is
+  an installable APK suitable for the Maestro staging workflow.
+- `production` creates store builds on the `production` channel and increments
+  native build numbers remotely.
+- Runtime compatibility follows the app `version`. Increment `version` and
+  create new native builds whenever native dependencies or configuration
+  change.
+
+Configure the required `EXPO_PUBLIC_*` values in the matching EAS
+`development`, `preview`, and `production` Environments. Do not promote a
+preview update group to production when those values target different APIs.
+
+To undo a bad OTA update, select the affected update with
+`eas update:rollback`. For an explicit known-good update group:
+
+```powershell
+eas update:republish --group <known-good-group-id> --destination-channel production --message "Rollback production"
+```
+
+Confirm the group has the same runtime version and production environment
+values before republishing. Native changes cannot be rolled back through OTA;
+ship a new store build.
 
 `apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
 readiness, and a point award using stable native test IDs. The

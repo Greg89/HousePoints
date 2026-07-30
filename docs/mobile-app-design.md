@@ -289,7 +289,12 @@ App identity (decided in §17 and locked in before Auth0 native app registration
 - Auth0 callback: `housepoints://com.housepoints.app/callback`
 - Auth0 logout: `housepoints://com.housepoints.app/logout`
 
-**Expo Updates (OTA)** is enabled from day one on both `preview` and `production` channels via `expo-updates`. Native code changes still require a store submission; JS-only fixes ship OTA within the same release channel. Rollback is `eas update --branch <channel> --republish` to the previous known-good runtime version.
+**Expo Updates (OTA)** is enabled on `preview` and `production` channels via
+`expo-updates`. Runtime compatibility uses the `appVersion` policy. Native
+changes require an app-version bump and new store build; compatible JS-only
+fixes can ship within their existing channel. Roll back interactively with
+`eas update:rollback`, or republish a known-good update group with
+`eas update:republish --group <id> --destination-channel <channel>`.
 
 ## 13. Observability
 
@@ -309,7 +314,10 @@ App identity (decided in §17 and locked in before Auth0 native app registration
   award-points. `.github/workflows/mobile-e2e-staging.yml` runs it in Maestro
   Cloud against a prebuilt staging APK on pushes to `develop` and manual
   dispatches.
-- EAS Build in CI: `preview` builds on every merge to `develop`, `production` builds on tag from `master`, matching the web release discipline described in [docs/release-and-e2e-automation.md](docs/release-and-e2e-automation.md).
+- EAS profiles are configured for development-client, internal preview, and
+  store production builds. Automating builds on `develop` and production tags
+  remains a release-operations step; credentials must first be configured in
+  EAS Environments and store accounts.
 - Contract drift protection: the mobile Vitest suite imports the same Zod schemas and asserts a couple of representative fixtures parse — if a contract changes shape without a matching mobile update, CI fails.
 
 ## 15. Security considerations
