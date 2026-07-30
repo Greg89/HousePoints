@@ -183,7 +183,8 @@ staging configuration.
 
 The main GitHub Actions CI now publishes a dedicated
 `Mobile Lint, Type-check & Test` result on pushes and pull requests. It uses
-the root npm cache plus Expo/EAS state caches and runs the three mobile
+the root npm cache plus Expo/EAS state caches, builds the shared theme and
+contracts packages needed by a clean checkout, and runs the three mobile
 workspace gates without requiring device credentials or environment secrets.
 
 When `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED=true` and the API's
