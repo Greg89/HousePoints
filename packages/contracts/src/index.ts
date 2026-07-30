@@ -7,4 +7,5 @@ export * from "./admin-schemas.js";
 export * from "./notification-schemas.js";
 export * from "./org-schemas.js";
 export * from "./release-schemas.js";
+export * from "./device-schemas.js";
 export * from "./api-contracts.js";

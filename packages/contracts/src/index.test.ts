@@ -93,6 +93,8 @@ const webConsumedApiEndpoints = [
   "/admin/users/remove",
   "/admin/users/role",
   "/dashboard/summary",
+  "/devices/register",
+  "/devices/unregister",
   "/houses/leaderboard",
   "/members",
   "/notifications/list",

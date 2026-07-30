@@ -88,6 +88,10 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    deviceRegistration: {
+      upsert: vi.fn(),
+      updateMany: vi.fn(),
+    },
   },
 }));
 
@@ -155,6 +159,8 @@ const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof
 const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
 const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
 const mockPointReactionUpdate = prisma.pointReaction.update as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationUpsert = prisma.deviceRegistration.upsert as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationUpdateMany = prisma.deviceRegistration.updateMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -7707,6 +7713,160 @@ describe("POST /notifications/mark-all-read", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
     expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+
+describe("POST /devices/register", () => {
+  it("upserts a device registration and returns the id", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpsert.mockResolvedValue({ id: "dev-1" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: {
+        platform: "IOS",
+        pushToken: "ExponentPushToken[abc]",
+        appVersion: "0.1.0",
+        locale: "en-US",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: "dev-1" });
+    expect(mockDeviceRegistrationUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        userId_pushToken: {
+          userId: "user-1",
+          pushToken: "ExponentPushToken[abc]",
+        },
+      },
+      create: expect.objectContaining({
+        userId: "user-1",
+        organizationId: "org-1",
+        platform: "IOS",
+        pushToken: "ExponentPushToken[abc]",
+        appVersion: "0.1.0",
+        locale: "en-US",
+      }),
+      update: expect.objectContaining({
+        organizationId: "org-1",
+        platform: "IOS",
+        appVersion: "0.1.0",
+        locale: "en-US",
+        revokedAt: null,
+      }),
+    }));
+    await app.close();
+  });
+
+  it("defaults optional fields to null when not provided", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpsert.mockResolvedValue({ id: "dev-2" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: { platform: "ANDROID", pushToken: "fcm-token-xyz" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const call = mockDeviceRegistrationUpsert.mock.calls[0][0];
+    expect(call.create.appVersion).toBeNull();
+    expect(call.create.locale).toBeNull();
+    expect(call.update.appVersion).toBeNull();
+    expect(call.update.locale).toBeNull();
+    await app.close();
+  });
+
+  it("rejects invalid platform values", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: { platform: "WINDOWS", pushToken: "abc" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockDeviceRegistrationUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 403 when the actor cannot be resolved", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: { platform: "IOS", pushToken: "abc" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockDeviceRegistrationUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /devices/unregister", () => {
+  it("soft-revokes the matching device registration", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/unregister",
+      payload: { pushToken: "ExponentPushToken[abc]" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revoked: true });
+    expect(mockDeviceRegistrationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        pushToken: "ExponentPushToken[abc]",
+        revokedAt: null,
+      },
+      data: { revokedAt: expect.any(Date) },
+    });
+    await app.close();
+  });
+
+  it("returns revoked: false when no active registration matches", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 0 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/unregister",
+      payload: { pushToken: "unknown-token" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revoked: false });
+    await app.close();
+  });
+
+  it("rejects an empty pushToken", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/unregister",
+      payload: { pushToken: "" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockDeviceRegistrationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 });

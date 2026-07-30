@@ -16,6 +16,7 @@ import {
 import { readCorsAllowedOriginsFromEnv, readPointAdjustmentsEnabledFromEnv } from "./config.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
+import { registerDeviceRoutes } from "./routes/devices.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
@@ -102,6 +103,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerHealthRoutes(app);
   await registerSeasonRoutes(app);
   await registerAdminRoutes(app);
+  await registerDeviceRoutes(app);
   await registerNotificationRoutes(app);
   await registerOrgRoutes(app);
   await registerUserRoutes(app, { verifyIdToken });

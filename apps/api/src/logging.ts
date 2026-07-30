@@ -55,6 +55,8 @@ export type ApiLogEvent =
   | "notifications.marked_all_read"
   | "notifications.marked_read"
   | "dashboard.summary.loaded"
+  | "devices.registered"
+  | "devices.unregistered"
   | "seasons.active_missing"
   | "seasons.compare.loaded"
   | "seasons.context.loaded"

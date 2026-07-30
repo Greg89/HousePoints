@@ -81,6 +81,12 @@ import {
   createReleaseAnnouncementSchema,
   releaseAnnouncementSchema,
 } from "./release-schemas.js";
+import {
+  registerDeviceRequestSchema,
+  registerDeviceResponseSchema,
+  unregisterDeviceRequestSchema,
+  unregisterDeviceResponseSchema,
+} from "./device-schemas.js";
 
 type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
   request: Req;
@@ -126,6 +132,8 @@ export const apiContracts = {
     seasonScopedRequestSchema,
     dashboardSummarySchema,
   ),
+  "/devices/register": defineContract(registerDeviceRequestSchema, registerDeviceResponseSchema),
+  "/devices/unregister": defineContract(unregisterDeviceRequestSchema, unregisterDeviceResponseSchema),
   "/houses/leaderboard": defineContract(seasonScopedRequestSchema, leaderboardSchema),
   "/members": defineContract(actorScopeSchema, orgMembersSchema),
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),
