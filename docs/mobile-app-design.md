@@ -229,7 +229,9 @@ Deduction rows do not expose reaction controls.
   with `/admin/context` and the existing mutation routes under `/admin/*`).
 - Invite generation + platform-native share sheet (implemented with
   `/orgs/invite` and React Native's link-capable `Share` API).
-- Point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`, same feature flag the web app respects).
+- Point deduction (implemented with `/points/deduct`; the mobile action requires
+  `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED=true` and the API separately requires
+  `POINT_ADJUSTMENTS_ENABLED=true`).
 - Recent admin actions read view.
 
 Deferred (web-only for now): season creation/transition, org archive, release announcements, house theme QA, season comparison report.

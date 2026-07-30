@@ -4,7 +4,7 @@ import type {
   InviteLink,
 } from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -364,6 +364,22 @@ export default function AdminScreen() {
         ) : null}
       </View>
 
+      {env.pointAdjustmentsEnabled ? (
+        <View style={styles.deductionCard}>
+          <Text style={styles.cardTitle}>Point deduction</Text>
+          <Text style={styles.body}>
+            Deduct 10 points from a member in another house. Cooldowns and
+            eligibility are verified by the server.
+          </Text>
+          <Pressable
+            style={styles.deductionButton}
+            onPress={() => router.push("/deduct")}
+          >
+            <Text style={styles.deductionButtonText}>Deduct points</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Members</Text>
         <TextInput
@@ -531,6 +547,22 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardTitle: { fontSize: 17, fontWeight: "700", color: "#0f172a" },
+  deductionCard: {
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    borderRadius: 14,
+    padding: 16,
+    gap: 10,
+  },
+  deductionButton: {
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#b91c1c",
+  },
+  deductionButtonText: { color: "#ffffff", fontWeight: "700" },
   body: { color: "#475569", fontSize: 14, lineHeight: 20 },
   listItem: { color: "#475569", fontSize: 14, paddingLeft: 4 },
   inviteResult: {

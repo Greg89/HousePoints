@@ -89,7 +89,13 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.6d: add the feature-gated native point-deduction flow.
+- Task 6.7a: add mobile typecheck, lint, and test coverage to pull-request CI.
+
+When `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED=true` and the API's
+`POINT_ADJUSTMENTS_ENABLED` flag is also enabled, admins and owners can deduct
+the fixed 10 points from an assigned member in another house. The modal
+explains the 24-hour limits, requires a public reason and confirmation, and
+leaves eligibility and cooldown enforcement authoritative on the API.
 
 Admins and owners can generate 24-hour, 3-day, or 7-day single-use invite
 links from the Admin tab. The raw link is returned by the API only once and is
