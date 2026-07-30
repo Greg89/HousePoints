@@ -9,16 +9,11 @@ Roadmap: Tier 6 in [`docs/roadmap.md`](../../docs/roadmap.md).
 
 ## Status
 
-**Task 6.1 — spike scaffold.** The current app is a single-screen probe that
-runs three smoke tests:
-
-1. Sign in via Auth0 Universal Login (Authorization Code + PKCE).
-2. `GET /health` against the API (unauthenticated).
-3. `POST /users/bootstrap` with a `Bearer <accessToken>` header (proves the
-   API accepts tokens issued to the native Auth0 application).
-
-If all three succeed on a device, 6.1 is done and Phase 1 (task 6.2) can
-start on the real dashboard, org picker, and activity feed.
+Phase 1 is complete. The app includes Auth0 native sign-in, organization
+selection, dashboard, leaderboard, paginated activity, award-points, profile
+editing, and in-app notifications. Phase 2 backend device registration and
+Expo push dispatch are also available; mobile-side permission and device-token
+registration is the next roadmap slice (task 6.5a).
 
 ## Prerequisites
 
@@ -53,7 +48,7 @@ Fill in:
   (NOT the web app's client id).
 - `EXPO_PUBLIC_AUTH0_AUDIENCE` — matches `AUTH0_AUDIENCE` in `apps/api/.env`.
 
-## Run the spike
+## Run the app
 
 `react-native-auth0` requires a native development build; Expo Go will not
 work. From the repo root:
@@ -73,13 +68,9 @@ npm run android -w @housepoints/mobile
 The API must be running in another terminal (`npm run dev:api`) and reachable
 from the simulator/device at the URL configured above.
 
-Once the app boots, tap through the three cards in order:
-
-1. **Sign in with Auth0** — opens Auth0 Universal Login in a system browser.
-2. **GET /health** — should return `{ "status": "ok" }` (or equivalent).
-3. **POST /users/bootstrap** — should return the current user record; a 401
-   means the access token is missing or the API's `AUTH0_AUDIENCE` does not
-   match the value the token was issued for.
+Once the app boots, sign in through Auth0 Universal Login and select an
+organization. A 401 during bootstrap usually means the API audience configured
+for the native Auth0 application does not match `AUTH0_AUDIENCE`.
 
 ## Verify (dev laptop, no device)
 
@@ -91,11 +82,10 @@ npm run lint -w @housepoints/mobile
 npm run test -w @housepoints/mobile
 ```
 
-## What ships in Phase 1 (task 6.2, not yet started)
+## Next work
 
-- Replace the spike screen with the real Expo Router structure (dashboard,
-  leaderboard, activity feed, profile, org picker).
-- Wrap `apiRequest` in TanStack Query with per-org cache keys.
-- Persist active org slug in `expo-secure-store`.
-- Parse every response with Zod schemas from `@housepoints/contracts`.
-- Adopt design tokens from `@housepoints/theme` via a small RN style helper.
+- Task 6.5a: request notification permission, obtain the Expo push token, and
+  register/unregister the device as authentication and active organization
+  change.
+- Task 6.5b: add notification and invite deep links.
+- Task 6.5c: add activity reactions.

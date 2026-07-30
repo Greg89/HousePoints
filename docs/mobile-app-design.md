@@ -164,6 +164,13 @@ All routes go through the existing actor + org-scope hooks. Contracts live in a 
 
 ### 7.2 Push dispatch alongside in-app notifications
 
+**Status:** Implemented for the Phase 2 backend. The API dispatches eligible
+notifications after their database transaction commits, looks up active device
+registrations within the recipient organization, and sends through an
+injectable Expo provider. Dispatch is synchronous best-effort and controlled by
+`PUSH_DISPATCH_ENABLED`; failures are logged without rolling back in-app
+notifications.
+
 The existing `Notification` writer path in [apps/api/src/notifications.ts](apps/api/src/notifications.ts) becomes the single fan-out point. After a notification row is persisted, an async dispatcher looks up the recipient's active `DeviceRegistration` rows (org-scoped) and enqueues push messages. For MVP: synchronous best-effort send with structured logging (`notifications.push_dispatched`, `notifications.push_failed`); no external queue until volume demands it.
 
 Send provider: **Expo Push API** first (single HTTP call, handles APNs + FCM). If we ever move off Expo, swap the implementation behind a `PushDispatcher` interface.

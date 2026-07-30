@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma, AuditEventType } from "@prisma/client";
-import { buildRoleChangedNotificationData } from "../notifications.js";
+import { buildRoleChangedNotificationData, dispatchPushForNotifications } from "../notifications.js";
+import type { PushDispatcher } from "../push-dispatcher.js";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
@@ -543,21 +544,22 @@ export async function changeUserRoleInDb(params: {
       },
     });
     const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.user.id)]));
-    if (recipientIds.length > 0) {
+    const notificationRows = recipientIds.map((recipientId) => buildRoleChangedNotificationData({
+      organizationId: params.organizationId,
+      recipientId,
+      actorDisplayName: params.actorDisplayName,
+      targetUserDisplayName: changedUser.displayName,
+      targetUserId: changedUser.id,
+      previousRole: params.targetMembership.role,
+      newRole: changedUser.role,
+    }));
+    if (notificationRows.length > 0) {
       await tx.notification.createMany({
-        data: recipientIds.map((recipientId) => buildRoleChangedNotificationData({
-          organizationId: params.organizationId,
-          recipientId,
-          actorDisplayName: params.actorDisplayName,
-          targetUserDisplayName: changedUser.displayName,
-          targetUserId: changedUser.id,
-          previousRole: params.targetMembership.role,
-          newRole: changedUser.role,
-        })),
+        data: notificationRows,
         skipDuplicates: true,
       });
     }
-    return changedUser;
+    return { changedUser, notificationRows };
   });
 }
 
@@ -753,7 +755,10 @@ export async function removeOrgMemberInDb(params: {
   });
 }
 
-export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
+export async function registerAdminRoutes(
+  app: FastifyInstance,
+  options: { pushDispatcher?: PushDispatcher } = {},
+): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
     const parsed = await parseBody(actorScopeSchema, request, reply);
     if (!parsed) return;
@@ -952,6 +957,31 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       actor: { id: actor.id, displayName: actor.displayName },
       actorMembership,
       targetMembership,
+    });
+    await dispatchPushForNotifications({
+      client: prisma,
+      dispatcher: options.pushDispatcher,
+      logger: request.log,
+      rows: [
+        buildRoleChangedNotificationData({
+          organizationId: actor.organizationId,
+          recipientId: newOwner.id,
+          actorDisplayName: actor.displayName,
+          targetUserDisplayName: newOwner.displayName,
+          targetUserId: newOwner.id,
+          previousRole: targetMembership.role,
+          newRole: "OWNER",
+        }),
+        buildRoleChangedNotificationData({
+          organizationId: actor.organizationId,
+          recipientId: actor.id,
+          actorDisplayName: actor.displayName,
+          targetUserDisplayName: actor.displayName,
+          targetUserId: actor.id,
+          previousRole: "OWNER",
+          newRole: "ADMIN",
+        }),
+      ],
     });
 
     info(request.log, "admin.org.owner_transferred", {
@@ -1188,12 +1218,18 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const updatedUser = await changeUserRoleInDb({
+    const { changedUser: updatedUser, notificationRows } = await changeUserRoleInDb({
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
       targetMembership,
       newRole: parsed.role,
+    });
+    await dispatchPushForNotifications({
+      client: prisma,
+      dispatcher: options.pushDispatcher,
+      logger: request.log,
+      rows: notificationRows,
     });
 
     info(request.log, "admin.user.role_changed", {

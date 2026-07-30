@@ -22,7 +22,9 @@ import {
   buildPointAwardNotificationData,
   buildPointDeductionNotificationData,
   buildPointReactionNotificationData,
+  dispatchPushForNotifications,
 } from "../notifications.js";
+import type { PushDispatcher } from "../push-dispatcher.js";
 
 export const ACTIVITY_ITEM_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
@@ -137,6 +139,7 @@ export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: 
 
 type PointRouteOptions = {
   pointAdjustmentsEnabled: boolean;
+  pushDispatcher?: PushDispatcher;
 };
 
 export async function findTargetUser(targetUserId: string) {
@@ -670,6 +673,17 @@ export async function reactToPointTransaction(params: {
     return {
       ok: true as const,
       value: await summarizePointReactions(tx, params.organizationId, point.id, params.actorId),
+      pushNotification: point.targetUserId !== params.actorId
+        ? buildPointReactionNotificationData({
+            organizationId: params.organizationId,
+            recipientUserId: point.targetUserId,
+            actorUserId: params.actorId,
+            actorDisplayName: params.actorDisplayName,
+            reactionKey: reaction.reactionKey as PointReactionKey,
+            transactionId: point.id,
+            reactionId: reaction.id,
+          })
+        : null,
     };
   });
 }
@@ -792,6 +806,21 @@ export async function registerPointRoutes(
       reason: parsed.reason,
       trait: parsed.trait,
     });
+    if (targetUser.id !== actor.id) {
+      await dispatchPushForNotifications({
+        client: prisma,
+        dispatcher: options.pushDispatcher,
+        logger: request.log,
+        rows: [buildPointAwardNotificationData({
+          organizationId: actor.organizationId,
+          recipientUserId: targetUser.id,
+          actorDisplayName: actor.displayName,
+          delta: parsed.delta,
+          trait: parsed.trait,
+          transactionId: transaction.id,
+        })],
+      });
+    }
 
     info(request.log, "points.adjusted", {
       transactionId: transaction.id,
@@ -938,6 +967,18 @@ export async function registerPointRoutes(
       targetHouseId,
       reason: parsed.reason,
     });
+    await dispatchPushForNotifications({
+      client: prisma,
+      dispatcher: options.pushDispatcher,
+      logger: request.log,
+      rows: [buildPointDeductionNotificationData({
+        organizationId: actor.organizationId,
+        recipientUserId: targetUser.id,
+        actorDisplayName: actor.displayName,
+        reason: parsed.reason,
+        transactionId: transaction.id,
+      })],
+    });
 
     info(request.log, "points.deducted", {
       transactionId: transaction.id,
@@ -1019,6 +1060,14 @@ export async function registerPointRoutes(
       return reply.status(result.statusCode).send({
         code: result.code,
         message: result.message,
+      });
+    }
+    if (result.pushNotification) {
+      await dispatchPushForNotifications({
+        client: prisma,
+        dispatcher: options.pushDispatcher,
+        logger: request.log,
+        rows: [result.pushNotification],
       });
     }
 

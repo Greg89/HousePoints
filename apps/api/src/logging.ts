@@ -54,6 +54,8 @@ export type ApiLogEvent =
   | "notifications.loaded"
   | "notifications.marked_all_read"
   | "notifications.marked_read"
+  | "notifications.push_dispatched"
+  | "notifications.push_failed"
   | "dashboard.summary.loaded"
   | "devices.registered"
   | "devices.unregistered"

@@ -17,7 +17,12 @@ import { getUserRouteOrgContextBySub } from "../actor.js";
 import { mapAppUser, APP_USER_SELECT } from "../app-user.js";
 import { info, warn, type ApiLogEvent } from "../logging.js";
 import { parseBody, requireAdminActor } from "../route-helpers.js";
-import { buildMemberNeedsAssignmentNotificationData } from "../notifications.js";
+import {
+  buildMemberNeedsAssignmentNotificationData,
+  dispatchPushForNotifications,
+  type NotificationRow,
+} from "../notifications.js";
+import type { PushDispatcher } from "../push-dispatcher.js";
 
 function generateInviteToken(): string {
   return randomBytes(32).toString("hex"); // 64-char hex string
@@ -374,6 +379,7 @@ export async function joinOrgInDb(params: {
     });
 
     let notificationCount = 0;
+    let notificationRows: NotificationRow[] = [];
     const notificationRecipients = await tx.organizationMembership.findMany({
       where: {
         organizationId: invite.organizationId,
@@ -385,14 +391,15 @@ export async function joinOrgInDb(params: {
       select: { user: { select: { id: true } } },
     });
     if (notificationRecipients.length > 0) {
-      const created = await tx.notification.createMany({
-        data: notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
+      notificationRows = notificationRecipients.map((recipient) => buildMemberNeedsAssignmentNotificationData({
           organizationId: invite.organizationId,
           recipientId: recipient.user.id,
           joinedUserName: userIdentity.displayName,
           organizationName: invite.organization?.name ?? "the organization",
           joinedUserId: userIdentity.id,
-        })),
+        }));
+      const created = await tx.notification.createMany({
+        data: notificationRows,
         skipDuplicates: true,
       });
       notificationCount = created.count;
@@ -412,11 +419,15 @@ export async function joinOrgInDb(params: {
       inviteId: invite.id,
       organizationId: invite.organizationId,
       notificationCount,
+      notificationRows,
     };
   });
 }
 
-export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
+export async function registerOrgRoutes(
+  app: FastifyInstance,
+  options: { pushDispatcher?: PushDispatcher } = {},
+): Promise<void> {
   app.post("/orgs/route-context", async (request, reply) => {
     const parsed = await parseBody(orgRouteContextRequestSchema, request, reply);
     if (!parsed) return;
@@ -677,6 +688,12 @@ export async function registerOrgRoutes(app: FastifyInstance): Promise<void> {
         tokenHash,
         organizationSlug,
         claimedAt,
+      });
+      await dispatchPushForNotifications({
+        client: prisma,
+        dispatcher: options.pushDispatcher,
+        logger: request.log,
+        rows: result.notificationRows,
       });
 
       info(request.log, "orgs.join.success", {

@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import type { FastifyBaseLogger } from "fastify";
+import { describe, it, expect, vi } from "vitest";
 import {
   buildPointAwardNotificationData,
   buildPointDeductionNotificationData,
@@ -7,7 +8,78 @@ import {
   buildRoleChangedNotificationData,
   buildMemberNeedsAssignmentNotificationData,
   buildReleaseAnnouncementNotificationData,
+  dispatchPushForNotifications,
 } from "./notifications.js";
+
+describe("dispatchPushForNotifications", () => {
+  it("looks up active org-scoped devices and dispatches mapped messages", async () => {
+    const row = buildPointAwardNotificationData({
+      organizationId: "org-1",
+      recipientUserId: "user-2",
+      actorDisplayName: "Alice",
+      delta: 5,
+      trait: "LEADERSHIP",
+      transactionId: "txn-1",
+    });
+    const client = {
+      deviceRegistration: {
+        findMany: vi.fn().mockResolvedValue([{
+          organizationId: "org-1",
+          userId: "user-2",
+          pushToken: "ExponentPushToken[test]",
+        }]),
+      },
+    };
+    const dispatcher = {
+      send: vi.fn().mockResolvedValue({ acceptedCount: 1 }),
+    };
+    const logger = { info: vi.fn(), error: vi.fn() } as unknown as FastifyBaseLogger;
+
+    await dispatchPushForNotifications({ rows: [row], client, dispatcher, logger });
+
+    expect(dispatcher.send).toHaveBeenCalledWith([expect.objectContaining({
+      to: "ExponentPushToken[test]",
+      title: "Points awarded",
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        type: "POINT_AWARD_RECEIVED",
+      }),
+    })]);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "notifications.push_dispatched", deviceCount: 1 }),
+      "notifications.push_dispatched",
+    );
+  });
+
+  it("logs provider failures without rejecting the notification operation", async () => {
+    const row = buildPointAwardNotificationData({
+      organizationId: "org-1",
+      recipientUserId: "user-2",
+      actorDisplayName: "Alice",
+      delta: 5,
+      trait: "LEADERSHIP",
+      transactionId: "txn-1",
+    });
+    const client = {
+      deviceRegistration: {
+        findMany: vi.fn().mockResolvedValue([{
+          organizationId: "org-1",
+          userId: "user-2",
+          pushToken: "ExponentPushToken[test]",
+        }]),
+      },
+    };
+    const dispatcher = { send: vi.fn().mockRejectedValue(new Error("offline")) };
+    const logger = { info: vi.fn(), error: vi.fn() } as unknown as FastifyBaseLogger;
+
+    await expect(dispatchPushForNotifications({ rows: [row], client, dispatcher, logger }))
+      .resolves.toBeUndefined();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "notifications.push_failed" }),
+      "notifications.push_failed",
+    );
+  });
+});
 
 describe("buildPointAwardNotificationData", () => {
   const base = {

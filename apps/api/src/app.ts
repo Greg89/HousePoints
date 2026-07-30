@@ -13,7 +13,12 @@ import {
   registerAuthenticationHook,
   registerRequestLifecycleHooks,
 } from "./api-hooks.js";
-import { readCorsAllowedOriginsFromEnv, readPointAdjustmentsEnabledFromEnv } from "./config.js";
+import {
+  readCorsAllowedOriginsFromEnv,
+  readExpoAccessTokenFromEnv,
+  readPointAdjustmentsEnabledFromEnv,
+  readPushDispatchEnabledFromEnv,
+} from "./config.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerDeviceRoutes } from "./routes/devices.js";
@@ -32,6 +37,7 @@ import {
   logRateLimitExceeded,
   rateLimitKey,
 } from "./rate-limits.js";
+import { ExpoPushDispatcher, type PushDispatcher } from "./push-dispatcher.js";
 
 type BuildAppOptions = {
   verifyAccessToken?: VerifyAccessToken;
@@ -39,6 +45,7 @@ type BuildAppOptions = {
   corsAllowedOrigins?: readonly string[];
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
+  pushDispatcher?: PushDispatcher | null;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -51,6 +58,11 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const pointAdjustmentsEnabled =
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
+  const pushDispatcher = options.pushDispatcher === undefined
+    ? readPushDispatchEnabledFromEnv()
+      ? new ExpoPushDispatcher(readExpoAccessTokenFromEnv())
+      : undefined
+    : options.pushDispatcher ?? undefined;
   const app = Fastify({
     loggerInstance: apiLogger.logger,
     requestIdHeader: "x-request-id",
@@ -101,14 +113,14 @@ export async function buildApp(options: BuildAppOptions = {}) {
   registerRequestLifecycleHooks(app);
 
   await registerHealthRoutes(app);
-  await registerSeasonRoutes(app);
-  await registerAdminRoutes(app);
+  await registerSeasonRoutes(app, { pushDispatcher });
+  await registerAdminRoutes(app, { pushDispatcher });
   await registerDeviceRoutes(app);
   await registerNotificationRoutes(app);
-  await registerOrgRoutes(app);
+  await registerOrgRoutes(app, { pushDispatcher });
   await registerUserRoutes(app, { verifyIdToken });
-  await registerPointRoutes(app, { pointAdjustmentsEnabled });
-  await registerReleaseRoutes(app);
+  await registerPointRoutes(app, { pointAdjustmentsEnabled, pushDispatcher });
+  await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
 
   return app;

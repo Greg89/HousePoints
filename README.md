@@ -64,6 +64,8 @@ AUTH0_CLIENT_ID="your-web-client-id"
 AUTH0_AUDIENCE="https://api.housepoints.example"
 CORS_ALLOWED_ORIGINS="http://localhost:3000"
 POINT_ADJUSTMENTS_ENABLED="false"
+PUSH_DISPATCH_ENABLED="false"
+EXPO_ACCESS_TOKEN=""
 SEQ_SERVER_URL=""
 SEQ_API_KEY=""
 DEFAULT_ORGANIZATION_SLUG="default"
@@ -92,6 +94,7 @@ Set `CORS_ALLOWED_ORIGINS` to exact web origins only, comma-separated when there
 Leave `DATABASE_POOL_MAX` unset to use the default direct Postgres pool cap of `5` connections per process, or set it explicitly per environment when tuning Railway connection usage.
 Set API `AUTH0_CLIENT_ID` to the same Auth0 application client ID used by the web service. The API uses it to verify the web session ID token when safely linking same-email Auth0 identities.
 Set `POINT_ADJUSTMENTS_ENABLED="true"` on both the API and web apps to enable the admin/owner `Deduct points` flow. Leave it unset or `"false"` to hide the web action and block the API endpoint.
+Set API `PUSH_DISPATCH_ENABLED="true"` to send push notifications through Expo after in-app notifications commit. Set `EXPO_ACCESS_TOKEN` when enhanced push security is enabled for the Expo project; keep dispatch disabled until mobile device registration is ready in the target environment.
 
 The API applies a 300-request-per-minute authenticated-user safety limit and
 stricter per-route limits to write operations. Public requests fall back to an
@@ -219,6 +222,8 @@ API service variables:
 - `AUTH0_AUDIENCE`
 - `CORS_ALLOWED_ORIGINS`
 - optional `POINT_ADJUSTMENTS_ENABLED` (`"true"` enables `POST /points/deduct`)
+- optional `PUSH_DISPATCH_ENABLED` (`"true"` enables best-effort Expo push dispatch)
+- optional `EXPO_ACCESS_TOKEN` (required when Expo enhanced push security is enabled)
 - optional `SEQ_SERVER_URL`, `SEQ_API_KEY`, `LOG_LEVEL`, `SERVICE_NAME`
 
 Web service variables:

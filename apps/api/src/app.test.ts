@@ -91,6 +91,7 @@ vi.mock("@housepoints/db", () => ({
     deviceRegistration: {
       upsert: vi.fn(),
       updateMany: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
@@ -161,6 +162,7 @@ const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<ty
 const mockPointReactionUpdate = prisma.pointReaction.update as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationUpsert = prisma.deviceRegistration.upsert as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationUpdateMany = prisma.deviceRegistration.updateMany as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationFindMany = prisma.deviceRegistration.findMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -325,6 +327,7 @@ beforeEach(() => {
   mockNotificationCreateMany.mockResolvedValue({ count: 0 });
   mockNotificationFindMany.mockResolvedValue([]);
   mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
+  mockDeviceRegistrationFindMany.mockResolvedValue([]);
   const releaseAnnouncement = {
     id: "release-1",
     version: "v1.2.3",
@@ -355,11 +358,13 @@ async function buildTestApp(
   options: {
     idTokenSubject?: string;
     idTokenClaims?: Record<string, unknown>;
+    pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
+    pushDispatcher: options.pushDispatcher,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
       claims: { sub: subject, ...claims },
@@ -969,6 +974,14 @@ describe("POST /points/adjust", () => {
   });
 
   it("awards points, notifies the recipient, and returns 201 with the transaction id and trait", async () => {
+    const pushDispatcher = {
+      send: vi.fn().mockResolvedValue({ acceptedCount: 1 }),
+    };
+    mockDeviceRegistrationFindMany.mockResolvedValue([{
+      organizationId: "org-1",
+      userId: "user-1",
+      pushToken: "ExponentPushToken[test]",
+    }]);
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
     mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
@@ -985,7 +998,7 @@ describe("POST /points/adjust", () => {
       trait: "TECHNICAL_EXCELLENCE",
       createdAt: new Date(),
     });
-    const app = await buildTestApp();
+    const app = await buildTestApp("auth0|member", {}, { pushDispatcher });
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -1046,6 +1059,28 @@ describe("POST /points/adjust", () => {
       }],
       skipDuplicates: true,
     });
+    expect(mockDeviceRegistrationFindMany).toHaveBeenCalledWith({
+      where: {
+        revokedAt: null,
+        OR: [{ organizationId: "org-1", userId: "user-1" }],
+      },
+      select: {
+        organizationId: true,
+        userId: true,
+        pushToken: true,
+      },
+    });
+    expect(pushDispatcher.send).toHaveBeenCalledWith([{
+      to: "ExponentPushToken[test]",
+      title: "Points awarded",
+      body: "Bob awarded you 15 points for Technical Excellence.",
+      data: {
+        organizationId: "org-1",
+        type: "POINT_AWARD_RECEIVED",
+        entityId: "tx-abc",
+        actionHref: "/?tab=activity",
+      },
+    }]);
     await app.close();
   });
 
