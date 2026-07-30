@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from "expo-router";
 
+import { AlertsHeaderButton } from "@/components/AlertsHeaderButton";
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 
@@ -22,7 +23,13 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: "#94a3b8",
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Home",
+          headerRight: () => <AlertsHeaderButton />,
+        }}
+      />
       <Tabs.Screen name="leaderboard" options={{ title: "Leaderboard" }} />
       <Tabs.Screen name="activity" options={{ title: "Activity" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
