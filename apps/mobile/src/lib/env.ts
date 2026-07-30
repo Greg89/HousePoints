@@ -22,6 +22,7 @@ function readOptional(key: string): string | undefined {
  */
 export const env = {
   apiBaseUrl: readRequired("EXPO_PUBLIC_API_BASE_URL").replace(/\/$/, ""),
+  webBaseUrl: readRequired("EXPO_PUBLIC_WEB_BASE_URL").replace(/\/$/, ""),
   auth0Domain: readRequired("EXPO_PUBLIC_AUTH0_DOMAIN"),
   auth0ClientId: readRequired("EXPO_PUBLIC_AUTH0_CLIENT_ID"),
   auth0Audience: readRequired("EXPO_PUBLIC_AUTH0_AUDIENCE"),
@@ -29,6 +30,8 @@ export const env = {
   defaultOrgSlug: readOptional("EXPO_PUBLIC_DEFAULT_ORG_SLUG"),
   pointAdjustmentsEnabled:
     readOptional("EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED") === "true",
+  mobileAdminEnabled:
+    readOptional("EXPO_PUBLIC_MOBILE_ADMIN_ENABLED") === "true",
 };
 
 export type MobileEnv = typeof env;

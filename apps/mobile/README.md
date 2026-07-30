@@ -49,6 +49,9 @@ Fill in:
 - `EXPO_PUBLIC_AUTH0_AUDIENCE` — matches `AUTH0_AUDIENCE` in `apps/api/.env`.
 - `EXPO_PUBLIC_EAS_PROJECT_ID` — EAS project UUID used when requesting an Expo
   push token. Find it in the Expo project dashboard or `eas project:info`.
+- `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
+- `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
+  mobile Admin tab during the Phase 3 rollout.
 
 ## Run the app
 
@@ -86,7 +89,12 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.6a: add the mobile admin feature gate and role-aware admin tab.
+- Task 6.6b: add native member assignment, role-change, and removal tools.
+
+The Admin tab appears only when `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED=true` and
+the active organization role is `ADMIN` or `OWNER`. The route repeats the same
+guard for direct navigation. Out-of-scope organization workflows open the
+active organization’s Manage workspace at `EXPO_PUBLIC_WEB_BASE_URL`.
 
 Activity award rows support reactions through the visible **React** action or
 a long press on the row. Selection updates the displayed counts immediately,

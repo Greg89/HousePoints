@@ -264,12 +264,14 @@ Deferred (web-only for now): season creation/transition, org archive, release an
 
 ```env
 EXPO_PUBLIC_API_BASE_URL="https://api.housepoints.example"
+EXPO_PUBLIC_WEB_BASE_URL="https://app.housepoints.example"
 EXPO_PUBLIC_AUTH0_DOMAIN="your-tenant.us.auth0.com"
 EXPO_PUBLIC_AUTH0_CLIENT_ID="your-native-client-id"
 EXPO_PUBLIC_AUTH0_AUDIENCE="https://api.housepoints.example"
 EXPO_PUBLIC_EAS_PROJECT_ID="your-eas-project-id"
 EXPO_PUBLIC_DEFAULT_ORG_SLUG=""      # optional; usually blank
 EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED="false"
+EXPO_PUBLIC_MOBILE_ADMIN_ENABLED="false"
 EXPO_PUBLIC_SEQ_INGEST_URL=""        # optional client-side breadcrumb ingest
 ```
 
@@ -320,6 +322,12 @@ App identity (decided in §17 and locked in before Auth0 native app registration
 3. **MVP Phase 1** feature set behind a staging Auth0 connection. TestFlight + Play internal testing tracks. Expo Updates (`preview` channel) enabled here.
 4. **Phase 2** push + reactions. Enables device registration and push endpoints in staging first. Expo Push API used as the dispatcher.
 5. **Phase 3** admin subset (member mgmt, invites, point deduction). Gated by feature flag `MOBILE_ADMIN_ENABLED` in the mobile app for a soak period. Deeper Manage flows deep-link to the web dashboard.
+
+**Phase 3 gate status:** Implemented. Because Expo only exposes public runtime
+configuration to the client, the concrete variable is
+`EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`. The Admin tab and route require both the
+flag and an active `ADMIN`/`OWNER` membership. The empty state links to the
+slug-scoped Manage workspace using `EXPO_PUBLIC_WEB_BASE_URL`.
 6. **Public release** on both stores after two consecutive clean staging E2E runs. Expo Updates (`production` channel) becomes the hotfix path.
 
 Roadmap update: Tier 6 in [docs/roadmap.md](docs/roadmap.md) mirrors this phasing.

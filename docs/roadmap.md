@@ -100,7 +100,7 @@ Each tier has its own file with detailed task breakdowns.
 | 6.5a | Phase 2 - Mobile-side device registration: request notification permission on first launch, obtain Expo push token, call `POST /devices/register` on sign-in and on active-org change; call `POST /devices/unregister` on sign-out | [done] |
 | 6.5b | Phase 2 - Deep links: `expo-router` linking config for `housepoints://o/<slug>/dashboard`, `housepoints://o/<slug>/activity/<pointId>`, `housepoints://invite/<token>`. Notification tap → route through the same linking config | [done] |
 | 6.5c | Phase 2 - Point reactions on activity feed (`POST /transactions/react`, `GET /transactions/reactions`) with optimistic updates and long-press affordance mirroring the web pattern | [done] |
-| 6.6a | Phase 3 - Admin gate: `MOBILE_ADMIN_ENABLED` feature flag + admin tab that only renders for `ADMIN`/`OWNER` roles; empty-state that deep-links to web for out-of-scope flows | [todo] |
+| 6.6a | Phase 3 - Admin gate: `MOBILE_ADMIN_ENABLED` feature flag + admin tab that only renders for `ADMIN`/`OWNER` roles; empty-state that deep-links to web for out-of-scope flows | [done] |
 | 6.6b | Phase 3 - Manage members: house assignment (`POST /admin/users/assign-house`), role changes (`POST /admin/users/role`), remove member (`POST /admin/users/remove`) | [todo] |
 | 6.6c | Phase 3 - Invite generation + native share sheet (`POST /orgs/invite` + `expo-sharing`) | [todo] |
 | 6.6d | Phase 3 - Point deduction flow (`POST /points/deduct`), gated by `POINT_ADJUSTMENTS_ENABLED` from `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED` | [todo] |
@@ -115,7 +115,8 @@ Phase 1 MVP is fully in place (6.0 – 6.3). Phase 2 backend is complete:
 6.4a provides device registration and 6.4b provides best-effort Expo push
 dispatch after committed in-app notifications. Mobile-side device registration
 and deep links are complete. Phase 2 mobile activity reactions are complete;
-the role-aware mobile admin gate (6.6a) is the next slice.
+the role-aware mobile admin gate is complete. Native member management (6.6b)
+is the next slice.
 
 Key context for whoever picks this up next:
 
@@ -140,6 +141,10 @@ Key context for whoever picks this up next:
   shortcut. Optimistic summaries roll back on failure and reconcile after the
   mutation settles. Summary chips load `/transactions/reactions`; deductions
   remain non-reactable.
+- **Mobile admin gate** — `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` and the active
+  membership role jointly control the Admin tab, and the route repeats the
+  authorization guard. The empty state links to the active organization’s web
+  Manage workspace for intentionally out-of-scope flows.
 - **TanStack Query gotcha (documented in `/memories/repo/ui-notes.md`)** — `z.output<generic>` collapses to `any` at the queryFn boundary. Workaround: destructure to a local with an explicit annotation, e.g. `const data: PagedNotifications | undefined = query.data`. Continue this pattern in 6.5c reactions and 6.6b admin screens.
 - **Working agreement (from `AGENTS.md`)** — one focused slice per commit; agent does not commit or push. Definition of done for a slice touching production runtime: typecheck + test + build + lint green for touched workspaces. Contracts must be rebuilt (`npm.cmd run build -w @housepoints/contracts`) after schema edits so downstream workspaces see them.
 
