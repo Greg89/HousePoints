@@ -24,6 +24,17 @@
     }
   },
   "submit": {
-    "production": {}
+    "internal": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed"
+      }
+    },
+    "production": {
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed"
+      }
+    }
   }
 }

@@ -89,8 +89,10 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.8: rehearse internal-track releases and require two clean staging E2E
-  runs before public store submission.
+- Complete the external 6.8 release rehearsal: configure store credentials and
+  protected GitHub Environments, upload to TestFlight and Play internal
+  testing, and record two consecutive clean staging E2E runs before the first
+  public submission.
 
 ## EAS builds and updates
 
@@ -129,6 +131,48 @@ eas update:republish --group <known-good-group-id> --destination-channel product
 Confirm the group has the same runtime version and production environment
 values before republishing. Native changes cannot be rolled back through OTA;
 ship a new store build.
+
+## Store release workflow
+
+The manually dispatched `Mobile Store Release` GitHub Actions workflow queues a
+production EAS build and automatically submits it:
+
+- `internal` sends Android to Play's internal testing track and iOS to
+  App Store Connect/TestFlight;
+- `public` sends Android to the production track and uploads iOS to
+  App Store Connect. Apple still requires an operator to select the processed
+  TestFlight build and submit it for App Review.
+
+Public dispatches must build `master`. The workflow reads the latest two
+completed `Mobile Staging E2E` runs on `develop` and stops unless both
+consecutive runs succeeded. Store releases use the production EAS Environment,
+even for internal-track binaries, so testers rehearse the production artifact
+and runtime channel.
+
+Configure these GitHub Environments:
+
+- `mobile-internal-release` for internal testing;
+- `mobile-production-release` with required reviewers for public submission.
+
+Both environments need the `EXPO_TOKEN` secret and `EXPO_ASC_APP_ID` variable
+when iOS is selected. Upload the Google Play service-account credential and App
+Store Connect credentials to EAS before the first non-interactive run. Reserve
+`com.housepoints.app` in both stores and complete their required listing,
+privacy, content-rating, signing, and compliance setup.
+
+First release rehearsal:
+
+1. Dispatch `Mobile Store Release` with `internal` and `all`; it builds
+   `develop`.
+2. Confirm the processed build installs through TestFlight and Play internal
+   testing; sign in and exercise dashboard, award, notifications, deep links,
+   push receipt, and sign-out on physical iOS and Android devices.
+3. Run `Mobile Staging E2E` twice against the candidate staging APK without an
+   intervening failed completed run.
+4. Merge the approved candidate to `master`, dispatch `public`, approve the
+   protected production environment, and monitor both EAS submissions.
+5. In App Store Connect, attach the processed build to the release and submit
+   it for App Review. Confirm Google Play review and rollout status separately.
 
 `apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
 readiness, and a point award using stable native test IDs. The

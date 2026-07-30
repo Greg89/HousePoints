@@ -107,7 +107,7 @@ Each tier has its own file with detailed task breakdowns.
 | 6.7a | Mobile CI - GitHub Actions workflow mirroring api/web: typecheck + lint + test for `@housepoints/mobile` on PR; caching for Expo/EAS | [done] |
 | 6.7b | Mobile CI - Maestro E2E flow (sign-in → dashboard → award-points) against staging on `develop`; secret + environment plumbing documented in [release-and-e2e-automation.md](./release-and-e2e-automation.md) | [done] |
 | 6.7c | Mobile CI - EAS Build profiles (`development`, `preview`, `production`) + Expo Updates channels; document rollback via `eas update --republish` | [done] |
-| 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs | [todo] |
+| 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs | [in progress] |
 
 ### Tier 6 handoff notes (2026-07-30)
 
@@ -117,8 +117,10 @@ dispatch after committed in-app notifications. Mobile-side device registration
 and deep links are complete. Phase 2 mobile activity reactions are complete;
 the role-aware mobile admin gate, member management, invite sharing, and
 feature-gated point deduction, mobile CI, Maestro staging smoke, EAS Build
-profiles, and Expo Updates channels are complete. Internal-track release
-rehearsal and the two-clean-E2E release gate (6.8) are next.
+profiles, and Expo Updates channels are complete. The protected manual store
+release workflow and automated two-clean-E2E gate for 6.8 are implemented.
+External store credential setup, internal-track rehearsal, physical-device
+smoke, and the first public submissions remain before 6.8 can be marked done.
 
 Key context for whoever picks this up next:
 

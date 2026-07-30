@@ -230,6 +230,40 @@ Rollback procedure:
 4. If native code/configuration changed, OTA rollback is insufficient; increment
    the app version, build again, and release through the store track.
 
+## Mobile store release gate
+
+The manually dispatched `.github/workflows/mobile-release.yml` workflow is the
+store handoff for task 6.8. Internal releases submit the production binary to
+TestFlight and the Google Play internal track. Public releases must build
+`master`; before EAS is invoked, the workflow queries the latest two completed
+`Mobile Staging E2E` runs on `develop` and requires both conclusions to be
+`success`. A failure, cancellation, or other non-success conclusion resets the
+consecutive-run gate.
+
+Use protected GitHub Environments to keep the two authority levels separate:
+
+- `mobile-internal-release`: internal TestFlight/Play rehearsal;
+- `mobile-production-release`: public release, with required reviewers.
+
+Both need an `EXPO_TOKEN` secret. iOS releases also require the non-secret
+`EXPO_ASC_APP_ID` variable. Store signing and submission credentials remain in
+EAS. Google Play's first service-account-backed upload may require a manual
+Play Console upload before API submission is accepted.
+
+EAS Submit uploads iOS builds to App Store Connect/TestFlight; it does not send
+them to App Review. After a successful public workflow run, an operator must
+complete the App Store Connect release record, choose the processed build, and
+submit it for review. Android public submission targets the production track,
+and the protected-environment approval is therefore the final automated safety
+gate before EAS queues it.
+
+Operational completion evidence for 6.8 consists of links to:
+
+1. successful TestFlight and Play internal submissions;
+2. physical-device smoke results for both platforms;
+3. the two qualifying consecutive mobile staging E2E runs;
+4. public App Store Connect and Play Console submissions.
+
 ## Phase Status
 
 | Phase | Status | Notes |
