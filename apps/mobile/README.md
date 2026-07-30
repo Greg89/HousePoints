@@ -86,8 +86,21 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.5b: add notification and invite deep links.
 - Task 6.5c: add activity reactions.
+
+## Deep links
+
+Expo Router handles these canonical app URLs:
+
+- `housepoints://o/<slug>/dashboard`
+- `housepoints://o/<slug>/activity/<pointId>`
+- `housepoints://invite/<token>`
+
+Dashboard and activity links verify that the signed-in user belongs to the
+requested organization before switching context. Invite links show an explicit
+accept action and send the untrusted token to the API for verification.
+Foreground, background, and cold-start notification responses use the same
+route resolver.
 
 Push registration requires a physical device. After sign-in and organization
 selection, the app creates the Android notification channel when applicable,

@@ -211,6 +211,12 @@ The web app currently performs several sequential calls during dashboard load. C
 - Point reactions on the activity feed (`POST /points/:id/react`, `GET /points/:id/reactions`).
 - Deep links: `housepoints://o/<slug>/dashboard`, `housepoints://o/<slug>/activity/<pointId>`, invite acceptance link.
 
+**Status:** Implemented. Expo Router exposes the canonical dashboard, activity,
+and invite routes. Organization routes verify membership before switching
+context. Notification responses use the same resolver when the app is running
+or cold-started, and invite tokens are accepted only through the authenticated
+server join endpoint after explicit confirmation.
+
 **Phase 3 — Admin subset**
 
 - Manage members: house assignment, role changes, remove member (all existing admin routes under `/admin/*`).

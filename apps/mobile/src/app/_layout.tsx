@@ -9,6 +9,7 @@ import { AuthProvider } from "@/context/auth-provider";
 import { OrgProvider } from "@/context/org-provider";
 import { ToastProvider } from "@/context/toast-provider";
 import { DeviceRegistrationManager } from "@/components/DeviceRegistrationManager";
+import { NotificationResponseManager } from "@/components/NotificationResponseManager";
 import { auth0Config } from "@/lib/auth";
 
 export default function RootLayout() {
@@ -34,6 +35,7 @@ export default function RootLayout() {
           <AuthProvider>
             <OrgProvider>
               <DeviceRegistrationManager />
+              <NotificationResponseManager />
               <ToastProvider>
                 <StatusBar style="dark" />
                 <Stack screenOptions={{ headerShown: false }} />

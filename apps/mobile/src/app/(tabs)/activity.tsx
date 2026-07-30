@@ -1,6 +1,7 @@
 import type { ActivityItem, PagedActivityFeed } from "@housepoints/contracts";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,8 +19,10 @@ import { ApiResponseError, callApi } from "@/lib/api-client";
 const PAGE_LIMIT = 20;
 
 export default function ActivityScreen() {
+  const { pointId } = useLocalSearchParams<{ pointId?: string }>();
   const { getAccessToken } = useAppAuth();
   const { activeOrgSlug } = useActiveOrg();
+  const listRef = useRef<FlatList<ActivityItem>>(null);
 
   const feedQuery = useInfiniteQuery({
     queryKey: ["activity", "recent", activeOrgSlug],
@@ -58,6 +61,14 @@ export default function ActivityScreen() {
   const failed = feedQuery.error;
   const initialLoading = feedQuery.isPending && items.length === 0;
 
+  useEffect(() => {
+    if (!pointId) return;
+    const index = items.findIndex((item) => item.id === pointId);
+    if (index >= 0) {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+    }
+  }, [items, pointId]);
+
   const onEndReached = useCallback(() => {
     if (feedQuery.hasNextPage && !feedQuery.isFetchingNextPage) {
       void feedQuery.fetchNextPage();
@@ -66,11 +77,13 @@ export default function ActivityScreen() {
 
   return (
     <FlatList
+      ref={listRef}
       style={styles.list}
       contentContainerStyle={styles.container}
       data={items}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ActivityRow item={item} />}
+      renderItem={({ item }) => <ActivityRow item={item} focused={item.id === pointId} />}
+      onScrollToIndexFailed={() => undefined}
       ItemSeparatorComponent={Separator}
       refreshControl={
         <RefreshControl
@@ -117,11 +130,11 @@ function Separator() {
   return <View style={styles.separator} />;
 }
 
-function ActivityRow({ item }: { item: ActivityItem }) {
+function ActivityRow({ item, focused }: { item: ActivityItem; focused: boolean }) {
   const isDeduction = item.type === "DEDUCTION" || item.delta < 0;
   const displayDelta = Math.abs(item.delta);
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, focused && styles.rowFocused]}>
       <View style={[styles.dot, { backgroundColor: item.targetHouseColor }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>
@@ -224,6 +237,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
     backgroundColor: "#ffffff",
+  },
+  rowFocused: {
+    borderWidth: 2,
+    borderColor: "#3b82f6",
   },
   separator: {
     height: 1,
