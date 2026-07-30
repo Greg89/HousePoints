@@ -302,6 +302,9 @@ App identity (decided in §17 and locked in before Auth0 native app registration
 - `npm run typecheck -w @housepoints/mobile` — TS strict.
 - `npm run test -w @housepoints/mobile` — Vitest for logic + React Native Testing Library for components.
 - `npm run lint -w @housepoints/mobile` — ESLint with `eslint-plugin-react-native`.
+- `.github/workflows/ci.yml` publishes a dedicated mobile job on pushes and
+  pull requests. It runs those three workspace commands and caches npm plus
+  Expo/EAS state; no mobile secrets or native build credentials are required.
 - **Maestro** flows in `apps/mobile/e2e/` for sign-in → dashboard → award-points happy paths. Runs against staging in CI on `develop`.
 - EAS Build in CI: `preview` builds on every merge to `develop`, `production` builds on tag from `master`, matching the web release discipline described in [docs/release-and-e2e-automation.md](docs/release-and-e2e-automation.md).
 - Contract drift protection: the mobile Vitest suite imports the same Zod schemas and asserts a couple of representative fixtures parse — if a contract changes shape without a matching mobile update, CI fails.

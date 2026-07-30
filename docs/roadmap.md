@@ -104,7 +104,7 @@ Each tier has its own file with detailed task breakdowns.
 | 6.6b | Phase 3 - Manage members: house assignment (`POST /admin/users/assign-house`), role changes (`POST /admin/users/role`), remove member (`POST /admin/users/remove`) | [done] |
 | 6.6c | Phase 3 - Invite generation + native share sheet (`POST /orgs/invite` + React Native `Share`; `expo-sharing` is file-only) | [done] |
 | 6.6d | Phase 3 - Point deduction flow (`POST /points/deduct`), gated by `POINT_ADJUSTMENTS_ENABLED` from `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED` | [done] |
-| 6.7a | Mobile CI - GitHub Actions workflow mirroring api/web: typecheck + lint + test for `@housepoints/mobile` on PR; caching for Expo/EAS | [todo] |
+| 6.7a | Mobile CI - GitHub Actions workflow mirroring api/web: typecheck + lint + test for `@housepoints/mobile` on PR; caching for Expo/EAS | [done] |
 | 6.7b | Mobile CI - Maestro E2E flow (sign-in → dashboard → award-points) against staging on `develop`; secret + environment plumbing documented in [release-and-e2e-automation.md](./release-and-e2e-automation.md) | [todo] |
 | 6.7c | Mobile CI - EAS Build profiles (`development`, `preview`, `production`) + Expo Updates channels; document rollback via `eas update --republish` | [todo] |
 | 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs | [todo] |
@@ -116,8 +116,8 @@ Phase 1 MVP is fully in place (6.0 – 6.3). Phase 2 backend is complete:
 dispatch after committed in-app notifications. Mobile-side device registration
 and deep links are complete. Phase 2 mobile activity reactions are complete;
 the role-aware mobile admin gate, member management, invite sharing, and
-feature-gated point deduction are complete. Mobile pull-request CI (6.7a) is
-the next slice.
+feature-gated point deduction and mobile pull-request CI are complete. The
+Maestro staging E2E flow (6.7b) is the next slice.
 
 Key context for whoever picks this up next:
 

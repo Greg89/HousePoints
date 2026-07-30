@@ -89,7 +89,12 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.7a: add mobile typecheck, lint, and test coverage to pull-request CI.
+- Task 6.7b: add the Maestro staging E2E flow.
+
+The main GitHub Actions CI now publishes a dedicated
+`Mobile Lint, Type-check & Test` result on pushes and pull requests. It uses
+the root npm cache plus Expo/EAS state caches and runs the three mobile
+workspace gates without requiring device credentials or environment secrets.
 
 When `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED=true` and the API's
 `POINT_ADJUSTMENTS_ENABLED` flag is also enabled, admins and owners can deduct
