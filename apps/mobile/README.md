@@ -47,6 +47,8 @@ Fill in:
 - `EXPO_PUBLIC_AUTH0_CLIENT_ID` — the **native** application's client id
   (NOT the web app's client id).
 - `EXPO_PUBLIC_AUTH0_AUDIENCE` — matches `AUTH0_AUDIENCE` in `apps/api/.env`.
+- `EXPO_PUBLIC_EAS_PROJECT_ID` — EAS project UUID used when requesting an Expo
+  push token. Find it in the Expo project dashboard or `eas project:info`.
 
 ## Run the app
 
@@ -84,8 +86,11 @@ npm run test -w @housepoints/mobile
 
 ## Next work
 
-- Task 6.5a: request notification permission, obtain the Expo push token, and
-  register/unregister the device as authentication and active organization
-  change.
 - Task 6.5b: add notification and invite deep links.
 - Task 6.5c: add activity reactions.
+
+Push registration requires a physical device. After sign-in and organization
+selection, the app creates the Android notification channel when applicable,
+requests permission if it has not been decided, obtains the Expo push token,
+and registers it with the API. Organization switches update the registration;
+sign-out unregisters it before Auth0 credentials are cleared.

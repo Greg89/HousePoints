@@ -13,6 +13,7 @@ import { useAuth0 } from "react-native-auth0";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { AUTH0_SCOPE, auth0AuthorizeParams } from "@/lib/auth";
 import { logger, serializeError } from "@/lib/logger";
+import { unregisterCurrentDevice } from "@/lib/device-registration";
 
 /**
  * Auth lifecycle for the mobile app.
@@ -141,6 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      await unregisterCurrentDevice(getAccessToken);
+    } catch (err) {
+      logger.warn("mobile.devices.unregister_failed", serializeError(err));
+    }
+    try {
       await auth0.clearSession();
     } catch (err) {
       logger.warn("mobile.auth.sign_out.failed", serializeError(err));
@@ -148,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAppUser(null);
       setStatus("signedOut");
     }
-  }, [auth0]);
+  }, [auth0, getAccessToken]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

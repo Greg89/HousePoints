@@ -7,6 +7,7 @@ import * as SecureStore from "expo-secure-store";
  */
 
 const ACTIVE_ORG_SLUG_KEY = "housepoints.activeOrgSlug";
+const PUSH_TOKEN_KEY = "housepoints.pushToken";
 
 export async function getStoredActiveOrgSlug(): Promise<string | null> {
   try {
@@ -22,4 +23,20 @@ export async function persistActiveOrgSlug(slug: string): Promise<void> {
 
 export async function clearStoredActiveOrgSlug(): Promise<void> {
   await SecureStore.deleteItemAsync(ACTIVE_ORG_SLUG_KEY);
+}
+
+export async function getStoredPushToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function persistPushToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+}
+
+export async function clearStoredPushToken(): Promise<void> {
+  await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
 }

@@ -97,7 +97,7 @@ Each tier has its own file with detailed task breakdowns.
 | 6.3 | Phase 1 MVP - in-app notifications list, mark-read, and pull-to-refresh across primary tabs | [done] |
 | 6.4a | Phase 2 - `DeviceRegistration` Prisma model + migration, `device-schemas` contracts, `POST /devices/register` + `POST /devices/unregister` routes with tests | [done] |
 | 6.4b | Phase 2 - `PushDispatcher` interface + Expo Push implementation, wire into notification-writer call sites (points, admin, orgs, seasons, releases), structured logging (`notifications.push_dispatched`, `notifications.push_failed`), env config (`EXPO_ACCESS_TOKEN`, `PUSH_DISPATCH_ENABLED`). See §7.2 of [mobile-app-design.md](./mobile-app-design.md) | [done] |
-| 6.5a | Phase 2 - Mobile-side device registration: request notification permission on first launch, obtain Expo push token, call `POST /devices/register` on sign-in and on active-org change; call `POST /devices/unregister` on sign-out | [todo] |
+| 6.5a | Phase 2 - Mobile-side device registration: request notification permission on first launch, obtain Expo push token, call `POST /devices/register` on sign-in and on active-org change; call `POST /devices/unregister` on sign-out | [done] |
 | 6.5b | Phase 2 - Deep links: `expo-router` linking config for `housepoints://o/<slug>/dashboard`, `housepoints://o/<slug>/activity/<pointId>`, `housepoints://invite/<token>`. Notification tap → route through the same linking config | [todo] |
 | 6.5c | Phase 2 - Point reactions on activity feed (`POST /transactions/react`, `GET /transactions/reactions`) with optimistic updates and long-press affordance mirroring the web pattern | [todo] |
 | 6.6a | Phase 3 - Admin gate: `MOBILE_ADMIN_ENABLED` feature flag + admin tab that only renders for `ADMIN`/`OWNER` roles; empty-state that deep-links to web for out-of-scope flows | [todo] |
@@ -114,7 +114,7 @@ Each tier has its own file with detailed task breakdowns.
 Phase 1 MVP is fully in place (6.0 – 6.3). Phase 2 backend is complete:
 6.4a provides device registration and 6.4b provides best-effort Expo push
 dispatch after committed in-app notifications. Mobile-side device registration
-(6.5a) is the next slice.
+is complete; notification and invite deep links (6.5b) are the next slice.
 
 Key context for whoever picks this up next:
 
@@ -127,6 +127,10 @@ Key context for whoever picks this up next:
 - **Eligible notification types for push** — `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `RELEASE_ANNOUNCEMENT`, `MEMBER_NEEDS_HOUSE_ASSIGNMENT` (admins only). Non-pushable types should short-circuit before the HTTP call.
 - **Test approach** — mock `deviceRegistration.findMany` and the `PushDispatcher` in `apps/api/src/app.test.ts` (`deviceRegistration` delegate is already in the top-level `vi.mock` block). Assert both the persist happens and the dispatcher is called with the expected payload.
 - **Mobile screens shipped** — Home, Leaderboard, Activity (paginated), Award (modal), Profile (display-name edit), Notifications (list + mark-read + mark-all-read). All under `apps/mobile/src/app/`. The `AlertsHeaderButton` in `apps/mobile/src/components/` drives the Home-tab unread badge.
+- **Mobile push registration** — `DeviceRegistrationManager` observes the
+  authenticated user and active organization. It requests permission only when
+  undetermined, skips simulators, registers the Expo token after sign-in and
+  org changes, and unregisters the stored token during sign-out.
 - **TanStack Query gotcha (documented in `/memories/repo/ui-notes.md`)** — `z.output<generic>` collapses to `any` at the queryFn boundary. Workaround: destructure to a local with an explicit annotation, e.g. `const data: PagedNotifications | undefined = query.data`. Continue this pattern in 6.5c reactions and 6.6b admin screens.
 - **Working agreement (from `AGENTS.md`)** — one focused slice per commit; agent does not commit or push. Definition of done for a slice touching production runtime: typecheck + test + build + lint green for touched workspaces. Contracts must be rebuilt (`npm.cmd run build -w @housepoints/contracts`) after schema edits so downstream workspaces see them.
 

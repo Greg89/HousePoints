@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/context/auth-provider";
 import { OrgProvider } from "@/context/org-provider";
 import { ToastProvider } from "@/context/toast-provider";
+import { DeviceRegistrationManager } from "@/components/DeviceRegistrationManager";
 import { auth0Config } from "@/lib/auth";
 
 export default function RootLayout() {
@@ -32,6 +33,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <OrgProvider>
+              <DeviceRegistrationManager />
               <ToastProvider>
                 <StatusBar style="dark" />
                 <Stack screenOptions={{ headerShown: false }} />

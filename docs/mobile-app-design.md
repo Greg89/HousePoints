@@ -127,6 +127,12 @@ Everything below is additive — no breaking changes to existing endpoints.
 
 ### 7.1 Device registration for push (new)
 
+**Status:** Implemented. The API registration endpoints and mobile lifecycle
+are in place. On a physical device the app requests notification permission,
+obtains an Expo token using `EXPO_PUBLIC_EAS_PROJECT_ID`, registers after
+sign-in and active-organization changes, and best-effort unregisters before
+sign-out clears Auth0 credentials.
+
 New Prisma model:
 
 ```prisma
@@ -249,6 +255,7 @@ EXPO_PUBLIC_API_BASE_URL="https://api.housepoints.example"
 EXPO_PUBLIC_AUTH0_DOMAIN="your-tenant.us.auth0.com"
 EXPO_PUBLIC_AUTH0_CLIENT_ID="your-native-client-id"
 EXPO_PUBLIC_AUTH0_AUDIENCE="https://api.housepoints.example"
+EXPO_PUBLIC_EAS_PROJECT_ID="your-eas-project-id"
 EXPO_PUBLIC_DEFAULT_ORG_SLUG=""      # optional; usually blank
 EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED="false"
 EXPO_PUBLIC_SEQ_INGEST_URL=""        # optional client-side breadcrumb ingest

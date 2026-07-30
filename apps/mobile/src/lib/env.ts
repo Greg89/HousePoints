@@ -25,6 +25,7 @@ export const env = {
   auth0Domain: readRequired("EXPO_PUBLIC_AUTH0_DOMAIN"),
   auth0ClientId: readRequired("EXPO_PUBLIC_AUTH0_CLIENT_ID"),
   auth0Audience: readRequired("EXPO_PUBLIC_AUTH0_AUDIENCE"),
+  easProjectId: readRequired("EXPO_PUBLIC_EAS_PROJECT_ID"),
   defaultOrgSlug: readOptional("EXPO_PUBLIC_DEFAULT_ORG_SLUG"),
   pointAdjustmentsEnabled:
     readOptional("EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED") === "true",
