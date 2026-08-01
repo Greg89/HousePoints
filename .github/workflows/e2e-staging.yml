@@ -38,6 +38,7 @@ jobs:
       E2E_REACTION_RECIPIENT_PASSWORD: ${{ secrets.E2E_REACTION_RECIPIENT_PASSWORD }}
       E2E_TARGET_MEMBER: ${{ secrets.E2E_TARGET_MEMBER }}
       E2E_ROLE_TARGET_MEMBER: ${{ secrets.E2E_ROLE_TARGET_MEMBER }}
+      E2E_LIFECYCLE_ORG_SLUG: ${{ secrets.E2E_LIFECYCLE_ORG_SLUG }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
 
     steps:
@@ -89,6 +90,7 @@ jobs:
           const reactionActorConfigured = Boolean(process.env.E2E_REACTION_ACTOR_EMAIL?.trim() && process.env.E2E_REACTION_ACTOR_PASSWORD?.trim());
           const reactionRecipientConfigured = Boolean(process.env.E2E_REACTION_RECIPIENT_EMAIL?.trim() && process.env.E2E_REACTION_RECIPIENT_PASSWORD?.trim());
           const roleTargetConfigured = Boolean(process.env.E2E_ROLE_TARGET_MEMBER?.trim());
+          const lifecycleOrgConfigured = Boolean(process.env.E2E_LIFECYCLE_ORG_SLUG?.trim());
           console.log(`E2E base protocol: ${baseUrl.protocol}`);
           console.log(`E2E base host: ${baseUrl.host}`);
           console.log(`E2E base pathname: ${baseUrl.pathname}`);
@@ -98,6 +100,7 @@ jobs:
           console.log(`E2E reaction actor configured: ${reactionActorConfigured ? "yes" : "no"}`);
           console.log(`E2E reaction recipient configured: ${reactionRecipientConfigured ? "yes" : "no"}`);
           console.log(`E2E role mutation target configured: ${roleTargetConfigured ? "yes" : "no"}`);
+          console.log(`E2E lifecycle organization configured: ${lifecycleOrgConfigured ? "yes" : "no"}`);
           console.log(`E2E start pathname: ${targetUrl.pathname}`);
           console.log(`E2E start host: ${targetUrl.host}`);
           NODE

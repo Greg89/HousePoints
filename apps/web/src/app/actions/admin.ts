@@ -15,6 +15,7 @@ import {
   pagedAdminAuditActionsSchema,
   pointAdjustmentStatsSchema,
   removeOrgMemberResponseSchema,
+  restoreOrgResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -24,7 +25,7 @@ import {
 } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import type { ArchiveOrganizationResult, CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberDisplayNameResult, MemberRemovalResult, OrgSettingsMutationResult, RoleChangeResult } from "@/lib/action-results";
+import type { ArchiveOrganizationResult, CreateInviteResult, DeletePointResult, HouseAssignmentResult, HouseMutationResult, MemberDisplayNameResult, MemberRemovalResult, OrgSettingsMutationResult, RestoreOrganizationResult, RoleChangeResult } from "@/lib/action-results";
 import { logInfo } from "@/lib/logging";
 import { getActorMappingForAdmin, resolveActiveActorMapping } from "./admin-auth";
 
@@ -318,6 +319,60 @@ export async function archiveOrganization(formData: FormData): Promise<ArchiveOr
     revalidatePath(`/o/${actor.organizationSlug}`);
 
     return { ok: true, redirectTo: `/o/${encodeURIComponent(actor.organizationSlug)}` };
+  });
+}
+
+export async function restoreOrganization(formData: FormData): Promise<RestoreOrganizationResult> {
+  return runServerAction("restoreOrganization", async (context) => {
+    const { requestId } = context;
+    const slug = String(formData.get("slug") ?? "").trim();
+    const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+    if (!slug || confirmation !== slug) {
+      return {
+        ok: false,
+        code: "ORG_RESTORE_CONFIRMATION_MISMATCH",
+        message: "Type the organization slug to restore this organization.",
+      };
+    }
+
+    const response = await apiFetch("/admin/org/restore", requestId, {
+      method: "POST",
+      body: JSON.stringify({ slug }),
+    });
+
+    try {
+      const restoredOrganization = await parseApiResponse(
+        response,
+        restoreOrgResponseSchema,
+        "The organization could not be restored. Please try again.",
+      );
+
+      logInfo("web.admin.org_restored", {
+        requestId,
+        organizationId: restoredOrganization.id,
+        organizationSlug: restoredOrganization.slug,
+      });
+    } catch (error) {
+      if (!isExpectedAdminMutationFailure(error)) {
+        throw error;
+      }
+
+      logServerActionFailed(context, error, {
+        organizationSlug: slug,
+      });
+
+      return {
+        ok: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    revalidatePath("/");
+    revalidatePath(`/o/${slug}`);
+
+    return { ok: true, redirectTo: `/o/${encodeURIComponent(slug)}/switch` };
   });
 }
 

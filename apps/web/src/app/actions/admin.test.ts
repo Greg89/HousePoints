@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { archiveOrganization, assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, transferOwnership, updateMemberDisplayName, updateOrgSettings, updateOrgSlug } from "./admin";
+import { archiveOrganization, assignUserHouse, createHouse, createInviteLink, deletePointTransaction, promoteUserRole, removeOrgMember, restoreOrganization, transferOwnership, updateMemberDisplayName, updateOrgSettings, updateOrgSlug } from "./admin";
 import { getActorMappingForAdmin } from "./admin-auth";
 
 vi.mock("next/cache", () => ({
@@ -681,6 +681,53 @@ describe("archiveOrganization", () => {
       },
     );
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("restoreOrganization", () => {
+  beforeEach(() => {
+    apiFetchMock.mockResolvedValue(Response.json({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    }));
+    parseApiResponseMock.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    });
+  });
+
+  it("returns the switch route and revalidates restored organization paths", async () => {
+    const formData = new FormData();
+    formData.set("slug", "acme");
+    formData.set("confirmation", "acme");
+
+    await expect(restoreOrganization(formData)).resolves.toEqual({
+      ok: true,
+      redirectTo: "/o/acme/switch",
+    });
+    expect(apiFetchMock).toHaveBeenCalledWith("/admin/org/restore", "request-1", {
+      method: "POST",
+      body: JSON.stringify({ slug: "acme" }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/o/acme");
+  });
+
+  it("rejects a mismatched confirmation before calling the API", async () => {
+    const formData = new FormData();
+    formData.set("slug", "acme");
+    formData.set("confirmation", "wrong");
+
+    await expect(restoreOrganization(formData)).resolves.toEqual({
+      ok: false,
+      code: "ORG_RESTORE_CONFIRMATION_MISMATCH",
+      message: "Type the organization slug to restore this organization.",
+    });
+    expect(apiFetchMock).not.toHaveBeenCalled();
   });
 });
 

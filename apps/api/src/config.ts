@@ -49,6 +49,14 @@ export function readPointAdjustmentsEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.POINT_ADJUSTMENTS_ENABLED);
 }
 
+export function readPushDispatchEnabledFromEnv(): boolean {
+  return parseBooleanFlag(process.env.PUSH_DISPATCH_ENABLED);
+}
+
+export function readExpoAccessTokenFromEnv(): string | undefined {
+  return process.env.EXPO_ACCESS_TOKEN?.trim() || undefined;
+}
+
 export function parseReleaseAutomationSecret(value: string | undefined): string {
   const secret = value?.trim();
 

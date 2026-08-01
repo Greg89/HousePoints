@@ -20,6 +20,8 @@ import {
   adminUserSchema,
   archiveOrgResponseSchema,
   archiveOrgSchema,
+  restoreOrgResponseSchema,
+  restoreOrgSchema,
 } from "./admin-schemas.js";
 import {
   dashboardSummarySchema,
@@ -79,14 +81,23 @@ import {
   createReleaseAnnouncementSchema,
   releaseAnnouncementSchema,
 } from "./release-schemas.js";
+import {
+  registerDeviceRequestSchema,
+  registerDeviceResponseSchema,
+  unregisterDeviceRequestSchema,
+  unregisterDeviceResponseSchema,
+} from "./device-schemas.js";
 
-type ApiContract = {
-  request: z.ZodType;
-  response: z.ZodType;
+type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
+  request: Req;
+  response: Res;
   error: typeof apiErrorSchema;
 };
 
-function defineContract(request: z.ZodType, response: z.ZodType): ApiContract {
+function defineContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny>(
+  request: Req,
+  response: Res,
+): ApiContract<Req, Res> {
   return {
     request,
     response,
@@ -102,6 +113,7 @@ export const apiContracts = {
   "/admin/org/slug": defineContract(updateOrgSlugSchema, orgSettingsSchema),
   "/admin/org/owner": defineContract(transferOwnerSchema, adminUserSchema),
   "/admin/org/archive": defineContract(archiveOrgSchema, archiveOrgResponseSchema),
+  "/admin/org/restore": defineContract(restoreOrgSchema, restoreOrgResponseSchema),
   "/admin/point-adjustments/stats": defineContract(
     seasonScopedRequestSchema,
     pointAdjustmentStatsSchema,
@@ -120,6 +132,8 @@ export const apiContracts = {
     seasonScopedRequestSchema,
     dashboardSummarySchema,
   ),
+  "/devices/register": defineContract(registerDeviceRequestSchema, registerDeviceResponseSchema),
+  "/devices/unregister": defineContract(unregisterDeviceRequestSchema, unregisterDeviceResponseSchema),
   "/houses/leaderboard": defineContract(seasonScopedRequestSchema, leaderboardSchema),
   "/members": defineContract(actorScopeSchema, orgMembersSchema),
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),

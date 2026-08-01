@@ -7,6 +7,46 @@ on:
     branches: ["**"]
 
 jobs:
+  mobile:
+    name: Mobile Lint, Type-check & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache Expo and EAS state
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.expo
+            ~/.eas
+          key: ${{ runner.os }}-expo-eas-${{ hashFiles('package-lock.json', 'apps/mobile/package.json', 'apps/mobile/app.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-expo-eas-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build mobile workspace dependencies
+        run: |
+          npm run build -w @housepoints/theme
+          npm run build -w @housepoints/contracts
+
+      - name: Lint mobile
+        run: npm run lint -w @housepoints/mobile
+
+      - name: Type-check mobile
+        run: npm run typecheck -w @housepoints/mobile
+
+      - name: Test mobile
+        run: npm run test -w @housepoints/mobile
+
   test:
     name: Lint, Test & Build
     runs-on: ubuntu-latest

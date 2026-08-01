@@ -4,7 +4,11 @@ Status markers:
 
 - `[x]` complete
 - `[-]` partially complete
-- `[ ]` not started
+- `[ ]` item from the original planning snapshot
+
+Completion note: all planned phases and gates below were completed on July 1, 2026. The checklist
+is retained as the original execution record; [README](./README.md) is the authoritative completion
+summary and [Acceptance Criteria](./03-acceptance-criteria.md) records the final gate.
 
 Every phase must pass the full quality gate before the next phase begins:
 `npm run lint` + `npm run typecheck` + `npm test` + `npm run build`

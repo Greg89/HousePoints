@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { readOrgRouteContext } from "@/app/actions/orgs";
+import { restoreOrganization } from "@/app/actions/admin";
 import { renderDashboardPage } from "@/app/dashboard-page";
+import { RestoreOrganizationCard } from "@/components/RestoreOrganizationCard";
 import { readActiveOrganizationSlug } from "@/lib/active-organization";
 import { WebAuthenticationError } from "@/lib/api-client";
 import { logError, serializeErrorForLog } from "@/lib/logging";
@@ -68,14 +70,38 @@ async function renderOrganizationDashboardPage(slug: string, route: string) {
 
   if (routeContext.status === "ARCHIVED") {
     return (
-      <SlugRouteMessage
-        title="This organization is archived"
-        description={`${routeContext.organizationName} has been archived. Historical records are preserved, but the dashboard is no longer available for normal activity.`}
-        actionHref="/"
-        actionLabel="Go home"
-        secondaryHref="/auth/logout"
-        secondaryLabel="Sign out"
-      />
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
+          <h1 className="font-display text-2xl font-semibold text-primary">
+            This organization is archived
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {routeContext.organizationName} has been archived. Historical records are preserved,
+            but the dashboard is no longer available for normal activity.
+          </p>
+          {routeContext.canRestore ? (
+            <RestoreOrganizationCard
+              organizationName={routeContext.organizationName}
+              organizationSlug={routeContext.organizationSlug}
+              onRestoreOrganization={restoreOrganization}
+            />
+          ) : null}
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/"
+              className="inline-flex h-11 items-center justify-center rounded-lg border bg-card px-5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Go home
+            </Link>
+            <Link
+              href="/auth/logout"
+              className="inline-flex h-11 items-center justify-center rounded-lg border bg-card px-5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Sign out
+            </Link>
+          </div>
+        </div>
+      </div>
     );
   }
 

@@ -14,6 +14,10 @@ export default defineConfig({
         __dirname,
         "../../packages/contracts/src/index.ts",
       ),
+      "@housepoints/theme": path.resolve(
+        __dirname,
+        "../../packages/theme/src/index.ts",
+      ),
       "server-only": path.resolve(__dirname, "src/test/server-only.ts"),
     },
   },

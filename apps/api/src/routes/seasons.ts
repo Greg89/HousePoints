@@ -10,7 +10,12 @@ import type { ActorRecord } from "../actor.js";
 import { SeasonScopeError, mapSeason } from "../season-scope.js";
 import { parseBody, requireActor, requireOwnerActor } from "../route-helpers.js";
 import { info, warn } from "../logging.js";
-import { buildSeasonStartedNotificationData } from "../notifications.js";
+import {
+  buildSeasonStartedNotificationData,
+  dispatchPushForNotifications,
+  type NotificationRow,
+} from "../notifications.js";
+import type { PushDispatcher } from "../push-dispatcher.js";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
@@ -199,20 +204,22 @@ export async function startSeasonTransaction(actor: ActorRecord, seasonName: str
       select: { user: { select: { id: true } } },
     });
 
-    if (notificationRecipients.length > 0) {
+    const notificationRows: NotificationRow[] = notificationRecipients.map((recipient) =>
+      buildSeasonStartedNotificationData({
+        organizationId: actor.organizationId,
+        recipientId: recipient.user.id,
+        actorDisplayName: actor.displayName,
+        seasonName: activeSeason.name,
+        seasonId: activeSeason.id,
+      }));
+    if (notificationRows.length > 0) {
       await tx.notification.createMany({
-        data: notificationRecipients.map((recipient) => buildSeasonStartedNotificationData({
-          organizationId: actor.organizationId,
-          recipientId: recipient.user.id,
-          actorDisplayName: actor.displayName,
-          seasonName: activeSeason.name,
-          seasonId: activeSeason.id,
-        })),
+        data: notificationRows,
         skipDuplicates: true,
       });
     }
 
-    return { previousSeason, activeSeason };
+    return { previousSeason, activeSeason, notificationRows };
   });
 }
 
@@ -231,7 +238,10 @@ export async function renameSeasonInDb(seasonId: string, name: string) {
   });
 }
 
-export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> {
+export async function registerSeasonRoutes(
+  app: FastifyInstance,
+  options: { pushDispatcher?: PushDispatcher } = {},
+): Promise<void> {
   app.post("/seasons/context", async (request, reply) => {
     const parsed = await parseBody(actorScopeSchema, request, reply);
     if (!parsed) return;
@@ -408,6 +418,12 @@ export async function registerSeasonRoutes(app: FastifyInstance): Promise<void> 
 
     try {
       const transition = await startSeasonTransaction(actor, parsed.name);
+      await dispatchPushForNotifications({
+        client: prisma,
+        dispatcher: options.pushDispatcher,
+        logger: request.log,
+        rows: transition.notificationRows,
+      });
 
       info(request.log, "seasons.started", {
         actorUserId: actor.id,

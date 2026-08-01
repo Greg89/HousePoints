@@ -1,0 +1,57 @@
+appId: com.housepoints.app
+name: Sign in, load dashboard, and award points
+tags:
+  - staging
+  - smoke
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.login.sign-in"
+    timeout: 30000
+- tapOn:
+    id: "mobile.login.sign-in"
+
+- extendedWaitUntil:
+    visible: "Email address"
+    timeout: 30000
+- tapOn: "Email address"
+- inputText: ${MOBILE_E2E_USER_EMAIL}
+- tapOn: "Password"
+- inputText: ${MOBILE_E2E_USER_PASSWORD}
+- tapOn: "Continue"
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.home.dashboard"
+    timeout: 60000
+- assertVisible:
+    id: "mobile.home.award-points"
+- tapOn:
+    id: "mobile.home.award-points"
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.award.member-search"
+    timeout: 30000
+- tapOn:
+    id: "mobile.award.member-search"
+- inputText: ${MOBILE_E2E_TARGET_MEMBER}
+- tapOn: ${MOBILE_E2E_TARGET_MEMBER}
+- tapOn:
+    id: "mobile.award.trait.TEAMWORK"
+- tapOn:
+    id: "mobile.award.reason"
+- inputText: "Maestro staging award"
+- tapOn:
+    id: "mobile.award.submit"
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.home.dashboard"
+    timeout: 30000
+- assertVisible:
+    id: "mobile.home.award-points"
+

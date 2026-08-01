@@ -1,0 +1,163 @@
+name: Mobile Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_stage:
+        description: "Internal testing or public store release"
+        required: true
+        default: internal
+        type: choice
+        options:
+          - internal
+          - public
+      platform:
+        description: "Store platform"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mobile-store-release-${{ inputs.release_stage }}
+  cancel-in-progress: false
+
+jobs:
+  release-gate:
+    name: Verify release gate
+    runs-on: ubuntu-latest
+    outputs:
+      submit_profile: ${{ steps.release.outputs.submit_profile }}
+      environment_name: ${{ steps.release.outputs.environment_name }}
+      release_ref: ${{ steps.release.outputs.release_ref }}
+
+    steps:
+      - name: Validate release selection
+        id: release
+        shell: bash
+        env:
+          RELEASE_STAGE: ${{ inputs.release_stage }}
+        run: |
+          if [ "$RELEASE_STAGE" = "public" ]; then
+            echo "submit_profile=production" >> "$GITHUB_OUTPUT"
+            echo "environment_name=mobile-production-release" >> "$GITHUB_OUTPUT"
+            echo "release_ref=master" >> "$GITHUB_OUTPUT"
+          else
+            echo "submit_profile=internal" >> "$GITHUB_OUTPUT"
+            echo "environment_name=mobile-internal-release" >> "$GITHUB_OUTPUT"
+            echo "release_ref=develop" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require two consecutive clean mobile staging runs
+        if: ${{ inputs.release_stage == 'public' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "mobile-e2e-staging.yml",
+              branch: "develop",
+              status: "completed",
+              per_page: 2,
+            });
+
+            const runs = response.data.workflow_runs;
+            if (runs.length < 2) {
+              core.setFailed(
+                `Public release requires two completed mobile staging E2E runs; found ${runs.length}.`,
+              );
+              return;
+            }
+
+            const failures = runs.filter((run) => run.conclusion !== "success");
+            if (failures.length > 0) {
+              const details = failures
+                .map((run) => `${run.html_url} (${run.conclusion})`)
+                .join(", ");
+              core.setFailed(
+                `The latest two completed mobile staging E2E runs must both pass: ${details}`,
+              );
+              return;
+            }
+
+            await core.summary
+              .addHeading("Public mobile release gate")
+              .addRaw("The latest two completed mobile staging E2E runs on `develop` passed.\n")
+              .addList(runs.map((run) => `${run.head_sha.slice(0, 7)} — ${run.html_url}`))
+              .write();
+
+  build-and-submit:
+    name: Build and submit (${{ inputs.platform }})
+    needs: release-gate
+    runs-on: ubuntu-latest
+    environment: ${{ needs.release-gate.outputs.environment_name }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-gate.outputs.release_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          packager: npm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Validate store configuration
+        shell: bash
+        env:
+          EXPO_ASC_APP_ID: ${{ vars.EXPO_ASC_APP_ID }}
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          if [ "$PLATFORM" != "android" ] && [ -z "$EXPO_ASC_APP_ID" ]; then
+            echo "EXPO_ASC_APP_ID must be configured for non-interactive iOS submission."
+            exit 1
+          fi
+
+      - name: Add App Store Connect application ID
+        if: ${{ inputs.platform != 'android' }}
+        working-directory: apps/mobile
+        shell: bash
+        env:
+          EXPO_ASC_APP_ID: ${{ vars.EXPO_ASC_APP_ID }}
+          SUBMIT_PROFILE: ${{ needs.release-gate.outputs.submit_profile }}
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = "eas.json";
+          const config = JSON.parse(fs.readFileSync(path, "utf8"));
+          config.submit[process.env.SUBMIT_PROFILE].ios = {
+            ascAppId: process.env.EXPO_ASC_APP_ID,
+          };
+          fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+          NODE
+
+      - name: Queue store build and submission
+        working-directory: apps/mobile
+        env:
+          CI: "true"
+        run: >-
+          eas build
+          --platform ${{ inputs.platform }}
+          --profile production
+          --auto-submit-with-profile ${{ needs.release-gate.outputs.submit_profile }}
+          --non-interactive
+          --no-wait

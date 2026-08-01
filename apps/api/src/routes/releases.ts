@@ -7,7 +7,12 @@ import {
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { readReleaseAutomationSecretFromEnv } from "../config.js";
-import { buildReleaseAnnouncementNotificationData } from "../notifications.js";
+import {
+  buildReleaseAnnouncementNotificationData,
+  dispatchPushForNotifications,
+  type NotificationRow,
+} from "../notifications.js";
+import type { PushDispatcher } from "../push-dispatcher.js";
 import { info, warn } from "../logging.js";
 import { parseBody } from "../route-helpers.js";
 
@@ -86,7 +91,10 @@ async function requireReleaseAutomationSecret(
   return true;
 }
 
-export async function registerReleaseRoutes(app: FastifyInstance): Promise<void> {
+export async function registerReleaseRoutes(
+  app: FastifyInstance,
+  options: { pushDispatcher?: PushDispatcher } = {},
+): Promise<void> {
   app.post("/system/releases/record", async (request, reply) => {
     if (!(await requireReleaseAutomationSecret(request, reply))) {
       return;
@@ -149,6 +157,7 @@ export async function registerReleaseRoutes(app: FastifyInstance): Promise<void>
           release,
           notificationCount: 0,
           alreadyBroadcast,
+          notificationRows: [] as NotificationRow[],
         };
       }
 
@@ -166,17 +175,19 @@ export async function registerReleaseRoutes(app: FastifyInstance): Promise<void>
         },
       });
 
-      const createResult = recipients.length > 0
+      const notificationRows: NotificationRow[] = recipients.map((recipient) =>
+        buildReleaseAnnouncementNotificationData({
+          organizationId: recipient.organizationId,
+          recipientId: recipient.userId,
+          releaseId: release.id,
+          version: release.version,
+          title: release.title,
+          summary: release.summary,
+          releaseNotesUrl: release.releaseNotesUrl,
+        }));
+      const createResult = notificationRows.length > 0
         ? await tx.notification.createMany({
-            data: recipients.map((recipient) => buildReleaseAnnouncementNotificationData({
-              organizationId: recipient.organizationId,
-              recipientId: recipient.userId,
-              releaseId: release.id,
-              version: release.version,
-              title: release.title,
-              summary: release.summary,
-              releaseNotesUrl: release.releaseNotesUrl,
-            })),
+            data: notificationRows,
             skipDuplicates: true,
           })
         : { count: 0 };
@@ -193,6 +204,7 @@ export async function registerReleaseRoutes(app: FastifyInstance): Promise<void>
         release: updatedRelease,
         notificationCount: createResult.count,
         alreadyBroadcast,
+        notificationRows,
       };
     });
 
@@ -202,6 +214,12 @@ export async function registerReleaseRoutes(app: FastifyInstance): Promise<void>
         message: "Release announcement was not found.",
       });
     }
+    await dispatchPushForNotifications({
+      client: prisma,
+      dispatcher: options.pushDispatcher,
+      logger: request.log,
+      rows: result.notificationRows,
+    });
 
     info(request.log, "releases.broadcasted", {
       releaseId: result.release.id,

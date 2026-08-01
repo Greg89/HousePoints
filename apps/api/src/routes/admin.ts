@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma, AuditEventType } from "@prisma/client";
-import { buildRoleChangedNotificationData } from "../notifications.js";
+import { buildRoleChangedNotificationData, dispatchPushForNotifications } from "../notifications.js";
+import type { PushDispatcher } from "../push-dispatcher.js";
 import {
   type AdminAuditAction,
   adminAuditRequestSchema,
@@ -10,6 +11,7 @@ import {
   createHouseSchema,
   promoteUserSchema,
   removeOrgMemberSchema,
+  restoreOrgSchema,
   seasonScopedRequestSchema,
   transferOwnerSchema,
   updateMemberDisplayNameSchema,
@@ -20,6 +22,7 @@ import { isOrganizationSlugReserved, prisma, updateUserDisplayName } from "@hous
 import { info, warn } from "../logging.js";
 import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapDeletedPoint, DELETED_POINT_SELECT } from "./points.js";
+import { getArchivedOwnerActorBySubAndSlug } from "../actor.js";
 
 export async function loadAdminContextData(organizationId: string) {
   const [
@@ -455,6 +458,43 @@ export async function archiveOrganizationInDb(params: {
   });
 }
 
+export async function restoreOrganizationInDb(params: {
+  organizationId: string;
+  actorId: string;
+  actorDisplayName: string;
+  organizationName: string;
+  organizationSlug: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const restoredAt = new Date();
+    const restoredAtIso = restoredAt.toISOString();
+    const organization = await tx.organization.update({
+      where: { id: params.organizationId },
+      data: {
+        archivedAt: null,
+        archivedById: null,
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId: params.organizationId,
+        actorUserId: params.actorId,
+        eventType: "ORG_RESTORED",
+        summary: `${params.actorDisplayName} restored ${params.organizationName}.`,
+        metadata: {
+          organizationName: params.organizationName,
+          organizationSlug: params.organizationSlug,
+          restoredAt: restoredAtIso,
+        },
+      },
+    });
+
+    return organization;
+  });
+}
+
 export async function changeUserRoleInDb(params: {
   organizationId: string;
   actorId: string;
@@ -504,21 +544,22 @@ export async function changeUserRoleInDb(params: {
       },
     });
     const recipientIds = Array.from(new Set([changedUser.id, ...ownerRecipients.map((r) => r.user.id)]));
-    if (recipientIds.length > 0) {
+    const notificationRows = recipientIds.map((recipientId) => buildRoleChangedNotificationData({
+      organizationId: params.organizationId,
+      recipientId,
+      actorDisplayName: params.actorDisplayName,
+      targetUserDisplayName: changedUser.displayName,
+      targetUserId: changedUser.id,
+      previousRole: params.targetMembership.role,
+      newRole: changedUser.role,
+    }));
+    if (notificationRows.length > 0) {
       await tx.notification.createMany({
-        data: recipientIds.map((recipientId) => buildRoleChangedNotificationData({
-          organizationId: params.organizationId,
-          recipientId,
-          actorDisplayName: params.actorDisplayName,
-          targetUserDisplayName: changedUser.displayName,
-          targetUserId: changedUser.id,
-          previousRole: params.targetMembership.role,
-          newRole: changedUser.role,
-        })),
+        data: notificationRows,
         skipDuplicates: true,
       });
     }
-    return changedUser;
+    return { changedUser, notificationRows };
   });
 }
 
@@ -714,7 +755,10 @@ export async function removeOrgMemberInDb(params: {
   });
 }
 
-export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
+export async function registerAdminRoutes(
+  app: FastifyInstance,
+  options: { pushDispatcher?: PushDispatcher } = {},
+): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
     const parsed = await parseBody(actorScopeSchema, request, reply);
     if (!parsed) return;
@@ -914,6 +958,31 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       actorMembership,
       targetMembership,
     });
+    await dispatchPushForNotifications({
+      client: prisma,
+      dispatcher: options.pushDispatcher,
+      logger: request.log,
+      rows: [
+        buildRoleChangedNotificationData({
+          organizationId: actor.organizationId,
+          recipientId: newOwner.id,
+          actorDisplayName: actor.displayName,
+          targetUserDisplayName: newOwner.displayName,
+          targetUserId: newOwner.id,
+          previousRole: targetMembership.role,
+          newRole: "OWNER",
+        }),
+        buildRoleChangedNotificationData({
+          organizationId: actor.organizationId,
+          recipientId: actor.id,
+          actorDisplayName: actor.displayName,
+          targetUserDisplayName: actor.displayName,
+          targetUserId: actor.id,
+          previousRole: "OWNER",
+          newRole: "ADMIN",
+        }),
+      ],
+    });
 
     info(request.log, "admin.org.owner_transferred", {
       actorUserId: actor.id,
@@ -951,6 +1020,41 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       ...archivedOrganization,
       archivedAt: archivedOrganization.archivedAt.toISOString(),
     };
+  });
+
+  app.post("/admin/org/restore", async (request, reply) => {
+    const parsed = await parseBody(restoreOrgSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await getArchivedOwnerActorBySubAndSlug(
+      request.auth.subject,
+      parsed.slug,
+    );
+    if (!actor) {
+      warn(request.log, "owner.forbidden", {
+        organizationSlug: parsed.slug,
+      });
+      return reply.status(403).send({
+        code: "OWNER_REQUIRED",
+        message: "Owner access to the archived organization is required",
+      });
+    }
+
+    const restoredOrganization = await restoreOrganizationInDb({
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorDisplayName: actor.displayName,
+      organizationName: actor.organizationName,
+      organizationSlug: actor.organizationSlug,
+    });
+
+    info(request.log, "admin.org.restored", {
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      organizationSlug: actor.organizationSlug,
+    });
+
+    return restoredOrganization;
   });
 
   app.post("/admin/point-adjustments/stats", async (request, reply) => {
@@ -1114,12 +1218,18 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const updatedUser = await changeUserRoleInDb({
+    const { changedUser: updatedUser, notificationRows } = await changeUserRoleInDb({
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
       targetMembership,
       newRole: parsed.role,
+    });
+    await dispatchPushForNotifications({
+      client: prisma,
+      dispatcher: options.pushDispatcher,
+      logger: request.log,
+      rows: notificationRows,
     });
 
     info(request.log, "admin.user.role_changed", {

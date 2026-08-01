@@ -27,12 +27,12 @@ Implemented:
 - Normal actor/app-user resolution ignores memberships whose organization is archived.
 - Owners can archive their active organization through `POST /admin/org/archive`; the API writes an `ORG_ARCHIVED` audit event.
 - Archived `/o/{slug}` routes render an archived-state page for members instead of the dashboard.
+- Owners can restore their archived organization from that page through `POST /admin/org/restore`; the API writes an `ORG_RESTORED` audit event and normal dashboard access resumes.
+- The Manage Organization danger zone provides the owner-facing archive UI, and the archived state provides the owner-facing restore UI.
 
 Not implemented:
 
-- Organization restore.
 - Hard delete.
-- Owner-facing organization lifecycle UI.
 
 ---
 
@@ -62,7 +62,7 @@ Archiving should not:
 
 ### Restore
 
-Only an `OWNER` of the archived organization, or a future operator-only path, can restore it.
+Only an active `OWNER` membership of the archived organization can restore it. The restore endpoint uses a dedicated archived-owner resolver because normal actor resolution intentionally excludes archived organizations.
 
 Restore should:
 
@@ -71,7 +71,7 @@ Restore should:
 - preserve the same current slug and aliases;
 - write a durable audit event.
 
-Open question: if every owner membership is archived before org archive, restore may require an operator-only path.
+Organization archive preserves memberships, so the owner remains recoverable. An operator path is still appropriate for exceptional data repair, but it is not required for the normal product workflow.
 
 ### Hard Delete
 
@@ -115,7 +115,7 @@ Add owner-only endpoints:
 | Endpoint | Purpose |
 |---|---|
 | `POST /admin/org/archive` | Archive the actor's active organization. |
-| `POST /admin/org/restore` | Restore the actor's archived organization, if product policy allows owner restore. |
+| `POST /admin/org/restore` | Restore an archived organization after resolving an active owner membership by authenticated subject and confirmed current slug. |
 
 Expected failure codes:
 
@@ -147,7 +147,7 @@ Archived org access:
 
 - `/o/{slug}` should show an archived-state page for members of the org.
 - Members should not see dashboard tabs for archived orgs.
-- Owners should see restore guidance if owner restore is enabled.
+- Owners see a slug-confirmed restore action.
 - Non-members should continue to get the current safe not-found/blocked behavior.
 
 ---
@@ -179,7 +179,7 @@ Notifications are optional for the first slice. A later slice can notify all act
 3. Add owner-only archive API with tests. [done]
 4. Add archived-state web handling for `/o/{slug}`. [done]
 5. Add Manage Settings danger-zone UI. [done]
-6. Add restore path only after archive behavior is proven.
+6. Add owner restore API, archived-state UI, audit event, and tests. [done]
 7. Leave hard delete as operator-only future work.
 
 ---
@@ -201,6 +201,8 @@ Web tests:
 - Admin/member do not see an enabled archive action.
 - Confirmation requires slug.
 - Archived org route shows archived state instead of dashboard.
+- Owner sees the restore action on the archived state; admin/member do not.
+- Restore confirmation requires the current slug and returns through the organization switch route.
 
 Operational checks:
 

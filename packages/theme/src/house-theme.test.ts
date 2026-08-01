@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assessHouseThemeColor, resolveHouseThemeStyle } from "./house-theme";
-import { houseThemeQaCases } from "./house-theme-qa";
+import { assessHouseThemeColor, resolveHouseThemeStyle } from "./house-theme.js";
+import { houseThemeQaCases } from "./house-theme-qa.js";
 
 const expectedThemeTokens = [
   "--primary",

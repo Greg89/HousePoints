@@ -70,9 +70,9 @@ For an internal team app the simplest approach is enabling Railway's built-in PI
 
 ---
 
-## 5.5 Org settings, owner transfer, deeper admin removal, and org deletion [doing]
+## 5.5 Org settings, owner transfer, member removal, and archive/restore [done]
 
-The app supports creating and joining organizations. Owners can update organization settings from the Manage Organization workspace, and sensitive changes are audited. Broader organization administration remains future work.
+The app supports creating, joining, switching, archiving, and restoring organizations. Owners can update organization settings from the Manage Organization workspace, and sensitive changes are audited. Hard delete remains an operator-only future policy rather than a product workflow.
 
 Deferred sub-features:
 
@@ -81,12 +81,12 @@ Deferred sub-features:
 - Transfer owner role. Implemented for owners in Manage Organization. The acting owner becomes an admin, the selected member becomes owner, and the change is audited.
 - Define deeper admin-removal rules. Owner-only member promotion and admin demotion are implemented in Manage Team with audited role changes.
 - Remove users from an organization. Implemented for owners in Manage Team. The user row is preserved, org-scoped fields are cleared, role resets to member, related notifications are archived, and the removal is audited.
-- Delete or archive an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). The data/API slice is implemented: organizations can be archived by owners, normal active-context resolution excludes archived organizations, archive actions are audited, archived organization routes render a neutral archived-state page instead of the dashboard, and owners can launch the archive action from the Manage Organization danger zone with slug confirmation. Successful archives now send the owner to that neutral archived-state page.
+- Archive or restore an organization. Archive-first product and engineering rules are specified in [Organization Lifecycle And Archive Design](./org-lifecycle-archive-design.md). Owners can archive from Manage Organization with slug confirmation, normal active-context resolution excludes archived organizations, archived routes render a neutral state, and owners can restore from that state with a second slug confirmation. Archive and restore actions are audited. Hard delete remains deferred.
 
 Recommended remaining order:
 
-1. Expand staging E2E coverage for owner and admin flows.
-2. Continue product hardening around multi-org switching and lifecycle recovery.
+1. Provision the optional dedicated lifecycle organization and enable its staging E2E smoke.
+2. Continue product hardening only when real multi-org usage identifies a concrete gap.
 
 ---
 

@@ -88,6 +88,11 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    deviceRegistration: {
+      upsert: vi.fn(),
+      updateMany: vi.fn(),
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -155,6 +160,9 @@ const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof
 const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
 const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
 const mockPointReactionUpdate = prisma.pointReaction.update as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationUpsert = prisma.deviceRegistration.upsert as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationUpdateMany = prisma.deviceRegistration.updateMany as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationFindMany = prisma.deviceRegistration.findMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -319,6 +327,7 @@ beforeEach(() => {
   mockNotificationCreateMany.mockResolvedValue({ count: 0 });
   mockNotificationFindMany.mockResolvedValue([]);
   mockNotificationUpdateMany.mockResolvedValue({ count: 0 });
+  mockDeviceRegistrationFindMany.mockResolvedValue([]);
   const releaseAnnouncement = {
     id: "release-1",
     version: "v1.2.3",
@@ -349,11 +358,13 @@ async function buildTestApp(
   options: {
     idTokenSubject?: string;
     idTokenClaims?: Record<string, unknown>;
+    pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
+    pushDispatcher: options.pushDispatcher,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
       claims: { sub: subject, ...claims },
@@ -963,6 +974,14 @@ describe("POST /points/adjust", () => {
   });
 
   it("awards points, notifies the recipient, and returns 201 with the transaction id and trait", async () => {
+    const pushDispatcher = {
+      send: vi.fn().mockResolvedValue({ acceptedCount: 1 }),
+    };
+    mockDeviceRegistrationFindMany.mockResolvedValue([{
+      organizationId: "org-1",
+      userId: "user-1",
+      pushToken: "ExponentPushToken[test]",
+    }]);
     mockFindUnique.mockResolvedValueOnce(makeAdmin());
     mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
@@ -979,7 +998,7 @@ describe("POST /points/adjust", () => {
       trait: "TECHNICAL_EXCELLENCE",
       createdAt: new Date(),
     });
-    const app = await buildTestApp();
+    const app = await buildTestApp("auth0|member", {}, { pushDispatcher });
     const res = await app.inject({
       method: "POST",
       url: "/points/adjust",
@@ -1040,6 +1059,28 @@ describe("POST /points/adjust", () => {
       }],
       skipDuplicates: true,
     });
+    expect(mockDeviceRegistrationFindMany).toHaveBeenCalledWith({
+      where: {
+        revokedAt: null,
+        OR: [{ organizationId: "org-1", userId: "user-1" }],
+      },
+      select: {
+        organizationId: true,
+        userId: true,
+        pushToken: true,
+      },
+    });
+    expect(pushDispatcher.send).toHaveBeenCalledWith([{
+      to: "ExponentPushToken[test]",
+      title: "Points awarded",
+      body: "Bob awarded you 15 points for Technical Excellence.",
+      data: {
+        organizationId: "org-1",
+        type: "POINT_AWARD_RECEIVED",
+        entityId: "tx-abc",
+        actionHref: "/?tab=activity",
+      },
+    }]);
     await app.close();
   });
 
@@ -4312,6 +4353,90 @@ describe("POST /admin/org/archive", () => {
   });
 });
 
+describe("POST /admin/org/restore", () => {
+  it("allows an archived organization owner to restore it and writes an audit event", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-owner",
+        displayName: "Olivia",
+        memberships: [{
+          id: "membership-owner",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }],
+      },
+    });
+    mockOrgUpdate.mockResolvedValue({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/restore",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockOrgUpdate).toHaveBeenCalledWith({
+      where: { id: "org-1" },
+      data: {
+        archivedAt: null,
+        archivedById: null,
+      },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-1",
+        actorUserId: "user-owner",
+        eventType: "ORG_RESTORED",
+        summary: "Olivia restored Acme Corp.",
+        metadata: {
+          organizationName: "Acme Corp",
+          organizationSlug: "acme",
+          restoredAt: expect.any(String),
+        },
+      },
+    });
+    expect(res.json()).toEqual({
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+    });
+    await app.close();
+  });
+
+  it("rejects members and non-members without exposing archived organization details", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-member",
+        displayName: "Alice",
+        memberships: [],
+      },
+    });
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/restore",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /admin/users/remove", () => {
   it("returns 403 OWNER_REQUIRED when actor is an admin", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
@@ -6109,6 +6234,7 @@ describe("POST /orgs/create", () => {
         memberships: [
           {
             organizationId: "org-1",
+            role: "MEMBER",
             role: "OWNER",
             houseId: "house-1",
             organization: { name: "Acme Corp", slug: "acme" },
@@ -6676,6 +6802,7 @@ describe("POST /orgs/route-context", () => {
       organizationSlug: "acme",
       organizationName: "Acme Corp",
       archivedAt: "2026-07-04T17:30:00.000Z",
+      canRestore: false,
     });
     await app.close();
   });
@@ -7621,6 +7748,160 @@ describe("POST /notifications/mark-all-read", () => {
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
     expect(mockNotificationUpdateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+
+describe("POST /devices/register", () => {
+  it("upserts a device registration and returns the id", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpsert.mockResolvedValue({ id: "dev-1" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: {
+        platform: "IOS",
+        pushToken: "ExponentPushToken[abc]",
+        appVersion: "0.1.0",
+        locale: "en-US",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ id: "dev-1" });
+    expect(mockDeviceRegistrationUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        userId_pushToken: {
+          userId: "user-1",
+          pushToken: "ExponentPushToken[abc]",
+        },
+      },
+      create: expect.objectContaining({
+        userId: "user-1",
+        organizationId: "org-1",
+        platform: "IOS",
+        pushToken: "ExponentPushToken[abc]",
+        appVersion: "0.1.0",
+        locale: "en-US",
+      }),
+      update: expect.objectContaining({
+        organizationId: "org-1",
+        platform: "IOS",
+        appVersion: "0.1.0",
+        locale: "en-US",
+        revokedAt: null,
+      }),
+    }));
+    await app.close();
+  });
+
+  it("defaults optional fields to null when not provided", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpsert.mockResolvedValue({ id: "dev-2" });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: { platform: "ANDROID", pushToken: "fcm-token-xyz" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const call = mockDeviceRegistrationUpsert.mock.calls[0][0];
+    expect(call.create.appVersion).toBeNull();
+    expect(call.create.locale).toBeNull();
+    expect(call.update.appVersion).toBeNull();
+    expect(call.update.locale).toBeNull();
+    await app.close();
+  });
+
+  it("rejects invalid platform values", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: { platform: "WINDOWS", pushToken: "abc" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockDeviceRegistrationUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns 403 when the actor cannot be resolved", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/register",
+      payload: { platform: "IOS", pushToken: "abc" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(mockDeviceRegistrationUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("POST /devices/unregister", () => {
+  it("soft-revokes the matching device registration", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/unregister",
+      payload: { pushToken: "ExponentPushToken[abc]" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revoked: true });
+    expect(mockDeviceRegistrationUpdateMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        pushToken: "ExponentPushToken[abc]",
+        revokedAt: null,
+      },
+      data: { revokedAt: expect.any(Date) },
+    });
+    await app.close();
+  });
+
+  it("returns revoked: false when no active registration matches", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 0 });
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/unregister",
+      payload: { pushToken: "unknown-token" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revoked: false });
+    await app.close();
+  });
+
+  it("rejects an empty pushToken", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/devices/unregister",
+      payload: { pushToken: "" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockDeviceRegistrationUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 });

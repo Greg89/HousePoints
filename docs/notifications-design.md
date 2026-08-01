@@ -370,7 +370,7 @@ Add more types only after the first workflow feels useful:
 - Role changed
 - Org settings changed
 
-Status: in progress. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Org settings changes remain deferred.
+Status: implemented for the currently selected producers. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Org settings changes remain a deferred producer rather than incomplete MVP work.
 
 `POINT_AWARD_RECEIVED` is implemented as a targeted `INFO` notification created inside the point-award transaction. It notifies the recipient, links to Activity, and skips self-awards to avoid echoing an action the current user just performed.
 

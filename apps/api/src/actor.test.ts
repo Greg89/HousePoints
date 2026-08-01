@@ -15,6 +15,7 @@ import { prisma } from "@housepoints/db";
 import {
   getActorBySub,
   getActorBySubForOrganizationSlug,
+  getArchivedOwnerActorBySubAndSlug,
   getUserOrgContextBySub,
   getUserRouteOrgContextBySub,
   isAdminRole,
@@ -396,6 +397,20 @@ describe("getActorBySubForOrganizationSlug", () => {
       getActorBySubForOrganizationSlug("auth0|member", "legacy-acme"),
     ).resolves.toBeNull();
   });
+
+  it("returns null when no user matches the subject for a scoped API call", async () => {
+    mockIdentityFindUnique.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue(null);
+
+    await expect(
+      getActorBySubForOrganizationSlug("auth0|missing", "acme"),
+    ).resolves.toBeNull();
+
+    expect(mockFindUnique).toHaveBeenCalledWith({
+      where: { auth0Sub: "auth0|missing" },
+      select: actorUserSelect,
+    });
+  });
 });
 
 describe("getUserOrgContextBySub", () => {
@@ -409,6 +424,7 @@ describe("getUserOrgContextBySub", () => {
         memberships: [
           {
             organizationId: "org-1",
+            role: "MEMBER",
             organization: {
               name: "Acme Corp",
               slug: "acme",
@@ -492,6 +508,7 @@ describe("getUserRouteOrgContextBySub", () => {
           },
           {
             organizationId: "org-2",
+            role: "MEMBER",
             organization: {
               name: "Second Org",
               slug: "second-org",
@@ -510,6 +527,7 @@ describe("getUserRouteOrgContextBySub", () => {
         organizationName: "Second Org",
         organizationSlug: "second-org",
         organizationArchivedAt: null,
+        role: "MEMBER",
       },
     });
   });
@@ -521,6 +539,7 @@ describe("getUserRouteOrgContextBySub", () => {
         memberships: [
           {
             organizationId: "org-1",
+            role: "MEMBER",
             organization: {
               name: "Archived Org",
               slug: "archived-org",
@@ -529,6 +548,7 @@ describe("getUserRouteOrgContextBySub", () => {
           },
           {
             organizationId: "org-2",
+            role: "MEMBER",
             organization: {
               name: "Active Org",
               slug: "active-org",
@@ -548,7 +568,58 @@ describe("getUserRouteOrgContextBySub", () => {
         organizationName: "Archived Org",
         organizationSlug: "archived-org",
         organizationArchivedAt: archivedAt,
+        role: "MEMBER",
       },
     });
+  });
+});
+
+describe("getArchivedOwnerActorBySubAndSlug", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns an owner membership for the requested archived organization", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-owner",
+        displayName: "Olivia",
+        memberships: [{
+          id: "membership-owner",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }],
+      },
+    });
+
+    await expect(
+      getArchivedOwnerActorBySubAndSlug("auth0|owner", "acme"),
+    ).resolves.toEqual({
+      id: "user-owner",
+      auth0Sub: "auth0|owner",
+      displayName: "Olivia",
+      membershipId: "membership-owner",
+      role: "OWNER",
+      houseId: "house-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      organizationSlug: "acme",
+    });
+  });
+
+  it("does not authorize users without a matching archived owner membership", async () => {
+    mockIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-member",
+        displayName: "Alice",
+        memberships: [],
+      },
+    });
+
+    await expect(
+      getArchivedOwnerActorBySubAndSlug("auth0|member", "acme"),
+    ).resolves.toBeNull();
   });
 });

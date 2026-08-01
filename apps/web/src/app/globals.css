@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
-/* Design tokens from house-points design system */
+/*
+ * Design tokens from the HousePoints design system.
+ *
+ * Canonical source of these values lives in `packages/theme/src/tokens.ts`
+ * so the (future) mobile app can consume the same palette. When updating a
+ * token, update `tokens.ts` in the same change; the tokens test locks the
+ * shared object and will fail if the two drift.
+ */
 :root {
   --background: oklch(0.97 0 0);
   --foreground: oklch(0.15 0 0);
