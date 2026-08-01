@@ -6,11 +6,12 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
 
 ## Progress record
 
-- Release owner:
-- Target version:
+- Release owner: Gregory Dodson
+- Target version: `1.0.0`
 - Candidate commit:
 - Target internal-release date:
 - Target public-release date:
+- Support email: `dodson.gregory@gmail.com`
 
 Keep links to completed workflow runs and store submissions in the evidence
 section at the end of this document. Do not record credential values here.
@@ -26,12 +27,12 @@ The identifiers already committed to the application are:
 
 Before the first store build:
 
-- [ ] Decide whether the first public version is `1.0.0` and update
-  `apps/mobile/app.config.ts`; the current version is `0.1.0`.
-- [ ] Add a final application icon.
-- [ ] Add an Android adaptive icon.
-- [ ] Add final splash-screen artwork.
-- [ ] Reference the assets from `apps/mobile/app.config.ts`.
+- [x] Use `1.0.0` as the first public version in
+  `apps/mobile/app.config.ts`.
+- [x] Add a final application icon.
+- [x] Add an Android adaptive icon.
+- [x] Add final splash-screen artwork.
+- [x] Reference the assets from `apps/mobile/app.config.ts`.
 - [ ] Prepare phone screenshots for App Store Connect and Google Play.
 - [ ] Write short and full store descriptions.
 - [ ] Publish a privacy-policy URL.

@@ -6,7 +6,8 @@ const config: ExpoConfig = {
   name: "HousePoints",
   slug: "housepoints",
   scheme: "housepoints",
-  version: "0.1.0",
+  version: "1.0.0",
+  icon: "./assets/icon.png",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -31,10 +32,27 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.housepoints.app",
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#020d24",
+    },
   },
   plugins: [
     "expo-dev-client",
     "expo-router",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/splash-icon.png",
+        imageWidth: 240,
+        resizeMode: "contain",
+        backgroundColor: "#020d24",
+        dark: {
+          image: "./assets/splash-icon.png",
+          backgroundColor: "#020d24",
+        },
+      },
+    ],
     "expo-secure-store",
     "expo-notifications",
     [
