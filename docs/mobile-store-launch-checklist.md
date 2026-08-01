@@ -40,7 +40,8 @@ Before the first store build:
 - [x] Add final splash-screen artwork.
 - [x] Reference the assets from `apps/mobile/app.config.ts`.
 - [ ] Prepare phone screenshots for App Store Connect and Google Play.
-- [ ] Write short and full store descriptions.
+- [x] Write short and full Google Play store descriptions in
+  [Google Play Store Listing](./google-play-store-listing.md).
 - [x] Publish the privacy-policy page at the production URL.
 - [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
