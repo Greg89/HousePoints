@@ -45,7 +45,10 @@ Before the first store build:
 - [x] Publish the privacy-policy page at the production URL.
 - [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
-- [ ] Choose store categories and complete content/age-rating answers.
+- [ ] Choose store categories and complete content/age-rating answers using
+  [Google Play Console Declarations](./google-play-console-declarations.md).
+  Target ages require a release-owner decision, and the documented UGC
+  safeguards are a public-release blocker.
 - [ ] Complete Apple privacy disclosures and Google Play Data Safety answers.
 
 The repository does not currently contain final icon or splash assets. Treat
