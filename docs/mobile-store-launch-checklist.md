@@ -49,10 +49,14 @@ Before the first store build:
   [Google Play Console Declarations](./google-play-console-declarations.md).
   Target ages require a release-owner decision, and the documented UGC
   safeguards are a public-release blocker.
-- [ ] Complete Apple privacy disclosures and Google Play Data Safety answers.
+- [ ] Complete Google Play Data Safety answers using
+  [Google Play Data Safety Draft](./google-play-data-safety.md). Confirm the
+  production SDK behavior and Auth0 account-creation/deletion requirements.
+- [ ] Complete Apple privacy disclosures.
 
-The repository does not currently contain final icon or splash assets. Treat
-those as release blockers rather than shipping Expo placeholder branding.
+The repository contains the approved icon, Android adaptive icon, and splash
+assets under `apps/mobile/assets`; keep the store listing and submitted binary
+aligned with that branding.
 
 ## 2. Create the Expo/EAS project
 
@@ -106,10 +110,20 @@ configuration, not safe storage for secrets.
 - [ ] Enable Authorization Code with PKCE.
 - [ ] Enable and review refresh-token rotation.
 - [ ] Allow the intended staging and production database/social connections.
+- [ ] Replace Auth0 social-connection development keys for Google and GitHub
+  using [Auth0 Production Social Connections](./auth0-production-social-connections.md).
+- [ ] Put each provider's OAuth consent/application configuration into its
+  production or live state and complete any required brand or scope review.
+- [ ] Disable unused social connections rather than exposing unconfigured or
+  development-key options in Universal Login.
+- [ ] Test signup, sign-in, refresh, logout, and account linking for every
+  enabled connection on a physical Android device.
 - [ ] Confirm the Native Application can request the existing API audience.
 - [ ] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
 - [ ] Confirm no Auth0 client secret is present in mobile or EAS public
   variables.
+- [ ] Add in-app and external account-deletion request paths; self-service
+  account creation is enabled, so Google Play's account-deletion policy applies.
 
 ## 5. Prepare the production API
 
