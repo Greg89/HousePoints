@@ -14,9 +14,9 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
 - Support email: `dodson.gregory@gmail.com`
 - Production web URL: `https://housepointsweb-production.up.railway.app/`
 - Beta web URL: `https://housepointsweb-beta.up.railway.app/`
-- Planned privacy-policy URL:
+- Live privacy-policy URL:
   `https://housepointsweb-production.up.railway.app/privacy`
-- Planned support URL:
+- Live support URL:
   `https://housepointsweb-production.up.railway.app/support`
 
 Keep links to completed workflow runs and store submissions in the evidence
@@ -41,8 +41,8 @@ Before the first store build:
 - [x] Reference the assets from `apps/mobile/app.config.ts`.
 - [ ] Prepare phone screenshots for App Store Connect and Google Play.
 - [ ] Write short and full store descriptions.
-- [ ] Publish the prepared privacy-policy page at the planned production URL.
-- [ ] Publish the prepared support page at the planned production URL; support
+- [x] Publish the privacy-policy page at the production URL.
+- [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
 - [ ] Choose store categories and complete content/age-rating answers.
 - [ ] Complete Apple privacy disclosures and Google Play Data Safety answers.
