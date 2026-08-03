@@ -33,7 +33,7 @@ The documents in this folder serve three purposes:
 - [Google Play store listing](./google-play-store-listing.md): prepared title, descriptions, public contact URLs, and reviewer-access notes for the Android listing.
 - [Google Play Console declarations](./google-play-console-declarations.md): recommended category, ads and access answers, content-rating guidance, target-audience decision, and UGC compliance blockers.
 - [Google Play Data Safety draft](./google-play-data-safety.md): field-level Android data inventory, purposes, security answers, SDK checks, and account-deletion decision.
-- [Auth0 production social connections](./auth0-production-social-connections.md): Google and GitHub provider-owned OAuth credentials, environment isolation, minimum scopes, and physical-device verification.
+- [Auth0 production social connections](./auth0-production-social-connections.md): deferred Google and GitHub provider-owned OAuth setup for a later release.
 - [Staging E2E test data contract](./staging-e2e-test-data-contract.md): required staging users, org state, and GitHub Environment secrets for Playwright runs.
 - [Release process](./release-process.md): current manual GitHub Pages release note flow and commit convention.
 

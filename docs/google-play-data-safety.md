@@ -85,13 +85,13 @@ The release owner confirmed that the production Auth0 Universal Login permits
 users to create an account. Google Play's account-deletion requirements apply.
 
 - [x] Record that self-service account creation is enabled.
-- [ ] If enabled, add a readily discoverable in-app path to initiate account
-  and associated-data deletion.
-- [ ] If enabled, publish a dedicated external account-deletion resource that
-  lets former users initiate deletion without reinstalling the app.
-- [ ] If enabled, enter that external URL in Play Console's account-deletion
+- [x] Add a readily discoverable in-app path to initiate account and
+  associated-data deletion. Last owners must transfer ownership first.
+- [x] Add a dedicated external account-deletion resource that lets former users
+  initiate deletion without reinstalling the app.
+- [ ] Deploy the resource and enter its URL in Play Console's account-deletion
   field.
-- [ ] Define which records are deleted, anonymized, or retained for legitimate
+- [x] Define which records are deleted, anonymized, or retained for legitimate
   reasons and keep the privacy policy consistent.
 
 Do not select Play Console's exemption for apps that do not create accounts.

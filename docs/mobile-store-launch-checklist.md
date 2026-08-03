@@ -109,21 +109,18 @@ configuration, not safe storage for secrets.
 - [ ] Add `housepoints://com.housepoints.app/logout` as an allowed logout URL.
 - [ ] Enable Authorization Code with PKCE.
 - [ ] Enable and review refresh-token rotation.
-- [ ] Allow the intended staging and production database/social connections.
-- [ ] Replace Auth0 social-connection development keys for Google and GitHub
-  using [Auth0 Production Social Connections](./auth0-production-social-connections.md).
-- [ ] Put each provider's OAuth consent/application configuration into its
-  production or live state and complete any required brand or scope review.
-- [ ] Disable unused social connections rather than exposing unconfigured or
-  development-key options in Universal Login.
-- [ ] Test signup, sign-in, refresh, logout, and account linking for every
-  enabled connection on a physical Android device.
+- [ ] Allow the intended staging and production database connections.
+- [ ] Disable Google and GitHub for the first Play release. Only the intended
+  Auth0 database connection should appear in Universal Login.
+- [ ] Test database signup, sign-in, refresh, logout, and password recovery on
+  a physical Android device.
 - [ ] Confirm the Native Application can request the existing API audience.
 - [ ] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
 - [ ] Confirm no Auth0 client secret is present in mobile or EAS public
   variables.
-- [ ] Add in-app and external account-deletion request paths; self-service
-  account creation is enabled, so Google Play's account-deletion policy applies.
+- [x] Add an in-app account-deletion request path with last-owner protection.
+- [ ] Deploy and verify the external account-deletion resource at
+  `https://housepointsweb-production.up.railway.app/account-deletion`.
 
 ## 5. Prepare the production API
 

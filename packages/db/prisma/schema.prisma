@@ -162,6 +162,7 @@ model User {
   email                    String?                  @unique
   displayName              String
   houseThemeEnabled        Boolean                  @default(false)
+  deletionRequestedAt      DateTime?
   pointTransactions        PointTransaction[]       @relation("ActorTransactions")
   receivedTransactions     PointTransaction[]       @relation("PointsReceived")
   deletedPointTransactions PointTransaction[]       @relation("DeletedPointTransactions")
@@ -177,6 +178,8 @@ model User {
   deviceRegistrations      DeviceRegistration[]
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
+
+  @@index([deletionRequestedAt])
 }
 
 model OrganizationMembership {

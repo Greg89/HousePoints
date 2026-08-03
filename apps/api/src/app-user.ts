@@ -7,6 +7,7 @@ export const APP_USER_SELECT = {
   email: true,
   displayName: true,
   houseThemeEnabled: true,
+  deletionRequestedAt: true,
   memberships: {
     where: {
       isActive: true,

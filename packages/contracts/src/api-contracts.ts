@@ -63,6 +63,8 @@ import {
   bootstrapUserSchema,
   updateProfileSchema,
   updateProfileResponseSchema,
+  requestAccountDeletionSchema,
+  requestAccountDeletionResponseSchema,
 } from "./user-schemas.js";
 import {
   actorScopeSchema,
@@ -184,6 +186,10 @@ export const apiContracts = {
   "/users/profile": defineContract(
     updateProfileSchema,
     updateProfileResponseSchema,
+  ),
+  "/users/account-deletion": defineContract(
+    requestAccountDeletionSchema,
+    requestAccountDeletionResponseSchema,
   ),
   "/users/scores": defineContract(seasonScopedRequestSchema, memberScoresSchema),
 } as const;

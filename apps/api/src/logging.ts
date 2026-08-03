@@ -95,6 +95,8 @@ export type ApiLogEvent =
   | "points.reaction.saved"
   | "users.profile.updated"
   | "users.profile.validation_failed"
+  | "users.bootstrap.deletion_requested"
+  | "users.account_deletion.requested"
   | "orgs.created"
   | "orgs.create.slug_taken"
   | "orgs.create.already_in_org"

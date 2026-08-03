@@ -69,6 +69,44 @@ export default function ProfileScreen() {
     },
   });
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const accessToken = await getAccessToken();
+      return callApi(
+        "/users/account-deletion",
+        {},
+        { accessToken, organizationSlug: activeOrgSlug },
+      );
+    },
+    onSuccess: async () => {
+      logger.info("mobile.account_deletion.requested");
+      await signOut();
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiResponseError
+          ? err.message
+          : "Unable to request account deletion. Please try again.";
+      Alert.alert("Account not deleted", message);
+      logger.warn("mobile.account_deletion.failed", serializeError(err));
+    },
+  });
+
+  const confirmAccountDeletion = useCallback(() => {
+    Alert.alert(
+      "Delete your HousePoints account?",
+      "You will lose access to every HousePoints organization. Your name, email, login identity, and notification registrations will be removed during processing. Historical point and audit records may be retained in anonymized form. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete account",
+          style: "destructive",
+          onPress: () => deleteAccountMutation.mutate(),
+        },
+      ],
+    );
+  }, [deleteAccountMutation]);
+
   const startEditing = useCallback(() => {
     setDraftName(user?.displayName ?? "");
     setEditing(true);
@@ -205,6 +243,28 @@ export default function ProfileScreen() {
         >
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
+
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerTitle}>Delete account</Text>
+          <Text style={styles.dangerDescription}>
+            Permanently remove your HousePoints access and request deletion of
+            your personal account information.
+          </Text>
+          <Pressable
+            style={[
+              styles.deleteButton,
+              deleteAccountMutation.isPending && styles.buttonDisabled,
+            ]}
+            onPress={confirmAccountDeletion}
+            disabled={deleteAccountMutation.isPending}
+          >
+            {deleteAccountMutation.isPending ? (
+              <ActivityIndicator color="#b91c1c" />
+            ) : (
+              <Text style={styles.deleteButtonText}>Delete account</Text>
+            )}
+          </Pressable>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -296,4 +356,24 @@ const styles = StyleSheet.create({
   switchText: { color: "#0f172a", fontWeight: "500" },
   signOut: { alignItems: "center", padding: 12, marginTop: 16 },
   signOutText: { color: "#dc2626", fontSize: 15, fontWeight: "500" },
+  dangerZone: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#fecaca",
+    paddingTop: 20,
+  },
+  dangerTitle: { color: "#991b1b", fontSize: 16, fontWeight: "700" },
+  dangerDescription: { color: "#64748b", fontSize: 13, marginTop: 6 },
+  deleteButton: {
+    marginTop: 12,
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#dc2626",
+    backgroundColor: "#fff1f2",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  deleteButtonText: { color: "#b91c1c", fontSize: 14, fontWeight: "700" },
 });
