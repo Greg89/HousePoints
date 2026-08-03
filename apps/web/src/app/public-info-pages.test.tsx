@@ -1,9 +1,26 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import AboutPage, { metadata as aboutMetadata } from "./about/page";
 import PrivacyPage, { metadata as privacyMetadata } from "./privacy/page";
 import SupportPage, { metadata as supportMetadata } from "./support/page";
 
 describe("public store information pages", () => {
+  it("publishes a public HousePoints product homepage", () => {
+    render(<AboutPage />);
+
+    expect(screen.getByRole("heading", { name: "HousePoints" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What HousePoints does" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "HousePoints Privacy Policy" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+    expect(screen.getByRole("link", { name: "HousePoints Support" })).toHaveAttribute(
+      "href",
+      "/support",
+    );
+    expect(aboutMetadata.title).toBe("HousePoints | Recognition and House Scoring");
+  });
+
   it("publishes privacy information without requiring authentication", () => {
     render(<PrivacyPage />);
 

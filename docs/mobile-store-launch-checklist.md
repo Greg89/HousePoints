@@ -18,6 +18,8 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
   `https://housepointsweb-production.up.railway.app/privacy`
 - Live support URL:
   `https://housepointsweb-production.up.railway.app/support`
+- Public product homepage:
+  `https://housepointsweb-production.up.railway.app/about`
 
 Keep links to completed workflow runs and store submissions in the evidence
 section at the end of this document. Do not record credential values here.
@@ -45,6 +47,9 @@ Before the first store build:
 - [x] Publish the privacy-policy page at the production URL.
 - [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
+- [ ] Deploy and verify the public HousePoints product homepage at `/about`.
+- [ ] Verify the production Railway URL in Google Search Console using
+  `/googledacf7ffa3b911a1e.html`, then resubmit Google OAuth branding review.
 - [ ] Choose store categories and complete content/age-rating answers using
   [Google Play Console Declarations](./google-play-console-declarations.md).
   Target ages require a release-owner decision, and the documented UGC
