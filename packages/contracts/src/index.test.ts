@@ -117,6 +117,7 @@ const webConsumedApiEndpoints = [
   "/transactions/react",
   "/transactions/reactions",
   "/transactions/recent",
+  "/users/account-deletion",
   "/users/bootstrap",
   "/users/profile",
   "/users/scores",
