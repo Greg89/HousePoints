@@ -69,6 +69,16 @@ export const updateProfileSchema = z.object({
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
+export const requestAccountDeletionSchema = z.object({}).strict();
+
+export const requestAccountDeletionResponseSchema = z.object({
+  deletionRequestedAt: z.string().datetime(),
+}).strict();
+
+export type RequestAccountDeletionResponse = z.infer<
+  typeof requestAccountDeletionResponseSchema
+>;
+
 export const updateProfileResponseSchema = appUserSchema.omit({ created: true }).strict();
 
 export type UpdateProfileResponse = z.infer<

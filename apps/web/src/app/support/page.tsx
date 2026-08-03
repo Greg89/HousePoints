@@ -59,8 +59,10 @@ export default function SupportPage() {
         <h2>Privacy requests</h2>
         <p className="mt-4">
           Review our <a href="/privacy">Privacy Policy</a> for information about
-          the data HousePoints processes. Access, correction, or deletion
-          requests can be sent to the support email above.
+          the data HousePoints processes. Access or correction requests can be
+          sent to the support email above. See our{` `}
+          <a href="/account-deletion">account deletion instructions</a> to
+          remove a HousePoints account.
         </p>
       </section>
     </PublicInfoPage>

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   actorScopeSchema,
   bootstrapUserSchema,
+  requestAccountDeletionSchema,
   updateProfileSchema,
 } from "@housepoints/contracts";
 import { prisma, updateUserDisplayName } from "@housepoints/db";
@@ -177,6 +178,17 @@ export async function registerUserRoutes(
     const existing = await findExistingUser(auth0Sub);
 
     if (existing) {
+      if (existing.deletionRequestedAt) {
+        warn(request.log, "users.bootstrap.deletion_requested", {
+          userId: existing.id,
+          auth0Sub,
+        });
+        return reply.status(403).send({
+          code: "ACCOUNT_DELETION_REQUESTED",
+          message: "This HousePoints account is pending deletion.",
+        });
+      }
+
       const mappedExisting = mapAppUser(existing);
       info(request.log, "users.bootstrap.loaded", {
         userId: existing.id,
@@ -274,6 +286,83 @@ export async function registerUserRoutes(
     });
 
     return mapAppUser(updated);
+  });
+
+  app.post("/users/account-deletion", async (request, reply) => {
+    const parsed = await parseBody(requestAccountDeletionSchema, request, reply);
+    if (!parsed) return;
+
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
+
+    const ownerMemberships = await prisma.organizationMembership.findMany({
+      where: {
+        userId: actor.id,
+        role: "OWNER",
+        isActive: true,
+        archivedAt: null,
+        organization: { archivedAt: null },
+      },
+      select: {
+        organizationId: true,
+        organization: { select: { name: true } },
+      },
+    });
+
+    if (ownerMemberships.length > 0) {
+      const otherOwners = await prisma.organizationMembership.findMany({
+        where: {
+          organizationId: {
+            in: ownerMemberships.map((membership) => membership.organizationId),
+          },
+          userId: { not: actor.id },
+          role: "OWNER",
+          isActive: true,
+          archivedAt: null,
+        },
+        select: { organizationId: true },
+      });
+      const organizationsWithAnotherOwner = new Set(
+        otherOwners.map((membership) => membership.organizationId),
+      );
+      const blockedOrganizations = ownerMemberships.filter(
+        (membership) => !organizationsWithAnotherOwner.has(membership.organizationId),
+      );
+
+      if (blockedOrganizations.length > 0) {
+        return reply.status(409).send({
+          code: "ACCOUNT_DELETION_OWNER_TRANSFER_REQUIRED",
+          message: `Transfer ownership of ${blockedOrganizations.map((membership) => membership.organization.name).join(", ")} before deleting your account.`,
+        });
+      }
+    }
+
+    const deletionRequestedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.deviceRegistration.updateMany({
+        where: { userId: actor.id, revokedAt: null },
+        data: { revokedAt: deletionRequestedAt },
+      });
+      await tx.organizationMembership.updateMany({
+        where: { userId: actor.id, isActive: true },
+        data: {
+          isActive: false,
+          archivedAt: deletionRequestedAt,
+          houseId: null,
+        },
+      });
+      await tx.user.update({
+        where: { id: actor.id },
+        data: { deletionRequestedAt },
+      });
+    });
+
+    info(request.log, "users.account_deletion.requested", {
+      actorUserId: actor.id,
+      deletionRequestedAt: deletionRequestedAt.toISOString(),
+    });
+
+    return { deletionRequestedAt: deletionRequestedAt.toISOString() };
   });
 
   app.post("/members", async (request, reply) => {

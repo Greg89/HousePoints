@@ -19,7 +19,7 @@ export function PublicInfoPage({
       <article className="mx-auto max-w-3xl">
         <header className="border-b border-border pb-8">
           <Link
-            href="/"
+            href="/about"
             className="text-sm font-semibold text-primary hover:underline"
           >
             HousePoints
@@ -40,6 +40,12 @@ export function PublicInfoPage({
         </div>
 
         <footer className="border-t border-border pt-6 text-sm text-muted-foreground">
+          <Link href="/about" className="hover:text-foreground hover:underline">
+            About
+          </Link>
+          <span aria-hidden="true" className="mx-3">
+            Â·
+          </span>
           <Link href="/privacy" className="hover:text-foreground hover:underline">
             Privacy
           </Link>

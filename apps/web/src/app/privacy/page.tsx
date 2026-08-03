@@ -79,9 +79,12 @@ export default function PrivacyPage() {
         <h2>Your choices</h2>
         <p className="mt-4">
           You can disable push notifications through your device settings. To
-          request access, correction, or deletion of your information, contact
-          your organization administrator or email us. Some records may need to
-          be retained for the purposes described above.
+          request access or correction of your information, contact your
+          organization administrator or email us. To delete your account, use
+          the option in the mobile Profile tab or review our{` `}
+          <a href="/account-deletion">account deletion instructions</a>. Some
+          records may need to be retained in anonymized form for the purposes
+          described above.
         </p>
       </section>
 

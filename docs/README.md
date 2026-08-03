@@ -30,6 +30,10 @@ The documents in this folder serve three purposes:
 - [Multi-org membership design](./multi-org-membership-design.md): staged migration from single `User.organizationId` membership to membership-scoped org access.
 - [Release and E2E automation plan](./release-and-e2e-automation.md): phased release notes, in-app release announcements, and scheduled staging Playwright coverage.
 - [Mobile store launch checklist](./mobile-store-launch-checklist.md): ordered Expo, Auth0, Apple, Google, GitHub, E2E, device-testing, and public-release setup for completing Tier 6.
+- [Google Play store listing](./google-play-store-listing.md): prepared title, descriptions, public contact URLs, and reviewer-access notes for the Android listing.
+- [Google Play Console declarations](./google-play-console-declarations.md): recommended category, ads and access answers, content-rating guidance, target-audience decision, and UGC compliance blockers.
+- [Google Play Data Safety draft](./google-play-data-safety.md): field-level Android data inventory, purposes, security answers, SDK checks, and account-deletion decision.
+- [Auth0 production social connections](./auth0-production-social-connections.md): deferred Google and GitHub provider-owned OAuth setup for a later release.
 - [Staging E2E test data contract](./staging-e2e-test-data-contract.md): required staging users, org state, and GitHub Environment secrets for Playwright runs.
 - [Release process](./release-process.md): current manual GitHub Pages release note flow and commit convention.
 

@@ -14,10 +14,12 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
 - Support email: `dodson.gregory@gmail.com`
 - Production web URL: `https://housepointsweb-production.up.railway.app/`
 - Beta web URL: `https://housepointsweb-beta.up.railway.app/`
-- Planned privacy-policy URL:
+- Live privacy-policy URL:
   `https://housepointsweb-production.up.railway.app/privacy`
-- Planned support URL:
+- Live support URL:
   `https://housepointsweb-production.up.railway.app/support`
+- Public product homepage:
+  `https://housepointsweb-production.up.railway.app/about`
 
 Keep links to completed workflow runs and store submissions in the evidence
 section at the end of this document. Do not record credential values here.
@@ -40,15 +42,26 @@ Before the first store build:
 - [x] Add final splash-screen artwork.
 - [x] Reference the assets from `apps/mobile/app.config.ts`.
 - [ ] Prepare phone screenshots for App Store Connect and Google Play.
-- [ ] Write short and full store descriptions.
-- [ ] Publish the prepared privacy-policy page at the planned production URL.
-- [ ] Publish the prepared support page at the planned production URL; support
+- [x] Write short and full Google Play store descriptions in
+  [Google Play Store Listing](./google-play-store-listing.md).
+- [x] Publish the privacy-policy page at the production URL.
+- [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
-- [ ] Choose store categories and complete content/age-rating answers.
-- [ ] Complete Apple privacy disclosures and Google Play Data Safety answers.
+- [ ] Deploy and verify the public HousePoints product homepage at `/about`.
+- [ ] Verify the production Railway URL in Google Search Console using
+  `/googledacf7ffa3b911a1e.html`, then resubmit Google OAuth branding review.
+- [ ] Choose store categories and complete content/age-rating answers using
+  [Google Play Console Declarations](./google-play-console-declarations.md).
+  Target ages require a release-owner decision, and the documented UGC
+  safeguards are a public-release blocker.
+- [ ] Complete Google Play Data Safety answers using
+  [Google Play Data Safety Draft](./google-play-data-safety.md). Confirm the
+  production SDK behavior and Auth0 account-creation/deletion requirements.
+- [ ] Complete Apple privacy disclosures.
 
-The repository does not currently contain final icon or splash assets. Treat
-those as release blockers rather than shipping Expo placeholder branding.
+The repository contains the approved icon, Android adaptive icon, and splash
+assets under `apps/mobile/assets`; keep the store listing and submitted binary
+aligned with that branding.
 
 ## 2. Create the Expo/EAS project
 
@@ -101,11 +114,18 @@ configuration, not safe storage for secrets.
 - [ ] Add `housepoints://com.housepoints.app/logout` as an allowed logout URL.
 - [ ] Enable Authorization Code with PKCE.
 - [ ] Enable and review refresh-token rotation.
-- [ ] Allow the intended staging and production database/social connections.
+- [ ] Allow the intended staging and production database connections.
+- [ ] Disable Google and GitHub for the first Play release. Only the intended
+  Auth0 database connection should appear in Universal Login.
+- [ ] Test database signup, sign-in, refresh, logout, and password recovery on
+  a physical Android device.
 - [ ] Confirm the Native Application can request the existing API audience.
 - [ ] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
 - [ ] Confirm no Auth0 client secret is present in mobile or EAS public
   variables.
+- [x] Add an in-app account-deletion request path with last-owner protection.
+- [ ] Deploy and verify the external account-deletion resource at
+  `https://housepointsweb-production.up.railway.app/account-deletion`.
 
 ## 5. Prepare the production API
 

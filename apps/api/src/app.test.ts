@@ -30,6 +30,7 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     authIdentity: {
       findUnique: vi.fn(),
@@ -115,6 +116,7 @@ const mockMembershipFindFirst = prisma.organizationMembership.findFirst as Retur
 const mockMembershipFindMany = prisma.organizationMembership.findMany as ReturnType<typeof vi.fn>;
 const mockMembershipCreate = prisma.organizationMembership.create as ReturnType<typeof vi.fn>;
 const mockMembershipUpdate = prisma.organizationMembership.update as ReturnType<typeof vi.fn>;
+const mockMembershipUpdateMany = prisma.organizationMembership.updateMany as ReturnType<typeof vi.fn>;
 const mockCreate = prisma.user.create as ReturnType<typeof vi.fn>;
 const mockUserUpdate = prisma.user.update as ReturnType<typeof vi.fn>;
 const mockAuthIdentityFindUnique = prisma.authIdentity.findUnique as ReturnType<typeof vi.fn>;
@@ -731,6 +733,26 @@ describe("POST /users/bootstrap", () => {
     const body = res.json();
     expect(body.auth0Sub).toBe("auth0|member");
     expect(body.created).toBe(false);
+    await app.close();
+  });
+
+  it("blocks an account whose deletion has been requested", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({
+      deletionRequestedAt: new Date("2026-08-01T15:00:00.000Z"),
+    }));
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/bootstrap",
+      payload: { displayName: "Alice" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({
+      code: "ACCOUNT_DELETION_REQUESTED",
+      message: "This HousePoints account is pending deletion.",
+    });
     await app.close();
   });
 
@@ -3752,6 +3774,69 @@ describe("POST /users/profile", () => {
         memberships: expect.any(Object),
       }),
     });
+    await app.close();
+  });
+});
+
+describe("POST /users/account-deletion", () => {
+  it("deactivates memberships and devices and records the request", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockMembershipFindMany.mockResolvedValueOnce([]);
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 1 });
+    mockMembershipUpdateMany.mockResolvedValue({ count: 1 });
+    mockUserUpdate.mockResolvedValue({});
+    const app = await buildTestApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/account-deletion",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().deletionRequestedAt).toEqual(expect.any(String));
+    expect(mockDeviceRegistrationUpdateMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(mockMembershipUpdateMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", isActive: true },
+      data: {
+        isActive: false,
+        archivedAt: expect.any(Date),
+        houseId: null,
+      },
+    });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { deletionRequestedAt: expect.any(Date) },
+    });
+    await app.close();
+  });
+
+  it("requires a last owner to transfer ownership first", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockMembershipFindMany
+      .mockResolvedValueOnce([{
+        organizationId: "org-1",
+        organization: { name: "Acme Corp" },
+      }])
+      .mockResolvedValueOnce([]);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/users/account-deletion",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      code: "ACCOUNT_DELETION_OWNER_TRANSFER_REQUIRED",
+      message: "Transfer ownership of Acme Corp before deleting your account.",
+    });
+    expect(mockUserUpdate).not.toHaveBeenCalled();
+    expect(mockMembershipUpdateMany).not.toHaveBeenCalled();
     await app.close();
   });
 });
