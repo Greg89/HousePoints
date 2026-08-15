@@ -1,9 +1,12 @@
 import type { ExpoConfig } from "expo/config";
 
-const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+const easProjectId =
+  process.env.EXPO_PUBLIC_EAS_PROJECT_ID ??
+  "ce61b4ea-7185-4e4c-9a66-0ddc1fcd6bd5";
 
 const config: ExpoConfig = {
   name: "HousePoints",
+  owner: "dodson-llc",
   slug: "housepoints",
   scheme: "housepoints",
   version: "1.0.0",

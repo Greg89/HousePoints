@@ -67,10 +67,10 @@ aligned with that branding.
 
 ## 2. Create the Expo/EAS project
 
-- [ ] Create or select the team-owned Expo account.
-- [ ] From `apps/mobile`, run `eas login`.
-- [ ] Run `eas init` and link the app to the intended Expo project.
-- [ ] Record the generated project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID`.
+- [x] Create or select the team-owned Expo account (`dodson-llc`).
+- [x] From `apps/mobile`, run `eas login`.
+- [x] Run `eas init` and link the app to `@dodson-llc/housepoints`.
+- [x] Record the generated project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID`.
 - [ ] Create an Expo access token for GitHub Actions.
 - [ ] Store the token only as the `EXPO_TOKEN` GitHub Environment secret.
 - [ ] Confirm EAS can manage the iOS and Android signing credentials.
@@ -274,7 +274,7 @@ Test at least one physical iPhone and one physical Android phone:
 
 Fill these in as work completes:
 
-- Expo project:
+- Expo project: https://expo.dev/accounts/dodson-llc/projects/housepoints
 - Internal release workflow:
 - TestFlight internal submission:
 - Play internal submission:
