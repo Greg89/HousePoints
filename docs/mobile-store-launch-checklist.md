@@ -12,14 +12,14 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
 - Target internal-release date:
 - Target public-release date:
 - Support email: `dodson.gregory@gmail.com`
-- Production web URL: `https://housepointsweb-production.up.railway.app/`
-- Beta web URL: `https://housepointsweb-beta.up.railway.app/`
+- Production web URL: `https://app.housepoints-ds.com/`
+- Beta web URL: `https://beta.housepoints-ds.com/`
 - Live privacy-policy URL:
-  `https://housepointsweb-production.up.railway.app/privacy`
+  `https://app.housepoints-ds.com/privacy`
 - Live support URL:
-  `https://housepointsweb-production.up.railway.app/support`
+  `https://app.housepoints-ds.com/support`
 - Public product homepage:
-  `https://housepointsweb-production.up.railway.app/about`
+  `https://app.housepoints-ds.com/about`
 
 Keep links to completed workflow runs and store submissions in the evidence
 section at the end of this document. Do not record credential values here.
@@ -47,9 +47,11 @@ Before the first store build:
 - [x] Publish the privacy-policy page at the production URL.
 - [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
-- [ ] Deploy and verify the public HousePoints product homepage at `/about`.
-- [ ] Verify the production Railway URL in Google Search Console using
-  `/googledacf7ffa3b911a1e.html`, then resubmit Google OAuth branding review.
+- [x] Deploy and verify the public HousePoints product homepage at `/about`.
+- [x] Verify `housepoints-ds.com` as a Domain property in Google Search
+  Console using DNS verification.
+- [ ] Complete Google OAuth branding review for the production homepage and
+  privacy-policy URLs.
 - [ ] Choose store categories and complete content/age-rating answers using
   [Google Play Console Declarations](./google-play-console-declarations.md).
   Target ages require a release-owner decision, and the documented UGC
@@ -124,8 +126,8 @@ configuration, not safe storage for secrets.
 - [ ] Confirm no Auth0 client secret is present in mobile or EAS public
   variables.
 - [x] Add an in-app account-deletion request path with last-owner protection.
-- [ ] Deploy and verify the external account-deletion resource at
-  `https://housepointsweb-production.up.railway.app/account-deletion`.
+- [x] Deploy and verify the external account-deletion resource at
+  `https://app.housepoints-ds.com/account-deletion`.
 
 ## 5. Prepare the production API
 
