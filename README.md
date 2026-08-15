@@ -234,6 +234,7 @@ Web service variables:
 - `AUTH0_CLIENT_SECRET`
 - `AUTH0_AUDIENCE`
 - `APP_BASE_URL`
+- `APP_LEGACY_HOSTS` (optional comma-separated hostnames that permanently redirect to `APP_BASE_URL`; set this to the generated Railway hostname after adopting a custom domain)
 - `APP_API_BASE_URL`
 - optional `SHOW_SEASON_OVERVIEW_CARD` (`"true"` displays the Overview current-season status card)
 - optional `POINT_ADJUSTMENTS_ENABLED` (`"true"` displays the admin/owner `Deduct points` action)
