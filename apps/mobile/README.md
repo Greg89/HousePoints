@@ -21,8 +21,9 @@ registration is the next roadmap slice (task 6.5a).
 - An Auth0 tenant with:
   - A **Native Application** registered (separate from the existing web
     Regular Web Application).
-  - Callback URL `housepoints://com.housepoints.app/callback`.
-  - Logout URL `housepoints://com.housepoints.app/logout`.
+  - Callback and logout URLs for both native platforms:
+    - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/android/com.housepoints.app/callback`
+    - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/ios/com.housepoints.app/callback`
   - The existing HousePoints API audience granted to the native application.
   - Refresh token rotation + reuse detection enabled.
 - One of:

@@ -111,9 +111,10 @@ configuration, not safe storage for secrets.
 - [ ] Create a dedicated Auth0 **Native Application** for HousePoints.
 - [ ] Set its client ID as `EXPO_PUBLIC_AUTH0_CLIENT_ID` in the relevant EAS
   Environments.
-- [ ] Add `housepoints://com.housepoints.app/callback` as an allowed callback
-  URL.
-- [ ] Add `housepoints://com.housepoints.app/logout` as an allowed logout URL.
+- [ ] Add both SDK-generated native callback URLs as allowed callback URLs:
+  - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/android/com.housepoints.app/callback`
+  - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/ios/com.housepoints.app/callback`
+- [ ] Add those same two callback URLs as allowed logout URLs.
 - [ ] Enable Authorization Code with PKCE.
 - [ ] Enable and review refresh-token rotation.
 - [ ] Allow the intended staging and production database connections.
