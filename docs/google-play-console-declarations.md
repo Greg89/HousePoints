@@ -22,7 +22,7 @@ target-audience and Families-policy analysis.
 ## Privacy policy
 
 - Privacy-policy URL:
-  `https://housepointsweb-production.up.railway.app/privacy`
+  `https://app.housepoints-ds.com/privacy`
 - Status: published and publicly accessible without authentication.
 
 ## Ads

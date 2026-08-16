@@ -85,22 +85,22 @@ Useful references:
 Create EAS Environments named `development`, `preview`, and `production`.
 Define every variable from `apps/mobile/.env.example` in each Environment:
 
-- [ ] `EXPO_PUBLIC_API_BASE_URL`
-- [ ] `EXPO_PUBLIC_WEB_BASE_URL`
-- [ ] `EXPO_PUBLIC_AUTH0_DOMAIN`
-- [ ] `EXPO_PUBLIC_AUTH0_CLIENT_ID`
-- [ ] `EXPO_PUBLIC_AUTH0_AUDIENCE`
-- [ ] `EXPO_PUBLIC_EAS_PROJECT_ID`
-- [ ] `EXPO_PUBLIC_DEFAULT_ORG_SLUG`
-- [ ] `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED`
-- [ ] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
+- [x] `EXPO_PUBLIC_API_BASE_URL`
+- [x] `EXPO_PUBLIC_WEB_BASE_URL`
+- [x] `EXPO_PUBLIC_AUTH0_DOMAIN`
+- [x] `EXPO_PUBLIC_AUTH0_CLIENT_ID`
+- [x] `EXPO_PUBLIC_AUTH0_AUDIENCE`
+- [x] `EXPO_PUBLIC_EAS_PROJECT_ID`
+- [x] Leave optional `EXPO_PUBLIC_DEFAULT_ORG_SLUG` unset.
+- [x] `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED`
+- [x] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
 
 Environment mapping:
 
 - [ ] `development` points to development/local services.
-- [ ] `preview` points to staging API, web, and Auth0 configuration.
-- [ ] `production` points only to production services.
-- [ ] Preview and production values have been compared for accidental
+- [x] `preview` points to staging API, web, and Auth0 configuration.
+- [x] `production` points only to production services.
+- [x] Preview and production values have been compared for accidental
   cross-environment URLs.
 
 All `EXPO_PUBLIC_*` values are embedded in the application. They are
@@ -108,23 +108,23 @@ configuration, not safe storage for secrets.
 
 ## 4. Configure Auth0
 
-- [ ] Create a dedicated Auth0 **Native Application** for HousePoints.
-- [ ] Set its client ID as `EXPO_PUBLIC_AUTH0_CLIENT_ID` in the relevant EAS
+- [x] Create a dedicated Auth0 **Native Application** for HousePoints.
+- [x] Set its client ID as `EXPO_PUBLIC_AUTH0_CLIENT_ID` in the relevant EAS
   Environments.
-- [ ] Add both SDK-generated native callback URLs as allowed callback URLs:
+- [x] Add both SDK-generated native callback URLs as allowed callback URLs:
   - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/android/com.housepoints.app/callback`
   - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/ios/com.housepoints.app/callback`
-- [ ] Add those same two callback URLs as allowed logout URLs.
-- [ ] Enable Authorization Code with PKCE.
-- [ ] Enable and review refresh-token rotation.
-- [ ] Allow the intended staging and production database connections.
-- [ ] Disable Google and GitHub for the first Play release. Only the intended
+- [x] Add those same two callback URLs as allowed logout URLs.
+- [x] Enable Authorization Code with PKCE.
+- [x] Enable and review refresh-token rotation.
+- [x] Allow the intended staging and production database connections.
+- [x] Disable Google and GitHub for the first Play release. Only the intended
   Auth0 database connection should appear in Universal Login.
 - [ ] Test database signup, sign-in, refresh, logout, and password recovery on
   a physical Android device.
 - [ ] Confirm the Native Application can request the existing API audience.
-- [ ] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
-- [ ] Confirm no Auth0 client secret is present in mobile or EAS public
+- [x] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
+- [x] Confirm no Auth0 client secret is present in mobile or EAS public
   variables.
 - [x] Add an in-app account-deletion request path with last-owner protection.
 - [x] Deploy and verify the external account-deletion resource at
