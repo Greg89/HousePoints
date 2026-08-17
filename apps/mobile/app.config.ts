@@ -68,6 +68,7 @@ const config: ExpoConfig = {
     ],
   ],
   experiments: {
+    autolinkingModuleResolution: true,
     typedRoutes: true,
   },
 };
