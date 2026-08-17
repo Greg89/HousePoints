@@ -73,7 +73,8 @@ aligned with that branding.
 - [x] Record the generated project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID`.
 - [ ] Create an Expo access token for GitHub Actions.
 - [ ] Store the token only as the `EXPO_TOKEN` GitHub Environment secret.
-- [ ] Confirm EAS can manage the iOS and Android signing credentials.
+- [x] Confirm EAS can generate and manage the Android signing credentials.
+- [ ] Confirm EAS can manage the iOS signing credentials.
 
 Useful references:
 
@@ -276,6 +277,7 @@ Test at least one physical iPhone and one physical Android phone:
 Fill these in as work completes:
 
 - Expo project: https://expo.dev/accounts/dodson-llc/projects/housepoints
+- Android preview build: https://expo.dev/accounts/dodson-llc/projects/housepoints/builds/98c13499-6b24-4a2c-b217-0ee4ecb17e59
 - Internal release workflow:
 - TestFlight internal submission:
 - Play internal submission:
