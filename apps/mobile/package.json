@@ -10,6 +10,7 @@
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
     "test": "vitest run --passWithNoTests",
+    "pretypecheck": "npm run build -w @housepoints/theme && npm run build -w @housepoints/contracts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\""
   },
