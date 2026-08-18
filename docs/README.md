@@ -30,6 +30,7 @@ The documents in this folder serve three purposes:
 - [Multi-org membership design](./multi-org-membership-design.md): staged migration from single `User.organizationId` membership to membership-scoped org access.
 - [Release and E2E automation plan](./release-and-e2e-automation.md): phased release notes, in-app release announcements, and scheduled staging Playwright coverage.
 - [Mobile store launch checklist](./mobile-store-launch-checklist.md): ordered Expo, Auth0, Apple, Google, GitHub, E2E, device-testing, and public-release setup for completing Tier 6.
+- [Mobile local-testing runbook](../apps/mobile/README.md#windows-android-local-testing-runbook): Windows/Android Studio setup, daily emulator commands, Metro/ADB recovery, Auth0 troubleshooting, and device debugging.
 - [Google Play store listing](./google-play-store-listing.md): prepared title, descriptions, public contact URLs, and reviewer-access notes for the Android listing.
 - [Google Play Console declarations](./google-play-console-declarations.md): recommended category, ads and access answers, content-rating guidance, target-audience decision, and UGC compliance blockers.
 - [Google Play Data Safety draft](./google-play-data-safety.md): field-level Android data inventory, purposes, security answers, SDK checks, and account-deletion decision.

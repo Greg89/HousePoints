@@ -54,6 +54,148 @@ Fill in:
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
   mobile Admin tab during the Phase 3 rollout.
 
+### Use an EAS environment locally
+
+Developers testing against deployed staging services can pull the mobile
+configuration from the linked EAS `preview` environment instead of copying
+values by hand. Run these commands from `apps/mobile`:
+
+```powershell
+npx.cmd eas-cli@latest login
+npx.cmd eas-cli@latest env:pull --environment preview --path .env
+```
+
+The resulting `.env` is ignored by Git. Do not commit it or paste its contents
+into issues, logs, or documentation. Confirm that preview points to the beta web
+and API services before creating test data.
+
+## Windows Android local-testing runbook
+
+### First-time workstation setup
+
+1. Install Node.js 22+, Android Studio, and a JDK 17 distribution such as
+   Eclipse Temurin. Android Studio may bundle a newer Java runtime that is not
+   compatible with this project's Gradle/Groovy toolchain.
+2. In Android Studio's SDK Manager, install:
+   - Android SDK Platform 36 or another project-supported stable platform;
+   - Android SDK Build-Tools;
+   - Android SDK Platform-Tools;
+   - Android Emulator;
+   - Android SDK Command-line Tools (latest);
+   - a Google Play or Google APIs x86_64 system image.
+3. Create and start a Pixel Android Virtual Device from Device Manager.
+4. Set these Windows user environment variables, adjusting paths for the local
+   installation:
+
+```text
+JAVA_HOME=C:\Program Files\Eclipse Adoptium\<jdk-17-directory>
+ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+ANDROID_SDK_ROOT=%LOCALAPPDATA%\Android\Sdk
+```
+
+Add these entries to the user `Path`, then open a new PowerShell window:
+
+```text
+%JAVA_HOME%\bin
+%ANDROID_HOME%\platform-tools
+%ANDROID_HOME%\emulator
+```
+
+Verify the toolchain:
+
+```powershell
+java -version       # must report Java 17
+adb version
+adb devices         # the running AVD should show as "device"
+```
+
+Install dependencies and create the first native development build from the
+repository root:
+
+```powershell
+npm.cmd install
+npm.cmd run prebuild -w @housepoints/mobile -- --platform android
+npm.cmd run android -w @housepoints/mobile
+```
+
+The first Gradle build downloads and compiles the Android and React Native
+toolchains and can take significantly longer than subsequent builds. Expo Go
+cannot run this application because Auth0 and notifications use native modules.
+
+### Daily emulator workflow
+
+1. Start the existing AVD in Android Studio.
+2. Keep Metro running in a dedicated PowerShell window from the repository
+   root:
+
+```powershell
+npm.cmd run dev:mobile
+```
+
+3. In another PowerShell window, verify the emulator connection and forward
+   Metro's port:
+
+```powershell
+adb devices
+adb reverse tcp:8081 tcp:8081
+```
+
+4. Open HousePoints on the emulator. JavaScript and TypeScript changes should
+   use Fast Refresh. Run the native build again only after changing native
+   dependencies, Expo plugins, or `app.config.ts`:
+
+```powershell
+npm.cmd run prebuild -w @housepoints/mobile -- --platform android
+npm.cmd run android -w @housepoints/mobile
+```
+
+When using a physical Android device, enable USB debugging, confirm it appears
+in `adb devices`, and keep the port reverse. Push registration requires a
+physical device; the emulator is sufficient for most other application flows.
+
+### Useful debugging commands
+
+```powershell
+# Confirm Metro is listening.
+Get-NetTCPConnection -LocalPort 8081 -State Listen
+
+# Restore the emulator-to-Metro connection.
+adb reverse tcp:8081 tcp:8081
+
+# Restart only HousePoints while preserving credentials and application data.
+adb shell am force-stop com.housepoints.app
+adb shell monkey -p com.housepoints.app -c android.intent.category.LAUNCHER 1
+
+# Inspect recent application/runtime failures.
+adb logcat -d -t 1000 | Select-String `
+  "ReactNativeJS|AndroidRuntime|FATAL EXCEPTION|Network request failed"
+
+# Confirm the deployed preview API is reachable from the workstation.
+Invoke-WebRequest `
+  -Uri "https://housepointsapi-beta.up.railway.app/health" `
+  -UseBasicParsing
+```
+
+To remove stale Auth0 credentials or reproduce a first-install flow, clear only
+the emulator's HousePoints data. This signs the test user out and deletes all
+local HousePoints state on that emulator:
+
+```powershell
+adb shell pm clear com.housepoints.app
+```
+
+### Common failures
+
+| Symptom | Cause and recovery |
+| --- | --- |
+| **Unable to load script** red screen | Metro is stopped or port 8081 is not forwarded. Run `npm.cmd run dev:mobile`, then `adb reverse tcp:8081 tcp:8081`, and reload the app. Rebooting the AVD is normally unnecessary. |
+| `Unsupported class file major version 69` | Gradle is running with Java 25. Point `JAVA_HOME` to JDK 17, open a new terminal, and rebuild. |
+| Auth0 says the client is not authorized for the resource server | In Auth0, grant the Native Application user-delegated access to the HousePoints API audience. Do not create a machine-to-machine grant for the mobile user flow. |
+| `NO_REFRESH_TOKEN` | Enable **Allow Offline Access** on the Auth0 API and the **Refresh Token** grant on the Native Application. Clear the old emulator app data and sign in again so Auth0 issues a new credential set. |
+| `Network request failed` | Check the configured `EXPO_PUBLIC_API_BASE_URL`, the workstation/emulator network, and the deployed API health endpoint. A transient bootstrap refresh failure should not be treated as a sign-out. |
+| `adb` is not recognized | Open a new terminal after updating `Path`, or run `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe` directly. |
+| Types from `@housepoints/contracts` appear stale | Run `npm.cmd run typecheck -w @housepoints/mobile`; its `pretypecheck` step rebuilds the shared theme and contracts packages. |
+
 ## Run the app
 
 `react-native-auth0` requires a native development build; Expo Go will not
@@ -71,8 +213,9 @@ npm run ios -w @housepoints/mobile
 npm run android -w @housepoints/mobile
 ```
 
-The API must be running in another terminal (`npm run dev:api`) and reachable
-from the simulator/device at the URL configured above.
+The configured API must be reachable from the simulator/device. When using a
+local API, run it in another terminal with `npm run dev:api`; an `.env` pulled
+from the EAS `preview` environment uses the deployed beta API instead.
 
 Once the app boots, sign in through Auth0 Universal Login and select an
 organization. A 401 during bootstrap usually means the API audience configured
