@@ -324,7 +324,17 @@ export async function createPointDeduction(params: {
 export async function getUserScoresByMember(organizationId: string, seasonId: string) {
   return prisma.pointTransaction.groupBy({
     by: ["targetUserId"],
-    where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
+    where: {
+      organizationId,
+      seasonId,
+      deletedAt: null,
+      targetUserId: { not: null },
+      targetUser: {
+        memberships: {
+          some: { organizationId, isActive: true, archivedAt: null },
+        },
+      },
+    },
     _sum: { delta: true },
     orderBy: { _sum: { delta: "desc" } },
   });
@@ -760,6 +770,18 @@ export async function registerPointRoutes(
       return reply.status(403).send({
         message: "Signed-in user must be assigned to a house before awarding points",
         code: "ACTOR_HOUSE_UNASSIGNED",
+      });
+    }
+
+    if (parsed.targetUserId === actor.id) {
+      warn(request.log, "points.self_award_rejected", {
+        actorUserId: actor.id,
+        actorAuth0Sub: actor.auth0Sub,
+        organizationId: actor.organizationId,
+      });
+      return reply.status(422).send({
+        message: "You cannot award points to yourself",
+        code: "SELF_AWARD_NOT_ALLOWED",
       });
     }
 

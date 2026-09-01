@@ -1106,27 +1106,9 @@ describe("POST /points/adjust", () => {
     await app.close();
   });
 
-  it("does not create a recipient notification for self-awards", async () => {
+  it("rejects self-awards before resolving or creating the transaction", async () => {
     const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
     mockFindUnique.mockResolvedValueOnce(actor);
-    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({
-      userId: "user-2",
-      user: { id: "user-2", displayName: "Bob" },
-    }));
-    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
-    mockTxCreate.mockResolvedValue({
-      id: "tx-self",
-      organizationId: "org-1",
-      seasonId: "season-active",
-      actorUserId: "user-2",
-      targetUserId: "user-2",
-      targetHouseId: "house-1",
-      type: "AWARD",
-      delta: 5,
-      reason: "Kept the build green",
-      trait: "RELIABILITY",
-      createdAt: new Date(),
-    });
     const app = await buildTestApp("auth0|admin");
     const res = await app.inject({
       method: "POST",
@@ -1138,8 +1120,13 @@ describe("POST /points/adjust", () => {
         trait: "RELIABILITY",
       },
     });
-    expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBe("tx-self");
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({
+      message: "You cannot award points to yourself",
+      code: "SELF_AWARD_NOT_ALLOWED",
+    });
+    expect(mockMembershipFindFirst).not.toHaveBeenCalled();
+    expect(mockTxCreate).not.toHaveBeenCalled();
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });
@@ -5531,6 +5518,15 @@ describe("POST /users/scores", () => {
           seasonId: "season-active",
           deletedAt: null,
           targetUserId: { not: null },
+          targetUser: {
+            memberships: {
+              some: {
+                organizationId: "org-secure",
+                isActive: true,
+                archivedAt: null,
+              },
+            },
+          },
         },
       }),
     );
@@ -5881,6 +5877,7 @@ describe("POST /dashboard/summary", () => {
     ]);
     mockTxGroupBy
       .mockResolvedValueOnce([
+        { targetUserId: "user-removed", targetHouseId: "house-1", _sum: { delta: 100 } },
         { targetUserId: "user-1", targetHouseId: "house-1", _sum: { delta: 30 } },
         { targetUserId: "user-3", targetHouseId: "house-2", _sum: { delta: 10 } },
       ])
@@ -5890,6 +5887,7 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-2", trait: "INNOVATION", _count: { trait: 1 } },
       ])
       .mockResolvedValueOnce([
+        { targetUserId: "user-removed", _sum: { delta: 100 } },
         { targetUserId: "user-1", _sum: { delta: 55 } },
         { targetUserId: "user-2", _sum: { delta: 5 } },
         { targetUserId: "user-3", _sum: { delta: 10 } },

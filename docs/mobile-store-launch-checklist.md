@@ -12,14 +12,14 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
 - Target internal-release date:
 - Target public-release date:
 - Support email: `dodson.gregory@gmail.com`
-- Production web URL: `https://housepointsweb-production.up.railway.app/`
-- Beta web URL: `https://housepointsweb-beta.up.railway.app/`
+- Production web URL: `https://app.housepoints-ds.com/`
+- Beta web URL: `https://beta.housepoints-ds.com/`
 - Live privacy-policy URL:
-  `https://housepointsweb-production.up.railway.app/privacy`
+  `https://app.housepoints-ds.com/privacy`
 - Live support URL:
-  `https://housepointsweb-production.up.railway.app/support`
+  `https://app.housepoints-ds.com/support`
 - Public product homepage:
-  `https://housepointsweb-production.up.railway.app/about`
+  `https://app.housepoints-ds.com/about`
 
 Keep links to completed workflow runs and store submissions in the evidence
 section at the end of this document. Do not record credential values here.
@@ -47,9 +47,11 @@ Before the first store build:
 - [x] Publish the privacy-policy page at the production URL.
 - [x] Publish the support page at the production URL; support
   email is `dodson.gregory@gmail.com`.
-- [ ] Deploy and verify the public HousePoints product homepage at `/about`.
-- [ ] Verify the production Railway URL in Google Search Console using
-  `/googledacf7ffa3b911a1e.html`, then resubmit Google OAuth branding review.
+- [x] Deploy and verify the public HousePoints product homepage at `/about`.
+- [x] Verify `housepoints-ds.com` as a Domain property in Google Search
+  Console using DNS verification.
+- [ ] Complete Google OAuth branding review for the production homepage and
+  privacy-policy URLs.
 - [ ] Choose store categories and complete content/age-rating answers using
   [Google Play Console Declarations](./google-play-console-declarations.md).
   Target ages require a release-owner decision, and the documented UGC
@@ -65,13 +67,14 @@ aligned with that branding.
 
 ## 2. Create the Expo/EAS project
 
-- [ ] Create or select the team-owned Expo account.
-- [ ] From `apps/mobile`, run `eas login`.
-- [ ] Run `eas init` and link the app to the intended Expo project.
-- [ ] Record the generated project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID`.
+- [x] Create or select the team-owned Expo account (`dodson-llc`).
+- [x] From `apps/mobile`, run `eas login`.
+- [x] Run `eas init` and link the app to `@dodson-llc/housepoints`.
+- [x] Record the generated project UUID as `EXPO_PUBLIC_EAS_PROJECT_ID`.
 - [ ] Create an Expo access token for GitHub Actions.
 - [ ] Store the token only as the `EXPO_TOKEN` GitHub Environment secret.
-- [ ] Confirm EAS can manage the iOS and Android signing credentials.
+- [x] Confirm EAS can generate and manage the Android signing credentials.
+- [ ] Confirm EAS can manage the iOS signing credentials.
 
 Useful references:
 
@@ -83,22 +86,22 @@ Useful references:
 Create EAS Environments named `development`, `preview`, and `production`.
 Define every variable from `apps/mobile/.env.example` in each Environment:
 
-- [ ] `EXPO_PUBLIC_API_BASE_URL`
-- [ ] `EXPO_PUBLIC_WEB_BASE_URL`
-- [ ] `EXPO_PUBLIC_AUTH0_DOMAIN`
-- [ ] `EXPO_PUBLIC_AUTH0_CLIENT_ID`
-- [ ] `EXPO_PUBLIC_AUTH0_AUDIENCE`
-- [ ] `EXPO_PUBLIC_EAS_PROJECT_ID`
-- [ ] `EXPO_PUBLIC_DEFAULT_ORG_SLUG`
-- [ ] `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED`
-- [ ] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
+- [x] `EXPO_PUBLIC_API_BASE_URL`
+- [x] `EXPO_PUBLIC_WEB_BASE_URL`
+- [x] `EXPO_PUBLIC_AUTH0_DOMAIN`
+- [x] `EXPO_PUBLIC_AUTH0_CLIENT_ID`
+- [x] `EXPO_PUBLIC_AUTH0_AUDIENCE`
+- [x] `EXPO_PUBLIC_EAS_PROJECT_ID`
+- [x] Leave optional `EXPO_PUBLIC_DEFAULT_ORG_SLUG` unset.
+- [x] `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED`
+- [x] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
 
 Environment mapping:
 
 - [ ] `development` points to development/local services.
-- [ ] `preview` points to staging API, web, and Auth0 configuration.
-- [ ] `production` points only to production services.
-- [ ] Preview and production values have been compared for accidental
+- [x] `preview` points to staging API, web, and Auth0 configuration.
+- [x] `production` points only to production services.
+- [x] Preview and production values have been compared for accidental
   cross-environment URLs.
 
 All `EXPO_PUBLIC_*` values are embedded in the application. They are
@@ -106,26 +109,27 @@ configuration, not safe storage for secrets.
 
 ## 4. Configure Auth0
 
-- [ ] Create a dedicated Auth0 **Native Application** for HousePoints.
-- [ ] Set its client ID as `EXPO_PUBLIC_AUTH0_CLIENT_ID` in the relevant EAS
+- [x] Create a dedicated Auth0 **Native Application** for HousePoints.
+- [x] Set its client ID as `EXPO_PUBLIC_AUTH0_CLIENT_ID` in the relevant EAS
   Environments.
-- [ ] Add `housepoints://com.housepoints.app/callback` as an allowed callback
-  URL.
-- [ ] Add `housepoints://com.housepoints.app/logout` as an allowed logout URL.
-- [ ] Enable Authorization Code with PKCE.
-- [ ] Enable and review refresh-token rotation.
-- [ ] Allow the intended staging and production database connections.
-- [ ] Disable Google and GitHub for the first Play release. Only the intended
+- [x] Add both SDK-generated native callback URLs as allowed callback URLs:
+  - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/android/com.housepoints.app/callback`
+  - `com.housepoints.app.auth0://dev-0kihwasowi558bwz.us.auth0.com/ios/com.housepoints.app/callback`
+- [x] Add those same two callback URLs as allowed logout URLs.
+- [x] Enable Authorization Code with PKCE.
+- [x] Enable and review refresh-token rotation.
+- [x] Allow the intended staging and production database connections.
+- [x] Disable Google and GitHub for the first Play release. Only the intended
   Auth0 database connection should appear in Universal Login.
 - [ ] Test database signup, sign-in, refresh, logout, and password recovery on
   a physical Android device.
 - [ ] Confirm the Native Application can request the existing API audience.
-- [ ] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
-- [ ] Confirm no Auth0 client secret is present in mobile or EAS public
+- [x] Confirm `EXPO_PUBLIC_AUTH0_AUDIENCE` exactly matches the API identifier.
+- [x] Confirm no Auth0 client secret is present in mobile or EAS public
   variables.
 - [x] Add an in-app account-deletion request path with last-owner protection.
-- [ ] Deploy and verify the external account-deletion resource at
-  `https://housepointsweb-production.up.railway.app/account-deletion`.
+- [x] Deploy and verify the external account-deletion resource at
+  `https://app.housepoints-ds.com/account-deletion`.
 
 ## 5. Prepare the production API
 
@@ -272,7 +276,8 @@ Test at least one physical iPhone and one physical Android phone:
 
 Fill these in as work completes:
 
-- Expo project:
+- Expo project: https://expo.dev/accounts/dodson-llc/projects/housepoints
+- Android preview build: https://expo.dev/accounts/dodson-llc/projects/housepoints/builds/98c13499-6b24-4a2c-b217-0ee4ecb17e59
 - Internal release workflow:
 - TestFlight internal submission:
 - Play internal submission:

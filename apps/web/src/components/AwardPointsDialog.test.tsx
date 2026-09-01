@@ -159,6 +159,7 @@ function setupDialog(overrides: Partial<React.ComponentProps<typeof AwardPointsD
     open: true,
     onOpenChange: vi.fn(),
     members,
+    currentUserId: "current-user",
     houses,
     onAward: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
@@ -173,6 +174,14 @@ function setupDialog(overrides: Partial<React.ComponentProps<typeof AwardPointsD
 }
 
 describe("AwardPointsDialog", () => {
+  it("excludes the signed-in user from recipient options", async () => {
+    const { user } = setupDialog({ currentUserId: "member-1" });
+
+    await user.click(screen.getAllByRole("combobox")[0]);
+
+    expect(screen.queryByRole("option", { name: /Alice Assigned/ })).not.toBeInTheDocument();
+  });
+
   it("filters recipients by name or house", async () => {
     const { user } = setupDialog({
       members: [

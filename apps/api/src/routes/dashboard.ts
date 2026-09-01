@@ -215,9 +215,10 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const houseById = new Map(houses.map((house) => [house.id, house]));
     const memberById = new Map(members.map((member) => [member.id, member]));
+    const activeMemberIds = new Set(memberById.keys());
     const memberPoints = new Map(
       memberTotals
-        .filter((row) => row.targetUserId)
+        .filter((row) => row.targetUserId && activeMemberIds.has(row.targetUserId))
         .map((row) => [row.targetUserId as string, row._sum.delta ?? 0]),
     );
 
@@ -238,7 +239,9 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     }
 
     const monthlyMemberTotalsByMember = new Map<string, (typeof monthlyMemberTotals)[number]>();
-    for (const row of monthlyMemberTotals.filter((entry) => entry.targetUserId)) {
+    for (const row of monthlyMemberTotals.filter(
+      (entry) => entry.targetUserId && activeMemberIds.has(entry.targetUserId),
+    )) {
       const existing = monthlyMemberTotalsByMember.get(row.targetUserId as string);
       if (!existing) {
         monthlyMemberTotalsByMember.set(row.targetUserId as string, row);
@@ -320,7 +323,11 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       houseId: house.id,
       standout: toStandout(
         monthlyMemberTotals
-          .filter((row) => row.targetHouseId === house.id && row.targetUserId)
+          .filter((row) =>
+            row.targetHouseId === house.id &&
+            row.targetUserId &&
+            activeMemberIds.has(row.targetUserId)
+          )
           .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0],
       ),
     }));

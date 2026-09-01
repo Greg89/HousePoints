@@ -12,6 +12,11 @@ import { useAuth0 } from "react-native-auth0";
 
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { AUTH0_SCOPE, auth0AuthorizeParams } from "@/lib/auth";
+import {
+  shouldStartAuthBootstrap,
+  statusAfterBootstrapFailure,
+  type AuthBootstrapStatus,
+} from "@/lib/auth-bootstrap";
 import { logger, serializeError } from "@/lib/logger";
 import { unregisterCurrentDevice } from "@/lib/device-registration";
 
@@ -25,12 +30,7 @@ import { unregisterCurrentDevice } from "@/lib/device-registration";
  * access token (auto-refreshed via the native credentials manager).
  */
 
-export type AuthStatus =
-  | "initializing"
-  | "signedOut"
-  | "bootstrapping"
-  | "ready"
-  | "error";
+export type AuthStatus = AuthBootstrapStatus;
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -97,15 +97,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         membershipCount: fetched.organizationContexts.length,
       });
     } catch (err) {
-      logger.error("mobile.auth.bootstrap.failed", serializeError(err));
+      const hadExistingAppUser = appUser !== null;
+      const failureStatus = statusAfterBootstrapFailure(hadExistingAppUser);
+      const serializedError = serializeError(err);
+
+      if (hadExistingAppUser) {
+        logger.warn("mobile.auth.bootstrap_refresh.failed", serializedError);
+        setStatus(failureStatus);
+        throw err;
+      }
+
+      logger.error("mobile.auth.bootstrap.failed", serializedError);
       const message =
         err instanceof ApiResponseError
           ? err.message
           : "We could not load your account. Please try signing in again.";
       setError(message);
-      setStatus("error");
+      setStatus(failureStatus);
     }
-  }, [auth0.user, getAccessToken]);
+  }, [auth0.user, appUser, getAccessToken]);
 
   // React to Auth0's own lifecycle.
   useEffect(() => {
@@ -124,7 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     // Auth0 says we have a user. If we don't yet have an AppUser, bootstrap.
-    if (!appUser && status !== "bootstrapping") {
+    if (
+      shouldStartAuthBootstrap({
+        hasAuth0User: true,
+        hasAppUser: appUser !== null,
+        status,
+      })
+    ) {
       void runBootstrap();
     }
   }, [auth0.isLoading, auth0.user, appUser, status, runBootstrap]);

@@ -71,6 +71,7 @@ export type ApiLogEvent =
   | "points.actor_not_found"
   | "points.active_season_missing"
   | "points.actor_house_unassigned"
+  | "points.self_award_rejected"
   | "points.target_user_unassigned"
   | "points.cross_organization_target"
   | "points.adjusted"

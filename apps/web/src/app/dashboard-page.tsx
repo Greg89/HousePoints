@@ -186,6 +186,7 @@ export async function renderDashboardPage(route: string) {
   return (
     <DashboardShell
       session={{
+        userId: session.appUserId!,
         userName: session.userName ?? "Team Member",
         houseId: session.houseId ?? null,
         houseName: session.houseName ?? null,

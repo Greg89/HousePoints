@@ -32,7 +32,7 @@ For each Auth0 tenant, record outside this repository:
 - [ ] Set the tenant friendly name to `HousePoints`.
 - [ ] Set the support email to `dodson.gregory@gmail.com`.
 - [ ] Set the support URL to
-  `https://housepointsweb-production.up.railway.app/support`.
+  `https://app.housepoints-ds.com/support`.
 - [ ] Configure HousePoints branding in Universal Login.
 - [ ] Verify the Native Application callbacks and logout URLs.
 - [ ] Enable only Google, GitHub, and the intentionally supported database
@@ -54,10 +54,10 @@ organization.
 - [ ] Configure the application name as `HousePoints`.
 - [ ] Set the user support email to `dodson.gregory@gmail.com`.
 - [ ] Set the homepage to
-  `https://housepointsweb-production.up.railway.app/`.
+  `https://app.housepoints-ds.com/about`.
 - [ ] Set the privacy-policy URL to
-  `https://housepointsweb-production.up.railway.app/privacy`.
-- [ ] Add the Auth0 tenant domain as an authorized domain.
+  `https://app.housepoints-ds.com/privacy`.
+- [ ] Add `housepoints-ds.com` as the authorized domain.
 - [ ] Select the correct audience. Use **External** for public Google-account
   access; Internal limits access to one Google Workspace organization.
 - [ ] Request only basic identity scopes needed for name and email.
@@ -81,7 +81,7 @@ Create a GitHub OAuth application under an organization when possible, or a
 release-owner account with documented recovery access.
 
 - Application name: `HousePoints`
-- Homepage URL: `https://housepointsweb-production.up.railway.app/`
+- Homepage URL: `https://app.housepoints-ds.com/about`
 - Authorization callback URL:
   `https://YOUR_AUTH0_DOMAIN/login/callback`
 - Device Flow: leave disabled; HousePoints uses Auth0 browser authorization.

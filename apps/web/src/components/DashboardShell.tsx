@@ -50,6 +50,7 @@ import { cn } from "@/lib/cn";
 
 interface DashboardShellProps {
   session: {
+    userId: string;
     userName: string;
     houseId: string | null;
     houseName: string | null;
@@ -658,6 +659,7 @@ export function DashboardShell({
         onOpenChange={setAwardOpen}
         houses={leaderboard}
         members={members}
+        currentUserId={session.userId}
         onAward={onAward}
       />
       {onDeduct ? (

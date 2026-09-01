@@ -56,10 +56,10 @@ Play listing. Keep the published listing aligned with shipped mobile behavior.
 ## Store contact details
 
 - Support email: `dodson.gregory@gmail.com`
-- Website: `https://housepointsweb-production.up.railway.app/`
-- Support URL: `https://housepointsweb-production.up.railway.app/support`
+- Website: `https://app.housepoints-ds.com/about`
+- Support URL: `https://app.housepoints-ds.com/support`
 - Privacy-policy URL:
-  `https://housepointsweb-production.up.railway.app/privacy`
+  `https://app.housepoints-ds.com/privacy`
 
 ## App access notes for review
 

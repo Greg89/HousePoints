@@ -372,7 +372,7 @@ Add more types only after the first workflow feels useful:
 
 Status: implemented for the currently selected producers. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Org settings changes remain a deferred producer rather than incomplete MVP work.
 
-`POINT_AWARD_RECEIVED` is implemented as a targeted `INFO` notification created inside the point-award transaction. It notifies the recipient, links to Activity, and skips self-awards to avoid echoing an action the current user just performed.
+`POINT_AWARD_RECEIVED` is implemented as a targeted `INFO` notification created inside the point-award transaction. It notifies the recipient and links to Activity. Self-awards are rejected before a transaction or notification is created.
 
 `POINT_DEDUCTION_RECEIVED` is implemented as a targeted `WARNING` notification created inside the point-deduction transaction. It notifies the deducted member, links to Activity, and stays durable without becoming an active-session action-required toast.
 
