@@ -38,13 +38,14 @@ export function Leaderboard({
 
   const ranked = memberPoints
     .filter((mp) => mp.points > 0)
+    .map((mp) => ({ member: memberMap.get(mp.memberId), points: mp.points }))
+    .filter((entry): entry is { member: OrgMember; points: number } => Boolean(entry.member))
     .slice(0, 10)
-    .map((mp, index) => ({
-      member: memberMap.get(mp.memberId),
-      points: mp.points,
+    .map((entry, index) => ({
+      member: entry.member,
+      points: entry.points,
       rank: index + 1,
-    }))
-    .filter((r) => r.member);
+    }));
 
   return (
     <div className="rounded-xl border bg-card">
@@ -76,7 +77,7 @@ export function Leaderboard({
         ) : (
           ranked.map(({ member, points, rank }) => (
             <motion.div
-              key={member!.id}
+              key={member.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: rank * 0.04, duration: 0.25 }}
@@ -91,25 +92,25 @@ export function Leaderboard({
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white flex-shrink-0"
                 style={{
-                  backgroundColor: member!.houseColor ?? "var(--primary)",
-                  border: member!.houseColor ? `2px solid ${member!.houseColor}` : undefined,
+                  backgroundColor: member.houseColor ?? "var(--primary)",
+                  border: member.houseColor ? `2px solid ${member.houseColor}` : undefined,
                 }}
               >
-                {initials(member!.displayName)}
+                {initials(member.displayName)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{member!.displayName}</p>
-                {member!.houseName && (
-                  <p className="text-xs truncate" style={{ color: member!.houseColor ?? undefined }}>
-                    {member!.houseName}
+                <p className="font-semibold text-sm truncate">{member.displayName}</p>
+                {member.houseName && (
+                  <p className="text-xs truncate" style={{ color: member.houseColor ?? undefined }}>
+                    {member.houseName}
                   </p>
                 )}
               </div>
               <span
                 className="font-number font-bold text-sm px-2 py-0.5 rounded-full"
                 style={{
-                  backgroundColor: member!.houseColor ? `${member!.houseColor}20` : "var(--muted)",
-                  color: member!.houseColor ?? "var(--foreground)",
+                  backgroundColor: member.houseColor ? `${member.houseColor}20` : "var(--muted)",
+                  color: member.houseColor ?? "var(--foreground)",
                 }}
               >
                 {points.toLocaleString()}

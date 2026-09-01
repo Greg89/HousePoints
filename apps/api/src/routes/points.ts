@@ -324,7 +324,17 @@ export async function createPointDeduction(params: {
 export async function getUserScoresByMember(organizationId: string, seasonId: string) {
   return prisma.pointTransaction.groupBy({
     by: ["targetUserId"],
-    where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
+    where: {
+      organizationId,
+      seasonId,
+      deletedAt: null,
+      targetUserId: { not: null },
+      targetUser: {
+        memberships: {
+          some: { organizationId, isActive: true, archivedAt: null },
+        },
+      },
+    },
     _sum: { delta: true },
     orderBy: { _sum: { delta: "desc" } },
   });

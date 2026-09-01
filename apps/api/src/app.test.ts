@@ -5518,6 +5518,15 @@ describe("POST /users/scores", () => {
           seasonId: "season-active",
           deletedAt: null,
           targetUserId: { not: null },
+          targetUser: {
+            memberships: {
+              some: {
+                organizationId: "org-secure",
+                isActive: true,
+                archivedAt: null,
+              },
+            },
+          },
         },
       }),
     );
@@ -5868,6 +5877,7 @@ describe("POST /dashboard/summary", () => {
     ]);
     mockTxGroupBy
       .mockResolvedValueOnce([
+        { targetUserId: "user-removed", targetHouseId: "house-1", _sum: { delta: 100 } },
         { targetUserId: "user-1", targetHouseId: "house-1", _sum: { delta: 30 } },
         { targetUserId: "user-3", targetHouseId: "house-2", _sum: { delta: 10 } },
       ])
@@ -5877,6 +5887,7 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-2", trait: "INNOVATION", _count: { trait: 1 } },
       ])
       .mockResolvedValueOnce([
+        { targetUserId: "user-removed", _sum: { delta: 100 } },
         { targetUserId: "user-1", _sum: { delta: 55 } },
         { targetUserId: "user-2", _sum: { delta: 5 } },
         { targetUserId: "user-3", _sum: { delta: 10 } },

@@ -91,3 +91,11 @@ If not, update it. This ensures the `20260613190000_house_color_description` mig
 - Bootstrap, org create, and org join flows link same-email identities only when the Auth0 email claim is verified.
 - Unsafe or unverified same-email conflicts return `ACCOUNT_LINK_REQUIRED` instead of an unhandled Prisma error.
 - The web error boundary includes a logout recovery action so a trapped user can restart login.
+
+---
+
+## 1.8 Removed members do not occupy recognition rankings [done]
+
+**Original problem:** A removed organization member could remain first in season standout totals or retain a leaderboard rank because their historical point transactions still exist. The UI hid the inactive member but left the standout empty or skipped their ranking position.
+
+**Implemented fix:** Standout and member-score calculations now require an active, non-archived membership in the current organization. The web leaderboard also removes unknown members before assigning display ranks, so remaining members move up without gaps.
