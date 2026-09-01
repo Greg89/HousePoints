@@ -17,6 +17,8 @@ interface AwardPointsDialogProps {
   onOpenChange: (open: boolean) => void;
   /** All org members – shown as targets */
   members: OrgMember[];
+  /** Signed-in user, excluded from award targets */
+  currentUserId: string;
   /** Houses available for display context only */
   houses: LeaderboardEntry[];
   /** Server action to submit the award */
@@ -29,6 +31,7 @@ export function AwardPointsDialog({
   open,
   onOpenChange,
   members,
+  currentUserId,
   onAward,
 }: AwardPointsDialogProps) {
   const [targetUserId, setTargetUserId] = useState("");
@@ -142,7 +145,7 @@ export function AwardPointsDialog({
             {/* Member selector */}
             <MemberCombobox
               label="Recipient"
-              members={members.filter((m) => m.houseId)}
+              members={members.filter((m) => m.houseId && m.id !== currentUserId)}
               value={targetUserId}
               onValueChange={setTargetUserId}
               placeholder="Select a team member..."

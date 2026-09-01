@@ -179,6 +179,7 @@ const initialSeasonComparison = {
 
 const baseProps = {
   session: {
+    userId: "user-1",
     userName: "Gregory Dodson",
     houseId: "house-1",
     houseName: "Slytherin",

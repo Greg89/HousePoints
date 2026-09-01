@@ -1106,27 +1106,9 @@ describe("POST /points/adjust", () => {
     await app.close();
   });
 
-  it("does not create a recipient notification for self-awards", async () => {
+  it("rejects self-awards before resolving or creating the transaction", async () => {
     const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
     mockFindUnique.mockResolvedValueOnce(actor);
-    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({
-      userId: "user-2",
-      user: { id: "user-2", displayName: "Bob" },
-    }));
-    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
-    mockTxCreate.mockResolvedValue({
-      id: "tx-self",
-      organizationId: "org-1",
-      seasonId: "season-active",
-      actorUserId: "user-2",
-      targetUserId: "user-2",
-      targetHouseId: "house-1",
-      type: "AWARD",
-      delta: 5,
-      reason: "Kept the build green",
-      trait: "RELIABILITY",
-      createdAt: new Date(),
-    });
     const app = await buildTestApp("auth0|admin");
     const res = await app.inject({
       method: "POST",
@@ -1138,8 +1120,13 @@ describe("POST /points/adjust", () => {
         trait: "RELIABILITY",
       },
     });
-    expect(res.statusCode).toBe(201);
-    expect(res.json().id).toBe("tx-self");
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({
+      message: "You cannot award points to yourself",
+      code: "SELF_AWARD_NOT_ALLOWED",
+    });
+    expect(mockMembershipFindFirst).not.toHaveBeenCalled();
+    expect(mockTxCreate).not.toHaveBeenCalled();
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
   });

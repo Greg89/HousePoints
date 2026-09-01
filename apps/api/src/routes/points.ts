@@ -763,6 +763,18 @@ export async function registerPointRoutes(
       });
     }
 
+    if (parsed.targetUserId === actor.id) {
+      warn(request.log, "points.self_award_rejected", {
+        actorUserId: actor.id,
+        actorAuth0Sub: actor.auth0Sub,
+        organizationId: actor.organizationId,
+      });
+      return reply.status(422).send({
+        message: "You cannot award points to yourself",
+        code: "SELF_AWARD_NOT_ALLOWED",
+      });
+    }
+
     const targetMembership = await findTargetMembership(actor.organizationId, parsed.targetUserId);
 
     if (!targetMembership) {
