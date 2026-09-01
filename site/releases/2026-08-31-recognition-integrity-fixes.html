@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recognition Integrity Fixes | HousePoints</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">2026.08.31</p>
+        <h1>Recognition Integrity Fixes</h1>
+        <p class="summary">
+          Point awards and recognition rankings now consistently reflect eligible,
+          active organization members.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Highlights</h2>
+          <ul class="section-list">
+            <li>Members can no longer award points to themselves.</li>
+            <li>Removed members no longer leave empty or skipped positions in recognition views.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Fixes</h2>
+          <ul class="section-list">
+            <li>The signed-in member is excluded from the Award Points recipient picker.</li>
+            <li>The API rejects direct self-award attempts before creating a point transaction.</li>
+            <li>Season standout selection now considers active organization members only.</li>
+            <li>Leaderboard ranks are assigned after removed members are filtered out, keeping podium positions continuous.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li>No database migration, environment variable, or feature flag changes are required.</li>
+            <li>Both fixes were verified in the development environment.</li>
+            <li>Automated API tests, typechecks, lint checks, targeted web tests, and the production build pass.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
