@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -25,6 +26,7 @@ import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import { eligibleAwardMembers } from "@/lib/award-members";
 import { logger, serializeError } from "@/lib/logger";
 
 const DELTA_MIN = 1;
@@ -44,7 +46,7 @@ export default function AwardPointsScreen() {
   const [selectedTrait, setSelectedTrait] = useState<Trait | null>(null);
   const [delta, setDelta] = useState(DELTA_DEFAULT);
   const [reason, setReason] = useState("");
-  const [search, setSearch] = useState("");
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
 
   const membersQuery = useQuery({
     queryKey: ["members", activeOrgSlug],
@@ -61,17 +63,10 @@ export default function AwardPointsScreen() {
 
   const members: OrgMember[] | undefined = membersQuery.data;
 
-  const filteredMembers = useMemo(() => {
-    if (!members) return [];
-    const term = search.trim().toLowerCase();
-    const eligible = members.filter(
-      (member) => member.houseId !== null && member.id !== user?.id,
-    );
-    if (!term) return eligible;
-    return eligible.filter((member) =>
-      member.displayName.toLowerCase().includes(term),
-    );
-  }, [members, search, user?.id]);
+  const eligibleMembers = useMemo(
+    () => eligibleAwardMembers(members, user?.id),
+    [members, user?.id],
+  );
 
   const selectedMember = useMemo(
     () => members?.find((member) => member.id === selectedMemberId) ?? null,
@@ -154,35 +149,19 @@ export default function AwardPointsScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Section title="Recipient">
-            {selectedMember ? (
-              <SelectedMember
-                member={selectedMember}
-                onClear={() => setSelectedMemberId(null)}
-              />
-            ) : membersQuery.isPending ? (
+            {membersQuery.isPending ? (
               <ActivityIndicator style={styles.pad} color="#0f172a" />
             ) : membersQuery.error ? (
-              <ErrorText>
-                Unable to load members. Pull down or tap here to retry.
-              </ErrorText>
+              <Pressable onPress={() => void membersQuery.refetch()}>
+                <ErrorText>Unable to load members. Tap to retry.</ErrorText>
+              </Pressable>
+            ) : eligibleMembers.length === 0 ? (
+              <ErrorText>No other assigned members are available.</ErrorText>
             ) : (
-              <>
-                <TextInput
-                  testID="mobile.award.member-search"
-                  accessibilityLabel="Search members"
-                  style={styles.searchInput}
-                  placeholder="Search by name"
-                  placeholderTextColor="#94a3b8"
-                  value={search}
-                  onChangeText={setSearch}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <MemberList
-                  members={filteredMembers}
-                  onSelect={setSelectedMemberId}
-                />
-              </>
+              <MemberSelect
+                selectedMember={selectedMember}
+                onPress={() => setMemberPickerOpen(true)}
+              />
             )}
           </Section>
 
@@ -284,6 +263,16 @@ export default function AwardPointsScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      <MemberSelectModal
+        visible={memberPickerOpen}
+        members={eligibleMembers}
+        selectedMemberId={selectedMemberId}
+        onClose={() => setMemberPickerOpen(false)}
+        onSelect={(memberId) => {
+          setSelectedMemberId(memberId);
+          setMemberPickerOpen(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -303,71 +292,127 @@ function Section({
   );
 }
 
-function SelectedMember({
-  member,
-  onClear,
+function MemberSelect({
+  selectedMember,
+  onPress,
 }: {
-  member: OrgMember;
-  onClear: () => void;
+  selectedMember: OrgMember | null;
+  onPress: () => void;
 }) {
   return (
-    <View style={styles.selectedMember}>
-      <View
-        style={[
-          styles.dot,
-          { backgroundColor: member.houseColor ?? "#94a3b8" },
-        ]}
-      />
-      <View style={styles.selectedMemberText}>
-        <Text style={styles.selectedName}>{member.displayName}</Text>
-        {member.houseName ? (
-          <Text style={styles.selectedMeta}>{member.houseName}</Text>
+    <Pressable
+      testID="mobile.award.member-select"
+      accessibilityRole="button"
+      accessibilityLabel="Select award recipient"
+      accessibilityHint="Opens a list of assigned organization members"
+      style={styles.memberSelect}
+      onPress={onPress}
+    >
+      {selectedMember ? (
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: selectedMember.houseColor ?? "#94a3b8" },
+          ]}
+        />
+      ) : null}
+      <View style={styles.memberSelectText}>
+        <Text
+          style={
+            selectedMember ? styles.selectedName : styles.memberPlaceholder
+          }
+        >
+          {selectedMember?.displayName ?? "Select a team member..."}
+        </Text>
+        {selectedMember?.houseName ? (
+          <Text style={styles.selectedMeta}>{selectedMember.houseName}</Text>
         ) : null}
       </View>
-      <Pressable onPress={onClear} style={styles.changeButton}>
-        <Text style={styles.changeLabel}>Change</Text>
-      </Pressable>
-    </View>
+      <Text style={styles.caret} accessibilityElementsHidden>
+        ▾
+      </Text>
+    </Pressable>
   );
 }
 
-function MemberList({
+function MemberSelectModal({
+  visible,
   members,
+  selectedMemberId,
+  onClose,
   onSelect,
 }: {
+  visible: boolean;
   members: OrgMember[];
+  selectedMemberId: string | null;
+  onClose: () => void;
   onSelect: (id: string) => void;
 }) {
-  if (members.length === 0) {
-    return <ErrorText>No members match that search.</ErrorText>;
-  }
   return (
-    <FlatList
-      style={styles.memberList}
-      data={members}
-      keyExtractor={(item) => item.id}
-      ItemSeparatorComponent={MemberSeparator}
-      scrollEnabled={false}
-      renderItem={({ item }) => (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
         <Pressable
-          style={styles.memberRow}
-          onPress={() => onSelect(item.id)}
-        >
-          <View
-            style={[
-              styles.dot,
-              { backgroundColor: item.houseColor ?? "#94a3b8" },
-            ]}
-          />
-          <View style={styles.memberText}>
-            <Text style={styles.memberName}>{item.displayName}</Text>
-            {item.houseName ? (
-              <Text style={styles.memberMeta}>{item.houseName}</Text>
-            ) : null}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Close recipient list"
+          onPress={onClose}
+        />
+        <View style={styles.memberModal}>
+          <View style={styles.memberModalHeader}>
+            <View>
+              <Text style={styles.memberModalTitle}>Select recipient</Text>
+              <Text style={styles.memberModalDescription}>
+                Assigned members in this organization
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close recipient list"
+              onPress={onClose}
+              style={styles.modalClose}
+            >
+              <Text style={styles.modalCloseLabel}>×</Text>
+            </Pressable>
           </View>
-        </Pressable>
-      )}
-    />
+          <FlatList
+            data={members}
+            keyExtractor={(item) => item.id}
+            ItemSeparatorComponent={MemberSeparator}
+            renderItem={({ item }) => {
+              const selected = item.id === selectedMemberId;
+              return (
+                <Pressable
+                  testID={`mobile.award.member-option.${item.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.displayName}${item.houseName ? `, ${item.houseName}` : ""}`}
+                  accessibilityState={{ selected }}
+                  style={[styles.memberRow, selected && styles.memberRowSelected]}
+                  onPress={() => onSelect(item.id)}
+                >
+                  <View
+                    style={[
+                      styles.dot,
+                      { backgroundColor: item.houseColor ?? "#94a3b8" },
+                    ]}
+                  />
+                  <View style={styles.memberText}>
+                    <Text style={styles.memberName}>{item.displayName}</Text>
+                    {item.houseName ? (
+                      <Text style={styles.memberMeta}>{item.houseName}</Text>
+                    ) : null}
+                  </View>
+                  {selected ? <Text style={styles.selectedCheck}>✓</Text> : null}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -410,24 +455,53 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  searchInput: {
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: "#0f172a",
-  },
-  memberList: {
+  memberSelect: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     backgroundColor: "#ffffff",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginTop: 4,
-    maxHeight: 320,
+    borderColor: "#cbd5e1",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
+  memberSelectText: { flex: 1 },
+  memberPlaceholder: { fontSize: 15, color: "#64748b" },
+  caret: { fontSize: 20, color: "#64748b" },
+  modalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+  },
+  memberModal: {
+    maxHeight: "72%",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  memberModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  memberModalTitle: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
+  memberModalDescription: { fontSize: 12, color: "#64748b", marginTop: 2 },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f1f5f9",
+  },
+  modalCloseLabel: { fontSize: 24, lineHeight: 26, color: "#334155" },
   memberRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -435,6 +509,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 12,
   },
+  memberRowSelected: { backgroundColor: "#f1f5f9" },
   memberSeparator: {
     height: 1,
     backgroundColor: "#e2e8f0",
@@ -443,26 +518,9 @@ const styles = StyleSheet.create({
   memberText: { flex: 1 },
   memberName: { fontSize: 15, color: "#0f172a", fontWeight: "500" },
   memberMeta: { fontSize: 12, color: "#64748b", marginTop: 2 },
-  selectedMember: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    gap: 12,
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  selectedMemberText: { flex: 1 },
   selectedName: { fontSize: 16, fontWeight: "600", color: "#0f172a" },
   selectedMeta: { fontSize: 13, color: "#64748b", marginTop: 2 },
-  changeButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#f1f5f9",
-  },
-  changeLabel: { fontSize: 13, fontWeight: "600", color: "#334155" },
+  selectedCheck: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
   traitGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

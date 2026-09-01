@@ -34,11 +34,10 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "mobile.award.member-search"
+      id: "mobile.award.member-select"
     timeout: 30000
 - tapOn:
-    id: "mobile.award.member-search"
-- inputText: ${MOBILE_E2E_TARGET_MEMBER}
+    id: "mobile.award.member-select"
 - tapOn: ${MOBILE_E2E_TARGET_MEMBER}
 - tapOn:
     id: "mobile.award.trait.TEAMWORK"
@@ -54,4 +53,3 @@ tags:
     timeout: 30000
 - assertVisible:
     id: "mobile.home.award-points"
-
