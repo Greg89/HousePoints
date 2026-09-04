@@ -6,6 +6,7 @@
   "scripts": {
     "eas-build-post-install": "npm run build -w @housepoints/theme && npm run build -w @housepoints/contracts",
     "start": "expo start",
+    "dev:mobile": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",

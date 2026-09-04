@@ -132,6 +132,9 @@ cannot run this application because Auth0 and notifications use native modules.
 npm.cmd run dev:mobile
 ```
 
+This command works from either the repository root or `apps/mobile`. From
+`apps/mobile`, `npm.cmd run start` is the equivalent workspace-native command.
+
 3. In another PowerShell window, verify the emulator connection and forward
    Metro's port:
 
