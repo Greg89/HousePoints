@@ -59,6 +59,8 @@ refresh behavior.
 
 ### Slice 1: app and network lifecycle integration
 
+**Status:** Implemented.
+
 Connect React Native `AppState` to TanStack Query's focus manager and native
 connectivity to its online manager. Restore automatic refetch-on-focus and
 refetch-on-reconnect for active stale queries.

@@ -10,6 +10,7 @@ import { OrgProvider } from "@/context/org-provider";
 import { ToastProvider } from "@/context/toast-provider";
 import { DeviceRegistrationManager } from "@/components/DeviceRegistrationManager";
 import { NotificationResponseManager } from "@/components/NotificationResponseManager";
+import { QueryLifecycleManager } from "@/components/QueryLifecycleManager";
 import { auth0Config } from "@/lib/auth";
 
 export default function RootLayout() {
@@ -20,7 +21,8 @@ export default function RootLayout() {
         defaultOptions: {
           queries: {
             retry: 1,
-            refetchOnWindowFocus: false,
+            refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
             staleTime: 30_000,
           },
         },
@@ -32,6 +34,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <Auth0Provider domain={domain} clientId={clientId}>
         <QueryClientProvider client={queryClient}>
+          <QueryLifecycleManager />
           <AuthProvider>
             <OrgProvider>
               <DeviceRegistrationManager />

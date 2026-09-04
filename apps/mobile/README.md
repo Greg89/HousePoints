@@ -153,6 +153,10 @@ npm.cmd run prebuild -w @housepoints/mobile -- --platform android
 npm.cmd run android -w @housepoints/mobile
 ```
 
+The app automatically refetches active stale data when it returns to the
+foreground or regains network connectivity. Cached data stays visible during
+that background refresh; pull to refresh still forces an immediate request.
+
 When using a physical Android device, enable USB debugging, confirm it appears
 in `adb devices`, and keep the port reverse. Push registration requires a
 physical device; the emulator is sufficient for most other application flows.
