@@ -15,12 +15,16 @@ import {
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+
+const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
 
 type SeasonStandout = NonNullable<DashboardSummary["seasonStandout"]>;
 
 export default function HomeScreen() {
   const { user, getAccessToken } = useAppAuth();
   const { activeOrgSlug, activeMembership } = useActiveOrg();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
 
   const summaryQuery = useQuery({
     queryKey: ["dashboard", "summary", activeOrgSlug],

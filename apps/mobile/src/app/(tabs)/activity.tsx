@@ -30,8 +30,10 @@ import {
 } from "@/lib/activity-reactions";
 import { ReactionPickerModal } from "@/components/ReactionPickerModal";
 import { ReactionDetailsModal } from "@/components/ReactionDetailsModal";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 
 const PAGE_LIMIT = 20;
+const FOCUS_QUERY_KEYS = [["activity"]] as const;
 
 export default function ActivityScreen() {
   const { pointId } = useLocalSearchParams<{ pointId?: string }>();
@@ -39,6 +41,7 @@ export default function ActivityScreen() {
   const { activeOrgSlug } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
   const listRef = useRef<FlatList<ActivityItem>>(null);
   const [pickerItem, setPickerItem] = useState<ActivityItem | null>(null);
   const [detailsPointId, setDetailsPointId] = useState<string | null>(null);

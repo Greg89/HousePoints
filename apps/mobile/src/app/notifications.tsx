@@ -26,8 +26,10 @@ import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { logger, serializeError } from "@/lib/logger";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 
 const PAGE_LIMIT = 20;
+const FOCUS_QUERY_KEYS = [["notifications"]] as const;
 
 const SEVERITY_ACCENT: Record<NotificationSeverity, string> = {
   INFO: "#3b82f6",
@@ -40,6 +42,7 @@ export default function NotificationsScreen() {
   const { activeOrgSlug } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
 
   const feedQuery = useInfiniteQuery({
     queryKey: ["notifications", "list", activeOrgSlug, "all"],

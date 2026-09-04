@@ -37,6 +37,7 @@ import {
   filterAdminUsers,
 } from "@/lib/member-management";
 import { buildWebAdminUrl, canAccessMobileAdmin } from "@/lib/mobile-admin";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 
 const OUT_OF_SCOPE_FLOWS = [
   "Season creation and transitions",
@@ -44,6 +45,7 @@ const OUT_OF_SCOPE_FLOWS = [
   "Audit and comparison reports",
   "Release announcements",
 ] as const;
+const FOCUS_QUERY_KEYS = [["admin-context"]] as const;
 const INVITE_DURATIONS = [
   { hours: 24, label: "24 hours" },
   { hours: 72, label: "3 days" },
@@ -55,6 +57,7 @@ export default function AdminScreen() {
   const { activeOrgSlug, activeMembership } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
   const [search, setSearch] = useState("");
   const [inviteDuration, setInviteDuration] = useState(72);
   const [invite, setInvite] = useState<InviteLink | null>(null);

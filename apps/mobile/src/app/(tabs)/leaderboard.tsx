@@ -14,6 +14,9 @@ import {
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+
+const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
 
 type HouseRanking = DashboardSummary["houseMemberRankings"][number];
 type Member = HouseRanking["members"][number];
@@ -26,6 +29,7 @@ type HouseSection = {
 export default function LeaderboardScreen() {
   const { getAccessToken } = useAppAuth();
   const { activeOrgSlug } = useActiveOrg();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
 
   const summaryQuery = useQuery({
     queryKey: ["dashboard", "summary", activeOrgSlug],

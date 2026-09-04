@@ -108,7 +108,7 @@ Each tier has its own file with detailed task breakdowns.
 | 6.7b | Mobile CI - Maestro E2E flow (sign-in → dashboard → award-points) against staging on `develop`; secret + environment plumbing documented in [release-and-e2e-automation.md](./release-and-e2e-automation.md) | [done] |
 | 6.7c | Mobile CI - EAS Build profiles (`development`, `preview`, `production`) + Expo Updates channels; document rollback via `eas update --republish` | [done] |
 | 6.7d | Mobile refresh hardening - connect app foreground and network reconnect lifecycle to TanStack Query, refetching only active stale queries | [done] |
-| 6.7e | Mobile refresh hardening - reusable screen-focus refresh for primary tabs while preserving cache freshness and pull-to-refresh | [planned] |
+| 6.7e | Mobile refresh hardening - reusable screen-focus refresh for primary tabs while preserving cache freshness and pull-to-refresh | [done] |
 | 6.7f | Mobile refresh hardening - audit mutation invalidation by organization-scoped query-key groups | [planned] |
 | 6.7g | Mobile refresh hardening - reconcile auth memberships/roles on lifecycle and membership changes, then tune and observe request volume | [planned] |
 | 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs. Track external setup and evidence in [mobile-store-launch-checklist.md](./mobile-store-launch-checklist.md). | [in progress] |

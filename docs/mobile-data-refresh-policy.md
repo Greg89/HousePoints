@@ -76,6 +76,8 @@ Acceptance criteria:
 
 ### Slice 2: screen-focus refresh
 
+**Status:** Implemented.
+
 Add a reusable Expo Router focus hook and apply it to Dashboard, Leaderboard,
 Activity, Notifications, Members/Admin, and Profile. The hook refreshes only
 the screen's active, stale query keys.
