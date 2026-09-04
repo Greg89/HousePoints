@@ -110,7 +110,8 @@ Each tier has its own file with detailed task breakdowns.
 | 6.7d | Mobile refresh hardening - connect app foreground and network reconnect lifecycle to TanStack Query, refetching only active stale queries | [done] |
 | 6.7e | Mobile refresh hardening - reusable screen-focus refresh for primary tabs while preserving cache freshness and pull-to-refresh | [done] |
 | 6.7f | Mobile refresh hardening - audit mutation invalidation by organization-scoped query-key groups | [done] |
-| 6.7g | Mobile refresh hardening - reconcile auth memberships/roles on lifecycle and membership changes, then tune and observe request volume | [planned] |
+| 6.7g | Mobile refresh hardening - reconcile auth memberships/roles on lifecycle and membership changes, including removed active-org access | [done] |
+| 6.7h | Mobile refresh hardening - tune freshness windows and observe request volume during device testing; keep polling disabled | [planned] |
 | 6.8 | Release - TestFlight + Play internal tracks, then public store submissions after two consecutive clean staging E2E runs. Track external setup and evidence in [mobile-store-launch-checklist.md](./mobile-store-launch-checklist.md). | [in progress] |
 
 ### Tier 6 handoff notes (2026-07-30)

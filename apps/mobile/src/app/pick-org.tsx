@@ -1,6 +1,6 @@
 import { slugSchema, type AppUser } from "@housepoints/contracts";
 import { useMutation } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -15,9 +15,12 @@ type FormProps = { user: AppUser; getAccessToken: () => Promise<string>; onBack:
 
 export default function PickOrgScreen() {
   const { user, signOut, getAccessToken, synchronizeUser } = useAppAuth();
-  const { memberships, selectOrg } = useActiveOrg();
+  const { activeOrgSlug, memberships, selectOrg } = useActiveOrg();
   const [mode, setMode] = useState<Mode>("options");
   if (!user) return null;
+  if (activeOrgSlug && memberships.some((item) => item.organizationSlug === activeOrgSlug)) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   const finish = async (updatedUser: AppUser) => {
     const membership = updatedUser.organizationContexts.find((item) => item.isCurrent) ?? updatedUser.organizationContexts.at(-1);

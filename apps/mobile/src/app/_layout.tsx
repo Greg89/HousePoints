@@ -11,6 +11,7 @@ import { ToastProvider } from "@/context/toast-provider";
 import { DeviceRegistrationManager } from "@/components/DeviceRegistrationManager";
 import { NotificationResponseManager } from "@/components/NotificationResponseManager";
 import { QueryLifecycleManager } from "@/components/QueryLifecycleManager";
+import { AuthReconciliationManager } from "@/components/AuthReconciliationManager";
 import { auth0Config } from "@/lib/auth";
 
 export default function RootLayout() {
@@ -36,6 +37,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <QueryLifecycleManager />
           <AuthProvider>
+            <AuthReconciliationManager />
             <OrgProvider>
               <DeviceRegistrationManager />
               <NotificationResponseManager />

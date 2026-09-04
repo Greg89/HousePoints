@@ -123,9 +123,16 @@ Acceptance criteria:
 
 ### Slice 4: account and membership reconciliation
 
+**Status:** Implemented.
+
 Refresh `/users/bootstrap` after create/join and membership-affecting actions,
 and when returning to the foreground after a longer absence. Reconcile the
 active organization against the returned memberships.
+
+Create and join responses synchronize the returned user immediately. A signed-
+in app also reconciles after at least 60 seconds in the background. Bootstrap
+is single-flight, so overlapping lifecycle or explicit refresh calls share one
+request. A failed refresh retains the established user and ready state.
 
 Acceptance criteria:
 

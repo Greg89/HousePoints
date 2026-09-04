@@ -29,3 +29,18 @@ export function statusAfterBootstrapFailure(
 ): AuthBootstrapStatus {
   return hasExistingAppUser ? "ready" : "error";
 }
+
+export function runSingleFlight<T>(
+  reference: { current: Promise<T> | null },
+  operation: () => Promise<T>,
+): Promise<T> {
+  if (reference.current) return reference.current;
+
+  const task = operation();
+  reference.current = task;
+  const clear = () => {
+    if (reference.current === task) reference.current = null;
+  };
+  void task.then(clear, clear);
+  return task;
+}

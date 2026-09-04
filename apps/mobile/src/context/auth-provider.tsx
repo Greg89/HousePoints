@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -15,6 +16,7 @@ import { AUTH0_SCOPE, auth0AuthorizeParams } from "@/lib/auth";
 import {
   shouldStartAuthBootstrap,
   statusAfterBootstrapFailure,
+  runSingleFlight,
   type AuthBootstrapStatus,
 } from "@/lib/auth-bootstrap";
 import { logger, serializeError } from "@/lib/logger";
@@ -54,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("initializing");
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const bootstrapInFlight = useRef<Promise<void> | null>(null);
 
   const getAccessToken = useCallback(async (): Promise<string> => {
     const credentials = await auth0.getCredentials(
@@ -66,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return credentials.accessToken;
   }, [auth0]);
 
-  const runBootstrap = useCallback(async (): Promise<void> => {
+  const performBootstrap = useCallback(async (): Promise<void> => {
     setError(null);
     setStatus("bootstrapping");
     try {
@@ -117,6 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus(failureStatus);
     }
   }, [auth0.user, appUser, getAccessToken]);
+
+  const runBootstrap = useCallback((): Promise<void> => {
+    return runSingleFlight(bootstrapInFlight, performBootstrap);
+  }, [performBootstrap]);
 
   // React to Auth0's own lifecycle.
   useEffect(() => {

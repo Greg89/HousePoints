@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { logger, serializeError } from "@/lib/logger";
+import { reconcileActiveOrgSlug } from "@/lib/auth-reconciliation";
 import {
   clearStoredActiveOrgSlug,
   getStoredActiveOrgSlug,
@@ -76,43 +77,20 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (memberships.length === 0) {
-      if (activeOrgSlug !== null) {
-        setActiveOrgSlug(null);
-        void clearStoredActiveOrgSlug();
-      }
-      return;
-    }
+    const reconciledSlug = reconcileActiveOrgSlug(activeOrgSlug, memberships);
+    if (reconciledSlug === activeOrgSlug) return;
 
-    // If the persisted slug is not in memberships, clear it and let the picker
-    // handle the ambiguous state.
-    if (
-      activeOrgSlug &&
-      !memberships.some((m) => m.organizationSlug === activeOrgSlug)
-    ) {
-      setActiveOrgSlug(null);
+    setActiveOrgSlug(reconciledSlug);
+    if (reconciledSlug) {
+      void persistActiveOrgSlug(reconciledSlug);
+    } else {
       void clearStoredActiveOrgSlug();
-      return;
     }
-
-    // Auto-select the only membership.
-    if (!activeOrgSlug && memberships.length === 1) {
-      const only = memberships[0];
-      if (only) {
-        setActiveOrgSlug(only.organizationSlug);
-        void persistActiveOrgSlug(only.organizationSlug);
-      }
-      return;
-    }
-
-    // Prefer the server-side "current" membership if nothing is persisted.
-    if (!activeOrgSlug) {
-      const current = memberships.find((m) => m.isCurrent);
-      if (current) {
-        setActiveOrgSlug(current.organizationSlug);
-        void persistActiveOrgSlug(current.organizationSlug);
-      }
-    }
+    logger.info("mobile.org.membership_reconciled", {
+      previousSlug: activeOrgSlug,
+      nextSlug: reconciledSlug,
+      membershipCount: memberships.length,
+    });
   }, [hydrated, status, activeOrgSlug, memberships]);
 
   const selectOrg = useCallback(async (slug: string) => {

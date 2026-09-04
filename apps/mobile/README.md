@@ -163,6 +163,12 @@ Successful mutations use exact organization-scoped query keys. Point, member,
 profile, reaction, and notification changes invalidate every mobile view that
 embeds the changed data without marking another organization's cache stale.
 
+After at least 60 seconds in the background, a signed-in app also refreshes its
+user, organization memberships, roles, and house assignment. Overlapping
+bootstrap attempts share one request. If that refresh fails, the established
+session and cached data remain available; removed organization access routes
+to the remaining organization or workspace picker.
+
 When using a physical Android device, enable USB debugging, confirm it appears
 in `adb devices`, and keep the port reverse. Push registration requires a
 physical device; the emulator is sufficient for most other application flows.
