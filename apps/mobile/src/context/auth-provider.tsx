@@ -39,6 +39,7 @@ type AuthContextValue = {
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshBootstrap: () => Promise<void>;
+  synchronizeUser: (user: AppUser) => void;
   getAccessToken: () => Promise<string>;
 };
 
@@ -172,6 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [auth0, getAccessToken]);
 
+  const synchronizeUser = useCallback((user: AppUser) => {
+    setAppUser(user);
+    setError(null);
+    setStatus("ready");
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -180,9 +187,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       refreshBootstrap: runBootstrap,
+      synchronizeUser,
       getAccessToken,
     }),
-    [status, appUser, error, signIn, signOut, runBootstrap, getAccessToken],
+    [status, appUser, error, signIn, signOut, runBootstrap, synchronizeUser, getAccessToken],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

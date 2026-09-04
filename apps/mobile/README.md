@@ -10,7 +10,8 @@ Roadmap: Tier 6 in [`docs/roadmap.md`](../../docs/roadmap.md).
 ## Status
 
 Phase 1 is complete. The app includes Auth0 native sign-in, organization
-selection, dashboard, leaderboard, paginated activity, award-points, profile
+selection and zero-membership create/join onboarding, dashboard, leaderboard,
+paginated activity, award-points, profile
 editing, and in-app notifications. Phase 2 backend device registration and
 Expo push dispatch are also available; mobile-side permission and device-token
 registration is the next roadmap slice (task 6.5a).
@@ -220,8 +221,9 @@ The configured API must be reachable from the simulator/device. When using a
 local API, run it in another terminal with `npm run dev:api`; an `.env` pulled
 from the EAS `preview` environment uses the deployed beta API instead.
 
-Once the app boots, sign in through Auth0 Universal Login and select an
-organization. A 401 during bootstrap usually means the API audience configured
+Once the app boots, sign in through Auth0 Universal Login. Select an existing
+organization, create one with its first house, or paste an invite link/token to
+join one. A 401 during bootstrap usually means the API audience configured
 for the native Auth0 application does not match `AUTH0_AUDIENCE`.
 
 ## Verify (dev laptop, no device)
