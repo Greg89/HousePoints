@@ -93,6 +93,20 @@ Acceptance criteria:
 
 ### Slice 3: mutation invalidation audit
 
+**Status:** Implemented.
+
+| Mutation group | Exact organization-scoped cache surfaces |
+| --- | --- |
+| Award or deduct points | Activity, dashboard summary, house leaderboard, admin context |
+| Assign house, change role, remove member | Members, admin context, dashboard summary, house leaderboard, activity |
+| Change display name | Members, admin context, dashboard summary, activity |
+| React to activity | Activity |
+| Mark notifications read | Notification list and unread badge |
+
+All keys include the active organization slug, and invalidation uses exact-key
+matching. Create/join and account deletion update authentication state rather
+than ordinary query caches and remain governed by Slice 4.
+
 Document the query-key ownership map and audit every mobile mutation. Prefer a
 shared invalidation helper when multiple mutations affect the same business
 surfaces.

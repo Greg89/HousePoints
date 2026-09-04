@@ -15,6 +15,7 @@ import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+import { mobileQueryKeys } from "@/lib/mobile-query-keys";
 
 const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
 
@@ -32,7 +33,7 @@ export default function LeaderboardScreen() {
   useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
 
   const summaryQuery = useQuery({
-    queryKey: ["dashboard", "summary", activeOrgSlug],
+    queryKey: mobileQueryKeys.dashboardSummary(activeOrgSlug),
     enabled: activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
@@ -45,7 +46,7 @@ export default function LeaderboardScreen() {
   });
 
   const housesQuery = useQuery({
-    queryKey: ["houses", "leaderboard", activeOrgSlug],
+    queryKey: mobileQueryKeys.houseLeaderboard(activeOrgSlug),
     enabled: activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();

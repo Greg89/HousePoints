@@ -28,6 +28,7 @@ import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { eligibleAwardMembers } from "@/lib/award-members";
 import { logger, serializeError } from "@/lib/logger";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 
 const DELTA_MIN = 1;
 const DELTA_MAX = 100;
@@ -49,7 +50,7 @@ export default function AwardPointsScreen() {
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
 
   const membersQuery = useQuery({
-    queryKey: ["members", activeOrgSlug],
+    queryKey: mobileQueryKeys.members(activeOrgSlug),
     enabled: activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
@@ -107,9 +108,10 @@ export default function AwardPointsScreen() {
         delta,
         trait: selectedTrait,
       });
-      void queryClient.invalidateQueries({ queryKey: ["activity"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["houses"] });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.pointsChanged(activeOrgSlug),
+      );
       if (router.canGoBack()) {
         router.back();
       } else {

@@ -38,6 +38,7 @@ import {
 } from "@/lib/member-management";
 import { buildWebAdminUrl, canAccessMobileAdmin } from "@/lib/mobile-admin";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 
 const OUT_OF_SCOPE_FLOWS = [
   "Season creation and transitions",
@@ -69,7 +70,7 @@ export default function AdminScreen() {
   );
   const actorRole =
     activeMembership?.role === "OWNER" ? "OWNER" : "ADMIN";
-  const queryKey = ["admin-context", activeOrgSlug] as const;
+  const queryKey = mobileQueryKeys.adminContext(activeOrgSlug);
 
   const contextQuery = useQuery({
     queryKey,
@@ -113,6 +114,10 @@ export default function AdminScreen() {
         targetUserId: updated.id,
         targetHouseId: updated.houseId,
       });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.memberChanged(activeOrgSlug),
+      );
     },
     onError: (error) => showMutationError(error, showToast),
   });
@@ -139,6 +144,10 @@ export default function AdminScreen() {
         targetUserId: updated.id,
         role: updated.role,
       });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.memberChanged(activeOrgSlug),
+      );
     },
     onError: (error) => showMutationError(error, showToast),
   });
@@ -167,6 +176,10 @@ export default function AdminScreen() {
       );
       showToast({ message: `${removed.displayName} removed`, variant: "success" });
       logger.info("mobile.admin.member_removed", { targetUserId: removed.id });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.memberChanged(activeOrgSlug),
+      );
     },
     onError: (error) => showMutationError(error, showToast),
   });

@@ -159,6 +159,10 @@ that background refresh. Returning to Dashboard, Leaderboard, Activity,
 Notifications, or Admin also refreshes that screen's stale active data; pull
 to refresh still forces an immediate request.
 
+Successful mutations use exact organization-scoped query keys. Point, member,
+profile, reaction, and notification changes invalidate every mobile view that
+embeds the changed data without marking another organization's cache stale.
+
 When using a physical Android device, enable USB debugging, confirm it appears
 in `adb devices`, and keep the port reverse. Push registration requires a
 physical device; the emulator is sufficient for most other application flows.

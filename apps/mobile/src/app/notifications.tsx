@@ -27,6 +27,7 @@ import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { logger, serializeError } from "@/lib/logger";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 
 const PAGE_LIMIT = 20;
 const FOCUS_QUERY_KEYS = [["notifications"]] as const;
@@ -45,7 +46,7 @@ export default function NotificationsScreen() {
   useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
 
   const feedQuery = useInfiniteQuery({
-    queryKey: ["notifications", "list", activeOrgSlug, "all"],
+    queryKey: mobileQueryKeys.notificationList(activeOrgSlug),
     enabled: activeOrgSlug !== null,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) => {
@@ -87,7 +88,10 @@ export default function NotificationsScreen() {
       );
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.notificationsChanged(activeOrgSlug),
+      );
     },
     onError: (err) => {
       const message =
@@ -119,7 +123,10 @@ export default function NotificationsScreen() {
             : "All caught up",
         variant: "success",
       });
-      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.notificationsChanged(activeOrgSlug),
+      );
     },
     onError: (err) => {
       const message =
