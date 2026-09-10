@@ -39,6 +39,7 @@ import {
 import { buildWebAdminUrl, canAccessMobileAdmin } from "@/lib/mobile-admin";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 
 const OUT_OF_SCOPE_FLOWS = [
   "Season creation and transitions",
@@ -74,6 +75,7 @@ export default function AdminScreen() {
 
   const contextQuery = useQuery({
     queryKey,
+    staleTime: MOBILE_QUERY_STALE_MS.adminContext,
     enabled: allowed && activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();

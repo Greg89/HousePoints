@@ -169,6 +169,11 @@ bootstrap attempts share one request. If that refresh fails, the established
 session and cached data remain available; removed organization access routes
 to the remaining organization or workspace picker.
 
+Collaborative views use a 30-second freshness window; member and admin
+reference data use 60 seconds. Polling is disabled. Debug builds log query
+lifecycle events and actual API endpoint/request-id/status/duration metadata,
+without payloads or identity values, for request-volume checks.
+
 When using a physical Android device, enable USB debugging, confirm it appears
 in `adb devices`, and keep the port reverse. Push registration requires a
 physical device; the emulator is sufficient for most other application flows.

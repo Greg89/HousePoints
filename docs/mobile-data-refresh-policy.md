@@ -11,17 +11,17 @@ opens the affected screen.
 TanStack Query remains the source of truth for server-state caching. Pull to
 refresh remains available as an explicit fallback.
 
-## Current behavior
+## Implemented behavior
 
-- Queries have a global `staleTime` of 30 seconds.
-- Automatic window-focus refetch is disabled.
+- Collaborative queries default to a 30-second `staleTime`; member-selection
+  and admin-context queries use 60 seconds.
+- App foreground, network reconnect, and screen-focus triggers refetch stale
+  active queries.
 - Primary data screens expose pull to refresh.
-- Mobile mutations invalidate several related query keys, but invalidation has
-  not been audited as one complete policy.
-- Expo Router tabs can remain mounted, so revisiting a tab does not necessarily
-  mount its queries or cause a fetch.
+- Mobile mutations use an audited, exact, organization-scoped key catalog.
+- Expo Router focus hooks handle tabs that remain mounted.
 - Web and other-device mutations cannot invalidate this device's in-memory
-  cache.
+  cache directly; the lifecycle and focus triggers reconcile them on use.
 
 `staleTime` is not a polling interval. It only determines when cached data is
 eligible for a later refresh trigger.
@@ -47,13 +47,10 @@ eligible for a later refresh trigger.
 | --- | ---: | --- |
 | Dashboard, leaderboard, activity | 30 seconds | App foreground, reconnect, screen focus |
 | Notifications | 30 seconds | App foreground, reconnect, screen focus |
-| Members, houses, admin context | 60 seconds | App foreground, reconnect, screen focus |
-| Profile | 5 minutes | App foreground, reconnect, screen focus |
-| Auth user, memberships, and roles | Refresh on lifecycle policy below | App foreground after absence and membership mutations |
+| Members and admin context | 60 seconds | App foreground, reconnect, screen focus |
+| Auth user, memberships, roles, house assignment | 60-second background threshold | App foreground after absence and membership mutations |
 
-The first implementation may retain the existing global 30-second stale time.
-Per-resource values are an optimization slice, not a prerequisite for correct
-refresh behavior.
+No query uses `refetchInterval`; there is no polling.
 
 ## Delivery slices
 
@@ -146,6 +143,8 @@ Acceptance criteria:
 
 ### Slice 5: tune and observe
 
+**Status:** Implemented.
+
 Measure request volume and perceived freshness during emulator and physical
 device testing. Add per-resource stale times only where useful. Do not add
 polling, WebSockets, or Server-Sent Events unless testing demonstrates a
@@ -157,6 +156,20 @@ Acceptance criteria:
 - A documented manual test covers web mutation → mobile foreground/tab focus.
 - Request volume shows no repeated refresh loop.
 - Polling remains disabled by default.
+
+Implemented structured events:
+
+| Event | Purpose |
+| --- | --- |
+| `mobile.queries.app_focus_changed` | App active/background focus transition |
+| `mobile.queries.network_changed` | Online/offline transition |
+| `mobile.queries.screen_focused` | Screen cache groups considered for stale refresh |
+| `mobile.api.request_completed` | Actual endpoint, request ID, status, and duration |
+| `mobile.api.request_failed` | Transport failure endpoint, request ID, duration, and safe error summary |
+| `mobile.auth.foreground_reconciliation.started` | Membership bootstrap triggered after background absence |
+
+These events omit request bodies, access tokens, email addresses, and
+organization slugs. API request IDs provide correlation with server/SEQ logs.
 
 ## Out of scope
 
@@ -182,3 +195,15 @@ lifecycle smoke proportional to the change. The end-to-end manual scenario is:
 5. Repeat within the freshness window and confirm no unnecessary request.
 6. Disable and restore connectivity; confirm cached content survives and stale
    active data reconciles after reconnect.
+
+For Android development builds, capture the relevant client events with:
+
+```powershell
+adb logcat -d -t 2000 | Select-String `
+  "mobile.queries|mobile.api.request|foreground_reconciliation"
+```
+
+Expected request-volume result: revisiting a screen inside its freshness window
+logs the focus event but no corresponding API request; revisiting after the
+window logs one request per stale active resource. No repeated requests should
+appear while the screen remains idle.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isAppFocused, isNetworkOnline, subscribeToAppFocus } from "./query-lifecycle";
+import { distinctBooleanListener, isAppFocused, isNetworkOnline, subscribeToAppFocus } from "./query-lifecycle";
 
 describe("query lifecycle", () => {
   it("treats only an active app as focused", () => {
@@ -33,5 +33,15 @@ describe("query lifecycle", () => {
     expect(setFocused).toHaveBeenLastCalledWith(true);
     unsubscribe();
     expect(remove).toHaveBeenCalledOnce();
+  });
+
+  it("suppresses repeated lifecycle values", () => {
+    const listener = vi.fn();
+    const distinct = distinctBooleanListener(listener);
+    distinct(true);
+    distinct(true);
+    distinct(false);
+    distinct(false);
+    expect(listener.mock.calls).toEqual([[true], [false]]);
   });
 });

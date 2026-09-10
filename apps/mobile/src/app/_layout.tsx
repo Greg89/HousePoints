@@ -13,6 +13,7 @@ import { NotificationResponseManager } from "@/components/NotificationResponseMa
 import { QueryLifecycleManager } from "@/components/QueryLifecycleManager";
 import { AuthReconciliationManager } from "@/components/AuthReconciliationManager";
 import { auth0Config } from "@/lib/auth";
+import { mobileQueryDefaultOptions } from "@/lib/query-policy";
 
 export default function RootLayout() {
   const { domain, clientId } = useMemo(() => auth0Config(), []);
@@ -20,12 +21,7 @@ export default function RootLayout() {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: {
-            retry: 1,
-            refetchOnWindowFocus: true,
-            refetchOnReconnect: true,
-            staleTime: 30_000,
-          },
+          queries: mobileQueryDefaultOptions(),
         },
       }),
     [],

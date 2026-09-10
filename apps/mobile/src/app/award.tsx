@@ -29,6 +29,7 @@ import { ApiResponseError, callApi } from "@/lib/api-client";
 import { eligibleAwardMembers } from "@/lib/award-members";
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 
 const DELTA_MIN = 1;
 const DELTA_MAX = 100;
@@ -51,6 +52,7 @@ export default function AwardPointsScreen() {
 
   const membersQuery = useQuery({
     queryKey: mobileQueryKeys.members(activeOrgSlug),
+    staleTime: MOBILE_QUERY_STALE_MS.members,
     enabled: activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();

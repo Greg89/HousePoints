@@ -10,6 +10,9 @@ export function useRefreshQueriesOnFocus(queryKeys: readonly QueryKey[]) {
 
   useFocusEffect(
     useCallback(() => {
+      logger.debug("mobile.queries.screen_focused", {
+        queryGroups: queryKeys.map((key) => String(key[0] ?? "unknown")),
+      });
       void refreshStaleActiveQueries(queryClient, queryKeys).catch((error) => {
         logger.warn("mobile.queries.focus_refresh_failed", serializeError(error));
       });

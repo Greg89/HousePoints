@@ -24,6 +24,7 @@ import { ApiResponseError, callApi } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 import { canAccessMobileAdmin } from "@/lib/mobile-admin";
 import {
   DEDUCTION_AMOUNT,
@@ -47,6 +48,7 @@ export default function DeductPointsScreen() {
 
   const membersQuery = useQuery({
     queryKey: mobileQueryKeys.members(activeOrgSlug),
+    staleTime: MOBILE_QUERY_STALE_MS.members,
     enabled: allowed && activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
