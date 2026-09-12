@@ -26,6 +26,7 @@ jobs:
     environment: staging
 
     env:
+      MAESTRO_CLI_NO_ANALYTICS: "1"
       MOBILE_E2E_ANDROID_APP_URL: ${{ inputs.android_app_url || secrets.MOBILE_E2E_ANDROID_APP_URL }}
       MOBILE_E2E_USER_EMAIL: ${{ secrets.MOBILE_E2E_USER_EMAIL }}
       MOBILE_E2E_USER_PASSWORD: ${{ secrets.MOBILE_E2E_USER_PASSWORD }}
@@ -102,11 +103,7 @@ jobs:
           script: |
             adb install -r housepoints-staging.apk
             maestro --version
-            maestro test \
-              -e "MOBILE_E2E_USER_EMAIL=$MOBILE_E2E_USER_EMAIL" \
-              -e "MOBILE_E2E_USER_PASSWORD=$MOBILE_E2E_USER_PASSWORD" \
-              -e "MOBILE_E2E_TARGET_MEMBER=$MOBILE_E2E_TARGET_MEMBER" \
-              apps/mobile/e2e/sign-in-dashboard-award.yaml
+            maestro test -e "MOBILE_E2E_USER_EMAIL=$MOBILE_E2E_USER_EMAIL" -e "MOBILE_E2E_USER_PASSWORD=$MOBILE_E2E_USER_PASSWORD" -e "MOBILE_E2E_TARGET_MEMBER=$MOBILE_E2E_TARGET_MEMBER" apps/mobile/e2e/sign-in-dashboard-award.yaml
 
       - name: Upload Maestro failure artifacts
         if: ${{ failure() }}
