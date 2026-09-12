@@ -20,11 +20,11 @@ tags:
     retryTapIfNoChange: true
 
 - extendedWaitUntil:
-    visible: "Email address"
+    visible: "Email address.*"
     timeout: 30000
-- tapOn: "Email address"
+- tapOn: "Email address.*"
 - inputText: ${MOBILE_E2E_USER_EMAIL}
-- tapOn: "Password"
+- tapOn: "Password.*"
 - inputText: ${MOBILE_E2E_USER_PASSWORD}
 - tapOn: "Continue"
 
