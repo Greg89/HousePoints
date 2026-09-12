@@ -127,9 +127,10 @@ Optional manual input:
 `.github/workflows/mobile-e2e-staging.yml` runs the mobile Auth0 sign-in,
 dashboard, and award-points flow on pushes to `develop` and manual dispatches.
 It downloads a prebuilt staging APK, starts an Android 15 Google APIs emulator
-on the GitHub-hosted runner, and executes the pinned free Maestro CLI. CI does
-not build or sign a native binary in this slice, and no Maestro Cloud account
-or subscription is required.
+on the GitHub-hosted runner, initializes Chrome without its first-run screen so
+Auth0 Universal Login can open unattended, and executes the pinned free Maestro
+CLI. CI does not build or sign a native binary in this slice, and no Maestro
+Cloud account or subscription is required.
 
 Required secrets in the GitHub Environment named `staging`:
 

@@ -101,6 +101,9 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
+            adb shell pm clear com.android.chrome
+            adb shell am set-debug-app --persistent com.android.chrome
+            adb shell 'echo "chrome --disable-fre --no-default-browser-check --no-first-run" > /data/local/tmp/chrome-command-line'
             adb install -r housepoints-staging.apk
             maestro --version
             maestro test -e "MOBILE_E2E_USER_EMAIL=$MOBILE_E2E_USER_EMAIL" -e "MOBILE_E2E_USER_PASSWORD=$MOBILE_E2E_USER_PASSWORD" -e "MOBILE_E2E_TARGET_MEMBER=$MOBILE_E2E_TARGET_MEMBER" apps/mobile/e2e/sign-in-dashboard-award.yaml
