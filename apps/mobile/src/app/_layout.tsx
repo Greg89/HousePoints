@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
-import { useMemo } from "react";
 import { Auth0Provider } from "react-native-auth0";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -15,18 +14,14 @@ import { AuthReconciliationManager } from "@/components/AuthReconciliationManage
 import { auth0Config } from "@/lib/auth";
 import { mobileQueryDefaultOptions } from "@/lib/query-policy";
 
-export default function RootLayout() {
-  const { domain, clientId } = useMemo(() => auth0Config(), []);
-  const queryClient = useMemo(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: mobileQueryDefaultOptions(),
-        },
-      }),
-    [],
-  );
+const { domain, clientId } = auth0Config();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: mobileQueryDefaultOptions(),
+  },
+});
 
+export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <Auth0Provider domain={domain} clientId={clientId}>
