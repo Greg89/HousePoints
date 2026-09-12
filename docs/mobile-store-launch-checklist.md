@@ -204,12 +204,12 @@ track. Environment approval is therefore a release-control boundary.
 
 In the GitHub `staging` Environment:
 
-- [ ] Secret: `MOBILE_E2E_ANDROID_APP_URL`
-- [ ] Secret: `MOBILE_E2E_USER_EMAIL`
-- [ ] Secret: `MOBILE_E2E_USER_PASSWORD`
-- [ ] Secret: `MOBILE_E2E_TARGET_MEMBER`
-- [ ] Secret: `MAESTRO_CLOUD_API_KEY`
-- [ ] Repository or Environment variable: `MAESTRO_PROJECT_ID`
+- [x] Secret: `MOBILE_E2E_ANDROID_APP_URL`
+- [x] Secret: `MOBILE_E2E_USER_EMAIL`
+- [x] Secret: `MOBILE_E2E_USER_PASSWORD`
+- [x] Secret: `MOBILE_E2E_TARGET_MEMBER`
+- [x] Use the free pinned Maestro CLI on a GitHub-hosted Android emulator; no
+  Maestro Cloud credentials or subscription are required.
 
 Staging data:
 

@@ -125,21 +125,18 @@ Optional manual input:
 ### Mobile Maestro staging smoke
 
 `.github/workflows/mobile-e2e-staging.yml` runs the mobile Auth0 sign-in,
-dashboard, and award-points flow in Maestro Cloud on pushes to `develop` and
-manual dispatches. It downloads a prebuilt staging APK; CI does not build or
-sign a native binary in this slice.
+dashboard, and award-points flow on pushes to `develop` and manual dispatches.
+It downloads a prebuilt staging APK, starts an Android 15 Google APIs emulator
+on the GitHub-hosted runner, and executes the pinned free Maestro CLI. CI does
+not build or sign a native binary in this slice, and no Maestro Cloud account
+or subscription is required.
 
 Required secrets in the GitHub Environment named `staging`:
 
 - `MOBILE_E2E_ANDROID_APP_URL` — HTTPS URL for an installable staging APK;
 - `MOBILE_E2E_USER_EMAIL`;
 - `MOBILE_E2E_USER_PASSWORD`;
-- `MOBILE_E2E_TARGET_MEMBER`;
-- `MAESTRO_CLOUD_API_KEY`.
-
-Required GitHub Environment variable:
-
-- `MAESTRO_PROJECT_ID`.
+- `MOBILE_E2E_TARGET_MEMBER`.
 
 The APK must target the staging API and staging Auth0 Native Application. The
 test account must belong to exactly one organization so the smoke reaches the
@@ -149,7 +146,8 @@ The smoke intentionally creates a five-point Teamwork award on each run.
 
 The manual `android_app_url` input overrides
 `MOBILE_E2E_ANDROID_APP_URL` for one run. No new Railway variables are required;
-the existing staging API/Auth0 configuration remains authoritative.
+the existing staging API/Auth0 configuration remains authoritative. Failed
+Maestro runs upload local diagnostic artifacts with seven-day retention.
 
 ### Phase B2 - Test Data Contract
 

@@ -353,10 +353,11 @@ First release rehearsal:
 
 `apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
 readiness, and a point award using stable native test IDs. The
-`Mobile Staging E2E` workflow runs on pushes to `develop` or manually, uploads
-a configured staging APK to Maestro Cloud, and writes the cloud result to the
-workflow summary. See `docs/staging-e2e-test-data-contract.md` for required
-staging configuration.
+`Mobile Staging E2E` workflow runs on pushes to `develop` or manually. It
+downloads a configured staging APK, starts a GitHub-hosted Android emulator,
+and runs the free Maestro CLI without a Maestro Cloud subscription. Failure
+artifacts are retained for seven days. See
+`docs/staging-e2e-test-data-contract.md` for required staging configuration.
 
 The main GitHub Actions CI now publishes a dedicated
 `Mobile Lint, Type-check & Test` result on pushes and pull requests. It uses
