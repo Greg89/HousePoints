@@ -13,8 +13,8 @@ Phase 1 is complete. The app includes Auth0 native sign-in, organization
 selection and zero-membership create/join onboarding, dashboard, leaderboard,
 paginated activity, award-points, profile
 editing, and in-app notifications. Phase 2 backend device registration and
-Expo push dispatch are also available; mobile-side permission and device-token
-registration is the next roadmap slice (task 6.5a).
+Expo push dispatch are also available, including mobile permission handling,
+device-token registration, and notification-response routing.
 
 ## Prerequisites
 
@@ -54,6 +54,13 @@ Fill in:
 - `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
   mobile Admin tab during the Phase 3 rollout.
+
+Android push builds also require `apps/mobile/google-services.json` for the
+Firebase project registered to `com.housepoints.app`. This file contains the
+public Android Firebase client configuration and is committed with the app.
+The separate FCM V1 service-account JSON is private: upload it to EAS
+credentials, never copy it into this repository, and remove the downloaded
+copy after upload.
 
 ### Use an EAS environment locally
 

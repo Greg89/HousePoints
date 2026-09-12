@@ -35,6 +35,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.housepoints.app",
+    googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#020d24",

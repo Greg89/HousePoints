@@ -74,6 +74,12 @@ aligned with that branding.
 - [ ] Create an Expo access token for GitHub Actions.
 - [ ] Store the token only as the `EXPO_TOKEN` GitHub Environment secret.
 - [x] Confirm EAS can generate and manage the Android signing credentials.
+- [x] Register `com.housepoints.app` in the HousePoints Production Firebase
+  project and commit its Android `google-services.json` client configuration.
+- [x] Upload a dedicated, least-privilege FCM V1 service-account key to EAS for
+  `com.housepoints.app`.
+- [ ] Restore the Google Cloud policy that disables new service-account key
+  creation after the FCM credential is uploaded.
 - [ ] Confirm EAS can manage the iOS signing credentials.
 
 Useful references:
