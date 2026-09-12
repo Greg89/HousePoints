@@ -132,6 +132,10 @@ Auth0 Universal Login can open unattended, and executes the pinned free Maestro
 CLI. CI does not build or sign a native binary in this slice, and no Maestro
 Cloud account or subscription is required.
 
+The smoke flow also accepts Chrome's first-run **Use without an account** prompt
+because some Google APIs emulator images ignore Chrome's command-line
+first-run suppression flags.
+
 Required secrets in the GitHub Environment named `staging`:
 
 - `MOBILE_E2E_ANDROID_APP_URL` — HTTPS URL for an installable staging APK;
