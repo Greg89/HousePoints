@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
+  "expo": {
+    "autolinking": {
+      "searchPaths": [
+        "../../node_modules",
+        "./node_modules"
+      ]
+    }
+  },
   "scripts": {
     "eas-build-post-install": "npm run build -w @housepoints/theme && npm run build -w @housepoints/contracts",
     "start": "expo start",
@@ -18,10 +26,10 @@
   "dependencies": {
     "@housepoints/contracts": "*",
     "@housepoints/theme": "*",
-    "@react-native-community/netinfo": "^12.0.1",
+    "@react-native-community/netinfo": "11.4.1",
     "@tanstack/react-query": "^5.60.0",
-    "expo": "~54.0.36",
-    "expo-constants": "~18.0.13",
+    "expo": "~54.0.37",
+    "expo-constants": "~18.0.14",
     "expo-device": "~8.0.10",
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
@@ -30,7 +38,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
-    "expo-updates": "~29.0.19",
+    "expo-updates": "~29.0.20",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
