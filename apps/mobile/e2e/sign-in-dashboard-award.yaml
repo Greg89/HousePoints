@@ -46,7 +46,8 @@ tags:
     id: "mobile.award.member-select"
 - tapOn: ${MOBILE_E2E_TARGET_MEMBER}
 - tapOn:
-    id: "mobile.award.trait.TEAMWORK"
+    id: "mobile.award.trait.*"
+    index: 0
 - tapOn:
     id: "mobile.award.reason"
 - inputText: "Maestro staging award"

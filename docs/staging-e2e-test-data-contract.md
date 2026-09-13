@@ -147,7 +147,9 @@ Auth0 credentials can rotate independently from Playwright:
 The actor must authenticate through the Auth0 Native Application, belong to
 exactly one staging organization, and be assigned to a house. The target value
 must exactly match a different assigned member's display name in that same
-organization. Each run creates a five-point Teamwork award with the reason
+organization. The organization must expose at least one active award trait;
+the smoke selects the first available trait rather than depending on a specific
+organization configuration. Each run creates a five-point award with the reason
 `Maestro staging award`; staging must tolerate that accumulated activity.
 
 The mutating happy-path test intentionally creates point activity and one reaction on that activity. The staging organization should tolerate this accumulated history. If that history becomes noisy, add a reset or cleanup job before making scheduled E2E failures block releases.
