@@ -51,6 +51,11 @@ tags:
 - tapOn:
     id: "mobile.award.reason"
 - inputText: "Maestro staging award"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "mobile.award.submit"
+    timeout: 10000
 - tapOn:
     id: "mobile.award.submit"
 
