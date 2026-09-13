@@ -148,6 +148,8 @@ configuration, not safe storage for secrets.
 - [ ] Store `EXPO_ACCESS_TOKEN` in the API host's secret storage.
 - [ ] Confirm API logs redact tokens and include mobile request IDs.
 - [ ] Sign in on a physical device and confirm device registration is created.
+- [ ] Confirm the custom monochrome HousePoints notification icon renders on a
+  physical Android device after installing a build that includes it.
 - [ ] Sign out and confirm the registration is revoked.
 - [ ] Trigger an eligible notification and confirm push delivery remains
   organization-scoped.

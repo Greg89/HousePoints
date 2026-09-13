@@ -57,7 +57,14 @@ const config: ExpoConfig = {
       },
     ],
     "expo-secure-store",
-    "expo-notifications",
+    [
+      "expo-notifications",
+      {
+        icon: "./assets/notification-icon.png",
+        color: "#7C3AED",
+        defaultChannel: "default",
+      },
+    ],
     [
       "react-native-auth0",
       {

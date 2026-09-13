@@ -409,3 +409,8 @@ selection, the app creates the Android notification channel when applicable,
 requests permission if it has not been decided, obtains the Expo push token,
 and registers it with the API. Organization switches update the registration;
 sign-out unregisters it before Auth0 credentials are cleared.
+
+Android notification icons use `assets/notification-icon.png`, a dedicated
+96x96 white-on-transparent status-bar asset configured by the
+`expo-notifications` plugin. Changes to this icon or its tint require a new
+native Android build; an EAS Update alone cannot change them.
