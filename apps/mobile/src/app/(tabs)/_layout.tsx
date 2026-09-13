@@ -1,10 +1,11 @@
 import { Redirect, Tabs } from "expo-router";
 
-import { AlertsHeaderButton } from "@/components/AlertsHeaderButton";
+import { HeaderActions } from "@/components/AlertsHeaderButton";
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { env } from "@/lib/env";
 import { canAccessMobileAdmin } from "@/lib/mobile-admin";
+import { mobilePrimaryNavigation } from "@/lib/mobile-navigation";
 
 export default function TabsLayout() {
   const { status } = useAppAuth();
@@ -13,6 +14,7 @@ export default function TabsLayout() {
     env.mobileAdminEnabled,
     activeMembership?.role,
   );
+  const primaryDestinations = mobilePrimaryNavigation(showAdmin);
 
   if (status === "signedOut" || status === "error") {
     return <Redirect href="/login" />;
@@ -27,25 +29,23 @@ export default function TabsLayout() {
         headerShown: true,
         tabBarActiveTintColor: "#0f172a",
         tabBarInactiveTintColor: "#94a3b8",
+        headerRight: () => <HeaderActions />,
       }}
     >
+      {primaryDestinations.map((destination) => (
+        <Tabs.Screen
+          key={destination.route}
+          name={destination.route}
+          options={{
+            title: destination.title,
+            href: destination.visible ? undefined : null,
+          }}
+        />
+      ))}
       <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          headerRight: () => <AlertsHeaderButton />,
-        }}
+        name="profile"
+        options={{ title: "Profile", href: null }}
       />
-      <Tabs.Screen name="leaderboard" options={{ title: "Leaderboard" }} />
-      <Tabs.Screen name="activity" options={{ title: "Activity" }} />
-      <Tabs.Screen
-        name="admin"
-        options={{
-          title: "Admin",
-          href: showAdmin ? undefined : null,
-        }}
-      />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }

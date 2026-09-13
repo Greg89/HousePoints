@@ -73,3 +73,11 @@ tags:
     timeout: 30000
 - assertVisible:
     id: "mobile.home.award-points"
+- assertVisible:
+    id: "mobile.header.account"
+- tapOn:
+    id: "mobile.header.account"
+- extendedWaitUntil:
+    visible:
+      id: "mobile.profile.organization-select"
+    timeout: 10000

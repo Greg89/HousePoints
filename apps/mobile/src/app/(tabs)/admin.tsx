@@ -304,7 +304,7 @@ export default function AdminScreen() {
       }
     >
       <View>
-        <Text style={styles.title}>Administration</Text>
+        <Text style={styles.title}>Manage</Text>
         <Text style={styles.subtitle}>
           Manage {activeMembership?.organizationName} from your phone.
         </Text>

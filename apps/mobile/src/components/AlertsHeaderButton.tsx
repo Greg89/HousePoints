@@ -54,7 +54,41 @@ export function AlertsHeaderButton() {
   );
 }
 
+export function AccountHeaderButton() {
+  const { user } = useAppAuth();
+  const initial = user?.displayName.trim().charAt(0).toUpperCase() || "?";
+
+  return (
+    <Pressable
+      testID="mobile.header.account"
+      style={styles.avatarButton}
+      onPress={() => router.push("/(tabs)/profile")}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel="Account and profile"
+      accessibilityHint="Opens your profile and organization settings"
+    >
+      <Text style={styles.avatarLabel}>{initial}</Text>
+    </Pressable>
+  );
+}
+
+export function HeaderActions() {
+  return (
+    <View style={styles.actions}>
+      <AlertsHeaderButton />
+      <AccountHeaderButton />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 12,
+    gap: 2,
+  },
   button: {
     flexDirection: "row",
     alignItems: "center",
@@ -79,6 +113,19 @@ const styles = StyleSheet.create({
   badgeText: {
     color: "#ffffff",
     fontSize: 11,
+    fontWeight: "700",
+  },
+  avatarButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0f172a",
+  },
+  avatarLabel: {
+    color: "#ffffff",
+    fontSize: 15,
     fontWeight: "700",
   },
 });

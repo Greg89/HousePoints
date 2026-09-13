@@ -53,7 +53,7 @@ Fill in:
   push token. Find it in the Expo project dashboard or `eas project:info`.
 - `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
-  mobile Admin tab during the Phase 3 rollout.
+  mobile Manage tab during the Phase 3 rollout.
 
 Android push builds also require `apps/mobile/google-services.json` for the
 Firebase project registered to `com.housepoints.app`. This file contains the
@@ -372,7 +372,7 @@ explains the 24-hour limits, requires a public reason and confirmation, and
 leaves eligibility and cooldown enforcement authoritative on the API.
 
 Admins and owners can generate 24-hour, 3-day, or 7-day single-use invite
-links from the Admin tab. The raw link is returned by the API only once and is
+links from the Manage tab. The raw link is returned by the API only once and is
 kept in screen state for the platform-native share sheet.
 
 The native Members section loads organization-scoped users and houses. Admins
@@ -380,7 +380,7 @@ and owners can assign houses; only owners can promote, demote, or remove
 non-owner members. Permission-sensitive changes use native confirmation
 prompts, and pull-to-refresh reconciles the server state.
 
-The Admin tab appears only when `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED=true` and
+The Manage tab appears only when `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED=true` and
 the active organization role is `ADMIN` or `OWNER`. The route repeats the same
 guard for direct navigation. Out-of-scope organization workflows open the
 active organization’s Manage workspace at `EXPO_PUBLIC_WEB_BASE_URL`.

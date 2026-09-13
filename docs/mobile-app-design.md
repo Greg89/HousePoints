@@ -349,7 +349,7 @@ fixes can ship within their existing channel. Roll back interactively with
 
 **Phase 3 gate status:** Implemented. Because Expo only exposes public runtime
 configuration to the client, the concrete variable is
-`EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`. The Admin tab and route require both the
+`EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`. The Manage tab and route require both the
 flag and an active `ADMIN`/`OWNER` membership. The empty state links to the
 slug-scoped Manage workspace using `EXPO_PUBLIC_WEB_BASE_URL`.
 6. **Public release** on both stores after two consecutive clean staging E2E runs. Expo Updates (`production` channel) becomes the hotfix path.

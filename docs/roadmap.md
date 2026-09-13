@@ -139,7 +139,7 @@ Key context for whoever picks this up next:
   replaceable without changing notification writers.
 - **Eligible notification types for push** — `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `RELEASE_ANNOUNCEMENT`, `MEMBER_NEEDS_HOUSE_ASSIGNMENT` (admins only). Non-pushable types should short-circuit before the HTTP call.
 - **Test approach** — mock `deviceRegistration.findMany` and the `PushDispatcher` in `apps/api/src/app.test.ts` (`deviceRegistration` delegate is already in the top-level `vi.mock` block). Assert both the persist happens and the dispatcher is called with the expected payload.
-- **Mobile screens shipped** — Home, Leaderboard, Activity (paginated), Award (modal), Profile (display-name edit), Notifications (list + mark-read + mark-all-read). All under `apps/mobile/src/app/`. The `AlertsHeaderButton` in `apps/mobile/src/components/` drives the Home-tab unread badge.
+- **Mobile screens shipped** — Home, Activity (paginated), Leaderboard, Award (modal), Profile (display-name edit), Notifications (list + mark-read + mark-all-read). All under `apps/mobile/src/app/`. Alerts and account access share the primary-screen header while Profile stays out of the bottom navigation.
 - **Mobile push registration** — `DeviceRegistrationManager` observes the
   authenticated user and active organization. It requests permission only when
   undetermined, skips simulators, registers the Expo token after sign-in and
@@ -153,7 +153,7 @@ Key context for whoever picks this up next:
   mutation settles. Summary chips load `/transactions/reactions`; deductions
   remain non-reactable.
 - **Mobile admin gate** — `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` and the active
-  membership role jointly control the Admin tab, and the route repeats the
+  membership role jointly control the Manage tab, and the route repeats the
   authorization guard. The empty state links to the active organization’s web
   Manage workspace for intentionally out-of-scope flows.
 - **TanStack Query gotcha (documented in `/memories/repo/ui-notes.md`)** — `z.output<generic>` collapses to `any` at the queryFn boundary. Workaround: destructure to a local with an explicit annotation, e.g. `const data: PagedNotifications | undefined = query.data`. Continue this pattern in 6.5c reactions and 6.6b admin screens.
