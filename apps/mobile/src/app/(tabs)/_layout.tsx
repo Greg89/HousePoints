@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Redirect, Tabs } from "expo-router";
 
 import { HeaderActions } from "@/components/AlertsHeaderButton";
@@ -39,6 +40,13 @@ export default function TabsLayout() {
           options={{
             title: destination.title,
             href: destination.visible ? undefined : null,
+            tabBarIcon: ({ color, size, focused }) => (
+              <MaterialCommunityIcons
+                name={focused ? destination.activeIcon : destination.icon}
+                color={color}
+                size={size}
+              />
+            ),
           }}
         />
       ))}

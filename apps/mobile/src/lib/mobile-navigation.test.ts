@@ -24,4 +24,15 @@ describe("mobilePrimaryNavigation", () => {
     ]);
     expect(visible.map((item) => item.route)).not.toContain("profile");
   });
+
+  it("uses icons matching the corresponding web destinations", () => {
+    expect(
+      mobilePrimaryNavigation(true).map(({ title, icon }) => ({ title, icon })),
+    ).toEqual([
+      { title: "Home", icon: "chart-bar" },
+      { title: "Activity", icon: "clock-outline" },
+      { title: "Leaderboard", icon: "trophy-outline" },
+      { title: "Manage", icon: "wrench-outline" },
+    ]);
+  });
 });
