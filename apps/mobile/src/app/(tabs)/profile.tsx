@@ -1,9 +1,12 @@
+import type { AppUserOrganizationContext } from "@housepoints/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -19,6 +22,7 @@ import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations } from "@/lib/mobile-query-keys";
+import { organizationOptions } from "@/lib/organization-selector";
 
 const DISPLAY_NAME_MIN = 1;
 const DISPLAY_NAME_MAX = 120;
@@ -32,6 +36,7 @@ export default function ProfileScreen() {
 
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(user?.displayName ?? "");
+  const [organizationPickerOpen, setOrganizationPickerOpen] = useState(false);
 
   const trimmedDraft = draftName.trim();
   const canSave =
@@ -126,7 +131,7 @@ export default function ProfileScreen() {
     updateNameMutation.mutate(trimmedDraft);
   }, [canSave, trimmedDraft, updateNameMutation]);
 
-  const promptSwitch = () => {
+  const openOrganizationPicker = () => {
     if (memberships.length <= 1) {
       showToast({
         message: "You only belong to one organization.",
@@ -134,22 +139,28 @@ export default function ProfileScreen() {
       });
       return;
     }
-    const otherMemberships = memberships.filter(
-      (m) => m.organizationSlug !== activeOrgSlug,
-    );
-    Alert.alert("Switch organization", "Choose an organization to switch to.", [
-      ...otherMemberships.map((m) => ({
-        text: m.organizationName,
-        onPress: () => {
-          void selectOrg(m.organizationSlug);
-          showToast({
-            message: `Switched to ${m.organizationName}`,
-            variant: "success",
-          });
-        },
-      })),
-      { text: "Cancel", style: "cancel" as const },
-    ]);
+    setOrganizationPickerOpen(true);
+  };
+
+  const switchOrganization = async (
+    membership: AppUserOrganizationContext,
+  ) => {
+    setOrganizationPickerOpen(false);
+    if (membership.organizationSlug === activeOrgSlug) return;
+
+    try {
+      await selectOrg(membership.organizationSlug);
+      showToast({
+        message: `Switched to ${membership.organizationName}`,
+        variant: "success",
+      });
+    } catch (err) {
+      showToast({
+        message: "Unable to switch organizations. Please try again.",
+        variant: "error",
+      });
+      logger.warn("mobile.profile.organization_switch_failed", serializeError(err));
+    }
   };
 
   return (
@@ -222,21 +233,31 @@ export default function ProfileScreen() {
           <Text style={styles.value}>{user?.email ?? "-"}</Text>
         </View>
 
-        <View style={styles.card}>
+        <Pressable
+          testID="mobile.profile.organization-select"
+          accessibilityRole="button"
+          accessibilityLabel={`Organization: ${activeMembership?.organizationName ?? "None selected"}`}
+          accessibilityHint="Opens your organization list"
+          style={styles.card}
+          onPress={openOrganizationPicker}
+        >
           <Text style={styles.label}>Organization</Text>
-          <Text style={styles.value}>
-            {activeMembership?.organizationName ?? "-"}
-          </Text>
-          <Text style={styles.meta}>
-            {activeMembership?.role ?? ""}
-            {activeMembership?.houseName
-              ? ` \u00b7 ${activeMembership.houseName}`
-              : ""}
-          </Text>
-        </View>
-
-        <Pressable style={styles.switchButton} onPress={promptSwitch}>
-          <Text style={styles.switchText}>Switch organization</Text>
+          <View style={styles.organizationValueRow}>
+            <View style={styles.organizationText}>
+              <Text style={styles.value}>
+                {activeMembership?.organizationName ?? "-"}
+              </Text>
+              <Text style={styles.meta}>
+                {activeMembership?.role ?? ""}
+                {activeMembership?.houseName
+                  ? ` \u00b7 ${activeMembership.houseName}`
+                  : ""}
+              </Text>
+            </View>
+            <Text style={styles.caret} accessibilityElementsHidden>
+              ▾
+            </Text>
+          </View>
         </Pressable>
 
         <Pressable
@@ -270,7 +291,91 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <OrganizationSelectModal
+        visible={organizationPickerOpen}
+        memberships={memberships}
+        activeOrgSlug={activeOrgSlug}
+        onClose={() => setOrganizationPickerOpen(false)}
+        onSelect={(membership) => void switchOrganization(membership)}
+      />
     </KeyboardAvoidingView>
+  );
+}
+
+function OrganizationSelectModal({
+  visible,
+  memberships,
+  activeOrgSlug,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  memberships: AppUserOrganizationContext[];
+  activeOrgSlug: string | null;
+  onClose: () => void;
+  onSelect: (membership: AppUserOrganizationContext) => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Close organization list"
+          onPress={onClose}
+        />
+        <View style={styles.organizationModal}>
+          <View style={styles.modalHeader}>
+            <View style={styles.organizationText}>
+              <Text style={styles.modalTitle}>Select organization</Text>
+              <Text style={styles.modalDescription}>
+                Choose the organization you want to use
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close organization list"
+              onPress={onClose}
+              style={styles.modalClose}
+            >
+              <Text style={styles.modalCloseLabel}>×</Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={organizationOptions(memberships, activeOrgSlug)}
+            keyExtractor={({ membership }) => membership.organizationId}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            renderItem={({ item: { membership, selected } }) => {
+              return (
+                <Pressable
+                  testID={`mobile.profile.organization-option.${membership.organizationSlug}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${membership.organizationName}, ${membership.role}${membership.houseName ? `, ${membership.houseName}` : ""}`}
+                  accessibilityState={{ selected }}
+                  style={[styles.organizationRow, selected && styles.selectedRow]}
+                  onPress={() => onSelect(membership)}
+                >
+                  <View style={styles.organizationText}>
+                    <Text style={styles.organizationName}>
+                      {membership.organizationName}
+                    </Text>
+                    <Text style={styles.organizationMeta}>
+                      {membership.role}
+                      {membership.houseName ? ` · ${membership.houseName}` : ""}
+                    </Text>
+                  </View>
+                  {selected ? <Text style={styles.selectedCheck}>✓</Text> : null}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -284,6 +389,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
+  organizationValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  organizationText: { flex: 1 },
+  caret: { fontSize: 20, color: "#64748b", marginLeft: 12 },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -349,15 +461,50 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: { color: "#0f172a", fontSize: 14, fontWeight: "600" },
   buttonDisabled: { opacity: 0.5 },
-  switchButton: {
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#0f172a",
-    alignItems: "center",
-    marginTop: 12,
+  modalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
   },
-  switchText: { color: "#0f172a", fontWeight: "500" },
+  organizationModal: {
+    maxHeight: "72%",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
+  modalDescription: { fontSize: 12, color: "#64748b", marginTop: 2 },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f1f5f9",
+  },
+  modalCloseLabel: { fontSize: 24, lineHeight: 26, color: "#334155" },
+  organizationRow: {
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    gap: 12,
+  },
+  selectedRow: { backgroundColor: "#f1f5f9" },
+  organizationName: { fontSize: 15, fontWeight: "600", color: "#0f172a" },
+  organizationMeta: { fontSize: 12, color: "#64748b", marginTop: 3 },
+  selectedCheck: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
+  separator: { height: 1, backgroundColor: "#e2e8f0" },
   signOut: { alignItems: "center", padding: 12, marginTop: 16 },
   signOutText: { color: "#dc2626", fontSize: 15, fontWeight: "500" },
   dangerZone: {
