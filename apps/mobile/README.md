@@ -407,9 +407,12 @@ route resolver.
 
 Push registration requires a physical device. After sign-in and organization
 selection, the app creates the Android notification channel when applicable,
-requests permission if it has not been decided, obtains the Expo push token,
-and registers it with the API. Organization switches update the registration;
-sign-out unregisters it before Auth0 credentials are cleared.
+and automatically registers devices that already have permission. First-time
+permission requests are initiated from the Notifications card in Profile so
+the prompt has context. If permission was denied, Profile links to system
+notification settings and registers the device after the app resumes with
+permission granted. Organization switches update the registration; sign-out
+unregisters it before Auth0 credentials are cleared.
 
 Android notification icons use `assets/notification-icon.png`, a dedicated
 96x96 white-on-transparent status-bar asset configured by the

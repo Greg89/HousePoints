@@ -128,10 +128,11 @@ Everything below is additive — no breaking changes to existing endpoints.
 ### 7.1 Device registration for push (new)
 
 **Status:** Implemented. The API registration endpoints and mobile lifecycle
-are in place. On a physical device the app requests notification permission,
-obtains an Expo token using `EXPO_PUBLIC_EAS_PROJECT_ID`, registers after
-sign-in and active-organization changes, and best-effort unregisters before
-sign-out clears Auth0 credentials.
+are in place. On a physical device the Profile screen explains notification
+benefits and explicitly requests permission when the user chooses to enable
+them. Devices with permission obtain an Expo token using
+`EXPO_PUBLIC_EAS_PROJECT_ID`, register after sign-in and active-organization
+changes, and best-effort unregister before sign-out clears Auth0 credentials.
 
 New Prisma model:
 

@@ -91,3 +91,5 @@ tags:
     visible:
       id: "mobile.profile.organization-select"
     timeout: 10000
+- assertVisible:
+    id: "mobile.profile.notification-status"

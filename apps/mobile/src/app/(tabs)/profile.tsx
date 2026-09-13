@@ -1,11 +1,13 @@
 import type { AppUserOrganizationContext } from "@housepoints/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +22,11 @@ import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import {
+  getNotificationPermissionStatus,
+  registerCurrentDevice,
+} from "@/lib/device-registration";
+import type { NotificationPermissionStatus } from "@/lib/device-registration-core";
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations } from "@/lib/mobile-query-keys";
 import { organizationOptions } from "@/lib/organization-selector";
@@ -37,6 +44,55 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(user?.displayName ?? "");
   const [organizationPickerOpen, setOrganizationPickerOpen] = useState(false);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionStatus | null>(null);
+  const [notificationPending, setNotificationPending] = useState(false);
+
+  const refreshNotificationPermission = useCallback(async () => {
+    try {
+      const permission = await getNotificationPermissionStatus();
+      setNotificationPermission(permission);
+      return permission;
+    } catch (err) {
+      logger.warn(
+        "mobile.profile.notification_permission_read_failed",
+        serializeError(err),
+      );
+      return null;
+    }
+  }, []);
+
+  const registerNotifications = useCallback(async () => {
+    if (!activeOrgSlug) return false;
+    const accessToken = await getAccessToken();
+    const result = await registerCurrentDevice({
+      accessToken,
+      organizationSlug: activeOrgSlug,
+      requestPermission: false,
+    });
+    return result === "registered";
+  }, [activeOrgSlug, getAccessToken]);
+
+  useEffect(() => {
+    void refreshNotificationPermission();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      void (async () => {
+        const permission = await refreshNotificationPermission();
+        if (permission === "granted") {
+          try {
+            await registerNotifications();
+          } catch (err) {
+            logger.warn(
+              "mobile.profile.notification_registration_failed",
+              serializeError(err),
+            );
+          }
+        }
+      })();
+    });
+    return () => subscription.remove();
+  }, [refreshNotificationPermission, registerNotifications]);
 
   const trimmedDraft = draftName.trim();
   const canSave =
@@ -163,6 +219,44 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleNotificationAction = async () => {
+    if (notificationPermission === "denied") {
+      await Linking.openSettings();
+      return;
+    }
+    if (!activeOrgSlug) return;
+
+    setNotificationPending(true);
+    try {
+      const accessToken = await getAccessToken();
+      const result = await registerCurrentDevice({
+        accessToken,
+        organizationSlug: activeOrgSlug,
+        requestPermission: true,
+      });
+      const permission = await refreshNotificationPermission();
+      if (result === "registered" && permission === "granted") {
+        showToast({ message: "Notifications enabled", variant: "success" });
+      } else if (permission === "denied") {
+        showToast({
+          message: "Notifications are off. You can enable them in Settings.",
+          variant: "info",
+        });
+      }
+    } catch (err) {
+      showToast({
+        message: "Unable to enable notifications. Please try again.",
+        variant: "error",
+      });
+      logger.warn(
+        "mobile.profile.notification_enable_failed",
+        serializeError(err),
+      );
+    } finally {
+      setNotificationPending(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -259,6 +353,58 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </Pressable>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.label}>Notifications</Text>
+            <Text
+              testID="mobile.profile.notification-status"
+              style={[
+                styles.notificationStatus,
+                notificationPermission === "granted"
+                  ? styles.notificationStatusEnabled
+                  : styles.notificationStatusDisabled,
+              ]}
+            >
+              {notificationPermission === null
+                ? "Checking…"
+                : notificationPermission === "granted"
+                  ? "Enabled"
+                  : "Off"}
+            </Text>
+          </View>
+          <Text style={styles.notificationDescription}>
+            Get notified when you receive points, reactions, invitations, and
+            other important organization updates.
+          </Text>
+          {notificationPermission !== "granted" ? (
+            <Pressable
+              testID="mobile.profile.notification-action"
+              accessibilityRole="button"
+              style={[
+                styles.notificationButton,
+                (notificationPermission === null || notificationPending) &&
+                  styles.buttonDisabled,
+              ]}
+              disabled={notificationPermission === null || notificationPending}
+              onPress={() => void handleNotificationAction()}
+            >
+              {notificationPending ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.notificationButtonLabel}>
+                  {notificationPermission === "denied"
+                    ? "Open notification settings"
+                    : "Enable notifications"}
+                </Text>
+              )}
+            </Pressable>
+          ) : (
+            <Text style={styles.notificationEnabledMessage}>
+              This device is ready to receive HousePoints notifications.
+            </Text>
+          )}
+        </View>
 
         <Pressable
           style={styles.signOut}
@@ -461,6 +607,38 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: { color: "#0f172a", fontSize: 14, fontWeight: "600" },
   buttonDisabled: { opacity: 0.5 },
+  notificationStatus: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  notificationStatusEnabled: { color: "#047857" },
+  notificationStatusDisabled: { color: "#b45309" },
+  notificationDescription: {
+    color: "#475569",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  notificationButton: {
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: "#0f172a",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    marginTop: 14,
+  },
+  notificationButtonLabel: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  notificationEnabledMessage: {
+    color: "#047857",
+    fontSize: 13,
+    marginTop: 12,
+  },
   modalRoot: {
     flex: 1,
     justifyContent: "center",
