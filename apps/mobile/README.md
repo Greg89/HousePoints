@@ -11,8 +11,8 @@ Roadmap: Tier 6 in [`docs/roadmap.md`](../../docs/roadmap.md).
 
 Phase 1 is complete. The app includes Auth0 native sign-in, organization
 selection and zero-membership create/join onboarding, dashboard, a global
-top-10 contributor leaderboard across houses,
-paginated activity, award-points, profile
+top-10 contributor leaderboard across houses, recipient-focused paginated
+activity aligned with the web experience, award-points, profile
 editing, and in-app notifications. Phase 2 backend device registration and
 Expo push dispatch are also available, including mobile permission handling,
 device-token registration, and notification-response routing.

@@ -74,6 +74,11 @@ tags:
 - assertVisible:
     id: "mobile.home.award-points"
 - tapOn:
+    id: "mobile.nav.activity"
+- extendedWaitUntil:
+    visible: "Recognized by"
+    timeout: 30000
+- tapOn:
     id: "mobile.nav.leaderboard"
 - extendedWaitUntil:
     visible: "Top Contributors"
