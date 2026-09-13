@@ -1,5 +1,4 @@
 import {
-  POINT_REACTION_LABELS,
   type ActivityItem,
   type PagedActivityFeed,
   type PointReactionDetailsResponse,
@@ -23,6 +22,9 @@ import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import {
+  activityCardPresentation,
+} from "@/lib/activity-card";
 import {
   nextReactionKey,
   optimisticReactionResponse,
@@ -282,47 +284,109 @@ function ActivityRow({
   onOpenPicker: () => void;
   onViewDetails: () => void;
 }) {
-  const isDeduction = item.type === "DEDUCTION" || item.delta < 0;
-  const displayDelta = Math.abs(item.delta);
+  const presentation = activityCardPresentation(item);
   return (
     <Pressable
       style={[styles.row, focused && styles.rowFocused]}
-      onLongPress={isDeduction ? undefined : onOpenPicker}
+      onLongPress={presentation.isDeduction ? undefined : onOpenPicker}
       delayLongPress={350}
     >
-      <View style={[styles.dot, { backgroundColor: item.targetHouseColor }]} />
-      <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>
-          <Text style={styles.name}>{item.actorName}</Text>
-          <Text>{isDeduction ? " deducted from " : " awarded "}</Text>
-          <Text style={styles.name}>{item.targetUserName}</Text>
-        </Text>
-        {item.reason ? (
-          <Text style={styles.reason} numberOfLines={3}>
-            {item.reason}
+      <View style={styles.primaryRow}>
+        <View
+          style={[styles.avatar, { backgroundColor: item.targetHouseColor }]}
+          accessibilityElementsHidden
+        >
+          <Text style={styles.avatarText}>{presentation.targetInitial}</Text>
+        </View>
+        <View style={styles.recipientText}>
+          <Text style={styles.recipientName}>{item.targetUserName}</Text>
+          <Text style={[styles.houseName, { color: item.targetHouseColor }]}>
+            {item.targetHouseName}
           </Text>
-        ) : null}
+          <Text
+            testID={`mobile.activity.attribution.${item.id}`}
+            style={styles.attribution}
+          >
+            {presentation.attributionLabel}{" "}
+            <Text style={styles.actorName}>{item.actorName}</Text>
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.pointsBadge,
+            presentation.isDeduction
+              ? styles.pointsBadgeDeduction
+              : styles.pointsBadgeAward,
+          ]}
+        >
+          <Text
+            style={[
+              styles.delta,
+              presentation.isDeduction ? styles.deltaNeg : styles.deltaPos,
+            ]}
+          >
+            {presentation.deltaLabel}
+          </Text>
+          <Text
+            style={[
+              styles.pointsLabel,
+              presentation.isDeduction ? styles.deltaNeg : styles.deltaPos,
+            ]}
+          >
+            points
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.contentSection}>
+        <Text style={styles.reason}>{item.reason}</Text>
         <View style={styles.metaRow}>
-          {item.trait ? (
+          {presentation.traitLabel ? (
             <View style={styles.traitChip}>
-              <Text style={styles.traitLabel}>{formatTrait(item.trait)}</Text>
+              <Text style={styles.traitLabel}>{presentation.traitLabel}</Text>
+            </View>
+          ) : null}
+          {item.season ? (
+            <View
+              style={[
+                styles.seasonChip,
+                item.season.isActive
+                  ? styles.activeSeasonChip
+                  : styles.historicalSeasonChip,
+              ]}
+            >
+              <Text
+                style={
+                  item.season.isActive
+                    ? styles.activeSeasonLabel
+                    : styles.historicalSeasonLabel
+                }
+                numberOfLines={1}
+              >
+                {item.season.name}
+              </Text>
+            </View>
+          ) : null}
+          {presentation.isDeduction ? (
+            <View style={styles.deductionChip}>
+              <Text style={styles.deductionLabel}>Deducted</Text>
             </View>
           ) : null}
           <Text style={styles.timestamp}>
-            {formatRelativeTime(item.createdAt)}
+            {presentation.relativeTime}
           </Text>
         </View>
-        {!isDeduction ? (
+        {!presentation.isDeduction ? (
           <View style={styles.reactionRow}>
-            {(item.reactions ?? []).map((reaction) => (
+            {presentation.topReactions.map((reaction) => (
               <Pressable
                 key={reaction.reactionKey}
                 style={[
                   styles.reactionChip,
-                  item.myReactionKey === reaction.reactionKey && styles.reactionChipMine,
+                  reaction.mine && styles.reactionChipMine,
                 ]}
                 onPress={onViewDetails}
-                accessibilityLabel={`View ${POINT_REACTION_LABELS[reaction.reactionKey]} reactions`}
+                accessibilityLabel={`View ${reaction.label} reactions`}
               >
                 <Text>{REACTION_EMOJI[reaction.reactionKey]} {reaction.count}</Text>
               </Pressable>
@@ -342,12 +406,6 @@ function ActivityRow({
           </View>
         ) : null}
       </View>
-      <Text
-        style={[styles.delta, isDeduction ? styles.deltaNeg : styles.deltaPos]}
-      >
-        {isDeduction ? "-" : "+"}
-        {displayDelta}
-      </Text>
     </Pressable>
   );
 }
@@ -374,35 +432,6 @@ function ErrorCard({
   );
 }
 
-function formatTrait(value: string): string {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
-    .join(" ");
-}
-
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) {
-    return "";
-  }
-  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks}w ago`;
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 const styles = StyleSheet.create({
   list: { flex: 1, backgroundColor: "#f8fafc" },
   container: { padding: 20, paddingBottom: 40 },
@@ -415,36 +444,58 @@ const styles = StyleSheet.create({
     padding: 48,
   },
   row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
     backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    overflow: "hidden",
   },
   rowFocused: {
     borderWidth: 2,
     borderColor: "#3b82f6",
   },
   separator: {
-    height: 1,
-    backgroundColor: "#e2e8f0",
-    marginHorizontal: 0,
+    height: 12,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 6,
+  primaryRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 14,
+    gap: 12,
   },
-  rowText: { flex: 1 },
-  rowTitle: { fontSize: 14, color: "#0f172a", lineHeight: 20 },
-  name: { fontWeight: "600" },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { color: "#ffffff", fontSize: 15, fontWeight: "700" },
+  recipientText: { flex: 1 },
+  recipientName: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  houseName: { fontSize: 12, marginTop: 2, fontWeight: "500" },
+  attribution: { fontSize: 12, color: "#64748b", marginTop: 8 },
+  actorName: { color: "#0f172a", fontWeight: "600" },
+  pointsBadge: {
+    minWidth: 68,
+    minHeight: 58,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  pointsBadgeAward: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
+  pointsBadgeDeduction: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
+  contentSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+    padding: 14,
+  },
   reason: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#475569",
-    marginTop: 4,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   metaRow: {
     flexDirection: "row",
@@ -454,7 +505,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   traitChip: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#e0e7ff",
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -462,8 +513,15 @@ const styles = StyleSheet.create({
   traitLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#334155",
+    color: "#3730a3",
   },
+  seasonChip: { maxWidth: 128, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
+  activeSeasonChip: { backgroundColor: "#ecfdf5" },
+  historicalSeasonChip: { backgroundColor: "#fffbeb" },
+  activeSeasonLabel: { fontSize: 11, fontWeight: "600", color: "#047857" },
+  historicalSeasonLabel: { fontSize: 11, fontWeight: "600", color: "#b45309" },
+  deductionChip: { backgroundColor: "#fee2e2", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
+  deductionLabel: { fontSize: 11, fontWeight: "700", color: "#b91c1c" },
   timestamp: { fontSize: 12, color: "#64748b" },
   reactionRow: {
     flexDirection: "row",
@@ -484,12 +542,11 @@ const styles = StyleSheet.create({
   reactButton: { paddingHorizontal: 8, paddingVertical: 5 },
   reactButtonText: { color: "#2563eb", fontSize: 12, fontWeight: "700" },
   delta: {
-    fontSize: 16,
+    fontSize: 21,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
-    minWidth: 44,
-    textAlign: "right",
   },
+  pointsLabel: { fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
   deltaPos: { color: "#15803d" },
   deltaNeg: { color: "#b91c1c" },
   empty: {

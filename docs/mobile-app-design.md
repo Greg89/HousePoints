@@ -128,10 +128,11 @@ Everything below is additive — no breaking changes to existing endpoints.
 ### 7.1 Device registration for push (new)
 
 **Status:** Implemented. The API registration endpoints and mobile lifecycle
-are in place. On a physical device the app requests notification permission,
-obtains an Expo token using `EXPO_PUBLIC_EAS_PROJECT_ID`, registers after
-sign-in and active-organization changes, and best-effort unregisters before
-sign-out clears Auth0 credentials.
+are in place. On a physical device the Profile screen explains notification
+benefits and explicitly requests permission when the user chooses to enable
+them. Devices with permission obtain an Expo token using
+`EXPO_PUBLIC_EAS_PROJECT_ID`, register after sign-in and active-organization
+changes, and best-effort unregister before sign-out clears Auth0 credentials.
 
 New Prisma model:
 
@@ -198,7 +199,7 @@ The web app currently performs several sequential calls during dashboard load. C
 - Sign in / sign out (Auth0 native).
 - Org picker (reads `/orgs` memberships list; persists selection in SecureStore).
 - Dashboard: house leaderboard + season context (`GET /dashboard`).
-- Members tab: per-member scores in current season (`GET /dashboard/leaderboard`).
+- Leaderboard tab: top 10 positive member scores across all houses for the current season, matching the web app.
 - Activity feed with pagination (`GET /activity`) and pull-to-refresh.
 - Award points flow (`POST /points/award`) with trait picker and confirmation toast.
 - In-app notifications list + mark-read (`GET /notifications`, `POST /notifications/mark-read`).
@@ -349,7 +350,7 @@ fixes can ship within their existing channel. Roll back interactively with
 
 **Phase 3 gate status:** Implemented. Because Expo only exposes public runtime
 configuration to the client, the concrete variable is
-`EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`. The Admin tab and route require both the
+`EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`. The Manage tab and route require both the
 flag and an active `ADMIN`/`OWNER` membership. The empty state links to the
 slug-scoped Manage workspace using `EXPO_PUBLIC_WEB_BASE_URL`.
 6. **Public release** on both stores after two consecutive clean staging E2E runs. Expo Updates (`production` channel) becomes the hotfix path.

@@ -22,7 +22,11 @@ export function DeviceRegistrationManager() {
     void (async () => {
       try {
         const accessToken = await getAccessToken();
-        await registerCurrentDevice({ accessToken, organizationSlug: activeOrgSlug });
+        await registerCurrentDevice({
+          accessToken,
+          organizationSlug: activeOrgSlug,
+          requestPermission: false,
+        });
       } catch (err) {
         attemptedKey.current = null;
         logger.warn("mobile.devices.register_failed", serializeError(err));

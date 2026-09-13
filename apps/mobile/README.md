@@ -10,8 +10,9 @@ Roadmap: Tier 6 in [`docs/roadmap.md`](../../docs/roadmap.md).
 ## Status
 
 Phase 1 is complete. The app includes Auth0 native sign-in, organization
-selection and zero-membership create/join onboarding, dashboard, leaderboard,
-paginated activity, award-points, profile
+selection and zero-membership create/join onboarding, dashboard, a global
+top-10 contributor leaderboard across houses, recipient-focused paginated
+activity aligned with the web experience, award-points, profile
 editing, and in-app notifications. Phase 2 backend device registration and
 Expo push dispatch are also available, including mobile permission handling,
 device-token registration, and notification-response routing.
@@ -53,7 +54,7 @@ Fill in:
   push token. Find it in the Expo project dashboard or `eas project:info`.
 - `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
-  mobile Admin tab during the Phase 3 rollout.
+  mobile Manage tab during the Phase 3 rollout.
 
 Android push builds also require `apps/mobile/google-services.json` for the
 Firebase project registered to `com.housepoints.app`. This file contains the
@@ -372,7 +373,7 @@ explains the 24-hour limits, requires a public reason and confirmation, and
 leaves eligibility and cooldown enforcement authoritative on the API.
 
 Admins and owners can generate 24-hour, 3-day, or 7-day single-use invite
-links from the Admin tab. The raw link is returned by the API only once and is
+links from the Manage tab. The raw link is returned by the API only once and is
 kept in screen state for the platform-native share sheet.
 
 The native Members section loads organization-scoped users and houses. Admins
@@ -380,7 +381,7 @@ and owners can assign houses; only owners can promote, demote, or remove
 non-owner members. Permission-sensitive changes use native confirmation
 prompts, and pull-to-refresh reconciles the server state.
 
-The Admin tab appears only when `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED=true` and
+The Manage tab appears only when `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED=true` and
 the active organization role is `ADMIN` or `OWNER`. The route repeats the same
 guard for direct navigation. Out-of-scope organization workflows open the
 active organization’s Manage workspace at `EXPO_PUBLIC_WEB_BASE_URL`.
@@ -406,9 +407,12 @@ route resolver.
 
 Push registration requires a physical device. After sign-in and organization
 selection, the app creates the Android notification channel when applicable,
-requests permission if it has not been decided, obtains the Expo push token,
-and registers it with the API. Organization switches update the registration;
-sign-out unregisters it before Auth0 credentials are cleared.
+and automatically registers devices that already have permission. First-time
+permission requests are initiated from the Notifications card in Profile so
+the prompt has context. If permission was denied, Profile links to system
+notification settings and registers the device after the app resumes with
+permission granted. Organization switches update the registration; sign-out
+unregisters it before Auth0 credentials are cleared.
 
 Android notification icons use `assets/notification-icon.png`, a dedicated
 96x96 white-on-transparent status-bar asset configured by the

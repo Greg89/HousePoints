@@ -42,7 +42,8 @@ async function preparePlatform(): Promise<void> {
 export async function registerCurrentDevice(input: {
   accessToken: string;
   organizationSlug: string;
-}): Promise<void> {
+  requestPermission?: boolean;
+}): Promise<"registered" | "permission_denied" | "unsupported_device"> {
   const result = await registerDeviceForPush(input, {
     isPhysicalDevice: Device.isDevice,
     platform: Platform.OS === "ios" ? "IOS" : Platform.OS === "android" ? "ANDROID" : null,
@@ -78,6 +79,11 @@ export async function registerCurrentDevice(input: {
   logger.info(`mobile.devices.${result.status}`, {
     organizationSlug: input.organizationSlug,
   });
+  return result.status;
+}
+
+export async function getNotificationPermissionStatus(): Promise<NotificationPermissionStatus> {
+  return permissionStatus((await Notifications.getPermissionsAsync()).status);
 }
 
 export async function unregisterCurrentDevice(
@@ -109,4 +115,3 @@ export async function unregisterCurrentDevice(
     logger.warn("mobile.devices.unregister_failed", serializeError(err));
   }
 }
-

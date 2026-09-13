@@ -5,6 +5,7 @@ export type NotificationPermissionStatus = "granted" | "denied" | "undetermined"
 export type DeviceRegistrationInput = {
   accessToken: string;
   organizationSlug: string;
+  requestPermission?: boolean;
 };
 
 export type DeviceRegistrationDependencies = {
@@ -41,7 +42,7 @@ export async function registerDeviceForPush(
 
   await deps.preparePlatform();
   let permissionStatus = await deps.getPermissionStatus();
-  if (permissionStatus === "undetermined") {
+  if (permissionStatus === "undetermined" && input.requestPermission) {
     permissionStatus = await deps.requestPermission();
   }
   if (permissionStatus !== "granted") {
@@ -76,4 +77,3 @@ export async function unregisterDeviceForPush(input: {
     await input.clearPushToken();
   }
 }
-

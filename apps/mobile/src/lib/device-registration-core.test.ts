@@ -55,9 +55,24 @@ describe("registerDeviceForPush", () => {
     await registerDeviceForPush({
       accessToken: "access-token",
       organizationSlug: "acme",
+      requestPermission: true,
     }, deps);
 
     expect(deps.requestPermission).toHaveBeenCalledOnce();
+  });
+
+  it("does not show a permission prompt during background registration", async () => {
+    const deps = dependencies({
+      getPermissionStatus: vi.fn().mockResolvedValue("undetermined"),
+    });
+
+    await expect(registerDeviceForPush({
+      accessToken: "access-token",
+      organizationSlug: "acme",
+    }, deps)).resolves.toEqual({ status: "permission_denied" });
+
+    expect(deps.requestPermission).not.toHaveBeenCalled();
+    expect(deps.getPushToken).not.toHaveBeenCalled();
   });
 
   it("does not obtain or register a token when permission is denied", async () => {
