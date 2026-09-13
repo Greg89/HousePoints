@@ -199,7 +199,7 @@ export default function AwardPointsScreen() {
 
               <Section title={`Points (${DELTA_MIN}\u2013${DELTA_MAX})`}>
                 <View style={styles.stepperRow}>
-                  <StepperButton label="\u2212" onPress={() => step(-1)} />
+                  <StepperButton label={"\u2212"} onPress={() => step(-1)} />
                   <Text style={styles.deltaValue}>{delta}</Text>
                   <StepperButton label="+" onPress={() => step(1)} />
                 </View>
