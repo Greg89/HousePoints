@@ -73,6 +73,11 @@ tags:
     timeout: 30000
 - assertVisible:
     id: "mobile.home.award-points"
+- tapOn:
+    id: "mobile.nav.leaderboard"
+- extendedWaitUntil:
+    visible: "Top Contributors"
+    timeout: 30000
 - assertVisible:
     id: "mobile.header.account"
 - tapOn:

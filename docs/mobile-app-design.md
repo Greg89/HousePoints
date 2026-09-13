@@ -198,7 +198,7 @@ The web app currently performs several sequential calls during dashboard load. C
 - Sign in / sign out (Auth0 native).
 - Org picker (reads `/orgs` memberships list; persists selection in SecureStore).
 - Dashboard: house leaderboard + season context (`GET /dashboard`).
-- Members tab: per-member scores in current season (`GET /dashboard/leaderboard`).
+- Leaderboard tab: top 10 positive member scores across all houses for the current season, matching the web app.
 - Activity feed with pagination (`GET /activity`) and pull-to-refresh.
 - Award points flow (`POST /points/award`) with trait picker and confirmation toast.
 - In-app notifications list + mark-read (`GET /notifications`, `POST /notifications/mark-read`).

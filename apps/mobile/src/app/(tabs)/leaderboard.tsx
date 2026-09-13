@@ -1,5 +1,6 @@
 import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
 import { useQuery } from "@tanstack/react-query";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,16 +17,13 @@ import { useActiveOrg } from "@/context/org-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 import { mobileQueryKeys } from "@/lib/mobile-query-keys";
+import {
+  contributorInitials,
+  topContributors,
+  type TopContributor,
+} from "@/lib/leaderboard";
 
 const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
-
-type HouseRanking = DashboardSummary["houseMemberRankings"][number];
-type Member = HouseRanking["members"][number];
-
-type HouseSection = {
-  house: LeaderboardEntry;
-  members: Member[];
-};
 
 export default function LeaderboardScreen() {
   const { getAccessToken } = useAppAuth();
@@ -68,23 +66,13 @@ export default function LeaderboardScreen() {
     }
   }, [summaryQuery, housesQuery]);
 
-  const sections = useMemo<HouseSection[]>(() => {
+  const contributors = useMemo<TopContributor[]>(() => {
     const summary: DashboardSummary | undefined = summaryQuery.data;
     const houses: LeaderboardEntry[] | undefined = housesQuery.data;
     if (!summary || !houses) {
       return [];
     }
-    const rankingsByHouseId = new Map<string, Member[]>(
-      summary.houseMemberRankings.map((entry) => [entry.houseId, entry.members]),
-    );
-    return [...houses]
-      .sort((a, b) => b.score - a.score)
-      .map((house) => ({
-        house,
-        members: [...(rankingsByHouseId.get(house.id) ?? [])].sort(
-          (a, b) => b.points - a.points,
-        ),
-      }));
+    return topContributors(summary.houseMemberRankings, houses);
   }, [housesQuery.data, summaryQuery.data]);
 
   const initialLoading =
@@ -121,53 +109,70 @@ export default function LeaderboardScreen() {
         </View>
       ) : failed ? (
         <ErrorCard error={failed} onRetry={onRefresh} />
-      ) : sections.length === 0 ? (
-        <Text style={styles.empty}>
-          No houses yet. Ask an admin to set some up.
-        </Text>
+      ) : contributors.length === 0 ? (
+        <Text style={styles.empty}>No points awarded yet — be the first!</Text>
       ) : (
-        sections.map((section) => (
-          <HouseSectionView key={section.house.id} section={section} />
-        ))
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialCommunityIcons name="trophy" size={22} color="#f59e0b" />
+            <Text style={styles.cardTitle}>Top Contributors</Text>
+          </View>
+          {contributors.map((contributor, index) => (
+            <ContributorRow
+              key={contributor.memberId}
+              contributor={contributor}
+              bordered={index > 0}
+            />
+          ))}
+        </View>
       )}
     </ScrollView>
   );
 }
 
-function HouseSectionView({ section }: { section: HouseSection }) {
-  const { house, members } = section;
+function ContributorRow({
+  contributor,
+  bordered,
+}: {
+  contributor: TopContributor;
+  bordered: boolean;
+}) {
   return (
-    <View style={styles.section}>
-      <View style={styles.houseHeader}>
-        <View style={[styles.dot, { backgroundColor: house.color }]} />
-        <Text style={styles.houseName}>{house.name}</Text>
-        <Text style={styles.houseScore}>{house.score}</Text>
+    <View style={[styles.memberRow, bordered && styles.memberRowBorder]}>
+      <View style={styles.rank}>
+        <Rank rank={contributor.rank} />
       </View>
-      {members.length === 0 ? (
-        <Text style={styles.emptyInline}>No members yet.</Text>
-      ) : (
-        <View style={styles.card}>
-          {members.map((member, index) => (
-            <View
-              key={member.memberId}
-              style={[styles.memberRow, index > 0 && styles.memberRowBorder]}
-            >
-              <Text style={styles.rank}>{index + 1}</Text>
-              <View style={styles.memberText}>
-                <Text style={styles.memberName}>{member.displayName}</Text>
-                {member.role !== "MEMBER" ? (
-                  <Text style={styles.memberRole}>
-                    {roleLabel(member.role)}
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.memberPoints}>{member.points}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+      <View style={[styles.avatar, { backgroundColor: contributor.houseColor }]}>
+        <Text style={styles.avatarText}>
+          {contributorInitials(contributor.displayName)}
+        </Text>
+      </View>
+      <View style={styles.memberText}>
+        <Text style={styles.memberName}>{contributor.displayName}</Text>
+        <Text style={[styles.houseLabel, { color: contributor.houseColor }]}>
+          {contributor.houseName}
+        </Text>
+      </View>
+      <View style={[styles.pointsBadge, { backgroundColor: `${contributor.houseColor}20` }]}>
+        <Text style={[styles.memberPoints, { color: contributor.houseColor }]}>
+          {contributor.points.toLocaleString()}
+        </Text>
+      </View>
     </View>
   );
+}
+
+function Rank({ rank }: { rank: number }) {
+  if (rank === 1) {
+    return <MaterialCommunityIcons name="crown" size={22} color="#eab308" />;
+  }
+  if (rank === 2) {
+    return <MaterialCommunityIcons name="trophy" size={20} color="#94a3b8" />;
+  }
+  if (rank === 3) {
+    return <MaterialCommunityIcons name="medal" size={20} color="#ea580c" />;
+  }
+  return <Text style={styles.rankText}>{rank}</Text>;
 }
 
 function ErrorCard({
@@ -192,17 +197,6 @@ function ErrorCard({
   );
 }
 
-function roleLabel(role: Member["role"]): string {
-  switch (role) {
-    case "OWNER":
-      return "Owner";
-    case "ADMIN":
-      return "Admin";
-    default:
-      return "Member";
-  }
-}
-
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: "#f8fafc" },
   container: { padding: 20, paddingBottom: 40, gap: 20 },
@@ -214,20 +208,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 48,
   },
-  section: { gap: 10 },
-  houseHeader: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
   },
-  dot: { width: 12, height: 12, borderRadius: 6 },
-  houseName: { flex: 1, fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  houseScore: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0f172a",
-    fontVariant: ["tabular-nums"],
-  },
+  cardTitle: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
@@ -246,22 +235,25 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
   },
-  rank: {
-    width: 26,
+  rank: { width: 26, alignItems: "center", justifyContent: "center" },
+  rankText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#64748b",
     fontVariant: ["tabular-nums"],
   },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { color: "#ffffff", fontSize: 13, fontWeight: "700" },
   memberText: { flex: 1 },
   memberName: { fontSize: 15, fontWeight: "500", color: "#0f172a" },
-  memberRole: {
-    fontSize: 11,
-    color: "#64748b",
-    marginTop: 2,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
+  houseLabel: { fontSize: 12, marginTop: 2 },
+  pointsBadge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
   memberPoints: {
     fontSize: 16,
     fontWeight: "600",
@@ -277,12 +269,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
-  },
-  emptyInline: {
-    color: "#64748b",
-    fontSize: 13,
-    fontStyle: "italic",
-    paddingHorizontal: 4,
   },
   errorCard: {
     backgroundColor: "#fef2f2",

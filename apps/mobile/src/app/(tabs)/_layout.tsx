@@ -40,6 +40,7 @@ export default function TabsLayout() {
           options={{
             title: destination.title,
             href: destination.visible ? undefined : null,
+            tabBarButtonTestID: `mobile.nav.${destination.route}`,
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons
                 name={focused ? destination.activeIcon : destination.icon}
