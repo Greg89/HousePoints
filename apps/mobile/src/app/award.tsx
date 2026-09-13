@@ -49,6 +49,7 @@ export default function AwardPointsScreen() {
   const [delta, setDelta] = useState(DELTA_DEFAULT);
   const [reason, setReason] = useState("");
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [traitPickerOpen, setTraitPickerOpen] = useState(false);
 
   const membersQuery = useQuery({
     queryKey: mobileQueryKeys.members(activeOrgSlug),
@@ -172,29 +173,10 @@ export default function AwardPointsScreen() {
           {selectedMember ? (
             <>
               <Section title="Trait">
-                <View style={styles.traitGrid}>
-                  {TRAITS.map((trait) => {
-                    const active = trait === selectedTrait;
-                    return (
-                      <Pressable
-                        key={trait}
-                        testID={`mobile.award.trait.${trait}`}
-                        accessibilityLabel={TRAIT_LABELS[trait]}
-                        style={[styles.chip, active && styles.chipActive]}
-                        onPress={() => setSelectedTrait(trait)}
-                      >
-                        <Text
-                          style={[
-                            styles.chipLabel,
-                            active && styles.chipLabelActive,
-                          ]}
-                        >
-                          {TRAIT_LABELS[trait]}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <TraitSelect
+                  selectedTrait={selectedTrait}
+                  onPress={() => setTraitPickerOpen(true)}
+                />
               </Section>
 
               <Section title={`Points (${DELTA_MIN}\u2013${DELTA_MAX})`}>
@@ -277,7 +259,116 @@ export default function AwardPointsScreen() {
           setMemberPickerOpen(false);
         }}
       />
+      <TraitSelectModal
+        visible={traitPickerOpen}
+        selectedTrait={selectedTrait}
+        onClose={() => setTraitPickerOpen(false)}
+        onSelect={(trait) => {
+          setSelectedTrait(trait);
+          setTraitPickerOpen(false);
+        }}
+      />
     </SafeAreaView>
+  );
+}
+
+function TraitSelect({
+  selectedTrait,
+  onPress,
+}: {
+  selectedTrait: Trait | null;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      testID="mobile.award.trait-select"
+      accessibilityRole="button"
+      accessibilityLabel={
+        selectedTrait
+          ? `Selected trait: ${TRAIT_LABELS[selectedTrait]}`
+          : "Select a trait"
+      }
+      accessibilityHint="Opens the list of traits"
+      style={styles.selectField}
+      onPress={onPress}
+    >
+      <Text
+        style={selectedTrait ? styles.selectedName : styles.memberPlaceholder}
+      >
+        {selectedTrait ? TRAIT_LABELS[selectedTrait] : "Select a trait..."}
+      </Text>
+      <Text style={styles.caret} accessibilityElementsHidden>
+        ▾
+      </Text>
+    </Pressable>
+  );
+}
+
+function TraitSelectModal({
+  visible,
+  selectedTrait,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  selectedTrait: Trait | null;
+  onClose: () => void;
+  onSelect: (trait: Trait) => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Close trait list"
+          onPress={onClose}
+        />
+        <View style={styles.memberModal}>
+          <View style={styles.memberModalHeader}>
+            <View>
+              <Text style={styles.memberModalTitle}>Select trait</Text>
+              <Text style={styles.memberModalDescription}>
+                Choose what this award recognizes
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close trait list"
+              onPress={onClose}
+              style={styles.modalClose}
+            >
+              <Text style={styles.modalCloseLabel}>×</Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={TRAITS}
+            keyExtractor={(trait) => trait}
+            ItemSeparatorComponent={MemberSeparator}
+            renderItem={({ item: trait }) => {
+              const selected = trait === selectedTrait;
+              return (
+                <Pressable
+                  testID={`mobile.award.trait.${trait}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={TRAIT_LABELS[trait]}
+                  accessibilityState={{ selected }}
+                  style={[styles.traitRow, selected && styles.memberRowSelected]}
+                  onPress={() => onSelect(trait)}
+                >
+                  <Text style={styles.traitName}>{TRAIT_LABELS[trait]}</Text>
+                  {selected ? <Text style={styles.selectedCheck}>✓</Text> : null}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -471,6 +562,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  selectField: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   memberSelectText: { flex: 1 },
   memberPlaceholder: { fontSize: 15, color: "#64748b" },
   caret: { fontSize: 20, color: "#64748b" },
@@ -525,19 +629,15 @@ const styles = StyleSheet.create({
   selectedName: { fontSize: 16, fontWeight: "600", color: "#0f172a" },
   selectedMeta: { fontSize: 13, color: "#64748b", marginTop: 2 },
   selectedCheck: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
-  traitGrid: {
+  traitRow: {
+    minHeight: 52,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 18,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    backgroundColor: "#ffffff",
-  },
+  traitName: { flex: 1, fontSize: 15, color: "#0f172a", fontWeight: "500" },
   chipActive: {
     backgroundColor: "#0f172a",
     borderColor: "#0f172a",

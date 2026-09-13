@@ -45,6 +45,14 @@ tags:
 - tapOn:
     id: "mobile.award.member-select"
 - tapOn: ${MOBILE_E2E_TARGET_MEMBER}
+- assertVisible:
+    id: "mobile.award.trait-select"
+- tapOn:
+    id: "mobile.award.trait-select"
+- extendedWaitUntil:
+    visible:
+      id: "mobile.award.trait.*"
+    timeout: 10000
 - tapOn:
     id: "mobile.award.trait.*"
     index: 0
