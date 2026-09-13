@@ -76,7 +76,8 @@ tags:
 - tapOn:
     id: "mobile.nav.activity"
 - extendedWaitUntil:
-    visible: "Recognized by"
+    visible:
+      id: "mobile.activity.attribution.*"
     timeout: 30000
 - tapOn:
     id: "mobile.nav.leaderboard"

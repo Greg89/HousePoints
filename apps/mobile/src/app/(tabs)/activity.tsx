@@ -303,7 +303,10 @@ function ActivityRow({
           <Text style={[styles.houseName, { color: item.targetHouseColor }]}>
             {item.targetHouseName}
           </Text>
-          <Text style={styles.attribution}>
+          <Text
+            testID={`mobile.activity.attribution.${item.id}`}
+            style={styles.attribution}
+          >
             {presentation.attributionLabel}{" "}
             <Text style={styles.actorName}>{item.actorName}</Text>
           </Text>
