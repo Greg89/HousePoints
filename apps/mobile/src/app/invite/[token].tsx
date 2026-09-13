@@ -9,7 +9,7 @@ import { ApiResponseError, callApi } from "@/lib/api-client";
 
 export default function InviteDeepLink() {
   const { token } = useLocalSearchParams<{ token: string }>();
-  const { user, getAccessToken, refreshBootstrap } = useAppAuth();
+  const { user, getAccessToken, synchronizeUser } = useAppAuth();
   const { selectOrg } = useActiveOrg();
 
   const joinMutation = useMutation({
@@ -36,7 +36,7 @@ export default function InviteDeepLink() {
         ) ??
         joinedUser.organizationContexts.find((membership) => membership.isCurrent) ??
         joinedUser.organizationContexts.at(-1);
-      await refreshBootstrap();
+      synchronizeUser(joinedUser);
       if (joinedMembership) {
         await selectOrg(joinedMembership.organizationSlug);
       }

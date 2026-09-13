@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { callApi } from "@/lib/api-client";
+import { mobileQueryKeys } from "@/lib/mobile-query-keys";
 
 /**
  * Compact "Alerts" header button used on the Home tab. Fetches the notification
@@ -18,7 +19,7 @@ export function AlertsHeaderButton() {
   const { activeOrgSlug } = useActiveOrg();
 
   const query = useQuery({
-    queryKey: ["notifications", "badge", activeOrgSlug],
+    queryKey: mobileQueryKeys.notificationBadge(activeOrgSlug),
     enabled: activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();

@@ -28,6 +28,8 @@ import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { eligibleAwardMembers } from "@/lib/award-members";
 import { logger, serializeError } from "@/lib/logger";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 
 const DELTA_MIN = 1;
 const DELTA_MAX = 100;
@@ -49,7 +51,8 @@ export default function AwardPointsScreen() {
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
 
   const membersQuery = useQuery({
-    queryKey: ["members", activeOrgSlug],
+    queryKey: mobileQueryKeys.members(activeOrgSlug),
+    staleTime: MOBILE_QUERY_STALE_MS.members,
     enabled: activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
@@ -107,9 +110,10 @@ export default function AwardPointsScreen() {
         delta,
         trait: selectedTrait,
       });
-      void queryClient.invalidateQueries({ queryKey: ["activity"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["houses"] });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.pointsChanged(activeOrgSlug),
+      );
       if (router.canGoBack()) {
         router.back();
       } else {
@@ -195,7 +199,7 @@ export default function AwardPointsScreen() {
 
               <Section title={`Points (${DELTA_MIN}\u2013${DELTA_MAX})`}>
                 <View style={styles.stepperRow}>
-                  <StepperButton label="\u2212" onPress={() => step(-1)} />
+                  <StepperButton label={"\u2212"} onPress={() => step(-1)} />
                   <Text style={styles.deltaValue}>{delta}</Text>
                   <StepperButton label="+" onPress={() => step(1)} />
                 </View>

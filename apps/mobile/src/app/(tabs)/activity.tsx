@@ -30,8 +30,11 @@ import {
 } from "@/lib/activity-reactions";
 import { ReactionPickerModal } from "@/components/ReactionPickerModal";
 import { ReactionDetailsModal } from "@/components/ReactionDetailsModal";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 
 const PAGE_LIMIT = 20;
+const FOCUS_QUERY_KEYS = [["activity"]] as const;
 
 export default function ActivityScreen() {
   const { pointId } = useLocalSearchParams<{ pointId?: string }>();
@@ -39,6 +42,7 @@ export default function ActivityScreen() {
   const { activeOrgSlug } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
   const listRef = useRef<FlatList<ActivityItem>>(null);
   const [pickerItem, setPickerItem] = useState<ActivityItem | null>(null);
   const [detailsPointId, setDetailsPointId] = useState<string | null>(null);
@@ -47,7 +51,7 @@ export default function ActivityScreen() {
   >({});
 
   const feedQuery = useInfiniteQuery({
-    queryKey: ["activity", "recent", activeOrgSlug],
+    queryKey: mobileQueryKeys.activityRecent(activeOrgSlug),
     enabled: activeOrgSlug !== null,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) => {
@@ -131,9 +135,10 @@ export default function ActivityScreen() {
       });
     },
     onSettled: async (_data, _error, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["activity", "recent", activeOrgSlug],
-      });
+      await invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.reactionChanged(activeOrgSlug),
+      );
       setOptimisticReactions((current) => {
         const next = { ...current };
         delete next[variables.item.id];

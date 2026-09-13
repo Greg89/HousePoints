@@ -4,6 +4,7 @@ import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { registerCurrentDevice } from "@/lib/device-registration";
 import { logger, serializeError } from "@/lib/logger";
+import { updateRegistrationAttempt } from "./device-registration-manager-core";
 
 export function DeviceRegistrationManager() {
   const { status, user, getAccessToken } = useAppAuth();
@@ -11,11 +12,12 @@ export function DeviceRegistrationManager() {
   const attemptedKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (status !== "ready" || !user || !activeOrgSlug) return;
-
-    const registrationKey = `${user.id}:${activeOrgSlug}`;
-    if (attemptedKey.current === registrationKey) return;
-    attemptedKey.current = registrationKey;
+    const registrationKey = status === "ready" && user && activeOrgSlug
+      ? `${user.id}:${activeOrgSlug}`
+      : null;
+    const attempt = updateRegistrationAttempt(attemptedKey.current, registrationKey);
+    attemptedKey.current = attempt.attemptedKey;
+    if (!attempt.shouldRegister || !activeOrgSlug) return;
 
     void (async () => {
       try {
@@ -30,4 +32,3 @@ export function DeviceRegistrationManager() {
 
   return null;
 }
-

@@ -35,6 +35,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.housepoints.app",
+    googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#020d24",
@@ -56,7 +57,14 @@ const config: ExpoConfig = {
       },
     ],
     "expo-secure-store",
-    "expo-notifications",
+    [
+      "expo-notifications",
+      {
+        icon: "./assets/notification-icon.png",
+        color: "#7C3AED",
+        defaultChannel: "default",
+      },
+    ],
     [
       "react-native-auth0",
       {
@@ -68,7 +76,6 @@ const config: ExpoConfig = {
     ],
   ],
   experiments: {
-    autolinkingModuleResolution: true,
     typedRoutes: true,
   },
 };

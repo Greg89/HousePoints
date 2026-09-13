@@ -254,6 +254,12 @@ Deferred (web-only for now): season creation/transition, org archive, release an
 
 ## 11. State, caching, and error handling
 
+The production refresh behavior and its incremental delivery plan are defined
+in [mobile-data-refresh-policy.md](./mobile-data-refresh-policy.md). The target
+is fresh-on-use synchronization through app foreground, network reconnect, and
+screen-focus triggers; continuous polling and real-time transport are not part
+of the launch policy.
+
 - TanStack Query keys are namespaced by `activeOrgSlug` so switching org clears the cache surface.
 - `queryFn` uses the mobile `apiClient.request` wrapper, which:
   - Attaches auth + org + request-id headers.

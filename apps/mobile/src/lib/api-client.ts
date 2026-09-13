@@ -19,6 +19,7 @@ import {
 import type { z } from "zod";
 import { env } from "./env";
 import { generateRequestId } from "./request-id";
+import { logger, serializeError } from "./logger";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -55,6 +56,7 @@ async function postJson(
 ): Promise<unknown> {
   const requestId = options.requestId ?? generateRequestId();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const startedAt = Date.now();
 
   const headers = new Headers({
     "content-type": "application/json",
@@ -79,9 +81,24 @@ async function postJson(
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
     });
+  } catch (error) {
+    logger.debug("mobile.api.request_failed", {
+      endpoint: path,
+      requestId,
+      durationMs: Date.now() - startedAt,
+      ...serializeError(error),
+    });
+    throw error;
   } finally {
     clearTimeout(timeoutHandle);
   }
+
+  logger.debug("mobile.api.request_completed", {
+    endpoint: path,
+    requestId,
+    statusCode: response.status,
+    durationMs: Date.now() - startedAt,
+  });
 
   if (!response.ok) {
     let code = "API_REQUEST_FAILED";
@@ -134,6 +151,7 @@ export async function apiGet(
 ): Promise<unknown> {
   const requestId = options.requestId ?? generateRequestId();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const startedAt = Date.now();
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -144,9 +162,24 @@ export async function apiGet(
       headers: { "x-request-id": requestId },
       signal: controller.signal,
     });
+  } catch (error) {
+    logger.debug("mobile.api.request_failed", {
+      endpoint: path,
+      requestId,
+      durationMs: Date.now() - startedAt,
+      ...serializeError(error),
+    });
+    throw error;
   } finally {
     clearTimeout(timeoutHandle);
   }
+
+  logger.debug("mobile.api.request_completed", {
+    endpoint: path,
+    requestId,
+    statusCode: response.status,
+    durationMs: Date.now() - startedAt,
+  });
 
   if (!response.ok) {
     throw new ApiResponseError(

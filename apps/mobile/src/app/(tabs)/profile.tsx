@@ -18,6 +18,7 @@ import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { logger, serializeError } from "@/lib/logger";
+import { invalidateMobileQueries, mobileMutationInvalidations } from "@/lib/mobile-query-keys";
 
 const DISPLAY_NAME_MIN = 1;
 const DISPLAY_NAME_MAX = 120;
@@ -51,7 +52,10 @@ export default function ProfileScreen() {
     onSuccess: async () => {
       showToast({ message: "Display name updated", variant: "success" });
       logger.info("mobile.profile.name_updated");
-      void queryClient.invalidateQueries({ queryKey: ["members"] });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.profileChanged(activeOrgSlug),
+      );
       setEditing(false);
       try {
         await refreshBootstrap();

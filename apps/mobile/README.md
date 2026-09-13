@@ -10,10 +10,11 @@ Roadmap: Tier 6 in [`docs/roadmap.md`](../../docs/roadmap.md).
 ## Status
 
 Phase 1 is complete. The app includes Auth0 native sign-in, organization
-selection, dashboard, leaderboard, paginated activity, award-points, profile
+selection and zero-membership create/join onboarding, dashboard, leaderboard,
+paginated activity, award-points, profile
 editing, and in-app notifications. Phase 2 backend device registration and
-Expo push dispatch are also available; mobile-side permission and device-token
-registration is the next roadmap slice (task 6.5a).
+Expo push dispatch are also available, including mobile permission handling,
+device-token registration, and notification-response routing.
 
 ## Prerequisites
 
@@ -53,6 +54,13 @@ Fill in:
 - `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
   mobile Admin tab during the Phase 3 rollout.
+
+Android push builds also require `apps/mobile/google-services.json` for the
+Firebase project registered to `com.housepoints.app`. This file contains the
+public Android Firebase client configuration and is committed with the app.
+The separate FCM V1 service-account JSON is private: upload it to EAS
+credentials, never copy it into this repository, and remove the downloaded
+copy after upload.
 
 ### Use an EAS environment locally
 
@@ -132,6 +140,9 @@ cannot run this application because Auth0 and notifications use native modules.
 npm.cmd run dev:mobile
 ```
 
+This command works from either the repository root or `apps/mobile`. From
+`apps/mobile`, `npm.cmd run start` is the equivalent workspace-native command.
+
 3. In another PowerShell window, verify the emulator connection and forward
    Metro's port:
 
@@ -148,6 +159,27 @@ adb reverse tcp:8081 tcp:8081
 npm.cmd run prebuild -w @housepoints/mobile -- --platform android
 npm.cmd run android -w @housepoints/mobile
 ```
+
+The app automatically refetches active stale data when it returns to the
+foreground or regains network connectivity. Cached data stays visible during
+that background refresh. Returning to Dashboard, Leaderboard, Activity,
+Notifications, or Admin also refreshes that screen's stale active data; pull
+to refresh still forces an immediate request.
+
+Successful mutations use exact organization-scoped query keys. Point, member,
+profile, reaction, and notification changes invalidate every mobile view that
+embeds the changed data without marking another organization's cache stale.
+
+After at least 60 seconds in the background, a signed-in app also refreshes its
+user, organization memberships, roles, and house assignment. Overlapping
+bootstrap attempts share one request. If that refresh fails, the established
+session and cached data remain available; removed organization access routes
+to the remaining organization or workspace picker.
+
+Collaborative views use a 30-second freshness window; member and admin
+reference data use 60 seconds. Polling is disabled. Debug builds log query
+lifecycle events and actual API endpoint/request-id/status/duration metadata,
+without payloads or identity values, for request-volume checks.
 
 When using a physical Android device, enable USB debugging, confirm it appears
 in `adb devices`, and keep the port reverse. Push registration requires a
@@ -217,8 +249,9 @@ The configured API must be reachable from the simulator/device. When using a
 local API, run it in another terminal with `npm run dev:api`; an `.env` pulled
 from the EAS `preview` environment uses the deployed beta API instead.
 
-Once the app boots, sign in through Auth0 Universal Login and select an
-organization. A 401 during bootstrap usually means the API audience configured
+Once the app boots, sign in through Auth0 Universal Login. Select an existing
+organization, create one with its first house, or paste an invite link/token to
+join one. A 401 during bootstrap usually means the API audience configured
 for the native Auth0 application does not match `AUTH0_AUDIENCE`.
 
 ## Verify (dev laptop, no device)
@@ -320,10 +353,11 @@ First release rehearsal:
 
 `apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
 readiness, and a point award using stable native test IDs. The
-`Mobile Staging E2E` workflow runs on pushes to `develop` or manually, uploads
-a configured staging APK to Maestro Cloud, and writes the cloud result to the
-workflow summary. See `docs/staging-e2e-test-data-contract.md` for required
-staging configuration.
+`Mobile Staging E2E` workflow runs on pushes to `develop` or manually. It
+downloads a configured staging APK, starts a GitHub-hosted Android emulator,
+and runs the free Maestro CLI without a Maestro Cloud subscription. Failure
+artifacts are retained for seven days. See
+`docs/staging-e2e-test-data-contract.md` for required staging configuration.
 
 The main GitHub Actions CI now publishes a dedicated
 `Mobile Lint, Type-check & Test` result on pushes and pull requests. It uses
@@ -375,3 +409,8 @@ selection, the app creates the Android notification channel when applicable,
 requests permission if it has not been decided, obtains the Expo push token,
 and registers it with the API. Organization switches update the registration;
 sign-out unregisters it before Auth0 credentials are cleared.
+
+Android notification icons use `assets/notification-icon.png`, a dedicated
+96x96 white-on-transparent status-bar asset configured by the
+`expo-notifications` plugin. Changes to this icon or its tint require a new
+native Android build; an EAS Update alone cannot change them.

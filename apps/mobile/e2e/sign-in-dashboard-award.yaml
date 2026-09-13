@@ -14,13 +14,19 @@ tags:
 - tapOn:
     id: "mobile.login.sign-in"
 
+- tapOn:
+    text: "Use without an account"
+    optional: true
+    retryTapIfNoChange: true
+
 - extendedWaitUntil:
-    visible: "Email address"
+    visible: "Email address.*"
     timeout: 30000
-- tapOn: "Email address"
+- tapOn: "Email address.*"
 - inputText: ${MOBILE_E2E_USER_EMAIL}
-- tapOn: "Password"
+- tapOn: "Password.*"
 - inputText: ${MOBILE_E2E_USER_PASSWORD}
+- hideKeyboard
 - tapOn: "Continue"
 
 - extendedWaitUntil:
@@ -40,10 +46,16 @@ tags:
     id: "mobile.award.member-select"
 - tapOn: ${MOBILE_E2E_TARGET_MEMBER}
 - tapOn:
-    id: "mobile.award.trait.TEAMWORK"
+    id: "mobile.award.trait.*"
+    index: 0
 - tapOn:
     id: "mobile.award.reason"
 - inputText: "Maestro staging award"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "mobile.award.submit"
+    timeout: 10000
 - tapOn:
     id: "mobile.award.submit"
 

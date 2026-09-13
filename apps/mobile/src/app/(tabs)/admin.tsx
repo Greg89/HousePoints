@@ -37,6 +37,9 @@ import {
   filterAdminUsers,
 } from "@/lib/member-management";
 import { buildWebAdminUrl, canAccessMobileAdmin } from "@/lib/mobile-admin";
+import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 
 const OUT_OF_SCOPE_FLOWS = [
   "Season creation and transitions",
@@ -44,6 +47,7 @@ const OUT_OF_SCOPE_FLOWS = [
   "Audit and comparison reports",
   "Release announcements",
 ] as const;
+const FOCUS_QUERY_KEYS = [["admin-context"]] as const;
 const INVITE_DURATIONS = [
   { hours: 24, label: "24 hours" },
   { hours: 72, label: "3 days" },
@@ -55,6 +59,7 @@ export default function AdminScreen() {
   const { activeOrgSlug, activeMembership } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
   const [search, setSearch] = useState("");
   const [inviteDuration, setInviteDuration] = useState(72);
   const [invite, setInvite] = useState<InviteLink | null>(null);
@@ -66,10 +71,11 @@ export default function AdminScreen() {
   );
   const actorRole =
     activeMembership?.role === "OWNER" ? "OWNER" : "ADMIN";
-  const queryKey = ["admin-context", activeOrgSlug] as const;
+  const queryKey = mobileQueryKeys.adminContext(activeOrgSlug);
 
   const contextQuery = useQuery({
     queryKey,
+    staleTime: MOBILE_QUERY_STALE_MS.adminContext,
     enabled: allowed && activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
@@ -110,6 +116,10 @@ export default function AdminScreen() {
         targetUserId: updated.id,
         targetHouseId: updated.houseId,
       });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.memberChanged(activeOrgSlug),
+      );
     },
     onError: (error) => showMutationError(error, showToast),
   });
@@ -136,6 +146,10 @@ export default function AdminScreen() {
         targetUserId: updated.id,
         role: updated.role,
       });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.memberChanged(activeOrgSlug),
+      );
     },
     onError: (error) => showMutationError(error, showToast),
   });
@@ -164,6 +178,10 @@ export default function AdminScreen() {
       );
       showToast({ message: `${removed.displayName} removed`, variant: "success" });
       logger.info("mobile.admin.member_removed", { targetUserId: removed.id });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.memberChanged(activeOrgSlug),
+      );
     },
     onError: (error) => showMutationError(error, showToast),
   });

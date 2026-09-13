@@ -17,7 +17,7 @@ export default function TabsLayout() {
   if (status === "signedOut" || status === "error") {
     return <Redirect href="/login" />;
   }
-  if (needsPicker || activeOrgSlug === null) {
+  if (needsPicker || activeOrgSlug === null || activeMembership === null) {
     return <Redirect href="/pick-org" />;
   }
 

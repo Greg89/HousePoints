@@ -10,7 +10,10 @@ import { OrgProvider } from "@/context/org-provider";
 import { ToastProvider } from "@/context/toast-provider";
 import { DeviceRegistrationManager } from "@/components/DeviceRegistrationManager";
 import { NotificationResponseManager } from "@/components/NotificationResponseManager";
+import { QueryLifecycleManager } from "@/components/QueryLifecycleManager";
+import { AuthReconciliationManager } from "@/components/AuthReconciliationManager";
 import { auth0Config } from "@/lib/auth";
+import { mobileQueryDefaultOptions } from "@/lib/query-policy";
 
 export default function RootLayout() {
   const { domain, clientId } = useMemo(() => auth0Config(), []);
@@ -18,11 +21,7 @@ export default function RootLayout() {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: {
-            retry: 1,
-            refetchOnWindowFocus: false,
-            staleTime: 30_000,
-          },
+          queries: mobileQueryDefaultOptions(),
         },
       }),
     [],
@@ -32,7 +31,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <Auth0Provider domain={domain} clientId={clientId}>
         <QueryClientProvider client={queryClient}>
+          <QueryLifecycleManager />
           <AuthProvider>
+            <AuthReconciliationManager />
             <OrgProvider>
               <DeviceRegistrationManager />
               <NotificationResponseManager />

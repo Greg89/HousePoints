@@ -23,6 +23,8 @@ import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { logger, serializeError } from "@/lib/logger";
+import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 import { canAccessMobileAdmin } from "@/lib/mobile-admin";
 import {
   DEDUCTION_AMOUNT,
@@ -45,7 +47,8 @@ export default function DeductPointsScreen() {
     canAccessMobileAdmin(env.mobileAdminEnabled, activeMembership?.role);
 
   const membersQuery = useQuery({
-    queryKey: ["members", activeOrgSlug],
+    queryKey: mobileQueryKeys.members(activeOrgSlug),
+    staleTime: MOBILE_QUERY_STALE_MS.members,
     enabled: allowed && activeOrgSlug !== null,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
@@ -95,10 +98,10 @@ export default function DeductPointsScreen() {
         transactionId: transaction.id,
         targetUserId: selectedMemberId,
       });
-      void queryClient.invalidateQueries({ queryKey: ["activity"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      void queryClient.invalidateQueries({ queryKey: ["houses"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-context"] });
+      void invalidateMobileQueries(
+        queryClient,
+        mobileMutationInvalidations.pointsChanged(activeOrgSlug),
+      );
       if (router.canGoBack()) {
         router.back();
       } else {
@@ -368,4 +371,3 @@ const styles = StyleSheet.create({
   submitDisabled: { backgroundColor: "#94a3b8" },
   submitText: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
 });
-

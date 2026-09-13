@@ -74,6 +74,12 @@ aligned with that branding.
 - [ ] Create an Expo access token for GitHub Actions.
 - [ ] Store the token only as the `EXPO_TOKEN` GitHub Environment secret.
 - [x] Confirm EAS can generate and manage the Android signing credentials.
+- [x] Register `com.housepoints.app` in the HousePoints Production Firebase
+  project and commit its Android `google-services.json` client configuration.
+- [x] Upload a dedicated, least-privilege FCM V1 service-account key to EAS for
+  `com.housepoints.app`.
+- [ ] Restore the Google Cloud policy that disables new service-account key
+  creation after the FCM credential is uploaded.
 - [ ] Confirm EAS can manage the iOS signing credentials.
 
 Useful references:
@@ -142,6 +148,8 @@ configuration, not safe storage for secrets.
 - [ ] Store `EXPO_ACCESS_TOKEN` in the API host's secret storage.
 - [ ] Confirm API logs redact tokens and include mobile request IDs.
 - [ ] Sign in on a physical device and confirm device registration is created.
+- [ ] Confirm the custom monochrome HousePoints notification icon renders on a
+  physical Android device after installing a build that includes it.
 - [ ] Sign out and confirm the registration is revoked.
 - [ ] Trigger an eligible notification and confirm push delivery remains
   organization-scoped.
@@ -198,12 +206,12 @@ track. Environment approval is therefore a release-control boundary.
 
 In the GitHub `staging` Environment:
 
-- [ ] Secret: `MOBILE_E2E_ANDROID_APP_URL`
-- [ ] Secret: `MOBILE_E2E_USER_EMAIL`
-- [ ] Secret: `MOBILE_E2E_USER_PASSWORD`
-- [ ] Secret: `MOBILE_E2E_TARGET_MEMBER`
-- [ ] Secret: `MAESTRO_CLOUD_API_KEY`
-- [ ] Repository or Environment variable: `MAESTRO_PROJECT_ID`
+- [x] Secret: `MOBILE_E2E_ANDROID_APP_URL`
+- [x] Secret: `MOBILE_E2E_USER_EMAIL`
+- [x] Secret: `MOBILE_E2E_USER_PASSWORD`
+- [x] Secret: `MOBILE_E2E_TARGET_MEMBER`
+- [x] Use the free pinned Maestro CLI on a GitHub-hosted Android emulator; no
+  Maestro Cloud credentials or subscription are required.
 
 Staging data:
 

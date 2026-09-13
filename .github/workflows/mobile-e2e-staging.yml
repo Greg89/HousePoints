@@ -20,18 +20,17 @@ concurrency:
 
 jobs:
   maestro:
-    name: Maestro against staging
+    name: Maestro on Android emulator
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     environment: staging
 
     env:
+      MAESTRO_CLI_NO_ANALYTICS: "1"
       MOBILE_E2E_ANDROID_APP_URL: ${{ inputs.android_app_url || secrets.MOBILE_E2E_ANDROID_APP_URL }}
       MOBILE_E2E_USER_EMAIL: ${{ secrets.MOBILE_E2E_USER_EMAIL }}
       MOBILE_E2E_USER_PASSWORD: ${{ secrets.MOBILE_E2E_USER_PASSWORD }}
       MOBILE_E2E_TARGET_MEMBER: ${{ secrets.MOBILE_E2E_TARGET_MEMBER }}
-      MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
-      MAESTRO_PROJECT_ID: ${{ vars.MAESTRO_PROJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +39,7 @@ jobs:
         shell: bash
         run: |
           missing=()
-          for name in MOBILE_E2E_ANDROID_APP_URL MOBILE_E2E_USER_EMAIL MOBILE_E2E_USER_PASSWORD MOBILE_E2E_TARGET_MEMBER MAESTRO_CLOUD_API_KEY MAESTRO_PROJECT_ID; do
+          for name in MOBILE_E2E_ANDROID_APP_URL MOBILE_E2E_USER_EMAIL MOBILE_E2E_USER_PASSWORD MOBILE_E2E_TARGET_MEMBER; do
             if [ -z "${!name}" ]; then
               missing+=("$name")
             fi
@@ -69,30 +68,65 @@ jobs:
             --output housepoints-staging.apk
           test -s housepoints-staging.apk
 
-      - name: Run Maestro staging flow
-        id: maestro
-        uses: mobile-dev-inc/action-maestro-cloud@v1
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          api-key: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
-          project-id: ${{ vars.MAESTRO_PROJECT_ID }}
-          app-file: housepoints-staging.apk
-          workspace: apps/mobile/e2e
-          timeout: 20
-          env: |
-            MOBILE_E2E_USER_EMAIL=${{ secrets.MOBILE_E2E_USER_EMAIL }}
-            MOBILE_E2E_USER_PASSWORD=${{ secrets.MOBILE_E2E_USER_PASSWORD }}
-            MOBILE_E2E_TARGET_MEMBER=${{ secrets.MOBILE_E2E_TARGET_MEMBER }}
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Maestro CLI
+        shell: bash
+        run: |
+          export MAESTRO_VERSION=2.7.0
+          curl --fail-with-body --location --show-error --silent \
+            https://get.maestro.mobile.dev \
+            | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Maestro staging flow
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb shell am force-stop com.android.chrome
+            adb shell am set-debug-app --persistent com.android.chrome
+            adb shell 'echo "chrome --disable-fre --no-default-browser-check --no-first-run" > /data/local/tmp/chrome-command-line'
+            adb shell am wait-for-broadcast-idle
+            adb install -r housepoints-staging.apk
+            adb shell am wait-for-broadcast-idle
+            maestro --version
+            maestro test -e "MOBILE_E2E_USER_EMAIL=$MOBILE_E2E_USER_EMAIL" -e "MOBILE_E2E_USER_PASSWORD=$MOBILE_E2E_USER_PASSWORD" -e "MOBILE_E2E_TARGET_MEMBER=$MOBILE_E2E_TARGET_MEMBER" apps/mobile/e2e/sign-in-dashboard-award.yaml
+
+      - name: Upload Maestro failure artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-staging-maestro-failure
+          path: ~/.maestro/tests
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Write Maestro run summary
         if: ${{ always() }}
-        env:
-          MAESTRO_CONSOLE_URL: ${{ steps.maestro.outputs.MAESTRO_CLOUD_CONSOLE_URL }}
-          MAESTRO_UPLOAD_STATUS: ${{ steps.maestro.outputs.MAESTRO_CLOUD_UPLOAD_STATUS }}
         shell: bash
         run: |
           {
             echo "### Mobile staging E2E"
             echo
-            echo "- Status: ${MAESTRO_UPLOAD_STATUS:-unavailable}"
-            echo "- Console: ${MAESTRO_CONSOLE_URL:-unavailable}"
+            echo "- Runner: GitHub-hosted Android emulator"
+            echo "- Maestro: free CLI 2.7.0"
+            echo "- Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"
