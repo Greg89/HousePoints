@@ -222,6 +222,8 @@ API service variables:
 - `AUTH0_AUDIENCE`
 - `CORS_ALLOWED_ORIGINS`
 - optional `POINT_ADJUSTMENTS_ENABLED` (`"true"` enables `POST /points/deduct`)
+- optional `PUBLIC_ORGANIZATION_CREATION_ENABLED` (`"false"` blocks creating and restoring organizations)
+- optional `MAX_ACTIVE_ORGANIZATIONS` (positive integer cap; archived organizations do not count)
 - optional `PUSH_DISPATCH_ENABLED` (`"true"` enables best-effort Expo push dispatch)
 - optional `EXPO_ACCESS_TOKEN` (required when Expo enhanced push security is enabled)
 - optional `SEQ_SERVER_URL`, `SEQ_API_KEY`, `LOG_LEVEL`, `SERVICE_NAME`

@@ -4,6 +4,7 @@ import {
   createInviteSchema,
   joinInvitePreviewSchema,
   createOrgSchema,
+  orgCreationAvailabilityRequestSchema,
   joinOrgSchema,
   orgRouteContextRequestSchema,
 } from "@housepoints/contracts";
@@ -23,6 +24,12 @@ import {
   type NotificationRow,
 } from "../notifications.js";
 import type { PushDispatcher } from "../push-dispatcher.js";
+import type { OrganizationCreationPolicy } from "../config.js";
+import {
+  assertOrganizationCapacity,
+  OrganizationCapacityError,
+  readOrganizationCreationAvailability,
+} from "../organization-capacity.js";
 
 function generateInviteToken(): string {
   return randomBytes(32).toString("hex"); // 64-char hex string
@@ -76,8 +83,10 @@ export async function createOrgInDb(params: {
   firstHouseName: string;
   firstHouseColor: string;
   existingUser: { id: string } | null;
+  organizationCreationPolicy: OrganizationCreationPolicy;
 }) {
   return prisma.$transaction(async (tx) => {
+    await assertOrganizationCapacity(tx, params.organizationCreationPolicy);
     const org = await tx.organization.create({
       data: { name: params.orgName, slug: params.orgSlug },
       select: { id: true, slug: true, name: true },
@@ -426,8 +435,19 @@ export async function joinOrgInDb(params: {
 
 export async function registerOrgRoutes(
   app: FastifyInstance,
-  options: { pushDispatcher?: PushDispatcher } = {},
+  options: {
+    pushDispatcher?: PushDispatcher;
+    organizationCreationPolicy: OrganizationCreationPolicy;
+  },
 ): Promise<void> {
+  app.post("/orgs/create-availability", async (request, reply) => {
+    const parsed = await parseBody(orgCreationAvailabilityRequestSchema, request, reply);
+    if (!parsed) return;
+    return reply.status(200).send(
+      await readOrganizationCreationAvailability(prisma, options.organizationCreationPolicy),
+    );
+  });
+
   app.post("/orgs/route-context", async (request, reply) => {
     const parsed = await parseBody(orgRouteContextRequestSchema, request, reply);
     if (!parsed) return;
@@ -572,16 +592,27 @@ export async function registerOrgRoutes(
       });
     }
 
-    const { org, house, user, season } = await createOrgInDb({
-      auth0Sub,
-      email,
-      displayName,
-      orgName,
-      orgSlug,
-      firstHouseName,
-      firstHouseColor,
-      existingUser,
-    });
+    let created;
+    try {
+      created = await createOrgInDb({
+        auth0Sub,
+        email,
+        displayName,
+        orgName,
+        orgSlug,
+        firstHouseName,
+        firstHouseColor,
+        existingUser,
+        organizationCreationPolicy: options.organizationCreationPolicy,
+      });
+    } catch (error) {
+      if (error instanceof OrganizationCapacityError) {
+        warn(request.log, "orgs.create.capacity_rejected", { code: error.code });
+        return reply.status(409).send({ code: error.code, message: error.message });
+      }
+      throw error;
+    }
+    const { org, house, user, season } = created;
 
     info(request.log, "orgs.created", {
       orgId: org.id,

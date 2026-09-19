@@ -23,6 +23,15 @@ export const createOrgSchema = z.object({
 
 export type CreateOrgInput = z.infer<typeof createOrgSchema>;
 
+export const orgCreationAvailabilityRequestSchema = z.object({}).strict();
+
+export const orgCreationAvailabilitySchema = z.object({
+  canCreate: z.boolean(),
+  reason: z.enum(["AVAILABLE", "DISABLED", "CAPACITY_REACHED"]),
+});
+
+export type OrgCreationAvailability = z.infer<typeof orgCreationAvailabilitySchema>;
+
 export const createInviteSchema = z.object({
   /** How many hours the invite is valid for. Defaults to 72. Max 168 (7 days). */
   expiresInHours: z.number().int().min(1).max(168).default(72),

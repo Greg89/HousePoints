@@ -35,6 +35,8 @@ import {
 } from "./notification-schemas.js";
 import {
   createOrgSchema,
+  orgCreationAvailabilityRequestSchema,
+  orgCreationAvailabilitySchema,
   createInviteSchema,
   joinOrgSchema,
   joinInvitePreviewSchema,
@@ -147,6 +149,10 @@ export const apiContracts = {
   ),
   "/system/releases/record": defineContract(createReleaseAnnouncementSchema, releaseAnnouncementSchema),
   "/orgs/create": defineContract(createOrgSchema, appUserSchema),
+  "/orgs/create-availability": defineContract(
+    orgCreationAvailabilityRequestSchema,
+    orgCreationAvailabilitySchema,
+  ),
   "/orgs/invite": defineContract(createInviteSchema, inviteLinkSchema),
   "/orgs/join/preview": defineContract(joinInvitePreviewSchema, joinInvitePreviewResponseSchema),
   "/orgs/join": defineContract(joinOrgSchema, appUserSchema),

@@ -23,6 +23,8 @@ import { info, warn } from "../logging.js";
 import { parseBody, requireAdminActor, requireOwnerActor, resolveSeasonOrReject } from "../route-helpers.js";
 import { mapDeletedPoint, DELETED_POINT_SELECT } from "./points.js";
 import { getArchivedOwnerActorBySubAndSlug } from "../actor.js";
+import type { OrganizationCreationPolicy } from "../config.js";
+import { assertOrganizationCapacity, OrganizationCapacityError } from "../organization-capacity.js";
 
 export async function loadAdminContextData(organizationId: string) {
   const [
@@ -464,8 +466,10 @@ export async function restoreOrganizationInDb(params: {
   actorDisplayName: string;
   organizationName: string;
   organizationSlug: string;
+  organizationCreationPolicy: OrganizationCreationPolicy;
 }) {
   return prisma.$transaction(async (tx) => {
+    await assertOrganizationCapacity(tx, params.organizationCreationPolicy);
     const restoredAt = new Date();
     const restoredAtIso = restoredAt.toISOString();
     const organization = await tx.organization.update({
@@ -757,7 +761,10 @@ export async function removeOrgMemberInDb(params: {
 
 export async function registerAdminRoutes(
   app: FastifyInstance,
-  options: { pushDispatcher?: PushDispatcher } = {},
+  options: {
+    pushDispatcher?: PushDispatcher;
+    organizationCreationPolicy: OrganizationCreationPolicy;
+  },
 ): Promise<void> {
   app.post("/admin/context", async (request, reply) => {
     const parsed = await parseBody(actorScopeSchema, request, reply);
@@ -1040,13 +1047,23 @@ export async function registerAdminRoutes(
       });
     }
 
-    const restoredOrganization = await restoreOrganizationInDb({
-      organizationId: actor.organizationId,
-      actorId: actor.id,
-      actorDisplayName: actor.displayName,
-      organizationName: actor.organizationName,
-      organizationSlug: actor.organizationSlug,
-    });
+    let restoredOrganization;
+    try {
+      restoredOrganization = await restoreOrganizationInDb({
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        actorDisplayName: actor.displayName,
+        organizationName: actor.organizationName,
+        organizationSlug: actor.organizationSlug,
+        organizationCreationPolicy: options.organizationCreationPolicy,
+      });
+    } catch (error) {
+      if (error instanceof OrganizationCapacityError) {
+        warn(request.log, "admin.org.restore.capacity_rejected", { code: error.code });
+        return reply.status(409).send({ code: error.code, message: error.message });
+      }
+      throw error;
+    }
 
     info(request.log, "admin.org.restored", {
       actorUserId: actor.id,

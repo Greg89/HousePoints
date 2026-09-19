@@ -13,11 +13,13 @@ vi.mock("@housepoints/db", () => ({
   updateUserDisplayName: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
+    $executeRawUnsafe: vi.fn(),
     organization: {
       upsert: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -124,6 +126,8 @@ const mockAuthIdentityCreate = prisma.authIdentity.create as ReturnType<typeof v
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockOrgUpdate = prisma.organization.update as ReturnType<typeof vi.fn>;
+const mockOrgCount = prisma.organization.count as ReturnType<typeof vi.fn>;
+const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
@@ -302,6 +306,8 @@ beforeEach(() => {
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
+  mockOrgCount.mockResolvedValue(0);
+  mockExecuteRawUnsafe.mockResolvedValue(1);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
   mockUpdateUserDisplayName.mockImplementation(
@@ -361,11 +367,13 @@ async function buildTestApp(
     idTokenSubject?: string;
     idTokenClaims?: Record<string, unknown>;
     pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
+    organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
+    organizationCreationPolicy: options.organizationCreationPolicy,
     pushDispatcher: options.pushDispatcher,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
@@ -4426,6 +4434,38 @@ describe("POST /admin/org/archive", () => {
 });
 
 describe("POST /admin/org/restore", () => {
+  it("does not restore an archived organization when active capacity is full", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-owner",
+        displayName: "Olivia",
+        memberships: [{
+          id: "membership-owner",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }],
+      },
+    });
+    mockOrgCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|owner", {}, {
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 2 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/restore",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ORGANIZATION_CAPACITY_REACHED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("allows an archived organization owner to restore it and writes an audit event", async () => {
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
@@ -6206,6 +6246,45 @@ describe("POST /orgs/create", () => {
     firstHouseName: "Phoenix",
     firstHouseColor: "#7c3aed",
   };
+
+  it("reports when public organization creation is disabled", async () => {
+    const app = await buildTestApp("auth0|member", {}, {
+      organizationCreationPolicy: { enabled: false, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/create-availability",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ canCreate: false, reason: "DISABLED" });
+    expect(mockOrgCount).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects creation at capacity without creating organization records", async () => {
+    mockOrgCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|member", {}, {
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 2 },
+    });
+
+    const res = await app.inject({ method: "POST", url: "/orgs/create", payload });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      code: "ORGANIZATION_CAPACITY_REACHED",
+      message: "HousePoints has reached its current organization capacity. You can still join an existing organization with an invitation.",
+    });
+    expect(mockExecuteRawUnsafe).toHaveBeenCalledWith(
+      "SELECT pg_advisory_xact_lock($1)",
+      expect.any(Number),
+    );
+    expect(mockOrgCount).toHaveBeenCalledWith({ where: { archivedAt: null } });
+    expect(mockOrgCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
 
   it("returns SLUG_TAKEN before starting setup when organization slug already exists", async () => {
     mockIsOrganizationSlugReserved.mockResolvedValue(true);

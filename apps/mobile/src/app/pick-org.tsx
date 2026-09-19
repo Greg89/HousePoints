@@ -1,5 +1,5 @@
 import { slugSchema, type AppUser } from "@housepoints/contracts";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Redirect, router } from "expo-router";
 import { useMemo, useState, type ComponentProps } from "react";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -17,6 +17,16 @@ export default function PickOrgScreen() {
   const { user, signOut, getAccessToken, synchronizeUser } = useAppAuth();
   const { activeOrgSlug, memberships, selectOrg } = useActiveOrg();
   const [mode, setMode] = useState<Mode>("options");
+  const availabilityQuery = useQuery({
+    queryKey: ["organization-create-availability"],
+    enabled: Boolean(user) && memberships.length === 0,
+    queryFn: async () => callApi(
+      "/orgs/create-availability",
+      {},
+      { accessToken: await getAccessToken() },
+    ),
+  });
+  const creationAvailability = availabilityQuery.data ?? { canCreate: true, reason: "AVAILABLE" as const };
   if (!user) return null;
   if (activeOrgSlug && memberships.some((item) => item.organizationSlug === activeOrgSlug)) {
     return <Redirect href="/(tabs)" />;
@@ -45,7 +55,15 @@ export default function PickOrgScreen() {
     {mode === "options" ? <View style={styles.grow}>
       <Header title="Set up your workspace" subtitle={`Welcome, ${user.displayName}. Create an organization or join one with an invite.`} />
       <View style={styles.options}>
-        <Action testID="mobile.onboarding.create" title="Create a new organization" body="Set up houses and invite your team. You will become the owner." onPress={() => setMode("create")} />
+        <Action
+          testID="mobile.onboarding.create"
+          title="Create a new organization"
+          body={creationAvailability.canCreate
+            ? "Set up houses and invite your team. You will become the owner."
+            : "New organization registration is currently full. You can still join with an invitation."}
+          disabled={!creationAvailability.canCreate}
+          onPress={() => setMode("create")}
+        />
         <Action testID="mobile.onboarding.join" title="Join with an invite link" body="Paste the invite link or token shared by an organization owner." onPress={() => setMode("join")} />
       </View><SignOut onPress={signOut} />
     </View> : mode === "create" ? <Create user={user} getAccessToken={getAccessToken} onBack={() => setMode("options")} onSuccess={finish} /> : <Join user={user} getAccessToken={getAccessToken} onBack={() => setMode("options")} onSuccess={finish} />}
@@ -72,7 +90,7 @@ function Join({ user, getAccessToken, onBack, onSuccess }: FormProps) {
 }
 
 function Header({ title, subtitle }: { title: string; subtitle: string }) { return <View style={styles.header}><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>; }
-function Action({ title, body, onPress, testID }: { title: string; body: string; onPress: () => void; testID: string }) { return <Pressable testID={testID} style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={onPress}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.cardBody}>{body}</Text></Pressable>; }
+function Action({ title, body, onPress, testID, disabled = false }: { title: string; body: string; onPress: () => void; testID: string; disabled?: boolean }) { return <Pressable testID={testID} disabled={disabled} style={({ pressed }) => [styles.card, disabled && styles.disabled, pressed && styles.pressed]} onPress={onPress}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.cardBody}>{body}</Text></Pressable>; }
 function Field({ label, ...props }: ComponentProps<typeof TextInput> & { label: string }) { return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput {...props} style={styles.input} placeholderTextColor="#94a3b8" /></View>; }
 function Submit({ label, pending, disabled, onPress, testID }: { label: string; pending: boolean; disabled: boolean; onPress: () => void; testID: string }) { return <Pressable testID={testID} disabled={disabled || pending} onPress={onPress} style={[styles.primary, (disabled || pending) && styles.disabled]}>{pending ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{label}</Text>}</Pressable>; }
 function Back({ onPress }: { onPress: () => void }) { return <Pressable onPress={onPress} style={styles.back}><Text style={styles.backText}>‹ Back</Text></Pressable>; }

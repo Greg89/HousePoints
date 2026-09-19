@@ -1,5 +1,6 @@
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { readSessionSummary } from "@/app/actions/profile";
+import { readOrgCreationAvailability } from "@/app/actions/orgs";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function NewOrganizationPage() {
   const dashboardHref = session.organizationSlug
     ? `/o/${encodeURIComponent(session.organizationSlug)}`
     : "/";
+  const creationAvailability = await readOrgCreationAvailability();
 
   return (
     <OrgOnboarding
@@ -34,6 +36,7 @@ export default async function NewOrganizationPage() {
       allowJoin={false}
       backHref={dashboardHref}
       introText="Create another organisation and switch into it when setup is complete."
+      creationAvailability={creationAvailability}
     />
   );
 }

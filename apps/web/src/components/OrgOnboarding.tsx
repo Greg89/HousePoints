@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
+import type { OrgCreationAvailability } from "@housepoints/contracts";
 import { useRouter } from "next/navigation";
 import { Buildings, LinkSimple } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -14,6 +15,7 @@ interface OrgOnboardingProps {
   allowJoin?: boolean;
   backHref?: string;
   introText?: ReactNode;
+  creationAvailability?: OrgCreationAvailability;
 }
 
 type View = "pick" | "create" | "join";
@@ -34,6 +36,7 @@ export function OrgOnboarding({
   allowJoin = true,
   backHref = "/",
   introText,
+  creationAvailability = { canCreate: true, reason: "AVAILABLE" },
 }: OrgOnboardingProps) {
   const router = useRouter();
   const [view, setView] = useState<View>(initialView);
@@ -127,7 +130,13 @@ export function OrgOnboarding({
           <div className="grid gap-4">
             <button
               onClick={() => setView("create")}
-              className="flex items-start gap-4 p-5 rounded-xl border bg-card hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
+              disabled={!creationAvailability.canCreate}
+              className={cn(
+                "flex items-start gap-4 p-5 rounded-xl border bg-card transition-colors text-left",
+                creationAvailability.canCreate
+                  ? "hover:border-primary/50 hover:bg-primary/5"
+                  : "cursor-not-allowed opacity-60",
+              )}
             >
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Buildings size={22} className="text-primary" />
@@ -135,7 +144,9 @@ export function OrgOnboarding({
               <div>
                 <p className="font-semibold text-sm">Create a new organisation</p>
                 <p className="text-muted-foreground text-xs mt-0.5">
-                  Set up houses and invite your team. You&apos;ll become the owner.
+                  {creationAvailability.canCreate
+                    ? "Set up houses and invite your team. You'll become the owner."
+                    : "New organization registration is currently full. You can still join with an invitation."}
                 </p>
               </div>
             </button>
@@ -170,6 +181,11 @@ export function OrgOnboarding({
             <div className="space-y-1">
               <h2 className="font-display text-lg font-semibold">Create organisation</h2>
               <p className="text-muted-foreground text-sm">You&apos;ll be the owner and can invite others after setup.</p>
+              {!creationAvailability.canCreate ? (
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  New organization registration is currently full. Existing organizations can still invite members.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -249,10 +265,10 @@ export function OrgOnboarding({
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!orgName.trim() || !orgSlug || !firstHouseName.trim() || isPending}
+                disabled={!creationAvailability.canCreate || !orgName.trim() || !orgSlug || !firstHouseName.trim() || isPending}
                 className={cn(
                   "flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-colors",
-                  orgName.trim() && orgSlug && firstHouseName.trim() && !isPending
+                  creationAvailability.canCreate && orgName.trim() && orgSlug && firstHouseName.trim() && !isPending
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}

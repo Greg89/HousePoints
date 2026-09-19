@@ -103,6 +103,7 @@ const webConsumedApiEndpoints = [
   "/system/releases/broadcast",
   "/system/releases/record",
   "/orgs/create",
+  "/orgs/create-availability",
   "/orgs/invite",
   "/orgs/join",
   "/orgs/join/preview",

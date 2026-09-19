@@ -144,6 +144,8 @@ configuration, not safe storage for secrets.
 - [ ] Deploy all production database migrations.
 - [ ] Confirm the public API and web origins use HTTPS.
 - [ ] Confirm production Auth0 issuer and audience validation.
+- [ ] Set `PUBLIC_ORGANIZATION_CREATION_ENABLED` and
+  `MAX_ACTIVE_ORGANIZATIONS` on the production API Railway service.
 - [ ] Set `PUSH_DISPATCH_ENABLED=true` when production push is approved.
 - [ ] Store `EXPO_ACCESS_TOKEN` in the API host's secret storage.
 - [ ] Confirm API logs redact tokens and include mobile request IDs.

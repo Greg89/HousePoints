@@ -18,6 +18,8 @@ import {
   readExpoAccessTokenFromEnv,
   readPointAdjustmentsEnabledFromEnv,
   readPushDispatchEnabledFromEnv,
+  readOrganizationCreationPolicyFromEnv,
+  type OrganizationCreationPolicy,
 } from "./config.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
@@ -46,6 +48,7 @@ type BuildAppOptions = {
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
   pushDispatcher?: PushDispatcher | null;
+  organizationCreationPolicy?: OrganizationCreationPolicy;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -58,6 +61,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const pointAdjustmentsEnabled =
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
+  const organizationCreationPolicy =
+    options.organizationCreationPolicy ?? readOrganizationCreationPolicyFromEnv();
   const pushDispatcher = options.pushDispatcher === undefined
     ? readPushDispatchEnabledFromEnv()
       ? new ExpoPushDispatcher(readExpoAccessTokenFromEnv())
@@ -114,10 +119,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   await registerHealthRoutes(app);
   await registerSeasonRoutes(app, { pushDispatcher });
-  await registerAdminRoutes(app, { pushDispatcher });
+  await registerAdminRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerDeviceRoutes(app);
   await registerNotificationRoutes(app);
-  await registerOrgRoutes(app, { pushDispatcher });
+  await registerOrgRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerUserRoutes(app, { verifyIdToken });
   await registerPointRoutes(app, { pointAdjustmentsEnabled, pushDispatcher });
   await registerReleaseRoutes(app, { pushDispatcher });
