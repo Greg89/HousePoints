@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { PlatformOverview } from "@housepoints/contracts";
 import { toast } from "sonner";
 import { updatePlatformSettings } from "@/app/actions/platform";
@@ -72,7 +73,7 @@ export function PlatformDashboard({ overview }: { overview: PlatformOverview }) 
 
         <section className="rounded-2xl border bg-card p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="font-display text-xl font-semibold">Organizations</h2><input aria-label="Search organizations" className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Search name or slug" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="py-3">Organization</th><th>Status</th><th>Members</th><th>Owners</th><th>Last activity</th><th>Created</th></tr></thead><tbody>{organizations.map((organization) => <tr key={organization.id} className="border-b last:border-0"><td className="py-3"><p className="font-semibold">{organization.name}</p><p className="text-xs text-muted-foreground">{organization.slug}</p></td><td>{organization.status}</td><td>{organization.memberCount}</td><td>{organization.ownerCount}</td><td>{formatDate(organization.lastActivityAt)}</td><td>{formatDate(organization.createdAt)}</td></tr>)}</tbody></table></div>
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="py-3">Organization</th><th>Status</th><th>Members</th><th>Owners</th><th>Last activity</th><th>Created</th></tr></thead><tbody>{organizations.map((organization) => <tr key={organization.id} className="border-b last:border-0"><td className="py-3"><Link className="font-semibold text-primary hover:underline" href={`/platform/organizations/${organization.id}`}>{organization.name}</Link><p className="text-xs text-muted-foreground">{organization.slug}</p></td><td>{organization.status}</td><td>{organization.memberCount}</td><td>{organization.ownerCount}</td><td>{formatDate(organization.lastActivityAt)}</td><td>{formatDate(organization.createdAt)}</td></tr>)}</tbody></table></div>
         </section>
 
         <section className="rounded-2xl border bg-card p-5">

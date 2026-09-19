@@ -112,6 +112,19 @@ async function renderOrganizationDashboardPage(slug: string, route: string) {
     }
   }
 
+  if (routeContext.status === "SUSPENDED") {
+    return (
+      <SlugRouteMessage
+        title="This organization is temporarily suspended"
+        description={`${routeContext.organizationName} is unavailable while a platform operator reviews it. Your data is retained.`}
+        actionHref="/support"
+        actionLabel="Contact support"
+        secondaryHref="/auth/logout"
+        secondaryLabel="Sign out"
+      />
+    );
+  }
+
   try {
     return await renderDashboardPage(route);
   } catch (error) {

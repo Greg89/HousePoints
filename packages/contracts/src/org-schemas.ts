@@ -101,6 +101,13 @@ export const orgRouteContextSchema = z.discriminatedUnion("status", [
     canRestore: z.boolean(),
   }),
   z.object({
+    status: z.literal("SUSPENDED"),
+    requestedSlug: slugSchema,
+    organizationSlug: slugSchema,
+    organizationName: z.string().min(1),
+    suspendedAt: z.string().datetime(),
+  }),
+  z.object({
     status: z.literal("NO_ACTOR_ORG"),
     requestedSlug: slugSchema,
     organizationSlug: slugSchema.optional(),

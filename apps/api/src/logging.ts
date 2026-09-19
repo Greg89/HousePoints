@@ -106,6 +106,8 @@ export type ApiLogEvent =
   | "admin.org.restore.capacity_rejected"
   | "platform.owner_required"
   | "platform.settings.updated"
+  | "platform.organization.suspended"
+  | "platform.organization.resumed"
   | "orgs.invite.created"
   | "orgs.join.preview_loaded"
   | "orgs.join.invalid_token"

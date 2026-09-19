@@ -96,6 +96,10 @@ import {
   platformOverviewSchema,
   updatePlatformSettingsSchema,
   platformSettingsSchema,
+  platformOrganizationDetailRequestSchema,
+  platformOrganizationDetailSchema,
+  updatePlatformOrganizationStatusSchema,
+  platformOrganizationStatusResponseSchema,
 } from "./platform-schemas.js";
 
 type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
@@ -165,6 +169,8 @@ export const apiContracts = {
   "/orgs/route-context": defineContract(orgRouteContextRequestSchema, orgRouteContextSchema),
   "/platform/overview": defineContract(platformOverviewRequestSchema, platformOverviewSchema),
   "/platform/settings": defineContract(updatePlatformSettingsSchema, platformSettingsSchema),
+  "/platform/organizations/detail": defineContract(platformOrganizationDetailRequestSchema, platformOrganizationDetailSchema),
+  "/platform/organizations/status": defineContract(updatePlatformOrganizationStatusSchema, platformOrganizationStatusResponseSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,

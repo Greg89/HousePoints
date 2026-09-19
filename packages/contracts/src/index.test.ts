@@ -110,6 +110,8 @@ const webConsumedApiEndpoints = [
   "/orgs/route-context",
   "/points/adjust",
   "/platform/overview",
+  "/platform/organizations/detail",
+  "/platform/organizations/status",
   "/platform/settings",
   "/points/deduct",
   "/points/delete",

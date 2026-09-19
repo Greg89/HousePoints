@@ -102,11 +102,13 @@ Platform audit events include actor Auth0 subject, event type, safe summary, str
 
 ### Slice 2 — organization support controls
 
-- [ ] Organization detail route.
-- [ ] Centrally enforced suspension/resumption.
+- [x] Organization detail route with owners, usage counts, and organization audit history.
+- [x] Centrally enforced suspension/resumption with typed member-facing state.
 - [ ] Platform archive/restore with confirmation and audit.
 - [ ] Owner contact and outstanding-invite revocation.
 - [ ] Organization usage and recent-error signals.
+
+The first Slice 2 increment deliberately separates suspension from archive. Suspension is enforced in shared actor resolution, requires a platform-owner confirmation and reason, and is recorded in the platform audit log. Archive/restore and invite revocation remain follow-up actions so their organization-audit and capacity semantics are kept explicit.
 
 ### Slice 3 — user support and compliance
 

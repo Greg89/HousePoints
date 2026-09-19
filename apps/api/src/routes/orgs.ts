@@ -500,6 +500,16 @@ export async function registerOrgRoutes(
         });
       }
 
+      if (requestedMembership.organizationSuspendedAt) {
+        return reply.status(200).send({
+          status: "SUSPENDED",
+          requestedSlug,
+          organizationSlug: resolvedSlug.currentSlug,
+          organizationName: requestedMembership.organizationName,
+          suspendedAt: requestedMembership.organizationSuspendedAt.toISOString(),
+        });
+      }
+
       info(request.log, "orgs.route_context.match", {
         requestedSlug,
         organizationId: resolvedSlug.organizationId,
@@ -610,6 +620,7 @@ export async function registerOrgRoutes(
         warn(request.log, "orgs.create.capacity_rejected", { code: error.code });
         return reply.status(409).send({ code: error.code, message: error.message });
       }
+
       throw error;
     }
     const { org, house, user, season } = created;

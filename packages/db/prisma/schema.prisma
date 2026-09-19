@@ -89,6 +89,9 @@ model Organization {
   slug           String                   @unique
   archivedAt     DateTime?
   archivedById   String?
+  suspendedAt    DateTime?
+  suspendedByAuth0Sub String?
+  suspensionReason String?
   memberships    OrganizationMembership[]
   houses         House[]
   transactions   PointTransaction[]
@@ -104,6 +107,7 @@ model Organization {
   updatedAt      DateTime                 @updatedAt
 
   @@index([archivedAt])
+  @@index([suspendedAt])
   @@index([archivedById])
 }
 

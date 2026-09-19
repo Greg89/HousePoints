@@ -138,6 +138,7 @@ const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockOrgUpdate = prisma.organization.update as ReturnType<typeof vi.fn>;
 const mockOrgCount = prisma.organization.count as ReturnType<typeof vi.fn>;
 const mockOrgFindMany = prisma.organization.findMany as ReturnType<typeof vi.fn>;
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>;
 const mockMembershipCount = prisma.organizationMembership.count as ReturnType<typeof vi.fn>;
 const mockPlatformSettingsFindUnique = prisma.platformSettings.findUnique as ReturnType<typeof vi.fn>;
 const mockPlatformSettingsUpsert = prisma.platformSettings.upsert as ReturnType<typeof vi.fn>;
@@ -6621,6 +6622,27 @@ describe("platform support routes", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe("PLATFORM_HARD_CAP_EXCEEDED");
     expect(mockPlatformSettingsUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("suspends an organization and records the operator action atomically", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme", archivedAt: null, suspendedAt: null });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/status", payload: { organizationId: "org-1", action: "SUSPEND", confirmationSlug: "acme", reason: "Abuse investigation" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ id: "org-1", status: "SUSPENDED" });
+    expect(mockOrgUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "org-1" }, data: expect.objectContaining({ suspendedAt: expect.any(Date), suspensionReason: "Abuse investigation" }) }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_SUSPENDED", actorAuth0Sub: "auth0|platform-owner" }) });
+    await app.close();
+  });
+
+  it("requires the exact organization slug before changing lifecycle state", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme", archivedAt: null, suspendedAt: null });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/status", payload: { organizationId: "org-1", action: "SUSPEND", confirmationSlug: "wrong", reason: "Abuse investigation" } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("CONFIRMATION_MISMATCH");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
     await app.close();
   });
 });

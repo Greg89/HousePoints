@@ -6,7 +6,7 @@ export const platformOrganizationSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   slug: z.string().min(1),
-  status: z.enum(["ACTIVE", "ARCHIVED"]),
+  status: z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]),
   memberCount: z.number().int().nonnegative(),
   ownerCount: z.number().int().nonnegative(),
   lastActivityAt: z.string().datetime().nullable(),
@@ -43,6 +43,53 @@ export const updatePlatformSettingsSchema = z.object({
   organizationCreationEnabled: z.boolean(),
   maxActiveOrganizations: z.number().int().positive().nullable(),
 }).strict();
+
+export const platformOrganizationDetailRequestSchema = z.object({
+  organizationId: z.string().min(1),
+}).strict();
+
+export const platformOrganizationOwnerSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1),
+  email: z.string().email().nullable(),
+});
+
+export const platformOrganizationDetailSchema = z.object({
+  organization: platformOrganizationSchema.extend({
+    archivedAt: z.string().datetime().nullable(),
+    suspendedAt: z.string().datetime().nullable(),
+    suspensionReason: z.string().nullable(),
+    transactionCount: z.number().int().nonnegative(),
+    activeInviteCount: z.number().int().nonnegative(),
+    deviceCount: z.number().int().nonnegative(),
+  }),
+  owners: z.array(platformOrganizationOwnerSchema),
+  recentAuditEvents: z.array(z.object({
+    id: z.string().min(1),
+    eventType: z.string().min(1),
+    summary: z.string().min(1),
+    createdAt: z.string().datetime(),
+  })),
+});
+
+export const updatePlatformOrganizationStatusSchema = z.object({
+  organizationId: z.string().min(1),
+  action: z.enum(["SUSPEND", "RESUME"]),
+  confirmationSlug: z.string().min(1),
+  reason: z.string().trim().min(3).max(500).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.action === "SUSPEND" && !value.reason) {
+    context.addIssue({ code: "custom", path: ["reason"], message: "A suspension reason is required" });
+  }
+});
+
+export const platformOrganizationStatusResponseSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]),
+  suspendedAt: z.string().datetime().nullable(),
+});
+
+export type PlatformOrganizationDetail = z.infer<typeof platformOrganizationDetailSchema>;
 
 export type PlatformOverview = z.infer<typeof platformOverviewSchema>;
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
