@@ -6663,7 +6663,7 @@ describe("platform support routes", () => {
     mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme" });
     mockInviteUpdateMany.mockResolvedValue({ count: 3 });
     const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
-    const res = await app.inject({ method: "POST", url: "/platform/organizations/revoke-invites", payload: { organizationId: "org-1", confirmationSlug: "acme" } });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/revoke-invites", payload: { organizationId: "org-1", confirmationSlug: "acme", reason: "Owner requested cleanup" } });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ revokedCount: 3 });
     expect(mockInviteUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-1", usedAt: null }), data: { expiresAt: expect.any(Date) } }));
@@ -6672,7 +6672,7 @@ describe("platform support routes", () => {
   });
 
   it("searches users and calculates effective permissions across organization states", async () => {
-    mockUserFindMany.mockResolvedValue([{ id: "user-1", displayName: "Alex Owner", email: "alex@example.com", auth0Sub: "auth0|alex", deletionRequestedAt: null, deviceRegistrations: [{ id: "device-1" }], memberships: [
+    mockUserFindMany.mockResolvedValue([{ id: "user-1", displayName: "Alex Owner", email: "alex@example.com", auth0Sub: "auth0|alex", deletionRequestedAt: null, deviceRegistrations: [{ id: "device-1", organizationId: "org-1", platform: "ANDROID", appVersion: "1.2.3", locale: "en-US", createdAt: new Date("2026-09-01T12:00:00.000Z"), lastSeenAt: new Date("2026-09-19T12:00:00.000Z"), organization: { name: "Acme" } }], memberships: [
       { organizationId: "org-1", role: "OWNER", isActive: true, archivedAt: null, organization: { name: "Acme", slug: "acme", archivedAt: null, suspendedAt: null } },
       { organizationId: "org-2", role: "ADMIN", isActive: true, archivedAt: null, organization: { name: "Paused", slug: "paused", archivedAt: null, suspendedAt: new Date() } },
     ] }]);
@@ -6684,6 +6684,29 @@ describe("platform support routes", () => {
       { organizationSlug: "paused", effectiveAccess: "BLOCKED_ORGANIZATION", capabilities: [] },
     ] }] });
     expect(mockUserFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 50, where: { OR: expect.any(Array) } }));
+    await app.close();
+  });
+
+  it("revokes one active invitation with a reason and audit record", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme" });
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/revoke-invite", payload: { organizationId: "org-1", inviteId: "invite-1", confirmationSlug: "acme", reason: "Invite sent in error" } });
+    expect(res.statusCode).toBe(200);
+    expect(mockInviteUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: "invite-1", organizationId: "org-1" }) }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_INVITE_REVOKED", metadata: expect.objectContaining({ reason: "Invite sent in error" }) }) });
+    await app.close();
+  });
+
+  it("revokes a user's selected device registration with confirmation and a reason", async () => {
+    mockFindUnique.mockResolvedValue({ id: "user-1", displayName: "Alex Owner" });
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/users/revoke-devices", payload: { userId: "user-1", deviceRegistrationId: "device-1", confirmationDisplayName: "Alex Owner", reason: "Lost device" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revokedCount: 1 });
+    expect(mockDeviceRegistrationUpdateMany).toHaveBeenCalledWith({ where: { userId: "user-1", revokedAt: null, id: "device-1" }, data: { revokedAt: expect.any(Date) } });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "USER_DEVICE_REVOKED", metadata: expect.objectContaining({ reason: "Lost device" }) }) });
     await app.close();
   });
 });

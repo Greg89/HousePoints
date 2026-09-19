@@ -64,6 +64,12 @@ export const platformOrganizationDetailSchema = z.object({
     deviceCount: z.number().int().nonnegative(),
   }),
   owners: z.array(platformOrganizationOwnerSchema),
+  activeInvites: z.array(z.object({
+    id: z.string().min(1),
+    createdByName: z.string().min(1),
+    createdAt: z.string().datetime(),
+    expiresAt: z.string().datetime(),
+  })),
   recentAuditEvents: z.array(z.object({
     id: z.string().min(1),
     eventType: z.string().min(1),
@@ -95,14 +101,31 @@ export const platformOrganizationStatusResponseSchema = z.object({
   archivedAt: z.string().datetime().nullable(),
 });
 
-export const revokePlatformOrganizationInvitesSchema = z.object({ organizationId: z.string().min(1), confirmationSlug: z.string().min(1) }).strict();
+export const revokePlatformOrganizationInvitesSchema = z.object({
+  organizationId: z.string().min(1),
+  confirmationSlug: z.string().min(1),
+  reason: z.string().trim().min(3).max(500),
+}).strict();
 export const revokePlatformOrganizationInvitesResponseSchema = z.object({ revokedCount: z.number().int().nonnegative() });
+
+export const revokePlatformOrganizationInviteSchema = z.object({
+  organizationId: z.string().min(1),
+  inviteId: z.string().min(1),
+  confirmationSlug: z.string().min(1),
+  reason: z.string().trim().min(3).max(500),
+}).strict();
+export const revokePlatformOrganizationInviteResponseSchema = z.object({ revoked: z.boolean() });
 
 export const platformUserSearchSchema = z.object({ query: z.string().trim().min(2).max(120) }).strict();
 export const platformUserSearchResponseSchema = z.object({
   users: z.array(z.object({
     id: z.string().min(1), displayName: z.string().min(1), email: z.string().email().nullable(), auth0Sub: z.string().min(1),
     deletionRequestedAt: z.string().datetime().nullable(), activeDeviceCount: z.number().int().nonnegative(),
+    devices: z.array(z.object({
+      id: z.string().min(1), organizationId: z.string().min(1), organizationName: z.string().min(1),
+      platform: z.enum(["IOS", "ANDROID"]), appVersion: z.string().nullable(), locale: z.string().nullable(),
+      createdAt: z.string().datetime(), lastSeenAt: z.string().datetime(),
+    })),
     memberships: z.array(z.object({
       organizationId: z.string().min(1), organizationName: z.string().min(1), organizationSlug: z.string().min(1),
       role: z.enum(["MEMBER", "ADMIN", "OWNER"]), membershipStatus: z.enum(["ACTIVE", "INACTIVE"]),
@@ -111,6 +134,14 @@ export const platformUserSearchResponseSchema = z.object({
     })),
   })),
 });
+
+export const revokePlatformUserDevicesSchema = z.object({
+  userId: z.string().min(1),
+  deviceRegistrationId: z.string().min(1).optional(),
+  confirmationDisplayName: z.string().min(1),
+  reason: z.string().trim().min(3).max(500),
+}).strict();
+export const revokePlatformUserDevicesResponseSchema = z.object({ revokedCount: z.number().int().nonnegative() });
 
 export type PlatformUserSearchResponse = z.infer<typeof platformUserSearchResponseSchema>;
 

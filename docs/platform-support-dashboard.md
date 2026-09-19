@@ -115,11 +115,13 @@ Authenticated browser errors are stored as organization-scoped aggregates keyed 
 ### Slice 3 — user support and compliance
 
 - [x] User search and effective-permission diagnostics.
-- [ ] Device-registration and invitation support actions.
+- [x] Device-registration and invitation support actions.
 - [ ] Account-deletion work queue and completion evidence.
 - [ ] Support cases and private operator notes.
 
 The first Slice 3 increment is read-only. Platform owners can search by display name, email, primary Auth0 subject, or linked identity subject and inspect active devices, deletion-request state, every membership, organization lifecycle state, effective access, and role-derived capabilities. It deliberately provides no user impersonation or mutation controls.
+
+The second Slice 3 increment adds narrowly scoped support mutations. User search shows safe active-device metadata without returning push tokens and permits revoking one or all active registrations. Organization detail shows active invitation creator and timing metadata without returning token hashes and permits revoking one or all active invitations. Every action requires typed confirmation and a bounded support reason and is recorded in the platform audit trail.
 
 ### Slice 4 — moderation and operations
 

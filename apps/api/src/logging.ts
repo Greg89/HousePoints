@@ -111,6 +111,8 @@ export type ApiLogEvent =
   | "platform.organization.archived"
   | "platform.organization.restored"
   | "platform.organization.invites_revoked"
+  | "platform.organization.invite_revoked"
+  | "platform.user.devices_revoked"
   | "orgs.invite.created"
   | "orgs.join.preview_loaded"
   | "orgs.join.invalid_token"

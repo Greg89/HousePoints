@@ -9,8 +9,10 @@ import {
   platformOrganizationDetailSchema,
   platformOrganizationStatusResponseSchema,
   revokePlatformOrganizationInvitesResponseSchema,
+  revokePlatformOrganizationInviteResponseSchema,
   platformUserSearchResponseSchema,
   type PlatformUserSearchResponse,
+  revokePlatformUserDevicesResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -58,13 +60,42 @@ export async function updatePlatformOrganizationStatus(input: { organizationId: 
   });
 }
 
-export async function revokePlatformOrganizationInvites(input: { organizationId: string; confirmationSlug: string }): Promise<{ ok: true; revokedCount: number } | { ok: false; message: string }> {
+export async function revokePlatformOrganizationInvites(input: { organizationId: string; confirmationSlug: string; reason: string }): Promise<{ ok: true; revokedCount: number } | { ok: false; message: string }> {
   return runServerAction("revokePlatformOrganizationInvites", async (context) => {
     await requireAuthenticatedApiContext();
     const response = await apiFetch("/platform/organizations/revoke-invites", context.requestId, { method: "POST", body: JSON.stringify(input) });
     try {
       const result = await parseApiResponse(response, revokePlatformOrganizationInvitesResponseSchema, "Outstanding invites could not be revoked.");
       revalidatePath(`/platform/organizations/${input.organizationId}`);
+      return { ok: true, revokedCount: result.revokedCount };
+    } catch (error) {
+      if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message };
+      throw error;
+    }
+  });
+}
+
+export async function revokePlatformOrganizationInvite(input: { organizationId: string; inviteId: string; confirmationSlug: string; reason: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  return runServerAction("revokePlatformOrganizationInvite", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/organizations/revoke-invite", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try {
+      await parseApiResponse(response, revokePlatformOrganizationInviteResponseSchema, "The invitation could not be revoked.");
+      revalidatePath(`/platform/organizations/${input.organizationId}`);
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message };
+      throw error;
+    }
+  });
+}
+
+export async function revokePlatformUserDevices(input: { userId: string; deviceRegistrationId?: string; confirmationDisplayName: string; reason: string }): Promise<{ ok: true; revokedCount: number } | { ok: false; message: string }> {
+  return runServerAction("revokePlatformUserDevices", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/users/revoke-devices", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try {
+      const result = await parseApiResponse(response, revokePlatformUserDevicesResponseSchema, "Device registrations could not be revoked.");
       return { ok: true, revokedCount: result.revokedCount };
     } catch (error) {
       if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message };

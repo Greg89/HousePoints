@@ -4,8 +4,10 @@ import {
   platformOrganizationDetailRequestSchema,
   updatePlatformOrganizationStatusSchema,
   revokePlatformOrganizationInvitesSchema,
+  revokePlatformOrganizationInviteSchema,
   updatePlatformSettingsSchema,
   platformUserSearchSchema,
+  revokePlatformUserDevicesSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { OrganizationCreationPolicy } from "../config.js";
@@ -128,7 +130,7 @@ export async function registerPlatformRoutes(
         id: true, name: true, slug: true, archivedAt: true, suspendedAt: true, suspensionReason: true, createdAt: true,
         memberships: { where: { isActive: true, archivedAt: null }, select: { role: true, user: { select: { id: true, displayName: true, email: true } } } },
         transactions: { where: { deletedAt: null }, orderBy: { createdAt: "desc" }, select: { createdAt: true } },
-        invites: { where: { usedAt: null, expiresAt: { gt: new Date() } }, select: { id: true } },
+        invites: { where: { usedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" }, select: { id: true, createdAt: true, expiresAt: true, createdBy: { select: { displayName: true } } } },
         deviceRegistrations: { where: { revokedAt: null }, select: { id: true } },
         auditEvents: { orderBy: { createdAt: "desc" }, take: 25, select: { id: true, eventType: true, summary: true, createdAt: true } },
         errorSignals: { where: { lastSeenAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }, orderBy: { lastSeenAt: "desc" }, take: 20, select: { id: true, errorType: true, message: true, sourcePath: true, occurrenceCount: true, firstSeenAt: true, lastSeenAt: true } },
@@ -147,6 +149,7 @@ export async function registerPlatformRoutes(
         activeInviteCount: organization.invites.length, deviceCount: organization.deviceRegistrations.length,
       },
       owners,
+      activeInvites: organization.invites.map((invite) => ({ id: invite.id, createdByName: invite.createdBy.displayName, createdAt: invite.createdAt.toISOString(), expiresAt: invite.expiresAt.toISOString() })),
       recentAuditEvents: organization.auditEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() })),
       recentErrorSignals: organization.errorSignals.map((signal) => ({ ...signal, firstSeenAt: signal.firstSeenAt.toISOString(), lastSeenAt: signal.lastSeenAt.toISOString() })),
       recentErrorOccurrenceCount: organization.errorSignals.reduce((total, signal) => total + signal.occurrenceCount, 0),
@@ -201,10 +204,28 @@ export async function registerPlatformRoutes(
     await prisma.$transaction(async (tx) => {
       const result = await tx.orgInvite.updateMany({ where: { organizationId: organization.id, usedAt: null, expiresAt: { gt: revokedAt } }, data: { expiresAt: revokedAt } });
       revokedCount = result.count;
-      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "ORGANIZATION_INVITES_REVOKED", summary: `${revokedCount} outstanding invite${revokedCount === 1 ? "" : "s"} for ${organization.name} were revoked.`, metadata: { organizationId: organization.id, organizationSlug: organization.slug, revokedCount } } });
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "ORGANIZATION_INVITES_REVOKED", summary: `${revokedCount} outstanding invite${revokedCount === 1 ? "" : "s"} for ${organization.name} were revoked.`, metadata: { organizationId: organization.id, organizationSlug: organization.slug, revokedCount, reason: parsed.reason } } });
     });
     info(request.log, "platform.organization.invites_revoked", { organizationId: organization.id, revokedCount });
     return reply.status(200).send({ revokedCount });
+  });
+
+  app.post("/platform/organizations/revoke-invite", async (request, reply) => {
+    const parsed = await parseBody(revokePlatformOrganizationInviteSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const organization = await prisma.organization.findUnique({ where: { id: parsed.organizationId }, select: { id: true, name: true, slug: true } });
+    if (!organization) return reply.status(404).send({ code: "ORGANIZATION_NOT_FOUND", message: "Organization not found" });
+    if (organization.slug !== parsed.confirmationSlug) return reply.status(409).send({ code: "CONFIRMATION_MISMATCH", message: "The confirmation slug does not match" });
+    const revokedAt = new Date();
+    let revoked = false;
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.orgInvite.updateMany({ where: { id: parsed.inviteId, organizationId: organization.id, usedAt: null, expiresAt: { gt: revokedAt } }, data: { expiresAt: revokedAt } });
+      revoked = result.count > 0;
+      if (revoked) await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "ORGANIZATION_INVITE_REVOKED", summary: `An outstanding invite for ${organization.name} was revoked.`, metadata: { organizationId: organization.id, organizationSlug: organization.slug, inviteId: parsed.inviteId, reason: parsed.reason } } });
+    });
+    if (!revoked) return reply.status(409).send({ code: "INVITE_NOT_ACTIVE", message: "The invitation is no longer active" });
+    info(request.log, "platform.organization.invite_revoked", { organizationId: organization.id, inviteId: parsed.inviteId });
+    return reply.status(200).send({ revoked: true });
   });
 
   app.post("/platform/settings", async (request, reply) => {
@@ -265,13 +286,14 @@ export async function registerPlatformRoutes(
       orderBy: { displayName: "asc" }, take: 50,
       select: {
         id: true, displayName: true, email: true, auth0Sub: true, deletionRequestedAt: true,
-        deviceRegistrations: { where: { revokedAt: null }, select: { id: true } },
+        deviceRegistrations: { where: { revokedAt: null }, orderBy: { lastSeenAt: "desc" }, select: { id: true, organizationId: true, platform: true, appVersion: true, locale: true, createdAt: true, lastSeenAt: true, organization: { select: { name: true } } } },
         memberships: { select: { isActive: true, archivedAt: true, role: true, organizationId: true, organization: { select: { name: true, slug: true, archivedAt: true, suspendedAt: true } } } },
       },
     });
     return reply.status(200).send({ users: users.map((user) => ({
       id: user.id, displayName: user.displayName, email: user.email, auth0Sub: user.auth0Sub,
       deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null, activeDeviceCount: user.deviceRegistrations.length,
+      devices: user.deviceRegistrations.map((device) => ({ id: device.id, organizationId: device.organizationId, organizationName: device.organization.name, platform: device.platform, appVersion: device.appVersion, locale: device.locale, createdAt: device.createdAt.toISOString(), lastSeenAt: device.lastSeenAt.toISOString() })),
       memberships: user.memberships.map((membership) => {
         const membershipActive = membership.isActive && !membership.archivedAt;
         const organizationStatus = membership.organization.archivedAt ? "ARCHIVED" : membership.organization.suspendedAt ? "SUSPENDED" : "ACTIVE";
@@ -280,5 +302,22 @@ export async function registerPlatformRoutes(
         return { organizationId: membership.organizationId, organizationName: membership.organization.name, organizationSlug: membership.organization.slug, role: membership.role, membershipStatus: membershipActive ? "ACTIVE" : "INACTIVE", organizationStatus, effectiveAccess, capabilities };
       }),
     })) });
+  });
+
+  app.post("/platform/users/revoke-devices", async (request, reply) => {
+    const parsed = await parseBody(revokePlatformUserDevicesSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const user = await prisma.user.findUnique({ where: { id: parsed.userId }, select: { id: true, displayName: true } });
+    if (!user) return reply.status(404).send({ code: "USER_NOT_FOUND", message: "User not found" });
+    if (user.displayName !== parsed.confirmationDisplayName) return reply.status(409).send({ code: "CONFIRMATION_MISMATCH", message: "The confirmation display name does not match" });
+    const revokedAt = new Date();
+    let revokedCount = 0;
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.deviceRegistration.updateMany({ where: { userId: user.id, revokedAt: null, ...(parsed.deviceRegistrationId ? { id: parsed.deviceRegistrationId } : {}) }, data: { revokedAt } });
+      revokedCount = result.count;
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: parsed.deviceRegistrationId ? "USER_DEVICE_REVOKED" : "USER_DEVICES_REVOKED", summary: `${revokedCount} active device registration${revokedCount === 1 ? "" : "s"} for ${user.displayName} were revoked.`, metadata: { userId: user.id, deviceRegistrationId: parsed.deviceRegistrationId ?? null, revokedCount, reason: parsed.reason } } });
+    });
+    info(request.log, "platform.user.devices_revoked", { userId: user.id, deviceRegistrationId: parsed.deviceRegistrationId ?? null, revokedCount });
+    return reply.status(200).send({ revokedCount });
   });
 }
