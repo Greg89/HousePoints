@@ -205,6 +205,27 @@ export const updatePlatformSupportCaseSchema = z.object({ supportCaseId: z.strin
 export const addPlatformSupportNoteSchema = z.object({ supportCaseId: z.string().min(1), body: z.string().trim().min(3).max(2000) }).strict();
 export const platformSupportCaseMutationResponseSchema = z.object({ updated: z.boolean() });
 
+export const moderationReportTargetTypeSchema = z.enum(["USER", "POINT_TRANSACTION"]);
+export const moderationReportStatusSchema = z.enum(["OPEN", "REVIEWING", "RESOLVED", "DISMISSED"]);
+export const submitModerationReportSchema = z.object({
+  targetType: moderationReportTargetTypeSchema,
+  targetId: z.string().min(1),
+  category: z.enum(["HARASSMENT", "INAPPROPRIATE_CONTENT", "SPAM", "PRIVACY", "OTHER"]),
+  details: z.string().trim().max(1000).optional(),
+}).strict();
+export const submitModerationReportResponseSchema = z.object({ id: z.string().min(1) });
+export const listPlatformModerationReportsSchema = z.object({ status: moderationReportStatusSchema.optional() }).strict();
+export const platformModerationReportSchema = z.object({
+  id: z.string().min(1), targetType: moderationReportTargetTypeSchema, targetId: z.string().min(1),
+  category: z.string().min(1), details: z.string().nullable(), status: moderationReportStatusSchema,
+  evidenceSnapshot: z.record(z.string(), z.unknown()), createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
+  organization: z.object({ id: z.string().min(1), name: z.string().min(1), slug: z.string().min(1) }),
+  reporter: z.object({ id: z.string().min(1), displayName: z.string().min(1), email: z.string().email().nullable() }),
+  priorReportCount: z.number().int().nonnegative(),
+});
+export const listPlatformModerationReportsResponseSchema = z.object({ reports: z.array(platformModerationReportSchema) });
+export type PlatformModerationReportList = z.infer<typeof listPlatformModerationReportsResponseSchema>;
+
 export type PlatformUserSearchResponse = z.infer<typeof platformUserSearchResponseSchema>;
 export type PlatformAccountDeletionQueue = z.infer<typeof platformAccountDeletionQueueResponseSchema>;
 export type PlatformSupportCaseList = z.infer<typeof listPlatformSupportCasesResponseSchema>;

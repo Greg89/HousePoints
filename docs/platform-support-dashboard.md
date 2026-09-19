@@ -134,6 +134,8 @@ The fourth Slice 3 increment adds operator-created support cases with optional o
 - [ ] Release/client-version overview and maintenance messaging.
 - [ ] Cost, database-growth, push-delivery, and error thresholds.
 
+The first Slice 4 increment establishes organization-scoped report intake for users and point activity plus a platform-owner moderation queue. Each report stores an immutable, bounded evidence snapshot at submission time and shows prior-report counts for the same target. Resolution actions and end-user report controls remain the next increment, so the parent checklist stays open.
+
 ### Slice 5 — multi-operator governance
 
 - [ ] Database-backed platform roles and role-management UI.

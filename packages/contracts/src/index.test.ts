@@ -123,6 +123,8 @@ const webConsumedApiEndpoints = [
   "/platform/support-cases/detail",
   "/platform/support-cases/update",
   "/platform/support-cases/notes",
+  "/moderation/reports/submit",
+  "/platform/moderation/reports",
   "/platform/settings",
   "/points/deduct",
   "/points/delete",

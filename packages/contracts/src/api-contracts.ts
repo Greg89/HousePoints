@@ -122,6 +122,10 @@ import {
   updatePlatformSupportCaseSchema,
   addPlatformSupportNoteSchema,
   platformSupportCaseMutationResponseSchema,
+  submitModerationReportSchema,
+  submitModerationReportResponseSchema,
+  listPlatformModerationReportsSchema,
+  listPlatformModerationReportsResponseSchema,
 } from "./platform-schemas.js";
 
 type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
@@ -205,6 +209,8 @@ export const apiContracts = {
   "/platform/support-cases/detail": defineContract(readPlatformSupportCaseSchema, platformSupportCaseDetailSchema),
   "/platform/support-cases/update": defineContract(updatePlatformSupportCaseSchema, platformSupportCaseMutationResponseSchema),
   "/platform/support-cases/notes": defineContract(addPlatformSupportNoteSchema, platformSupportCaseMutationResponseSchema),
+  "/moderation/reports/submit": defineContract(submitModerationReportSchema, submitModerationReportResponseSchema),
+  "/platform/moderation/reports": defineContract(listPlatformModerationReportsSchema, listPlatformModerationReportsResponseSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,

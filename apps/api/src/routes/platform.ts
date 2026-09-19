@@ -15,8 +15,11 @@ import {
   readPlatformSupportCaseSchema,
   updatePlatformSupportCaseSchema,
   addPlatformSupportNoteSchema,
+  submitModerationReportSchema,
+  listPlatformModerationReportsSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import type { Prisma } from "@prisma/client";
 import type { OrganizationCreationPolicy } from "../config.js";
 import { info, warn } from "../logging.js";
 import {
@@ -24,7 +27,7 @@ import {
   assertOrganizationCapacity,
   OrganizationCapacityError,
 } from "../organization-capacity.js";
-import { parseBody } from "../route-helpers.js";
+import { parseBody, requireActor } from "../route-helpers.js";
 
 type PlatformRouteOptions = {
   hardOrganizationCreationPolicy: OrganizationCreationPolicy;
@@ -63,6 +66,26 @@ export async function registerPlatformRoutes(
   app: FastifyInstance,
   options: PlatformRouteOptions,
 ): Promise<void> {
+  app.post("/moderation/reports/submit", async (request, reply) => {
+    const parsed = await parseBody(submitModerationReportSchema, request, reply);
+    if (!parsed) return;
+    const actor = await requireActor(request, reply);
+    if (!actor) return;
+    let evidenceSnapshot: Prisma.InputJsonObject;
+    if (parsed.targetType === "POINT_TRANSACTION") {
+      const point = await prisma.pointTransaction.findFirst({ where: { id: parsed.targetId, organizationId: actor.organizationId }, select: { id: true, type: true, delta: true, reason: true, trait: true, createdAt: true, actor: { select: { id: true, displayName: true } }, targetUser: { select: { id: true, displayName: true } }, targetHouse: { select: { id: true, name: true } } } });
+      if (!point) return reply.status(404).send({ code: "REPORT_TARGET_NOT_FOUND", message: "Report target not found" });
+      evidenceSnapshot = { ...point, createdAt: point.createdAt.toISOString() };
+    } else {
+      const membership = await prisma.organizationMembership.findFirst({ where: { organizationId: actor.organizationId, userId: parsed.targetId }, select: { role: true, isActive: true, user: { select: { id: true, displayName: true } } } });
+      if (!membership) return reply.status(404).send({ code: "REPORT_TARGET_NOT_FOUND", message: "Report target not found" });
+      evidenceSnapshot = { userId: membership.user.id, displayName: membership.user.displayName, role: membership.role, membershipActive: membership.isActive };
+    }
+    const report = await prisma.moderationReport.create({ data: { organizationId: actor.organizationId, reporterUserId: actor.id, targetType: parsed.targetType, targetId: parsed.targetId, category: parsed.category, details: parsed.details, evidenceSnapshot }, select: { id: true } });
+    info(request.log, "moderation.report.submitted", { reportId: report.id, organizationId: actor.organizationId, targetType: parsed.targetType, targetId: parsed.targetId, category: parsed.category });
+    return reply.status(201).send(report);
+  });
+
   app.post("/platform/overview", async (request, reply) => {
     const parsed = await parseBody(platformOverviewRequestSchema, request, reply);
     if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
@@ -456,5 +479,16 @@ export async function registerPlatformRoutes(
     });
     info(request.log, "platform.support_case.note_added", { supportCaseId: parsed.supportCaseId });
     return reply.status(200).send({ updated: true });
+  });
+
+  app.post("/platform/moderation/reports", async (request, reply) => {
+    const parsed = await parseBody(listPlatformModerationReportsSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const [reports, totals] = await Promise.all([
+      prisma.moderationReport.findMany({ where: parsed.status ? { status: parsed.status } : undefined, orderBy: { createdAt: "desc" }, take: 200, select: { id: true, targetType: true, targetId: true, category: true, details: true, evidenceSnapshot: true, status: true, createdAt: true, updatedAt: true, organization: { select: { id: true, name: true, slug: true } }, reporter: { select: { id: true, displayName: true, email: true } } } }),
+      prisma.moderationReport.groupBy({ by: ["targetType", "targetId"], _count: true }),
+    ]);
+    const counts = new Map(totals.map((total) => [`${total.targetType}:${total.targetId}`, total._count]));
+    return reply.status(200).send({ reports: reports.map((report) => ({ ...report, evidenceSnapshot: report.evidenceSnapshot, createdAt: report.createdAt.toISOString(), updatedAt: report.updatedAt.toISOString(), priorReportCount: Math.max(0, (counts.get(`${report.targetType}:${report.targetId}`) ?? 1) - 1) })) });
   });
 }

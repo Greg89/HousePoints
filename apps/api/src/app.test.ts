@@ -51,6 +51,7 @@ vi.mock("@housepoints/db", () => ({
       update: vi.fn(),
     },
     platformSupportNote: { create: vi.fn() },
+    moderationReport: { create: vi.fn(), findMany: vi.fn(), groupBy: vi.fn() },
     organizationErrorSignal: { upsert: vi.fn() },
     authIdentity: {
       findUnique: vi.fn(),
@@ -159,6 +160,9 @@ const mockSupportCaseFindMany = prisma.platformSupportCase.findMany as ReturnTyp
 const mockSupportCaseFindUnique = prisma.platformSupportCase.findUnique as ReturnType<typeof vi.fn>;
 const mockSupportCaseCreate = prisma.platformSupportCase.create as ReturnType<typeof vi.fn>;
 const mockSupportNoteCreate = prisma.platformSupportNote.create as ReturnType<typeof vi.fn>;
+const mockModerationReportCreate = prisma.moderationReport.create as ReturnType<typeof vi.fn>;
+const mockModerationReportFindMany = prisma.moderationReport.findMany as ReturnType<typeof vi.fn>;
+const mockModerationReportGroupBy = prisma.moderationReport.groupBy as ReturnType<typeof vi.fn>;
 const mockErrorSignalUpsert = prisma.organizationErrorSignal.upsert as ReturnType<typeof vi.fn>;
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
@@ -350,6 +354,8 @@ beforeEach(() => {
   mockPlatformAuditFindMany.mockResolvedValue([]);
   mockPlatformAuditCreate.mockResolvedValue({});
   mockSupportCaseFindMany.mockResolvedValue([]);
+  mockModerationReportFindMany.mockResolvedValue([]);
+  mockModerationReportGroupBy.mockResolvedValue([]);
   mockExecuteRawUnsafe.mockResolvedValue(1);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
@@ -6551,6 +6557,28 @@ describe("POST /orgs/create", () => {
 });
 
 describe("platform support routes", () => {
+  it("submits an organization-scoped point report with an immutable evidence snapshot", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", type: "AWARD", delta: 10, reason: "Great work", trait: "LEADERSHIP", createdAt: new Date("2026-09-20T12:00:00.000Z"), actor: { id: "user-2", displayName: "Sam" }, targetUser: { id: "user-3", displayName: "Alex" }, targetHouse: { id: "house-1", name: "Phoenix" } });
+    mockModerationReportCreate.mockResolvedValue({ id: "report-1" });
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/moderation/reports/submit", payload: { targetType: "POINT_TRANSACTION", targetId: "tx-1", category: "INAPPROPRIATE_CONTENT", details: "The award message needs review." } });
+    expect(res.statusCode).toBe(201);
+    expect(mockModerationReportCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        reporterUserId: "user-1",
+        targetId: "tx-1",
+        evidenceSnapshot: expect.objectContaining({
+          reason: "Great work",
+          actor: { id: "user-2", displayName: "Sam" },
+        }),
+      }),
+      select: { id: true },
+    });
+    await app.close();
+  });
+
   it("rejects authenticated users who are not platform owners", async () => {
     const app = await buildTestApp("auth0|member", {}, {
       platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),

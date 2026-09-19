@@ -117,6 +117,7 @@ export type ApiLogEvent =
   | "platform.support_case.created"
   | "platform.support_case.updated"
   | "platform.support_case.note_added"
+  | "moderation.report.submitted"
   | "orgs.invite.created"
   | "orgs.join.preview_loaded"
   | "orgs.join.invalid_token"

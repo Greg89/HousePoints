@@ -22,6 +22,8 @@ import {
   type PlatformSupportCaseDetail,
   createPlatformSupportCaseResponseSchema,
   platformSupportCaseMutationResponseSchema,
+  listPlatformModerationReportsResponseSchema,
+  type PlatformModerationReportList,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -39,6 +41,14 @@ export async function readPlatformOverview(): Promise<PlatformOverview> {
       body: JSON.stringify({}),
     });
     return parseApiResponse(response, platformOverviewSchema, "The platform dashboard could not be loaded.");
+  });
+}
+
+export async function readPlatformModerationReports(): Promise<PlatformModerationReportList> {
+  return runServerAction("readPlatformModerationReports", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/moderation/reports", context.requestId, { method: "POST", body: JSON.stringify({}) });
+    return parseApiResponse(response, listPlatformModerationReportsResponseSchema, "Moderation reports could not be loaded.");
   });
 }
 

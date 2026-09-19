@@ -96,6 +96,18 @@ enum PlatformSupportCasePriority {
   URGENT
 }
 
+enum ModerationReportTargetType {
+  USER
+  POINT_TRANSACTION
+}
+
+enum ModerationReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
 model Organization {
   id             String                   @id @default(cuid())
   name           String
@@ -117,6 +129,7 @@ model Organization {
   deviceRegistrations DeviceRegistration[]
   errorSignals   OrganizationErrorSignal[]
   platformSupportCases PlatformSupportCase[]
+  moderationReports ModerationReport[]
   archivedBy     User?                    @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -200,6 +213,7 @@ model User {
   pointReactions           PointReaction[]          @relation("PointReactionActor")
   deviceRegistrations      DeviceRegistration[]
   platformSupportCases     PlatformSupportCase[]
+  moderationReports        ModerationReport[] @relation("ModerationReporter")
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -419,6 +433,27 @@ model PlatformSupportNote {
   supportCase      PlatformSupportCase @relation(fields: [supportCaseId], references: [id], onDelete: Cascade)
 
   @@index([supportCaseId, createdAt])
+}
+
+model ModerationReport {
+  id                String                     @id @default(cuid())
+  organizationId    String
+  reporterUserId    String
+  targetType        ModerationReportTargetType
+  targetId          String
+  category          String
+  details           String?
+  evidenceSnapshot  Json
+  status            ModerationReportStatus     @default(OPEN)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reporter          User                       @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([reporterUserId, createdAt])
 }
 
 model OrganizationErrorSignal {
