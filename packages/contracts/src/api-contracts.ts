@@ -100,6 +100,8 @@ import {
   platformOrganizationDetailSchema,
   updatePlatformOrganizationStatusSchema,
   platformOrganizationStatusResponseSchema,
+  revokePlatformOrganizationInvitesSchema,
+  revokePlatformOrganizationInvitesResponseSchema,
 } from "./platform-schemas.js";
 
 type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
@@ -171,6 +173,7 @@ export const apiContracts = {
   "/platform/settings": defineContract(updatePlatformSettingsSchema, platformSettingsSchema),
   "/platform/organizations/detail": defineContract(platformOrganizationDetailRequestSchema, platformOrganizationDetailSchema),
   "/platform/organizations/status": defineContract(updatePlatformOrganizationStatusSchema, platformOrganizationStatusResponseSchema),
+  "/platform/organizations/revoke-invites": defineContract(revokePlatformOrganizationInvitesSchema, revokePlatformOrganizationInvitesResponseSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,

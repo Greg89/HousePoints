@@ -74,7 +74,7 @@ export const platformOrganizationDetailSchema = z.object({
 
 export const updatePlatformOrganizationStatusSchema = z.object({
   organizationId: z.string().min(1),
-  action: z.enum(["SUSPEND", "RESUME"]),
+  action: z.enum(["SUSPEND", "RESUME", "ARCHIVE", "RESTORE"]),
   confirmationSlug: z.string().min(1),
   reason: z.string().trim().min(3).max(500).optional(),
 }).strict().superRefine((value, context) => {
@@ -87,7 +87,11 @@ export const platformOrganizationStatusResponseSchema = z.object({
   id: z.string().min(1),
   status: z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]),
   suspendedAt: z.string().datetime().nullable(),
+  archivedAt: z.string().datetime().nullable(),
 });
+
+export const revokePlatformOrganizationInvitesSchema = z.object({ organizationId: z.string().min(1), confirmationSlug: z.string().min(1) }).strict();
+export const revokePlatformOrganizationInvitesResponseSchema = z.object({ revokedCount: z.number().int().nonnegative() });
 
 export type PlatformOrganizationDetail = z.infer<typeof platformOrganizationDetailSchema>;
 

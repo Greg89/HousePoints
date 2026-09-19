@@ -6645,6 +6645,29 @@ describe("platform support routes", () => {
     expect(mockOrgUpdate).not.toHaveBeenCalled();
     await app.close();
   });
+
+  it("archives an organization and clears any suspension state", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme", archivedAt: null, suspendedAt: new Date() });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/status", payload: { organizationId: "org-1", action: "ARCHIVE", confirmationSlug: "acme" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ status: "ARCHIVED", archivedAt: expect.any(String) });
+    expect(mockOrgUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ archivedAt: expect.any(Date), suspendedAt: null, suspensionReason: null }) }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_ARCHIVED" }) });
+    await app.close();
+  });
+
+  it("revokes every outstanding invite and audits the count", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme" });
+    mockInviteUpdateMany.mockResolvedValue({ count: 3 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/revoke-invites", payload: { organizationId: "org-1", confirmationSlug: "acme" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revokedCount: 3 });
+    expect(mockInviteUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-1", usedAt: null }), data: { expiresAt: expect.any(Date) } }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_INVITES_REVOKED", metadata: expect.objectContaining({ revokedCount: 3 }) }) });
+    await app.close();
+  });
 });
 
 describe("POST /orgs/invite", () => {

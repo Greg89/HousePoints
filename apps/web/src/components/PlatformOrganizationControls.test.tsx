@@ -6,7 +6,7 @@ import { PlatformOrganizationControls } from "./PlatformOrganizationControls";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock("@/app/actions/platform", () => ({ updatePlatformOrganizationStatus: vi.fn().mockResolvedValue({ ok: true }) }));
+vi.mock("@/app/actions/platform", () => ({ updatePlatformOrganizationStatus: vi.fn().mockResolvedValue({ ok: true }), revokePlatformOrganizationInvites: vi.fn().mockResolvedValue({ ok: true, revokedCount: 1 }) }));
 
 const organization = { id: "org-1", name: "Acme", slug: "acme", status: "ACTIVE" as const, memberCount: 3, ownerCount: 1, lastActivityAt: null, createdAt: "2026-09-01T12:00:00.000Z", archivedAt: null, suspendedAt: null, suspensionReason: null, transactionCount: 5, activeInviteCount: 1, deviceCount: 2 };
 

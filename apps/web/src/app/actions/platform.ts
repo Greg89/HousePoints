@@ -8,6 +8,7 @@ import {
   type PlatformOrganizationDetail,
   platformOrganizationDetailSchema,
   platformOrganizationStatusResponseSchema,
+  revokePlatformOrganizationInvitesResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -36,13 +37,28 @@ export async function readPlatformOrganization(organizationId: string): Promise<
   });
 }
 
-export async function updatePlatformOrganizationStatus(input: { organizationId: string; action: "SUSPEND" | "RESUME"; confirmationSlug: string; reason?: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function updatePlatformOrganizationStatus(input: { organizationId: string; action: "SUSPEND" | "RESUME" | "ARCHIVE" | "RESTORE"; confirmationSlug: string; reason?: string }): Promise<{ ok: true } | { ok: false; message: string }> {
   return runServerAction("updatePlatformOrganizationStatus", async (context) => {
     await requireAuthenticatedApiContext();
     const response = await apiFetch("/platform/organizations/status", context.requestId, { method: "POST", body: JSON.stringify(input) });
     try { await parseApiResponse(response, platformOrganizationStatusResponseSchema, "The organization status could not be updated."); }
     catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
     revalidatePath("/platform"); revalidatePath(`/platform/organizations/${input.organizationId}`); return { ok: true };
+  });
+}
+
+export async function revokePlatformOrganizationInvites(input: { organizationId: string; confirmationSlug: string }): Promise<{ ok: true; revokedCount: number } | { ok: false; message: string }> {
+  return runServerAction("revokePlatformOrganizationInvites", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/organizations/revoke-invites", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try {
+      const result = await parseApiResponse(response, revokePlatformOrganizationInvitesResponseSchema, "Outstanding invites could not be revoked.");
+      revalidatePath(`/platform/organizations/${input.organizationId}`);
+      return { ok: true, revokedCount: result.revokedCount };
+    } catch (error) {
+      if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message };
+      throw error;
+    }
   });
 }
 

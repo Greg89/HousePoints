@@ -3,6 +3,7 @@ import {
   platformOverviewRequestSchema,
   platformOrganizationDetailRequestSchema,
   updatePlatformOrganizationStatusSchema,
+  revokePlatformOrganizationInvitesSchema,
   updatePlatformSettingsSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -10,6 +11,8 @@ import type { OrganizationCreationPolicy } from "../config.js";
 import { info, warn } from "../logging.js";
 import {
   readEffectiveOrganizationCreationPolicy,
+  assertOrganizationCapacity,
+  OrganizationCapacityError,
 } from "../organization-capacity.js";
 import { parseBody } from "../route-helpers.js";
 
@@ -152,19 +155,52 @@ export async function registerPlatformRoutes(
     const existing = await prisma.organization.findUnique({ where: { id: parsed.organizationId }, select: { id: true, name: true, slug: true, archivedAt: true, suspendedAt: true } });
     if (!existing) return reply.status(404).send({ code: "ORGANIZATION_NOT_FOUND", message: "Organization not found" });
     if (existing.slug !== parsed.confirmationSlug) return reply.status(409).send({ code: "CONFIRMATION_MISMATCH", message: "The confirmation slug does not match" });
-    if (existing.archivedAt) return reply.status(409).send({ code: "ORGANIZATION_ARCHIVED", message: "Archived organizations cannot be suspended or resumed" });
-    const suspendedAt = parsed.action === "SUSPEND" ? new Date() : null;
-    await prisma.$transaction(async (tx) => {
-      await tx.organization.update({ where: { id: existing.id }, data: { suspendedAt, suspendedByAuth0Sub: suspendedAt ? request.auth.subject : null, suspensionReason: suspendedAt ? parsed.reason : null } });
+    if ((parsed.action === "SUSPEND" || parsed.action === "RESUME") && existing.archivedAt) return reply.status(409).send({ code: "ORGANIZATION_ARCHIVED", message: "Archived organizations cannot be suspended or resumed" });
+    if (parsed.action === "ARCHIVE" && existing.archivedAt) return reply.status(409).send({ code: "ORGANIZATION_ALREADY_ARCHIVED", message: "Organization is already archived" });
+    if (parsed.action === "RESTORE" && !existing.archivedAt) return reply.status(409).send({ code: "ORGANIZATION_NOT_ARCHIVED", message: "Organization is not archived" });
+    const now = new Date();
+    try { await prisma.$transaction(async (tx) => {
+      if (parsed.action === "RESTORE") await assertOrganizationCapacity(tx, options.hardOrganizationCreationPolicy);
+      const data = parsed.action === "SUSPEND"
+        ? { suspendedAt: now, suspendedByAuth0Sub: request.auth.subject, suspensionReason: parsed.reason }
+        : parsed.action === "RESUME"
+          ? { suspendedAt: null, suspendedByAuth0Sub: null, suspensionReason: null }
+          : parsed.action === "ARCHIVE"
+            ? { archivedAt: now, archivedById: null, suspendedAt: null, suspendedByAuth0Sub: null, suspensionReason: null }
+            : { archivedAt: null, archivedById: null };
+      await tx.organization.update({ where: { id: existing.id }, data });
+      const pastTense = { SUSPEND: "suspended", RESUME: "resumed", ARCHIVE: "archived", RESTORE: "restored" }[parsed.action];
       await tx.platformAuditEvent.create({ data: {
         actorAuth0Sub: request.auth.subject,
-        eventType: parsed.action === "SUSPEND" ? "ORGANIZATION_SUSPENDED" : "ORGANIZATION_RESUMED",
-        summary: `${existing.name} was ${parsed.action === "SUSPEND" ? "suspended" : "resumed"}.`,
+        eventType: `ORGANIZATION_${pastTense.toUpperCase()}`,
+        summary: `${existing.name} was ${pastTense}.`,
         metadata: { organizationId: existing.id, organizationSlug: existing.slug, reason: parsed.reason ?? null },
       } });
+    }); } catch (error) {
+      if (error instanceof OrganizationCapacityError) return reply.status(409).send({ code: error.code, message: error.message });
+      throw error;
+    }
+    const status = parsed.action === "ARCHIVE" ? "ARCHIVED" : parsed.action === "SUSPEND" ? "SUSPENDED" : "ACTIVE";
+    const logEvent = { SUSPEND: "platform.organization.suspended", RESUME: "platform.organization.resumed", ARCHIVE: "platform.organization.archived", RESTORE: "platform.organization.restored" } as const;
+    info(request.log, logEvent[parsed.action], { organizationId: existing.id });
+    return reply.status(200).send({ id: existing.id, status, suspendedAt: parsed.action === "SUSPEND" ? now.toISOString() : null, archivedAt: parsed.action === "ARCHIVE" ? now.toISOString() : null });
+  });
+
+  app.post("/platform/organizations/revoke-invites", async (request, reply) => {
+    const parsed = await parseBody(revokePlatformOrganizationInvitesSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const organization = await prisma.organization.findUnique({ where: { id: parsed.organizationId }, select: { id: true, name: true, slug: true } });
+    if (!organization) return reply.status(404).send({ code: "ORGANIZATION_NOT_FOUND", message: "Organization not found" });
+    if (organization.slug !== parsed.confirmationSlug) return reply.status(409).send({ code: "CONFIRMATION_MISMATCH", message: "The confirmation slug does not match" });
+    const revokedAt = new Date();
+    let revokedCount = 0;
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.orgInvite.updateMany({ where: { organizationId: organization.id, usedAt: null, expiresAt: { gt: revokedAt } }, data: { expiresAt: revokedAt } });
+      revokedCount = result.count;
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "ORGANIZATION_INVITES_REVOKED", summary: `${revokedCount} outstanding invite${revokedCount === 1 ? "" : "s"} for ${organization.name} were revoked.`, metadata: { organizationId: organization.id, organizationSlug: organization.slug, revokedCount } } });
     });
-    info(request.log, parsed.action === "SUSPEND" ? "platform.organization.suspended" : "platform.organization.resumed", { organizationId: existing.id });
-    return reply.status(200).send({ id: existing.id, status: suspendedAt ? "SUSPENDED" : "ACTIVE", suspendedAt: suspendedAt?.toISOString() ?? null });
+    info(request.log, "platform.organization.invites_revoked", { organizationId: organization.id, revokedCount });
+    return reply.status(200).send({ revokedCount });
   });
 
   app.post("/platform/settings", async (request, reply) => {
