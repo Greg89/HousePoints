@@ -20,6 +20,7 @@ vi.mock("@housepoints/db", () => ({
       create: vi.fn(),
       update: vi.fn(),
       count: vi.fn(),
+      findMany: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -28,11 +29,20 @@ vi.mock("@housepoints/db", () => ({
       update: vi.fn(),
     },
     organizationMembership: {
+      count: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    platformSettings: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+    },
+    platformAuditEvent: {
+      findMany: vi.fn(),
+      create: vi.fn(),
     },
     authIdentity: {
       findUnique: vi.fn(),
@@ -127,6 +137,12 @@ const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockOrgUpdate = prisma.organization.update as ReturnType<typeof vi.fn>;
 const mockOrgCount = prisma.organization.count as ReturnType<typeof vi.fn>;
+const mockOrgFindMany = prisma.organization.findMany as ReturnType<typeof vi.fn>;
+const mockMembershipCount = prisma.organizationMembership.count as ReturnType<typeof vi.fn>;
+const mockPlatformSettingsFindUnique = prisma.platformSettings.findUnique as ReturnType<typeof vi.fn>;
+const mockPlatformSettingsUpsert = prisma.platformSettings.upsert as ReturnType<typeof vi.fn>;
+const mockPlatformAuditFindMany = prisma.platformAuditEvent.findMany as ReturnType<typeof vi.fn>;
+const mockPlatformAuditCreate = prisma.platformAuditEvent.create as ReturnType<typeof vi.fn>;
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
@@ -307,6 +323,12 @@ beforeEach(() => {
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
   mockOrgCount.mockResolvedValue(0);
+  mockOrgFindMany.mockResolvedValue([]);
+  mockMembershipCount.mockResolvedValue(0);
+  mockPlatformSettingsFindUnique.mockResolvedValue(null);
+  mockPlatformSettingsUpsert.mockResolvedValue({});
+  mockPlatformAuditFindMany.mockResolvedValue([]);
+  mockPlatformAuditCreate.mockResolvedValue({});
   mockExecuteRawUnsafe.mockResolvedValue(1);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
@@ -368,12 +390,14 @@ async function buildTestApp(
     idTokenClaims?: Record<string, unknown>;
     pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
     organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
+    platformOwnerAuth0Subjects?: ReadonlySet<string>;
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
     organizationCreationPolicy: options.organizationCreationPolicy,
+    platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
     pushDispatcher: options.pushDispatcher,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
@@ -6501,6 +6525,102 @@ describe("POST /orgs/create", () => {
       message: "Internal server error",
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
+    await app.close();
+  });
+});
+
+describe("platform support routes", () => {
+  it("rejects authenticated users who are not platform owners", async () => {
+    const app = await buildTestApp("auth0|member", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+    });
+
+    const res = await app.inject({ method: "POST", url: "/platform/overview", payload: {} });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("PLATFORM_OWNER_REQUIRED");
+    expect(mockOrgFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns organization inventory to an allowlisted platform owner", async () => {
+    mockOrgFindMany.mockResolvedValue([{
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+      createdAt: new Date("2026-09-01T12:00:00.000Z"),
+      memberships: [{ role: "OWNER" }, { role: "MEMBER" }],
+      transactions: [{ createdAt: new Date("2026-09-18T12:00:00.000Z") }],
+    }]);
+    mockMembershipCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|platform-owner", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({ method: "POST", url: "/platform/overview", payload: {} });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      activeOrganizationCount: 1,
+      archivedOrganizationCount: 0,
+      totalMemberCount: 2,
+      settings: {
+        hardMaxActiveOrganizations: 10,
+        effectiveMaxActiveOrganizations: 10,
+      },
+      organizations: [{ name: "Acme Corp", memberCount: 2, ownerCount: 1, status: "ACTIVE" }],
+    });
+    await app.close();
+  });
+
+  it("persists lower operating limits with a platform audit event", async () => {
+    mockPlatformSettingsFindUnique.mockResolvedValue({
+      organizationCreationEnabled: false,
+      maxActiveOrganizations: 8,
+    });
+    const app = await buildTestApp("auth0|platform-owner", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/platform/settings",
+      payload: { organizationCreationEnabled: false, maxActiveOrganizations: 8 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockPlatformSettingsUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "global" },
+      update: expect.objectContaining({ maxActiveOrganizations: 8 }),
+    }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorAuth0Sub: "auth0|platform-owner",
+        eventType: "PLATFORM_SETTINGS_UPDATED",
+      }),
+    });
+    expect(res.json().effectiveOrganizationCreationEnabled).toBe(false);
+    await app.close();
+  });
+
+  it("does not let dashboard settings exceed the Railway hard cap", async () => {
+    const app = await buildTestApp("auth0|platform-owner", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/platform/settings",
+      payload: { organizationCreationEnabled: true, maxActiveOrganizations: 11 },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("PLATFORM_HARD_CAP_EXCEEDED");
+    expect(mockPlatformSettingsUpsert).not.toHaveBeenCalled();
     await app.close();
   });
 });

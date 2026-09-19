@@ -19,6 +19,7 @@ import {
   readPointAdjustmentsEnabledFromEnv,
   readPushDispatchEnabledFromEnv,
   readOrganizationCreationPolicyFromEnv,
+  readPlatformOwnerAuth0SubjectsFromEnv,
   type OrganizationCreationPolicy,
 } from "./config.js";
 import { registerAdminRoutes } from "./routes/admin.js";
@@ -28,6 +29,7 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerPointRoutes } from "./routes/points.js";
+import { registerPlatformRoutes } from "./routes/platform.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
 import { registerUserRoutes } from "./routes/users.js";
@@ -49,6 +51,7 @@ type BuildAppOptions = {
   pointAdjustmentsEnabled?: boolean;
   pushDispatcher?: PushDispatcher | null;
   organizationCreationPolicy?: OrganizationCreationPolicy;
+  platformOwnerAuth0Subjects?: ReadonlySet<string>;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -63,6 +66,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
   const organizationCreationPolicy =
     options.organizationCreationPolicy ?? readOrganizationCreationPolicyFromEnv();
+  const platformOwnerAuth0Subjects =
+    options.platformOwnerAuth0Subjects ?? readPlatformOwnerAuth0SubjectsFromEnv();
   const pushDispatcher = options.pushDispatcher === undefined
     ? readPushDispatchEnabledFromEnv()
       ? new ExpoPushDispatcher(readExpoAccessTokenFromEnv())
@@ -125,6 +130,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerOrgRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerUserRoutes(app, { verifyIdToken });
   await registerPointRoutes(app, { pointAdjustmentsEnabled, pushDispatcher });
+  await registerPlatformRoutes(app, {
+    hardOrganizationCreationPolicy: organizationCreationPolicy,
+    platformOwnerAuth0Subjects,
+  });
   await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
 

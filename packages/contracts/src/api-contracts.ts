@@ -91,6 +91,12 @@ import {
   unregisterDeviceRequestSchema,
   unregisterDeviceResponseSchema,
 } from "./device-schemas.js";
+import {
+  platformOverviewRequestSchema,
+  platformOverviewSchema,
+  updatePlatformSettingsSchema,
+  platformSettingsSchema,
+} from "./platform-schemas.js";
 
 type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
   request: Req;
@@ -157,6 +163,8 @@ export const apiContracts = {
   "/orgs/join/preview": defineContract(joinInvitePreviewSchema, joinInvitePreviewResponseSchema),
   "/orgs/join": defineContract(joinOrgSchema, appUserSchema),
   "/orgs/route-context": defineContract(orgRouteContextRequestSchema, orgRouteContextSchema),
+  "/platform/overview": defineContract(platformOverviewRequestSchema, platformOverviewSchema),
+  "/platform/settings": defineContract(updatePlatformSettingsSchema, platformSettingsSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,

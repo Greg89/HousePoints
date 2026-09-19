@@ -343,6 +343,27 @@ model ReleaseAnnouncement {
   @@index([broadcastAt])
 }
 
+model PlatformSettings {
+  id                         String   @id
+  organizationCreationEnabled Boolean @default(true)
+  maxActiveOrganizations     Int?
+  updatedByAuth0Sub           String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+model PlatformAuditEvent {
+  id             String   @id @default(cuid())
+  actorAuth0Sub  String
+  eventType      String
+  summary        String
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorAuth0Sub, createdAt])
+}
+
 model DeviceRegistration {
   id             String         @id @default(cuid())
   userId         String

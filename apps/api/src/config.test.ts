@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBooleanFlag, parseCorsAllowedOrigins, parseMaxActiveOrganizations, parseReleaseAutomationSecret } from "./config";
+import { parseBooleanFlag, parseCorsAllowedOrigins, parseMaxActiveOrganizations, parsePlatformOwnerAuth0Subjects, parseReleaseAutomationSecret } from "./config";
 
 describe("parseCorsAllowedOrigins", () => {
   it("normalizes and deduplicates comma-separated HTTP origins", () => {
@@ -45,6 +45,15 @@ describe("parseMaxActiveOrganizations", () => {
     expect(() => parseMaxActiveOrganizations(value)).toThrow(
       "MAX_ACTIVE_ORGANIZATIONS must be a positive integer",
     );
+  });
+});
+
+describe("parsePlatformOwnerAuth0Subjects", () => {
+  it("trims, filters, and deduplicates configured subjects", () => {
+    expect([...parsePlatformOwnerAuth0Subjects(" auth0|one,auth0|two, auth0|one ")]).toEqual([
+      "auth0|one",
+      "auth0|two",
+    ]);
   });
 });
 

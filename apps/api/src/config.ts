@@ -69,6 +69,19 @@ export function readOrganizationCreationPolicyFromEnv(): OrganizationCreationPol
   };
 }
 
+export function parsePlatformOwnerAuth0Subjects(value: string | undefined): ReadonlySet<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((subject) => subject.trim())
+      .filter(Boolean),
+  );
+}
+
+export function readPlatformOwnerAuth0SubjectsFromEnv(): ReadonlySet<string> {
+  return parsePlatformOwnerAuth0Subjects(process.env.PLATFORM_OWNER_AUTH0_SUBS);
+}
+
 export function readPointAdjustmentsEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.POINT_ADJUSTMENTS_ENABLED);
 }

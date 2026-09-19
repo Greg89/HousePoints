@@ -104,6 +104,8 @@ export type ApiLogEvent =
   | "orgs.create.account_link_required"
   | "orgs.create.capacity_rejected"
   | "admin.org.restore.capacity_rejected"
+  | "platform.owner_required"
+  | "platform.settings.updated"
   | "orgs.invite.created"
   | "orgs.join.preview_loaded"
   | "orgs.join.invalid_token"
