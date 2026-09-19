@@ -16,6 +16,7 @@ import {
   type ActivityFeedRequest,
   type DashboardSummary,
   type PagedActivityFeed,
+  submitModerationReportResponseSchema,
 } from "@housepoints/contracts";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
@@ -38,6 +39,15 @@ export async function readLeaderboard(requestId: string = randomUUID()) {
     leaderboardSchema,
     "Dashboard data could not be loaded. Please try again.",
   );
+}
+
+export async function reportPointTransaction(input: { transactionId: string; category: "HARASSMENT" | "INAPPROPRIATE_CONTENT" | "SPAM" | "PRIVACY" | "OTHER"; details?: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  return runServerAction("reportPointTransaction", async (context) => {
+    await getCurrentUserForRequest(context.requestId);
+    const response = await apiFetch("/moderation/reports/submit", context.requestId, { method: "POST", body: JSON.stringify({ targetType: "POINT_TRANSACTION", targetId: input.transactionId, category: input.category, details: input.details || undefined }) });
+    try { await parseApiResponse(response, submitModerationReportResponseSchema, "The activity could not be reported."); return { ok: true }; }
+    catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
+  });
 }
 
 export async function readSeasonLeaderboard(

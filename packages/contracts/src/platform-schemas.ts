@@ -222,8 +222,17 @@ export const platformModerationReportSchema = z.object({
   organization: z.object({ id: z.string().min(1), name: z.string().min(1), slug: z.string().min(1) }),
   reporter: z.object({ id: z.string().min(1), displayName: z.string().min(1), email: z.string().email().nullable() }),
   priorReportCount: z.number().int().nonnegative(),
+  resolvedAt: z.string().datetime().nullable(),
+  resolvedByAuth0Sub: z.string().nullable(),
+  operatorNote: z.string().nullable(),
 });
 export const listPlatformModerationReportsResponseSchema = z.object({ reports: z.array(platformModerationReportSchema) });
+export const resolvePlatformModerationReportSchema = z.object({
+  reportId: z.string().min(1),
+  action: z.enum(["START_REVIEW", "DISMISS", "RESOLVE", "REDACT_CONTENT"]),
+  operatorNote: z.string().trim().min(3).max(1000),
+}).strict();
+export const resolvePlatformModerationReportResponseSchema = z.object({ updated: z.boolean() });
 export type PlatformModerationReportList = z.infer<typeof listPlatformModerationReportsResponseSchema>;
 
 export type PlatformUserSearchResponse = z.infer<typeof platformUserSearchResponseSchema>;

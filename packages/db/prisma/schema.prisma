@@ -444,7 +444,10 @@ model ModerationReport {
   category          String
   details           String?
   evidenceSnapshot  Json
-  status            ModerationReportStatus     @default(OPEN)
+    status            ModerationReportStatus     @default(OPEN)
+    resolvedAt        DateTime?
+    resolvedByAuth0Sub String?
+    operatorNote      String?
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)

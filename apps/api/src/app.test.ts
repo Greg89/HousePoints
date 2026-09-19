@@ -51,7 +51,7 @@ vi.mock("@housepoints/db", () => ({
       update: vi.fn(),
     },
     platformSupportNote: { create: vi.fn() },
-    moderationReport: { create: vi.fn(), findMany: vi.fn(), groupBy: vi.fn() },
+    moderationReport: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), groupBy: vi.fn() },
     organizationErrorSignal: { upsert: vi.fn() },
     authIdentity: {
       findUnique: vi.fn(),
@@ -163,6 +163,8 @@ const mockSupportNoteCreate = prisma.platformSupportNote.create as ReturnType<ty
 const mockModerationReportCreate = prisma.moderationReport.create as ReturnType<typeof vi.fn>;
 const mockModerationReportFindMany = prisma.moderationReport.findMany as ReturnType<typeof vi.fn>;
 const mockModerationReportGroupBy = prisma.moderationReport.groupBy as ReturnType<typeof vi.fn>;
+const mockModerationReportFindUnique = prisma.moderationReport.findUnique as ReturnType<typeof vi.fn>;
+const mockModerationReportUpdate = prisma.moderationReport.update as ReturnType<typeof vi.fn>;
 const mockErrorSignalUpsert = prisma.organizationErrorSignal.upsert as ReturnType<typeof vi.fn>;
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
@@ -6576,6 +6578,20 @@ describe("platform support routes", () => {
       }),
       select: { id: true },
     });
+    await app.close();
+  });
+
+  it("redacts reported point activity with organization and platform audit evidence", async () => {
+    mockModerationReportFindUnique.mockResolvedValue({ id: "report-1", status: "OPEN", organizationId: "org-1", targetType: "POINT_TRANSACTION", targetId: "tx-1" });
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", delta: 10, targetUserId: "user-3", targetHouseId: "house-1", reason: "Bad message", trait: "LEADERSHIP", deletedAt: null, targetUser: { displayName: "Alex" }, targetHouse: { name: "Phoenix" } });
+    mockModerationReportUpdate.mockResolvedValue({});
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/moderation/reports/resolve", payload: { reportId: "report-1", action: "REDACT_CONTENT", operatorNote: "Message violates the content policy." } });
+    expect(res.statusCode).toBe(200);
+    expect(mockTxUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "tx-1" }, data: expect.objectContaining({ deletedAt: expect.any(Date), deletedByUserId: null }) }));
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ organizationId: "org-1", eventType: "POINT_DELETED", metadata: expect.objectContaining({ moderationReportId: "report-1" }) }) });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "MODERATION_REPORT_UPDATED", metadata: expect.objectContaining({ action: "REDACT_CONTENT" }) }) });
+    expect(mockModerationReportUpdate).toHaveBeenCalledWith({ where: { id: "report-1" }, data: expect.objectContaining({ status: "RESOLVED", operatorNote: "Message violates the content policy.", resolvedByAuth0Sub: "auth0|platform-owner" }) });
     await app.close();
   });
 

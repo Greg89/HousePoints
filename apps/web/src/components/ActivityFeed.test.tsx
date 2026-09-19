@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { ActivityItem, OrgMember } from "@housepoints/contracts";
 import { ActivityFeed } from "./ActivityFeed";
 
+const { reportPointTransaction } = vi.hoisted(() => ({ reportPointTransaction: vi.fn() }));
+vi.mock("@/app/actions/dashboard", () => ({ reportPointTransaction }));
+
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({
@@ -636,5 +639,18 @@ describe("ActivityFeed", () => {
     expect(screen.getByText("Deducted")).toBeInTheDocument();
     expect(screen.getByText("-10")).toBeInTheDocument();
     expect(screen.queryByText(/recognized by/i)).not.toBeInTheDocument();
+  });
+
+  it("submits an activity report from the actions menu", async () => {
+    reportPointTransaction.mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<ActivityFeed items={[baseActivity]} members={members} nextCursor={null} onLoadMore={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /report activity/i }));
+    await user.selectOptions(screen.getByLabelText("Reason"), "SPAM");
+    await user.type(screen.getByLabelText(/details/i), "Repeated promotional message");
+    await user.click(screen.getByRole("button", { name: /submit report/i }));
+    await waitFor(() => expect(reportPointTransaction).toHaveBeenCalledWith({ transactionId: "activity-1", category: "SPAM", details: "Repeated promotional message" }));
+    expect(await screen.findByText(/report submitted/i)).toBeInTheDocument();
   });
 });

@@ -129,12 +129,14 @@ The fourth Slice 3 increment adds operator-created support cases with optional o
 
 ### Slice 4 — moderation and operations
 
-- [ ] User/content reporting and moderation queue.
+- [x] User/content reporting and moderation queue.
 - [ ] Redaction, warning, member suspension, and escalation policy.
 - [ ] Release/client-version overview and maintenance messaging.
 - [ ] Cost, database-growth, push-delivery, and error thresholds.
 
-The first Slice 4 increment establishes organization-scoped report intake for users and point activity plus a platform-owner moderation queue. Each report stores an immutable, bounded evidence snapshot at submission time and shows prior-report counts for the same target. Resolution actions and end-user report controls remain the next increment, so the parent checklist stays open.
+The first Slice 4 increment establishes organization-scoped report intake for users and point activity plus a platform-owner moderation queue. Each report stores an immutable, bounded evidence snapshot at submission time and shows prior-report counts for the same target.
+
+The second increment exposes point-activity reporting on web and mobile and adds private operator decisions for review, dismissal, resolution, and content redaction. Redaction uses the existing point-transaction soft-delete fields, retains the immutable report snapshot, and creates organization and platform audit records without copying the private operator note into general audit metadata. User warnings, member suspension, and a formal escalation policy remain a later increment.
 
 ### Slice 5 — multi-operator governance
 

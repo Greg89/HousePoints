@@ -17,6 +17,7 @@ import {
   addPlatformSupportNoteSchema,
   submitModerationReportSchema,
   listPlatformModerationReportsSchema,
+  resolvePlatformModerationReportSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { Prisma } from "@prisma/client";
@@ -485,10 +486,35 @@ export async function registerPlatformRoutes(
     const parsed = await parseBody(listPlatformModerationReportsSchema, request, reply);
     if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
     const [reports, totals] = await Promise.all([
-      prisma.moderationReport.findMany({ where: parsed.status ? { status: parsed.status } : undefined, orderBy: { createdAt: "desc" }, take: 200, select: { id: true, targetType: true, targetId: true, category: true, details: true, evidenceSnapshot: true, status: true, createdAt: true, updatedAt: true, organization: { select: { id: true, name: true, slug: true } }, reporter: { select: { id: true, displayName: true, email: true } } } }),
+      prisma.moderationReport.findMany({ where: parsed.status ? { status: parsed.status } : undefined, orderBy: { createdAt: "desc" }, take: 200, select: { id: true, targetType: true, targetId: true, category: true, details: true, evidenceSnapshot: true, status: true, resolvedAt: true, resolvedByAuth0Sub: true, operatorNote: true, createdAt: true, updatedAt: true, organization: { select: { id: true, name: true, slug: true } }, reporter: { select: { id: true, displayName: true, email: true } } } }),
       prisma.moderationReport.groupBy({ by: ["targetType", "targetId"], _count: true }),
     ]);
     const counts = new Map(totals.map((total) => [`${total.targetType}:${total.targetId}`, total._count]));
-    return reply.status(200).send({ reports: reports.map((report) => ({ ...report, evidenceSnapshot: report.evidenceSnapshot, createdAt: report.createdAt.toISOString(), updatedAt: report.updatedAt.toISOString(), priorReportCount: Math.max(0, (counts.get(`${report.targetType}:${report.targetId}`) ?? 1) - 1) })) });
+    return reply.status(200).send({ reports: reports.map((report) => ({ ...report, evidenceSnapshot: report.evidenceSnapshot, resolvedAt: report.resolvedAt?.toISOString() ?? null, createdAt: report.createdAt.toISOString(), updatedAt: report.updatedAt.toISOString(), priorReportCount: Math.max(0, (counts.get(`${report.targetType}:${report.targetId}`) ?? 1) - 1) })) });
+  });
+
+  app.post("/platform/moderation/reports/resolve", async (request, reply) => {
+    const parsed = await parseBody(resolvePlatformModerationReportSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const report = await prisma.moderationReport.findUnique({ where: { id: parsed.reportId }, select: { id: true, status: true, organizationId: true, targetType: true, targetId: true } });
+    if (!report) return reply.status(404).send({ code: "MODERATION_REPORT_NOT_FOUND", message: "Moderation report not found" });
+    if (report.status === "RESOLVED" || report.status === "DISMISSED") return reply.status(409).send({ code: "MODERATION_REPORT_CLOSED", message: "This moderation report is already closed" });
+    if (parsed.action === "REDACT_CONTENT" && report.targetType !== "POINT_TRANSACTION") return reply.status(409).send({ code: "MODERATION_TARGET_NOT_REDACTABLE", message: "Only reported point activity can be redacted" });
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      if (parsed.action === "REDACT_CONTENT") {
+        const point = await tx.pointTransaction.findFirst({ where: { id: report.targetId, organizationId: report.organizationId }, select: { id: true, delta: true, targetUserId: true, targetHouseId: true, reason: true, trait: true, deletedAt: true, targetUser: { select: { displayName: true } }, targetHouse: { select: { name: true } } } });
+        if (!point) throw Object.assign(new Error("Moderation target not found"), { code: "MODERATION_TARGET_NOT_FOUND" });
+        if (!point.deletedAt) {
+          await tx.pointTransaction.update({ where: { id: point.id }, data: { deletedAt: now, deletedByUserId: null, deletionReason: "Removed following platform moderation review" } });
+          await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "POINT_DELETED", summary: `Reported point activity for ${point.targetUser?.displayName ?? "Unknown member"} was removed after platform review.`, metadata: { moderationReportId: report.id, transactionId: point.id, targetUserId: point.targetUserId, targetHouseId: point.targetHouseId, targetHouseName: point.targetHouse.name, delta: point.delta, trait: point.trait, awardReason: point.reason, deletionReason: "Removed following platform moderation review" } } });
+        }
+      }
+      const status = parsed.action === "START_REVIEW" ? "REVIEWING" : parsed.action === "DISMISS" ? "DISMISSED" : "RESOLVED";
+      await tx.moderationReport.update({ where: { id: report.id }, data: { status, operatorNote: parsed.operatorNote, resolvedAt: status === "REVIEWING" ? null : now, resolvedByAuth0Sub: status === "REVIEWING" ? null : request.auth.subject } });
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "MODERATION_REPORT_UPDATED", summary: "A moderation report was updated.", metadata: { reportId: report.id, organizationId: report.organizationId, targetType: report.targetType, targetId: report.targetId, action: parsed.action, status } } });
+    });
+    info(request.log, "platform.moderation.report_resolved", { reportId: report.id, organizationId: report.organizationId, action: parsed.action });
+    return reply.status(200).send({ updated: true });
   });
 }

@@ -32,6 +32,8 @@ import {
 } from "@/lib/activity-reactions";
 import { ReactionPickerModal } from "@/components/ReactionPickerModal";
 import { ReactionDetailsModal } from "@/components/ReactionDetailsModal";
+import { ReportActivityModal } from "@/components/ReportActivityModal";
+import { activityReportPayload, type ReportCategory } from "@/lib/moderation-report";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 
@@ -48,6 +50,7 @@ export default function ActivityScreen() {
   const listRef = useRef<FlatList<ActivityItem>>(null);
   const [pickerItem, setPickerItem] = useState<ActivityItem | null>(null);
   const [detailsPointId, setDetailsPointId] = useState<string | null>(null);
+  const [reportItem, setReportItem] = useState<ActivityItem | null>(null);
   const [optimisticReactions, setOptimisticReactions] = useState<
     Record<string, PointReactionResponse>
   >({});
@@ -159,6 +162,14 @@ export default function ActivityScreen() {
       );
     },
   });
+  const reportMutation = useMutation({
+    mutationFn: async (variables: { item: ActivityItem; category: ReportCategory; details: string }) => {
+      const accessToken = await getAccessToken();
+      return callApi("/moderation/reports/submit", activityReportPayload(variables.item.id, variables.category, variables.details), { accessToken, organizationSlug: activeOrgSlug });
+    },
+    onSuccess: () => { setReportItem(null); showToast({ message: "Report submitted. Thank you.", variant: "success" }); },
+    onError: (error) => showToast({ message: error instanceof ApiResponseError ? error.message : "Unable to submit the report.", variant: "error" }),
+  });
   const reactionDetails: PointReactionDetailsResponse | null =
     detailsMutation.data ?? null;
 
@@ -197,6 +208,7 @@ export default function ActivityScreen() {
             detailsMutation.reset();
             detailsMutation.mutate(item.id);
           }}
+          onReport={() => setReportItem(item)}
         />
       )}
       onScrollToIndexFailed={() => undefined}
@@ -261,6 +273,7 @@ export default function ActivityScreen() {
               : null}
             onClose={() => setDetailsPointId(null)}
           />
+          <ReportActivityModal visible={reportItem !== null} pending={reportMutation.isPending} onClose={() => setReportItem(null)} onSubmit={(category, details) => { if (reportItem) reportMutation.mutate({ item: reportItem, category, details }); }} />
         </>
       }
     />
@@ -277,12 +290,14 @@ function ActivityRow({
   reacting,
   onOpenPicker,
   onViewDetails,
+  onReport,
 }: {
   item: ActivityItem;
   focused: boolean;
   reacting: boolean;
   onOpenPicker: () => void;
   onViewDetails: () => void;
+  onReport: () => void;
 }) {
   const presentation = activityCardPresentation(item);
   return (
@@ -405,6 +420,7 @@ function ActivityRow({
             </Pressable>
           </View>
         ) : null}
+        <Pressable style={styles.reportButton} onPress={onReport} accessibilityLabel="Report activity"><Text style={styles.reportButtonText}>⚑ Report</Text></Pressable>
       </View>
     </Pressable>
   );
@@ -541,6 +557,8 @@ const styles = StyleSheet.create({
   reactionChipMine: { borderColor: "#3b82f6", backgroundColor: "#eff6ff" },
   reactButton: { paddingHorizontal: 8, paddingVertical: 5 },
   reactButtonText: { color: "#2563eb", fontSize: 12, fontWeight: "700" },
+  reportButton: { alignSelf: "flex-end", marginTop: 10, paddingHorizontal: 8, paddingVertical: 5 },
+  reportButtonText: { color: "#64748b", fontSize: 12, fontWeight: "700" },
   delta: {
     fontSize: 21,
     fontWeight: "700",

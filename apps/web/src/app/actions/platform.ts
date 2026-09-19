@@ -24,6 +24,7 @@ import {
   platformSupportCaseMutationResponseSchema,
   listPlatformModerationReportsResponseSchema,
   type PlatformModerationReportList,
+  resolvePlatformModerationReportResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -49,6 +50,15 @@ export async function readPlatformModerationReports(): Promise<PlatformModeratio
     await requireAuthenticatedApiContext();
     const response = await apiFetch("/platform/moderation/reports", context.requestId, { method: "POST", body: JSON.stringify({}) });
     return parseApiResponse(response, listPlatformModerationReportsResponseSchema, "Moderation reports could not be loaded.");
+  });
+}
+
+export async function resolvePlatformModerationReport(input: { reportId: string; action: "START_REVIEW" | "DISMISS" | "RESOLVE" | "REDACT_CONTENT"; operatorNote: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  return runServerAction("resolvePlatformModerationReport", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/moderation/reports/resolve", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try { await parseApiResponse(response, resolvePlatformModerationReportResponseSchema, "The moderation report could not be updated."); revalidatePath("/platform/moderation"); return { ok: true }; }
+    catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
   });
 }
 
