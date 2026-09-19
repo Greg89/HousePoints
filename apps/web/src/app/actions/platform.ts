@@ -9,6 +9,8 @@ import {
   platformOrganizationDetailSchema,
   platformOrganizationStatusResponseSchema,
   revokePlatformOrganizationInvitesResponseSchema,
+  platformUserSearchResponseSchema,
+  type PlatformUserSearchResponse,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -26,6 +28,15 @@ export async function readPlatformOverview(): Promise<PlatformOverview> {
       body: JSON.stringify({}),
     });
     return parseApiResponse(response, platformOverviewSchema, "The platform dashboard could not be loaded.");
+  });
+}
+
+export async function searchPlatformUsers(query: string): Promise<{ ok: true; data: PlatformUserSearchResponse } | { ok: false; message: string }> {
+  return runServerAction("searchPlatformUsers", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/users/search", context.requestId, { method: "POST", body: JSON.stringify({ query }) });
+    try { return { ok: true, data: await parseApiResponse(response, platformUserSearchResponseSchema, "Users could not be searched.") }; }
+    catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
   });
 }
 

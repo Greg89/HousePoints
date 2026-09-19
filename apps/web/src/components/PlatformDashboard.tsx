@@ -48,6 +48,7 @@ export function PlatformDashboard({ overview }: { overview: PlatformOverview }) 
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">HousePoints platform</p>
           <h1 className="mt-2 font-display text-3xl font-bold">Support dashboard</h1>
           <p className="mt-2 text-sm text-muted-foreground">Operate capacity and inspect organizations without changing organization context.</p>
+          <Link className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline" href="/platform/users">Search users and permissions →</Link>
         </div>
 
         <section className="grid gap-4 sm:grid-cols-3">

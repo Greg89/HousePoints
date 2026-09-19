@@ -98,6 +98,22 @@ export const platformOrganizationStatusResponseSchema = z.object({
 export const revokePlatformOrganizationInvitesSchema = z.object({ organizationId: z.string().min(1), confirmationSlug: z.string().min(1) }).strict();
 export const revokePlatformOrganizationInvitesResponseSchema = z.object({ revokedCount: z.number().int().nonnegative() });
 
+export const platformUserSearchSchema = z.object({ query: z.string().trim().min(2).max(120) }).strict();
+export const platformUserSearchResponseSchema = z.object({
+  users: z.array(z.object({
+    id: z.string().min(1), displayName: z.string().min(1), email: z.string().email().nullable(), auth0Sub: z.string().min(1),
+    deletionRequestedAt: z.string().datetime().nullable(), activeDeviceCount: z.number().int().nonnegative(),
+    memberships: z.array(z.object({
+      organizationId: z.string().min(1), organizationName: z.string().min(1), organizationSlug: z.string().min(1),
+      role: z.enum(["MEMBER", "ADMIN", "OWNER"]), membershipStatus: z.enum(["ACTIVE", "INACTIVE"]),
+      organizationStatus: z.enum(["ACTIVE", "SUSPENDED", "ARCHIVED"]), effectiveAccess: z.enum(["ALLOWED", "BLOCKED_MEMBERSHIP", "BLOCKED_ORGANIZATION"]),
+      capabilities: z.array(z.enum(["VIEW_ORGANIZATION", "AWARD_POINTS", "MANAGE_MEMBERS", "MANAGE_ORGANIZATION"])),
+    })),
+  })),
+});
+
+export type PlatformUserSearchResponse = z.infer<typeof platformUserSearchResponseSchema>;
+
 export type PlatformOrganizationDetail = z.infer<typeof platformOrganizationDetailSchema>;
 
 export type PlatformOverview = z.infer<typeof platformOverviewSchema>;

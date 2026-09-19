@@ -5,6 +5,7 @@ import {
   updatePlatformOrganizationStatusSchema,
   revokePlatformOrganizationInvitesSchema,
   updatePlatformSettingsSchema,
+  platformUserSearchSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { OrganizationCreationPolicy } from "../config.js";
@@ -248,5 +249,36 @@ export async function registerPlatformRoutes(
       maxActiveOrganizations: parsed.maxActiveOrganizations,
     });
     return reply.status(200).send(await readSettings(options.hardOrganizationCreationPolicy));
+  });
+
+  app.post("/platform/users/search", async (request, reply) => {
+    const parsed = await parseBody(platformUserSearchSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const query = parsed.query;
+    const users = await prisma.user.findMany({
+      where: { OR: [
+        { displayName: { contains: query, mode: "insensitive" } },
+        { email: { contains: query, mode: "insensitive" } },
+        { auth0Sub: { contains: query, mode: "insensitive" } },
+        { authIdentities: { some: { providerSubject: { contains: query, mode: "insensitive" } } } },
+      ] },
+      orderBy: { displayName: "asc" }, take: 50,
+      select: {
+        id: true, displayName: true, email: true, auth0Sub: true, deletionRequestedAt: true,
+        deviceRegistrations: { where: { revokedAt: null }, select: { id: true } },
+        memberships: { select: { isActive: true, archivedAt: true, role: true, organizationId: true, organization: { select: { name: true, slug: true, archivedAt: true, suspendedAt: true } } } },
+      },
+    });
+    return reply.status(200).send({ users: users.map((user) => ({
+      id: user.id, displayName: user.displayName, email: user.email, auth0Sub: user.auth0Sub,
+      deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null, activeDeviceCount: user.deviceRegistrations.length,
+      memberships: user.memberships.map((membership) => {
+        const membershipActive = membership.isActive && !membership.archivedAt;
+        const organizationStatus = membership.organization.archivedAt ? "ARCHIVED" : membership.organization.suspendedAt ? "SUSPENDED" : "ACTIVE";
+        const effectiveAccess = !membershipActive ? "BLOCKED_MEMBERSHIP" : organizationStatus !== "ACTIVE" ? "BLOCKED_ORGANIZATION" : "ALLOWED";
+        const capabilities = effectiveAccess !== "ALLOWED" ? [] : ["VIEW_ORGANIZATION", "AWARD_POINTS", ...(membership.role === "ADMIN" || membership.role === "OWNER" ? ["MANAGE_MEMBERS"] : []), ...(membership.role === "OWNER" ? ["MANAGE_ORGANIZATION"] : [])];
+        return { organizationId: membership.organizationId, organizationName: membership.organization.name, organizationSlug: membership.organization.slug, role: membership.role, membershipStatus: membershipActive ? "ACTIVE" : "INACTIVE", organizationStatus, effectiveAccess, capabilities };
+      }),
+    })) });
   });
 }

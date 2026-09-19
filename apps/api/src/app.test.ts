@@ -6670,6 +6670,22 @@ describe("platform support routes", () => {
     expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_INVITES_REVOKED", metadata: expect.objectContaining({ revokedCount: 3 }) }) });
     await app.close();
   });
+
+  it("searches users and calculates effective permissions across organization states", async () => {
+    mockUserFindMany.mockResolvedValue([{ id: "user-1", displayName: "Alex Owner", email: "alex@example.com", auth0Sub: "auth0|alex", deletionRequestedAt: null, deviceRegistrations: [{ id: "device-1" }], memberships: [
+      { organizationId: "org-1", role: "OWNER", isActive: true, archivedAt: null, organization: { name: "Acme", slug: "acme", archivedAt: null, suspendedAt: null } },
+      { organizationId: "org-2", role: "ADMIN", isActive: true, archivedAt: null, organization: { name: "Paused", slug: "paused", archivedAt: null, suspendedAt: new Date() } },
+    ] }]);
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/users/search", payload: { query: "alex" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ users: [{ displayName: "Alex Owner", activeDeviceCount: 1, memberships: [
+      { organizationSlug: "acme", effectiveAccess: "ALLOWED", capabilities: ["VIEW_ORGANIZATION", "AWARD_POINTS", "MANAGE_MEMBERS", "MANAGE_ORGANIZATION"] },
+      { organizationSlug: "paused", effectiveAccess: "BLOCKED_ORGANIZATION", capabilities: [] },
+    ] }] });
+    expect(mockUserFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 50, where: { OR: expect.any(Array) } }));
+    await app.close();
+  });
 });
 
 describe("POST /telemetry/client-error", () => {

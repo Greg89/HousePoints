@@ -113,6 +113,7 @@ const webConsumedApiEndpoints = [
   "/platform/organizations/detail",
   "/platform/organizations/status",
   "/platform/organizations/revoke-invites",
+  "/platform/users/search",
   "/platform/settings",
   "/points/deduct",
   "/points/delete",
