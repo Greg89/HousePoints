@@ -44,6 +44,7 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       create: vi.fn(),
     },
+    organizationErrorSignal: { upsert: vi.fn() },
     authIdentity: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -144,6 +145,7 @@ const mockPlatformSettingsFindUnique = prisma.platformSettings.findUnique as Ret
 const mockPlatformSettingsUpsert = prisma.platformSettings.upsert as ReturnType<typeof vi.fn>;
 const mockPlatformAuditFindMany = prisma.platformAuditEvent.findMany as ReturnType<typeof vi.fn>;
 const mockPlatformAuditCreate = prisma.platformAuditEvent.create as ReturnType<typeof vi.fn>;
+const mockErrorSignalUpsert = prisma.organizationErrorSignal.upsert as ReturnType<typeof vi.fn>;
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
@@ -6666,6 +6668,30 @@ describe("platform support routes", () => {
     expect(res.json()).toEqual({ revokedCount: 3 });
     expect(mockInviteUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-1", usedAt: null }), data: { expiresAt: expect.any(Date) } }));
     expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_INVITES_REVOKED", metadata: expect.objectContaining({ revokedCount: 3 }) }) });
+    await app.close();
+  });
+});
+
+describe("POST /telemetry/client-error", () => {
+  it("aggregates a sanitized browser error within the actor organization", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockErrorSignalUpsert.mockResolvedValue({ id: "error-1" });
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/telemetry/client-error", payload: { type: "error", message: "Dashboard failed", sourcePath: "/o/acme" } });
+    expect(res.statusCode).toBe(202);
+    expect(mockErrorSignalUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId_fingerprint: { organizationId: "org-1", fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) } },
+      create: expect.objectContaining({ organizationId: "org-1", message: "Dashboard failed", sourcePath: "/o/acme" }),
+      update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+    }));
+    await app.close();
+  });
+
+  it("rejects stack traces and arbitrary telemetry fields", async () => {
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/telemetry/client-error", payload: { type: "error", message: "Failure", sourcePath: "/", stack: "secret stack" } });
+    expect(res.statusCode).toBe(400);
+    expect(mockErrorSignalUpsert).not.toHaveBeenCalled();
     await app.close();
   });
 });

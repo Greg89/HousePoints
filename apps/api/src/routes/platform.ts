@@ -130,6 +130,7 @@ export async function registerPlatformRoutes(
         invites: { where: { usedAt: null, expiresAt: { gt: new Date() } }, select: { id: true } },
         deviceRegistrations: { where: { revokedAt: null }, select: { id: true } },
         auditEvents: { orderBy: { createdAt: "desc" }, take: 25, select: { id: true, eventType: true, summary: true, createdAt: true } },
+        errorSignals: { where: { lastSeenAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }, orderBy: { lastSeenAt: "desc" }, take: 20, select: { id: true, errorType: true, message: true, sourcePath: true, occurrenceCount: true, firstSeenAt: true, lastSeenAt: true } },
       },
     });
     if (!organization) return reply.status(404).send({ code: "ORGANIZATION_NOT_FOUND", message: "Organization not found" });
@@ -146,6 +147,8 @@ export async function registerPlatformRoutes(
       },
       owners,
       recentAuditEvents: organization.auditEvents.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() })),
+      recentErrorSignals: organization.errorSignals.map((signal) => ({ ...signal, firstSeenAt: signal.firstSeenAt.toISOString(), lastSeenAt: signal.lastSeenAt.toISOString() })),
+      recentErrorOccurrenceCount: organization.errorSignals.reduce((total, signal) => total + signal.occurrenceCount, 0),
     });
   });
 

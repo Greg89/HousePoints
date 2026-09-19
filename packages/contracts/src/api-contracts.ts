@@ -91,6 +91,7 @@ import {
   unregisterDeviceRequestSchema,
   unregisterDeviceResponseSchema,
 } from "./device-schemas.js";
+import { reportClientErrorSchema, reportClientErrorResponseSchema } from "./telemetry-schemas.js";
 import {
   platformOverviewRequestSchema,
   platformOverviewSchema,
@@ -171,6 +172,7 @@ export const apiContracts = {
   "/orgs/route-context": defineContract(orgRouteContextRequestSchema, orgRouteContextSchema),
   "/platform/overview": defineContract(platformOverviewRequestSchema, platformOverviewSchema),
   "/platform/settings": defineContract(updatePlatformSettingsSchema, platformSettingsSchema),
+  "/telemetry/client-error": defineContract(reportClientErrorSchema, reportClientErrorResponseSchema),
   "/platform/organizations/detail": defineContract(platformOrganizationDetailRequestSchema, platformOrganizationDetailSchema),
   "/platform/organizations/status": defineContract(updatePlatformOrganizationStatusSchema, platformOrganizationStatusResponseSchema),
   "/platform/organizations/revoke-invites": defineContract(revokePlatformOrganizationInvitesSchema, revokePlatformOrganizationInvitesResponseSchema),

@@ -9,4 +9,5 @@ export * from "./org-schemas.js";
 export * from "./release-schemas.js";
 export * from "./device-schemas.js";
 export * from "./platform-schemas.js";
+export * from "./telemetry-schemas.js";
 export * from "./api-contracts.js";

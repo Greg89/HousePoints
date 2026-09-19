@@ -70,6 +70,11 @@ export const platformOrganizationDetailSchema = z.object({
     summary: z.string().min(1),
     createdAt: z.string().datetime(),
   })),
+  recentErrorSignals: z.array(z.object({
+    id: z.string().min(1), errorType: z.string().min(1), message: z.string().min(1), sourcePath: z.string().nullable(),
+    occurrenceCount: z.number().int().positive(), firstSeenAt: z.string().datetime(), lastSeenAt: z.string().datetime(),
+  })),
+  recentErrorOccurrenceCount: z.number().int().nonnegative(),
 });
 
 export const updatePlatformOrganizationStatusSchema = z.object({

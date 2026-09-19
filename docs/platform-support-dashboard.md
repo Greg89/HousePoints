@@ -106,9 +106,11 @@ Platform audit events include actor Auth0 subject, event type, safe summary, str
 - [x] Centrally enforced suspension/resumption with typed member-facing state.
 - [x] Platform archive/restore with confirmation, capacity enforcement, and audit.
 - [x] Owner email contact links and outstanding-invite revocation.
-- [ ] Recent-error signals backed by durable application telemetry.
+- [x] Recent-error signals backed by bounded, durable application telemetry.
 
-Suspension is enforced in shared actor resolution, requires a platform-owner confirmation and reason, and is recorded in the platform audit log. Platform archive and restore use the same explicit confirmation model; restore uses the shared capacity transaction lock. Invite revocation expires every outstanding link atomically and audits the affected count. Recent-error signals remain deferred until errors are stored in durable, organization-scoped telemetry.
+Suspension is enforced in shared actor resolution, requires a platform-owner confirmation and reason, and is recorded in the platform audit log. Platform archive and restore use the same explicit confirmation model; restore uses the shared capacity transaction lock. Invite revocation expires every outstanding link atomically and audits the affected count.
+
+Authenticated browser errors are stored as organization-scoped aggregates keyed by a SHA-256 fingerprint. The support view shows up to 20 fingerprints seen in the last seven days and their occurrence counts. Only the error type, a bounded message, and URL pathname are retained; query strings, stack traces, user agents, tokens, and arbitrary metadata are excluded. External logs remain authoritative for deeper diagnosis.
 
 ### Slice 3 — user support and compliance
 

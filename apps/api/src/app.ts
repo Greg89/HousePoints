@@ -33,6 +33,7 @@ import { registerPlatformRoutes } from "./routes/platform.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
 import { registerUserRoutes } from "./routes/users.js";
+import { registerTelemetryRoutes } from "./routes/telemetry.js";
 import { createApiLogger } from "./logging.js";
 import {
   applyMutationRateLimit,
@@ -136,6 +137,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
   await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
+  await registerTelemetryRoutes(app);
 
   return app;
 }

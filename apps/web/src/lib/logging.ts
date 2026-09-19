@@ -24,6 +24,7 @@ export type WebLogEvent =
   | "web.dashboard.render_failed"
   | "web.client.error_reported"
   | "web.client.error_report_rejected"
+  | "web.client.error_persistence_failed"
   | "web.request.failed"
   | "web.release_notes_url.invalid"
   | "web.auth.not_configured"
