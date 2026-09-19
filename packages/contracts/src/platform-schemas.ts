@@ -180,8 +180,35 @@ export const completePlatformAccountDeletionResponseSchema = z.object({
   evidence: platformAccountDeletionEvidenceSchema,
 });
 
+export const platformSupportCaseStatusSchema = z.enum(["OPEN", "IN_PROGRESS", "RESOLVED"]);
+export const platformSupportCasePrioritySchema = z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]);
+export const platformSupportCaseSummarySchema = z.object({
+  id: z.string().min(1), title: z.string().min(1), summary: z.string().min(1),
+  status: platformSupportCaseStatusSchema, priority: platformSupportCasePrioritySchema,
+  organization: z.object({ id: z.string().min(1), name: z.string().min(1), slug: z.string().min(1) }).nullable(),
+  user: z.object({ id: z.string().min(1), displayName: z.string().min(1), email: z.string().email().nullable() }).nullable(),
+  noteCount: z.number().int().nonnegative(), createdByAuth0Sub: z.string().min(1),
+  resolvedAt: z.string().datetime().nullable(), createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
+});
+export const listPlatformSupportCasesSchema = z.object({ status: platformSupportCaseStatusSchema.optional() }).strict();
+export const listPlatformSupportCasesResponseSchema = z.object({ cases: z.array(platformSupportCaseSummarySchema) });
+export const createPlatformSupportCaseSchema = z.object({
+  title: z.string().trim().min(3).max(120), summary: z.string().trim().min(10).max(1000),
+  priority: platformSupportCasePrioritySchema, organizationId: z.string().min(1).optional(), userId: z.string().min(1).optional(),
+}).strict();
+export const createPlatformSupportCaseResponseSchema = z.object({ id: z.string().min(1) });
+export const readPlatformSupportCaseSchema = z.object({ supportCaseId: z.string().min(1) }).strict();
+export const platformSupportCaseDetailSchema = platformSupportCaseSummarySchema.extend({
+  notes: z.array(z.object({ id: z.string().min(1), authorAuth0Sub: z.string().min(1), body: z.string().min(1), createdAt: z.string().datetime() })),
+});
+export const updatePlatformSupportCaseSchema = z.object({ supportCaseId: z.string().min(1), status: platformSupportCaseStatusSchema, priority: platformSupportCasePrioritySchema }).strict();
+export const addPlatformSupportNoteSchema = z.object({ supportCaseId: z.string().min(1), body: z.string().trim().min(3).max(2000) }).strict();
+export const platformSupportCaseMutationResponseSchema = z.object({ updated: z.boolean() });
+
 export type PlatformUserSearchResponse = z.infer<typeof platformUserSearchResponseSchema>;
 export type PlatformAccountDeletionQueue = z.infer<typeof platformAccountDeletionQueueResponseSchema>;
+export type PlatformSupportCaseList = z.infer<typeof listPlatformSupportCasesResponseSchema>;
+export type PlatformSupportCaseDetail = z.infer<typeof platformSupportCaseDetailSchema>;
 
 export type PlatformOrganizationDetail = z.infer<typeof platformOrganizationDetailSchema>;
 

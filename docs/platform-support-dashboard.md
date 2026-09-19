@@ -117,13 +117,15 @@ Authenticated browser errors are stored as organization-scoped aggregates keyed 
 - [x] User search and effective-permission diagnostics.
 - [x] Device-registration and invitation support actions.
 - [x] Account-deletion work queue and completion evidence.
-- [ ] Support cases and private operator notes.
+- [x] Support cases and private operator notes.
 
 The first Slice 3 increment is read-only. Platform owners can search by display name, email, primary Auth0 subject, or linked identity subject and inspect active devices, deletion-request state, every membership, organization lifecycle state, effective access, and role-derived capabilities. It deliberately provides no user impersonation or mutation controls.
 
 The second Slice 3 increment adds narrowly scoped support mutations. User search shows safe active-device metadata without returning push tokens and permits revoking one or all active registrations. Organization detail shows active invitation creator and timing metadata without returning token hashes and permits revoking one or all active invitations. Every action requires typed confirmation and a bounded support reason and is recorded in the platform audit trail.
 
 The third Slice 3 increment adds a web-only deletion queue with a final last-owner check, an explicit anonymization plan, typed confirmation, and a private completion note. Completion purges device registrations, notifications, and reactions; expires unused invitations created by the requester; disables memberships; and removes profile/email data. Historical memberships and point records remain attached to an anonymized `Deleted user` row so organization ledgers stay internally consistent. Auth0 subjects are retained only as access-blocking tombstones, preventing a deleted identity from silently creating a fresh account. Structured purge/retention counts, completion time, and operator identity form the durable completion evidence.
+
+The fourth Slice 3 increment adds operator-created support cases with optional organization and user links, priority and lifecycle status, and append-only private notes. Case and note mutations are platform-owner-only. General platform audit records capture case identifiers and lifecycle actions but deliberately exclude summaries and note bodies, keeping support content confined to the case workspace.
 
 ### Slice 4 — moderation and operations
 

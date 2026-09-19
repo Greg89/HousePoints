@@ -16,6 +16,12 @@ import {
   platformAccountDeletionQueueResponseSchema,
   type PlatformAccountDeletionQueue,
   completePlatformAccountDeletionResponseSchema,
+  listPlatformSupportCasesResponseSchema,
+  type PlatformSupportCaseList,
+  platformSupportCaseDetailSchema,
+  type PlatformSupportCaseDetail,
+  createPlatformSupportCaseResponseSchema,
+  platformSupportCaseMutationResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -33,6 +39,49 @@ export async function readPlatformOverview(): Promise<PlatformOverview> {
       body: JSON.stringify({}),
     });
     return parseApiResponse(response, platformOverviewSchema, "The platform dashboard could not be loaded.");
+  });
+}
+
+export async function readPlatformSupportCases(): Promise<PlatformSupportCaseList> {
+  return runServerAction("readPlatformSupportCases", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/support-cases/list", context.requestId, { method: "POST", body: JSON.stringify({}) });
+    return parseApiResponse(response, listPlatformSupportCasesResponseSchema, "Support cases could not be loaded.");
+  });
+}
+
+export async function readPlatformSupportCase(supportCaseId: string): Promise<PlatformSupportCaseDetail> {
+  return runServerAction("readPlatformSupportCase", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/support-cases/detail", context.requestId, { method: "POST", body: JSON.stringify({ supportCaseId }) });
+    return parseApiResponse(response, platformSupportCaseDetailSchema, "The support case could not be loaded.");
+  });
+}
+
+export async function createPlatformSupportCase(input: { title: string; summary: string; priority: "LOW" | "NORMAL" | "HIGH" | "URGENT"; organizationId?: string; userId?: string }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  return runServerAction("createPlatformSupportCase", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/support-cases/create", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try { const result = await parseApiResponse(response, createPlatformSupportCaseResponseSchema, "The support case could not be created."); revalidatePath("/platform/support-cases"); return { ok: true, id: result.id }; }
+    catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
+  });
+}
+
+export async function updatePlatformSupportCase(input: { supportCaseId: string; status: "OPEN" | "IN_PROGRESS" | "RESOLVED"; priority: "LOW" | "NORMAL" | "HIGH" | "URGENT" }): Promise<{ ok: true } | { ok: false; message: string }> {
+  return runServerAction("updatePlatformSupportCase", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/support-cases/update", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try { await parseApiResponse(response, platformSupportCaseMutationResponseSchema, "The support case could not be updated."); revalidatePath("/platform/support-cases"); revalidatePath(`/platform/support-cases/${input.supportCaseId}`); return { ok: true }; }
+    catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
+  });
+}
+
+export async function addPlatformSupportNote(input: { supportCaseId: string; body: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  return runServerAction("addPlatformSupportNote", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/support-cases/notes", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try { await parseApiResponse(response, platformSupportCaseMutationResponseSchema, "The private note could not be added."); revalidatePath(`/platform/support-cases/${input.supportCaseId}`); return { ok: true }; }
+    catch (error) { if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message }; throw error; }
   });
 }
 

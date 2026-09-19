@@ -10,6 +10,11 @@ import {
   revokePlatformUserDevicesSchema,
   platformAccountDeletionQueueRequestSchema,
   completePlatformAccountDeletionSchema,
+  listPlatformSupportCasesSchema,
+  createPlatformSupportCaseSchema,
+  readPlatformSupportCaseSchema,
+  updatePlatformSupportCaseSchema,
+  addPlatformSupportNoteSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { OrganizationCreationPolicy } from "../config.js";
@@ -390,5 +395,66 @@ export async function registerPlatformRoutes(
     });
     info(request.log, "platform.account_deletion.completed", { userId: user.id, evidence });
     return reply.status(200).send({ userId: user.id, completedAt: completedAt.toISOString(), evidence });
+  });
+
+  app.post("/platform/support-cases/list", async (request, reply) => {
+    const parsed = await parseBody(listPlatformSupportCasesSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const cases = await prisma.platformSupportCase.findMany({
+      where: parsed.status ? { status: parsed.status } : undefined,
+      orderBy: [{ status: "asc" }, { updatedAt: "desc" }], take: 200,
+      select: { id: true, title: true, summary: true, status: true, priority: true, createdByAuth0Sub: true, resolvedAt: true, createdAt: true, updatedAt: true, organization: { select: { id: true, name: true, slug: true } }, user: { select: { id: true, displayName: true, email: true } }, _count: { select: { notes: true } } },
+    });
+    return reply.status(200).send({ cases: cases.map(({ _count, ...supportCase }) => ({ ...supportCase, noteCount: _count.notes, resolvedAt: supportCase.resolvedAt?.toISOString() ?? null, createdAt: supportCase.createdAt.toISOString(), updatedAt: supportCase.updatedAt.toISOString() })) });
+  });
+
+  app.post("/platform/support-cases/create", async (request, reply) => {
+    const parsed = await parseBody(createPlatformSupportCaseSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    if (parsed.organizationId && !await prisma.organization.findUnique({ where: { id: parsed.organizationId }, select: { id: true } })) return reply.status(404).send({ code: "ORGANIZATION_NOT_FOUND", message: "Organization not found" });
+    if (parsed.userId && !await prisma.user.findUnique({ where: { id: parsed.userId }, select: { id: true } })) return reply.status(404).send({ code: "USER_NOT_FOUND", message: "User not found" });
+    let supportCaseId = "";
+    await prisma.$transaction(async (tx) => {
+      const supportCase = await tx.platformSupportCase.create({ data: { title: parsed.title, summary: parsed.summary, priority: parsed.priority, organizationId: parsed.organizationId, userId: parsed.userId, createdByAuth0Sub: request.auth.subject }, select: { id: true } });
+      supportCaseId = supportCase.id;
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "SUPPORT_CASE_CREATED", summary: "A private platform support case was created.", metadata: { supportCaseId, priority: parsed.priority, organizationId: parsed.organizationId ?? null, userId: parsed.userId ?? null } } });
+    });
+    info(request.log, "platform.support_case.created", { supportCaseId, priority: parsed.priority });
+    return reply.status(201).send({ id: supportCaseId });
+  });
+
+  app.post("/platform/support-cases/detail", async (request, reply) => {
+    const parsed = await parseBody(readPlatformSupportCaseSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const supportCase = await prisma.platformSupportCase.findUnique({ where: { id: parsed.supportCaseId }, select: { id: true, title: true, summary: true, status: true, priority: true, createdByAuth0Sub: true, resolvedAt: true, createdAt: true, updatedAt: true, organization: { select: { id: true, name: true, slug: true } }, user: { select: { id: true, displayName: true, email: true } }, notes: { orderBy: { createdAt: "asc" }, select: { id: true, authorAuth0Sub: true, body: true, createdAt: true } } } });
+    if (!supportCase) return reply.status(404).send({ code: "SUPPORT_CASE_NOT_FOUND", message: "Support case not found" });
+    return reply.status(200).send({ ...supportCase, noteCount: supportCase.notes.length, resolvedAt: supportCase.resolvedAt?.toISOString() ?? null, createdAt: supportCase.createdAt.toISOString(), updatedAt: supportCase.updatedAt.toISOString(), notes: supportCase.notes.map((note) => ({ ...note, createdAt: note.createdAt.toISOString() })) });
+  });
+
+  app.post("/platform/support-cases/update", async (request, reply) => {
+    const parsed = await parseBody(updatePlatformSupportCaseSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const existing = await prisma.platformSupportCase.findUnique({ where: { id: parsed.supportCaseId }, select: { id: true, status: true, priority: true } });
+    if (!existing) return reply.status(404).send({ code: "SUPPORT_CASE_NOT_FOUND", message: "Support case not found" });
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.platformSupportCase.update({ where: { id: existing.id }, data: { status: parsed.status, priority: parsed.priority, resolvedAt: parsed.status === "RESOLVED" ? now : null } });
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "SUPPORT_CASE_UPDATED", summary: "A private platform support case was updated.", metadata: { supportCaseId: existing.id, previousStatus: existing.status, status: parsed.status, previousPriority: existing.priority, priority: parsed.priority } } });
+    });
+    info(request.log, "platform.support_case.updated", { supportCaseId: existing.id, status: parsed.status, priority: parsed.priority });
+    return reply.status(200).send({ updated: true });
+  });
+
+  app.post("/platform/support-cases/notes", async (request, reply) => {
+    const parsed = await parseBody(addPlatformSupportNoteSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    if (!await prisma.platformSupportCase.findUnique({ where: { id: parsed.supportCaseId }, select: { id: true } })) return reply.status(404).send({ code: "SUPPORT_CASE_NOT_FOUND", message: "Support case not found" });
+    await prisma.$transaction(async (tx) => {
+      await tx.platformSupportNote.create({ data: { supportCaseId: parsed.supportCaseId, authorAuth0Sub: request.auth.subject, body: parsed.body } });
+      await tx.platformSupportCase.update({ where: { id: parsed.supportCaseId }, data: { updatedAt: new Date() } });
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "SUPPORT_CASE_NOTE_ADDED", summary: "A private note was added to a platform support case.", metadata: { supportCaseId: parsed.supportCaseId } } });
+    });
+    info(request.log, "platform.support_case.note_added", { supportCaseId: parsed.supportCaseId });
+    return reply.status(200).send({ updated: true });
   });
 }

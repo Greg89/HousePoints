@@ -113,6 +113,15 @@ import {
   platformAccountDeletionQueueResponseSchema,
   completePlatformAccountDeletionSchema,
   completePlatformAccountDeletionResponseSchema,
+  listPlatformSupportCasesSchema,
+  listPlatformSupportCasesResponseSchema,
+  createPlatformSupportCaseSchema,
+  createPlatformSupportCaseResponseSchema,
+  readPlatformSupportCaseSchema,
+  platformSupportCaseDetailSchema,
+  updatePlatformSupportCaseSchema,
+  addPlatformSupportNoteSchema,
+  platformSupportCaseMutationResponseSchema,
 } from "./platform-schemas.js";
 
 type ApiContract<Req extends z.ZodTypeAny, Res extends z.ZodTypeAny> = {
@@ -191,6 +200,11 @@ export const apiContracts = {
   "/platform/users/revoke-devices": defineContract(revokePlatformUserDevicesSchema, revokePlatformUserDevicesResponseSchema),
   "/platform/account-deletions": defineContract(platformAccountDeletionQueueRequestSchema, platformAccountDeletionQueueResponseSchema),
   "/platform/account-deletions/complete": defineContract(completePlatformAccountDeletionSchema, completePlatformAccountDeletionResponseSchema),
+  "/platform/support-cases/list": defineContract(listPlatformSupportCasesSchema, listPlatformSupportCasesResponseSchema),
+  "/platform/support-cases/create": defineContract(createPlatformSupportCaseSchema, createPlatformSupportCaseResponseSchema),
+  "/platform/support-cases/detail": defineContract(readPlatformSupportCaseSchema, platformSupportCaseDetailSchema),
+  "/platform/support-cases/update": defineContract(updatePlatformSupportCaseSchema, platformSupportCaseMutationResponseSchema),
+  "/platform/support-cases/notes": defineContract(addPlatformSupportNoteSchema, platformSupportCaseMutationResponseSchema),
   "/points/adjust": defineContract(
     adjustPointsSchema,
     pointAdjustmentResponseSchema,

@@ -44,6 +44,13 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       create: vi.fn(),
     },
+    platformSupportCase: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    platformSupportNote: { create: vi.fn() },
     organizationErrorSignal: { upsert: vi.fn() },
     authIdentity: {
       findUnique: vi.fn(),
@@ -148,6 +155,10 @@ const mockPlatformSettingsFindUnique = prisma.platformSettings.findUnique as Ret
 const mockPlatformSettingsUpsert = prisma.platformSettings.upsert as ReturnType<typeof vi.fn>;
 const mockPlatformAuditFindMany = prisma.platformAuditEvent.findMany as ReturnType<typeof vi.fn>;
 const mockPlatformAuditCreate = prisma.platformAuditEvent.create as ReturnType<typeof vi.fn>;
+const mockSupportCaseFindMany = prisma.platformSupportCase.findMany as ReturnType<typeof vi.fn>;
+const mockSupportCaseFindUnique = prisma.platformSupportCase.findUnique as ReturnType<typeof vi.fn>;
+const mockSupportCaseCreate = prisma.platformSupportCase.create as ReturnType<typeof vi.fn>;
+const mockSupportNoteCreate = prisma.platformSupportNote.create as ReturnType<typeof vi.fn>;
 const mockErrorSignalUpsert = prisma.organizationErrorSignal.upsert as ReturnType<typeof vi.fn>;
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
@@ -338,6 +349,7 @@ beforeEach(() => {
   mockPlatformSettingsUpsert.mockResolvedValue({});
   mockPlatformAuditFindMany.mockResolvedValue([]);
   mockPlatformAuditCreate.mockResolvedValue({});
+  mockSupportCaseFindMany.mockResolvedValue([]);
   mockExecuteRawUnsafe.mockResolvedValue(1);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
@@ -6740,6 +6752,31 @@ describe("platform support routes", () => {
     expect(mockPointReactionDeleteMany).toHaveBeenCalledWith({ where: { actorUserId: "user-1" } });
     expect(mockUserUpdate).toHaveBeenCalledWith({ where: { id: "user-1" }, data: expect.objectContaining({ email: null, displayName: "Deleted user", deletionCompletedAt: expect.any(Date), deletionCompletionNote: "Identity verified and request completed." }) });
     expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ACCOUNT_DELETION_COMPLETED", metadata: expect.objectContaining({ userId: "user-1" }) }) });
+    await app.close();
+  });
+
+  it("creates a linked private support case without copying case text into platform audit metadata", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1" });
+    mockFindUnique.mockResolvedValue({ id: "user-1" });
+    mockSupportCaseCreate.mockResolvedValue({ id: "case-1" });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/support-cases/create", payload: { title: "Member cannot sign in", summary: "Investigating a reported authentication loop.", priority: "HIGH", organizationId: "org-1", userId: "user-1" } });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ id: "case-1" });
+    expect(mockSupportCaseCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ title: "Member cannot sign in", priority: "HIGH", organizationId: "org-1", userId: "user-1" }), select: { id: true } });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "SUPPORT_CASE_CREATED", metadata: { supportCaseId: "case-1", priority: "HIGH", organizationId: "org-1", userId: "user-1" } }) });
+    expect(JSON.stringify(mockPlatformAuditCreate.mock.calls.at(-1))).not.toContain("authentication loop");
+    await app.close();
+  });
+
+  it("adds an append-only private note while auditing only the case identifier", async () => {
+    mockSupportCaseFindUnique.mockResolvedValue({ id: "case-1" });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/support-cases/notes", payload: { supportCaseId: "case-1", body: "Customer confirmed the issue is resolved." } });
+    expect(res.statusCode).toBe(200);
+    expect(mockSupportNoteCreate).toHaveBeenCalledWith({ data: { supportCaseId: "case-1", authorAuth0Sub: "auth0|platform-owner", body: "Customer confirmed the issue is resolved." } });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "SUPPORT_CASE_NOTE_ADDED", metadata: { supportCaseId: "case-1" } }) });
+    expect(JSON.stringify(mockPlatformAuditCreate.mock.calls.at(-1))).not.toContain("Customer confirmed");
     await app.close();
   });
 });

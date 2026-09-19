@@ -48,7 +48,7 @@ export function PlatformDashboard({ overview }: { overview: PlatformOverview }) 
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">HousePoints platform</p>
           <h1 className="mt-2 font-display text-3xl font-bold">Support dashboard</h1>
           <p className="mt-2 text-sm text-muted-foreground">Operate capacity and inspect organizations without changing organization context.</p>
-          <div className="mt-3 flex flex-wrap gap-4"><Link className="text-sm font-semibold text-primary hover:underline" href="/platform/users">Search users and permissions →</Link><Link className="text-sm font-semibold text-primary hover:underline" href="/platform/account-deletions">Account-deletion queue →</Link></div>
+          <div className="mt-3 flex flex-wrap gap-4"><Link className="text-sm font-semibold text-primary hover:underline" href="/platform/users">Search users and permissions →</Link><Link className="text-sm font-semibold text-primary hover:underline" href="/platform/account-deletions">Account-deletion queue →</Link><Link className="text-sm font-semibold text-primary hover:underline" href="/platform/support-cases">Private support cases →</Link></div>
         </div>
 
         <section className="grid gap-4 sm:grid-cols-3">

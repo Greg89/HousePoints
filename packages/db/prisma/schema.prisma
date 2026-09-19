@@ -83,6 +83,19 @@ enum DevicePlatform {
   ANDROID
 }
 
+enum PlatformSupportCaseStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum PlatformSupportCasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model Organization {
   id             String                   @id @default(cuid())
   name           String
@@ -103,6 +116,7 @@ model Organization {
   pointReactions PointReaction[]
   deviceRegistrations DeviceRegistration[]
   errorSignals   OrganizationErrorSignal[]
+  platformSupportCases PlatformSupportCase[]
   archivedBy     User?                    @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -185,6 +199,7 @@ model User {
   notifications            Notification[]           @relation("NotificationRecipient")
   pointReactions           PointReaction[]          @relation("PointReactionActor")
   deviceRegistrations      DeviceRegistration[]
+  platformSupportCases     PlatformSupportCase[]
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -372,6 +387,38 @@ model PlatformAuditEvent {
 
   @@index([createdAt])
   @@index([actorAuth0Sub, createdAt])
+}
+
+model PlatformSupportCase {
+  id                   String                      @id @default(cuid())
+  title                String
+  summary              String
+  status               PlatformSupportCaseStatus  @default(OPEN)
+  priority             PlatformSupportCasePriority @default(NORMAL)
+  organizationId       String?
+  userId               String?
+  createdByAuth0Sub     String
+  resolvedAt           DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  organization         Organization?                @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user                 User?                        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notes                PlatformSupportNote[]
+
+  @@index([status, updatedAt])
+  @@index([organizationId, updatedAt])
+  @@index([userId, updatedAt])
+}
+
+model PlatformSupportNote {
+  id               String              @id @default(cuid())
+  supportCaseId    String
+  authorAuth0Sub   String
+  body             String
+  createdAt        DateTime            @default(now())
+  supportCase      PlatformSupportCase @relation(fields: [supportCaseId], references: [id], onDelete: Cascade)
+
+  @@index([supportCaseId, createdAt])
 }
 
 model OrganizationErrorSignal {
