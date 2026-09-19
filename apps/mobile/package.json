@@ -52,7 +52,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.0",
+    "@babel/core": "^8.0.5",
     "@types/react": "~19.1.10",
     "eslint": "^9",
     "typescript": "~5.9.2",
