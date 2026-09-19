@@ -168,6 +168,10 @@ model User {
   displayName              String
   houseThemeEnabled        Boolean                  @default(false)
   deletionRequestedAt      DateTime?
+  deletionCompletedAt      DateTime?
+  deletionCompletedByAuth0Sub String?
+  deletionCompletionNote   String?
+  deletionCompletionEvidence Json?
   pointTransactions        PointTransaction[]       @relation("ActorTransactions")
   receivedTransactions     PointTransaction[]       @relation("PointsReceived")
   deletedPointTransactions PointTransaction[]       @relation("DeletedPointTransactions")
@@ -185,6 +189,7 @@ model User {
   updatedAt                DateTime                 @updatedAt
 
   @@index([deletionRequestedAt])
+  @@index([deletionCompletedAt])
 }
 
 model OrganizationMembership {

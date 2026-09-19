@@ -8,6 +8,8 @@ import {
   updatePlatformSettingsSchema,
   platformUserSearchSchema,
   revokePlatformUserDevicesSchema,
+  platformAccountDeletionQueueRequestSchema,
+  completePlatformAccountDeletionSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import type { OrganizationCreationPolicy } from "../config.js";
@@ -319,5 +321,74 @@ export async function registerPlatformRoutes(
     });
     info(request.log, "platform.user.devices_revoked", { userId: user.id, deviceRegistrationId: parsed.deviceRegistrationId ?? null, revokedCount });
     return reply.status(200).send({ revokedCount });
+  });
+
+  app.post("/platform/account-deletions", async (request, reply) => {
+    const parsed = await parseBody(platformAccountDeletionQueueRequestSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const users = await prisma.user.findMany({
+      where: { deletionRequestedAt: { not: null } },
+      orderBy: { deletionRequestedAt: "asc" },
+      take: 200,
+      select: {
+        id: true, displayName: true, email: true, deletionRequestedAt: true, deletionCompletedAt: true,
+        deletionCompletedByAuth0Sub: true, deletionCompletionNote: true, deletionCompletionEvidence: true,
+        memberships: { select: { role: true, organizationId: true, organization: { select: { name: true, archivedAt: true, memberships: { where: { role: "OWNER", isActive: true, archivedAt: null }, select: { userId: true } } } } } },
+      },
+    });
+    const items = users.map((user) => {
+      const lastOwnerConflicts = user.memberships
+        .filter((membership) => membership.role === "OWNER" && !membership.organization.archivedAt && membership.organization.memberships.every((owner) => owner.userId === user.id))
+        .map((membership) => ({ organizationId: membership.organizationId, organizationName: membership.organization.name }));
+      return {
+        userId: user.id, displayName: user.displayName, email: user.email,
+        requestedAt: user.deletionRequestedAt!.toISOString(), completedAt: user.deletionCompletedAt?.toISOString() ?? null,
+        completedByAuth0Sub: user.deletionCompletedByAuth0Sub, completionNote: user.deletionCompletionNote,
+        evidence: user.deletionCompletionEvidence, membershipCount: user.memberships.length, lastOwnerConflicts,
+      };
+    });
+    return reply.status(200).send({ pending: items.filter((item) => !item.completedAt), recentlyCompleted: items.filter((item) => item.completedAt).sort((a, b) => b.completedAt!.localeCompare(a.completedAt!)).slice(0, 50) });
+  });
+
+  app.post("/platform/account-deletions/complete", async (request, reply) => {
+    const parsed = await parseBody(completePlatformAccountDeletionSchema, request, reply);
+    if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
+    const user = await prisma.user.findUnique({
+      where: { id: parsed.userId },
+      select: {
+        id: true, displayName: true, deletionRequestedAt: true, deletionCompletedAt: true,
+        authIdentities: { select: { id: true } },
+        memberships: { select: { role: true, organizationId: true, organization: { select: { name: true, archivedAt: true, memberships: { where: { role: "OWNER", isActive: true, archivedAt: null }, select: { userId: true } } } } } },
+        _count: { select: { deviceRegistrations: true, notifications: true, pointReactions: true, pointTransactions: true, receivedTransactions: true } },
+      },
+    });
+    if (!user || !user.deletionRequestedAt) return reply.status(404).send({ code: "ACCOUNT_DELETION_NOT_FOUND", message: "No account-deletion request was found" });
+    const deletionRequestedAt = user.deletionRequestedAt;
+    if (user.deletionCompletedAt) return reply.status(409).send({ code: "ACCOUNT_DELETION_ALREADY_COMPLETED", message: "Account deletion has already been completed" });
+    if (user.displayName !== parsed.confirmationDisplayName) return reply.status(409).send({ code: "CONFIRMATION_MISMATCH", message: "The confirmation display name does not match" });
+    const lastOwnerConflicts = user.memberships.filter((membership) => membership.role === "OWNER" && !membership.organization.archivedAt && membership.organization.memberships.every((owner) => owner.userId === user.id));
+    if (lastOwnerConflicts.length) return reply.status(409).send({ code: "ACCOUNT_DELETION_OWNER_TRANSFER_REQUIRED", message: `Transfer ownership of ${lastOwnerConflicts.map((membership) => membership.organization.name).join(", ")} before completing deletion.` });
+    const completedAt = new Date();
+    const evidence = {
+      deletedDeviceRegistrations: user._count.deviceRegistrations,
+      deletedNotifications: user._count.notifications,
+      deletedReactions: user._count.pointReactions,
+      expiredInvitations: 0,
+      retainedIdentityTombstones: user.authIdentities.length + 1,
+      retainedMemberships: user.memberships.length,
+      retainedHistoricalPointRecords: user._count.pointTransactions + user._count.receivedTransactions,
+    };
+    await prisma.$transaction(async (tx) => {
+      await tx.deviceRegistration.deleteMany({ where: { userId: user.id } });
+      await tx.notification.deleteMany({ where: { recipientUserId: user.id } });
+      await tx.pointReaction.deleteMany({ where: { actorUserId: user.id } });
+      const inviteResult = await tx.orgInvite.updateMany({ where: { createdById: user.id, usedAt: null, expiresAt: { gt: completedAt } }, data: { expiresAt: completedAt } });
+      evidence.expiredInvitations = inviteResult.count;
+      await tx.organizationMembership.updateMany({ where: { userId: user.id }, data: { isActive: false, archivedAt: completedAt, houseId: null } });
+      await tx.user.update({ where: { id: user.id }, data: { email: null, displayName: "Deleted user", houseThemeEnabled: false, deletionCompletedAt: completedAt, deletionCompletedByAuth0Sub: request.auth.subject, deletionCompletionNote: parsed.completionNote, deletionCompletionEvidence: evidence } });
+      await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "ACCOUNT_DELETION_COMPLETED", summary: "An account-deletion request was completed.", metadata: { userId: user.id, requestedAt: deletionRequestedAt.toISOString(), completedAt: completedAt.toISOString(), evidence } } });
+    });
+    info(request.log, "platform.account_deletion.completed", { userId: user.id, evidence });
+    return reply.status(200).send({ userId: user.id, completedAt: completedAt.toISOString(), evidence });
   });
 }

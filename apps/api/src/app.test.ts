@@ -76,6 +76,7 @@ vi.mock("@housepoints/db", () => ({
       createMany: vi.fn(),
       findMany: vi.fn(),
       updateMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     releaseAnnouncement: {
       findUnique: vi.fn(),
@@ -101,11 +102,13 @@ vi.mock("@housepoints/db", () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      deleteMany: vi.fn(),
     },
     deviceRegistration: {
       upsert: vi.fn(),
       updateMany: vi.fn(),
       findMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
@@ -168,6 +171,7 @@ const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.
 const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
 const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
+const mockNotificationDeleteMany = prisma.notification.deleteMany as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementFindUnique = prisma.releaseAnnouncement.findUnique as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementUpsert = prisma.releaseAnnouncement.upsert as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementUpdate = prisma.releaseAnnouncement.update as ReturnType<typeof vi.fn>;
@@ -185,9 +189,11 @@ const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof
 const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
 const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
 const mockPointReactionUpdate = prisma.pointReaction.update as ReturnType<typeof vi.fn>;
+const mockPointReactionDeleteMany = prisma.pointReaction.deleteMany as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationUpsert = prisma.deviceRegistration.upsert as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationUpdateMany = prisma.deviceRegistration.updateMany as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationFindMany = prisma.deviceRegistration.findMany as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationDeleteMany = prisma.deviceRegistration.deleteMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -6707,6 +6713,33 @@ describe("platform support routes", () => {
     expect(res.json()).toEqual({ revokedCount: 1 });
     expect(mockDeviceRegistrationUpdateMany).toHaveBeenCalledWith({ where: { userId: "user-1", revokedAt: null, id: "device-1" }, data: { revokedAt: expect.any(Date) } });
     expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "USER_DEVICE_REVOKED", metadata: expect.objectContaining({ reason: "Lost device" }) }) });
+    await app.close();
+  });
+
+  it("lists pending and completed account-deletion requests with ownership conflicts", async () => {
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-pending", displayName: "Pending User", email: "pending@example.com", deletionRequestedAt: new Date("2026-09-18T12:00:00.000Z"), deletionCompletedAt: null, deletionCompletedByAuth0Sub: null, deletionCompletionNote: null, deletionCompletionEvidence: null, memberships: [{ role: "OWNER", organizationId: "org-1", organization: { name: "Acme", archivedAt: null, memberships: [] } }] },
+      { id: "user-complete", displayName: "Deleted user", email: null, deletionRequestedAt: new Date("2026-09-17T12:00:00.000Z"), deletionCompletedAt: new Date("2026-09-19T12:00:00.000Z"), deletionCompletedByAuth0Sub: "auth0|platform-owner", deletionCompletionNote: "Verified and completed.", deletionCompletionEvidence: { deletedDeviceRegistrations: 1, deletedNotifications: 2, deletedReactions: 3, expiredInvitations: 0, retainedIdentityTombstones: 2, retainedMemberships: 1, retainedHistoricalPointRecords: 4 }, memberships: [] },
+    ]);
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/account-deletions", payload: {} });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ pending: [{ userId: "user-pending", lastOwnerConflicts: [{ organizationName: "Acme" }] }], recentlyCompleted: [{ userId: "user-complete", evidence: { deletedNotifications: 2 } }] });
+    await app.close();
+  });
+
+  it("anonymizes a requested account and records structured completion evidence", async () => {
+    mockFindUnique.mockResolvedValue({ id: "user-1", displayName: "Alex Owner", deletionRequestedAt: new Date("2026-09-18T12:00:00.000Z"), deletionCompletedAt: null, authIdentities: [{ id: "identity-1" }], memberships: [{ role: "MEMBER", organizationId: "org-1", organization: { name: "Acme", archivedAt: null, memberships: [{ userId: "other-owner" }] } }], _count: { deviceRegistrations: 2, notifications: 3, pointReactions: 4, pointTransactions: 5, receivedTransactions: 6 } });
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/account-deletions/complete", payload: { userId: "user-1", confirmationDisplayName: "Alex Owner", completionNote: "Identity verified and request completed." } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ userId: "user-1", evidence: { deletedDeviceRegistrations: 2, deletedNotifications: 3, deletedReactions: 4, expiredInvitations: 1, retainedIdentityTombstones: 2, retainedHistoricalPointRecords: 11 } });
+    expect(mockDeviceRegistrationDeleteMany).toHaveBeenCalledWith({ where: { userId: "user-1" } });
+    expect(mockNotificationDeleteMany).toHaveBeenCalledWith({ where: { recipientUserId: "user-1" } });
+    expect(mockPointReactionDeleteMany).toHaveBeenCalledWith({ where: { actorUserId: "user-1" } });
+    expect(mockUserUpdate).toHaveBeenCalledWith({ where: { id: "user-1" }, data: expect.objectContaining({ email: null, displayName: "Deleted user", deletionCompletedAt: expect.any(Date), deletionCompletionNote: "Identity verified and request completed." }) });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ACCOUNT_DELETION_COMPLETED", metadata: expect.objectContaining({ userId: "user-1" }) }) });
     await app.close();
   });
 });

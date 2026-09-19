@@ -143,7 +143,45 @@ export const revokePlatformUserDevicesSchema = z.object({
 }).strict();
 export const revokePlatformUserDevicesResponseSchema = z.object({ revokedCount: z.number().int().nonnegative() });
 
+export const platformAccountDeletionQueueRequestSchema = z.object({}).strict();
+export const platformAccountDeletionEvidenceSchema = z.object({
+  deletedDeviceRegistrations: z.number().int().nonnegative(),
+  deletedNotifications: z.number().int().nonnegative(),
+  deletedReactions: z.number().int().nonnegative(),
+  expiredInvitations: z.number().int().nonnegative(),
+  retainedIdentityTombstones: z.number().int().nonnegative(),
+  retainedMemberships: z.number().int().nonnegative(),
+  retainedHistoricalPointRecords: z.number().int().nonnegative(),
+});
+export const platformAccountDeletionItemSchema = z.object({
+  userId: z.string().min(1),
+  displayName: z.string().min(1),
+  email: z.string().email().nullable(),
+  requestedAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+  completedByAuth0Sub: z.string().nullable(),
+  completionNote: z.string().nullable(),
+  evidence: platformAccountDeletionEvidenceSchema.nullable(),
+  membershipCount: z.number().int().nonnegative(),
+  lastOwnerConflicts: z.array(z.object({ organizationId: z.string().min(1), organizationName: z.string().min(1) })),
+});
+export const platformAccountDeletionQueueResponseSchema = z.object({
+  pending: z.array(platformAccountDeletionItemSchema),
+  recentlyCompleted: z.array(platformAccountDeletionItemSchema),
+});
+export const completePlatformAccountDeletionSchema = z.object({
+  userId: z.string().min(1),
+  confirmationDisplayName: z.string().min(1),
+  completionNote: z.string().trim().min(10).max(1000),
+}).strict();
+export const completePlatformAccountDeletionResponseSchema = z.object({
+  userId: z.string().min(1),
+  completedAt: z.string().datetime(),
+  evidence: platformAccountDeletionEvidenceSchema,
+});
+
 export type PlatformUserSearchResponse = z.infer<typeof platformUserSearchResponseSchema>;
+export type PlatformAccountDeletionQueue = z.infer<typeof platformAccountDeletionQueueResponseSchema>;
 
 export type PlatformOrganizationDetail = z.infer<typeof platformOrganizationDetailSchema>;
 

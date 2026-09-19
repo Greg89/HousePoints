@@ -13,6 +13,9 @@ import {
   platformUserSearchResponseSchema,
   type PlatformUserSearchResponse,
   revokePlatformUserDevicesResponseSchema,
+  platformAccountDeletionQueueResponseSchema,
+  type PlatformAccountDeletionQueue,
+  completePlatformAccountDeletionResponseSchema,
 } from "@housepoints/contracts";
 import {
   ApiResponseError,
@@ -30,6 +33,29 @@ export async function readPlatformOverview(): Promise<PlatformOverview> {
       body: JSON.stringify({}),
     });
     return parseApiResponse(response, platformOverviewSchema, "The platform dashboard could not be loaded.");
+  });
+}
+
+export async function readPlatformAccountDeletions(): Promise<PlatformAccountDeletionQueue> {
+  return runServerAction("readPlatformAccountDeletions", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/account-deletions", context.requestId, { method: "POST", body: JSON.stringify({}) });
+    return parseApiResponse(response, platformAccountDeletionQueueResponseSchema, "The account-deletion queue could not be loaded.");
+  });
+}
+
+export async function completePlatformAccountDeletion(input: { userId: string; confirmationDisplayName: string; completionNote: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  return runServerAction("completePlatformAccountDeletion", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/platform/account-deletions/complete", context.requestId, { method: "POST", body: JSON.stringify(input) });
+    try {
+      await parseApiResponse(response, completePlatformAccountDeletionResponseSchema, "Account deletion could not be completed.");
+      revalidatePath("/platform/account-deletions"); revalidatePath("/platform/users");
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof ApiResponseError && error.statusCode >= 400 && error.statusCode < 500) return { ok: false, message: error.message };
+      throw error;
+    }
   });
 }
 
