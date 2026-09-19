@@ -229,7 +229,7 @@ export const platformModerationReportSchema = z.object({
 export const listPlatformModerationReportsResponseSchema = z.object({ reports: z.array(platformModerationReportSchema) });
 export const resolvePlatformModerationReportSchema = z.object({
   reportId: z.string().min(1),
-  action: z.enum(["START_REVIEW", "DISMISS", "RESOLVE", "REDACT_CONTENT"]),
+  action: z.enum(["START_REVIEW", "DISMISS", "RESOLVE", "REDACT_CONTENT", "WARN_MEMBER", "SUSPEND_MEMBER", "RESTORE_MEMBER"]),
   operatorNote: z.string().trim().min(3).max(1000),
 }).strict();
 export const resolvePlatformModerationReportResponseSchema = z.object({ updated: z.boolean() });

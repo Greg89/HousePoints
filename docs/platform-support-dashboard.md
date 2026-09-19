@@ -130,13 +130,15 @@ The fourth Slice 3 increment adds operator-created support cases with optional o
 ### Slice 4 — moderation and operations
 
 - [x] User/content reporting and moderation queue.
-- [ ] Redaction, warning, member suspension, and escalation policy.
+- [x] Redaction, warning, member suspension, and escalation policy.
 - [ ] Release/client-version overview and maintenance messaging.
 - [ ] Cost, database-growth, push-delivery, and error thresholds.
 
 The first Slice 4 increment establishes organization-scoped report intake for users and point activity plus a platform-owner moderation queue. Each report stores an immutable, bounded evidence snapshot at submission time and shows prior-report counts for the same target.
 
-The second increment exposes point-activity reporting on web and mobile and adds private operator decisions for review, dismissal, resolution, and content redaction. Redaction uses the existing point-transaction soft-delete fields, retains the immutable report snapshot, and creates organization and platform audit records without copying the private operator note into general audit metadata. User warnings, member suspension, and a formal escalation policy remain a later increment.
+The second increment exposes point-activity reporting on web and mobile and adds private operator decisions for review, dismissal, resolution, and content redaction. Redaction uses the existing point-transaction soft-delete fields, retains the immutable report snapshot, and creates organization and platform audit records without copying the private operator note into general audit metadata.
+
+The third increment adds warnings, reversible organization-membership suspension, and restoration. The last active owner cannot be suspended. Operators should warn for a first substantiated, non-severe incident; suspend for repeated or severe member conduct; redact content when leaving it visible creates harm; and use organization suspension for organization-wide abuse. Private reasoning stays on the moderation report rather than general audit metadata.
 
 ### Slice 5 — multi-operator governance
 

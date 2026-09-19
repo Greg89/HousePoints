@@ -6595,6 +6595,19 @@ describe("platform support routes", () => {
     await app.close();
   });
 
+  it("warns a reported organization member and records the escalation", async () => {
+    mockModerationReportFindUnique.mockResolvedValue({ id: "report-2", status: "REVIEWING", organizationId: "org-1", targetType: "USER", targetId: "user-3" });
+    mockMembershipFindFirst.mockResolvedValue({ id: "membership-3", role: "MEMBER", isActive: true, suspendedAt: null, user: { id: "user-3", displayName: "Alex" } });
+    mockModerationReportUpdate.mockResolvedValue({});
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/moderation/reports/resolve", payload: { reportId: "report-2", action: "WARN_MEMBER", operatorNote: "First substantiated conduct incident." } });
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ recipientUserId: "user-3", type: "MODERATION_WARNING", severity: "WARNING" })], skipDuplicates: true });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "MODERATION_WARNING_ISSUED", metadata: expect.objectContaining({ moderationReportId: "report-2" }) }) });
+    expect(mockModerationReportUpdate).toHaveBeenCalledWith({ where: { id: "report-2" }, data: expect.objectContaining({ status: "RESOLVED" }) });
+    await app.close();
+  });
+
   it("rejects authenticated users who are not platform owners", async () => {
     const app = await buildTestApp("auth0|member", {}, {
       platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),

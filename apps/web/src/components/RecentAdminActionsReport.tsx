@@ -43,6 +43,9 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   USER_DISPLAY_NAME_CHANGED: "Display name changed",
   USER_ROLE_CHANGED: "Role changed",
   USER_REMOVED_FROM_ORG: "Member removed",
+  MODERATION_WARNING_ISSUED: "Moderation warning issued",
+  MEMBER_SUSPENDED: "Member suspended",
+  MEMBER_RESTORED: "Member restored",
 };
 
 const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
@@ -59,6 +62,9 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   USER_DISPLAY_NAME_CHANGED: IdentificationBadge,
   USER_ROLE_CHANGED: ShieldCheck,
   USER_REMOVED_FROM_ORG: UserMinus,
+  MODERATION_WARNING_ISSUED: ShieldCheck,
+  MEMBER_SUSPENDED: UserMinus,
+  MEMBER_RESTORED: UserPlus,
 };
 
 const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
@@ -69,6 +75,9 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "USER_ROLE_CHANGED", label: "Role changes" },
   { value: "USER_DISPLAY_NAME_CHANGED", label: "Display name changes" },
   { value: "USER_REMOVED_FROM_ORG", label: "Member removals" },
+  { value: "MODERATION_WARNING_ISSUED", label: "Moderation warnings" },
+  { value: "MEMBER_SUSPENDED", label: "Member suspensions" },
+  { value: "MEMBER_RESTORED", label: "Member restorations" },
   { value: "USER_HOUSE_ASSIGNED", label: "House assignments" },
   { value: "ORG_SETTINGS_UPDATED", label: "Organization updates" },
   { value: "ORG_ARCHIVED", label: "Organization archives" },

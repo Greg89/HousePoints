@@ -54,6 +54,9 @@ enum AuditEventType {
   USER_HOUSE_ASSIGNED
   USER_ROLE_CHANGED
   USER_REMOVED_FROM_ORG
+  MODERATION_WARNING_ISSUED
+  MEMBER_SUSPENDED
+  MEMBER_RESTORED
 }
 
 enum NotificationType {
@@ -65,6 +68,7 @@ enum NotificationType {
   POINT_DEDUCTION_RECEIVED
   POINT_REACTION_RECEIVED
   RELEASE_ANNOUNCEMENT
+  MODERATION_WARNING
 }
 
 enum NotificationSeverity {
@@ -228,7 +232,10 @@ model OrganizationMembership {
   role           Role      @default(MEMBER)
   houseId        String?
   isActive       Boolean   @default(true)
-  archivedAt     DateTime?
+    archivedAt     DateTime?
+    suspendedAt    DateTime?
+    suspensionReason String?
+    suspendedByAuth0Sub String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

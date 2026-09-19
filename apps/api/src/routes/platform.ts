@@ -498,8 +498,9 @@ export async function registerPlatformRoutes(
     if (!parsed || !requirePlatformOwner(request, reply, options.platformOwnerAuth0Subjects)) return;
     const report = await prisma.moderationReport.findUnique({ where: { id: parsed.reportId }, select: { id: true, status: true, organizationId: true, targetType: true, targetId: true } });
     if (!report) return reply.status(404).send({ code: "MODERATION_REPORT_NOT_FOUND", message: "Moderation report not found" });
-    if (report.status === "RESOLVED" || report.status === "DISMISSED") return reply.status(409).send({ code: "MODERATION_REPORT_CLOSED", message: "This moderation report is already closed" });
+    if ((report.status === "RESOLVED" || report.status === "DISMISSED") && parsed.action !== "RESTORE_MEMBER") return reply.status(409).send({ code: "MODERATION_REPORT_CLOSED", message: "This moderation report is already closed" });
     if (parsed.action === "REDACT_CONTENT" && report.targetType !== "POINT_TRANSACTION") return reply.status(409).send({ code: "MODERATION_TARGET_NOT_REDACTABLE", message: "Only reported point activity can be redacted" });
+    if (["WARN_MEMBER", "SUSPEND_MEMBER", "RESTORE_MEMBER"].includes(parsed.action) && report.targetType !== "USER") return reply.status(409).send({ code: "MODERATION_TARGET_NOT_MEMBER", message: "This action requires a reported organization member" });
     const now = new Date();
     await prisma.$transaction(async (tx) => {
       if (parsed.action === "REDACT_CONTENT") {
@@ -510,8 +511,25 @@ export async function registerPlatformRoutes(
           await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "POINT_DELETED", summary: `Reported point activity for ${point.targetUser?.displayName ?? "Unknown member"} was removed after platform review.`, metadata: { moderationReportId: report.id, transactionId: point.id, targetUserId: point.targetUserId, targetHouseId: point.targetHouseId, targetHouseName: point.targetHouse.name, delta: point.delta, trait: point.trait, awardReason: point.reason, deletionReason: "Removed following platform moderation review" } } });
         }
       }
-      const status = parsed.action === "START_REVIEW" ? "REVIEWING" : parsed.action === "DISMISS" ? "DISMISSED" : "RESOLVED";
-      await tx.moderationReport.update({ where: { id: report.id }, data: { status, operatorNote: parsed.operatorNote, resolvedAt: status === "REVIEWING" ? null : now, resolvedByAuth0Sub: status === "REVIEWING" ? null : request.auth.subject } });
+      if (["WARN_MEMBER", "SUSPEND_MEMBER", "RESTORE_MEMBER"].includes(parsed.action)) {
+        const membership = await tx.organizationMembership.findFirst({ where: { organizationId: report.organizationId, userId: report.targetId }, select: { id: true, role: true, isActive: true, suspendedAt: true, user: { select: { id: true, displayName: true } } } });
+        if (!membership) throw new Error("Moderation membership target not found");
+        if (parsed.action === "WARN_MEMBER") {
+          await tx.notification.createMany({ data: [{ organizationId: report.organizationId, recipientUserId: membership.user.id, type: "MODERATION_WARNING", severity: "WARNING", title: "Message from the HousePoints safety team", body: "A platform operator reviewed a report involving your activity. Please review your organization expectations.", entityType: "ModerationReport", entityId: report.id, dedupeKey: `moderation-warning:${report.id}` }], skipDuplicates: true });
+          await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "MODERATION_WARNING_ISSUED", summary: `A platform moderation warning was issued to ${membership.user.displayName}.`, metadata: { moderationReportId: report.id, targetUserId: membership.user.id } } });
+        } else if (parsed.action === "SUSPEND_MEMBER") {
+          if (!membership.isActive) throw new Error("Membership is not active");
+          if (membership.role === "OWNER" && await tx.organizationMembership.count({ where: { organizationId: report.organizationId, role: "OWNER", isActive: true, archivedAt: null } }) <= 1) throw new Error("The last active owner cannot be suspended");
+          await tx.organizationMembership.update({ where: { id: membership.id }, data: { isActive: false, suspendedAt: now, suspensionReason: parsed.operatorNote, suspendedByAuth0Sub: request.auth.subject } });
+          await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "MEMBER_SUSPENDED", summary: `${membership.user.displayName}'s membership was suspended after platform review.`, metadata: { moderationReportId: report.id, targetUserId: membership.user.id, previousRole: membership.role } } });
+        } else {
+          if (!membership.suspendedAt) throw new Error("Membership is not suspended");
+          await tx.organizationMembership.update({ where: { id: membership.id }, data: { isActive: true, suspendedAt: null, suspensionReason: null, suspendedByAuth0Sub: null } });
+          await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "MEMBER_RESTORED", summary: `${membership.user.displayName}'s suspended membership was restored.`, metadata: { moderationReportId: report.id, targetUserId: membership.user.id } } });
+        }
+      }
+      const status = parsed.action === "RESTORE_MEMBER" ? report.status : parsed.action === "START_REVIEW" ? "REVIEWING" : parsed.action === "DISMISS" ? "DISMISSED" : "RESOLVED";
+      await tx.moderationReport.update({ where: { id: report.id }, data: parsed.action === "RESTORE_MEMBER" ? { operatorNote: parsed.operatorNote } : { status, operatorNote: parsed.operatorNote, resolvedAt: status === "REVIEWING" ? null : now, resolvedByAuth0Sub: status === "REVIEWING" ? null : request.auth.subject } });
       await tx.platformAuditEvent.create({ data: { actorAuth0Sub: request.auth.subject, eventType: "MODERATION_REPORT_UPDATED", summary: "A moderation report was updated.", metadata: { reportId: report.id, organizationId: report.organizationId, targetType: report.targetType, targetId: report.targetId, action: parsed.action, status } } });
     });
     info(request.log, "platform.moderation.report_resolved", { reportId: report.id, organizationId: report.organizationId, action: parsed.action });

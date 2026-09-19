@@ -53,7 +53,7 @@ export async function readPlatformModerationReports(): Promise<PlatformModeratio
   });
 }
 
-export async function resolvePlatformModerationReport(input: { reportId: string; action: "START_REVIEW" | "DISMISS" | "RESOLVE" | "REDACT_CONTENT"; operatorNote: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function resolvePlatformModerationReport(input: { reportId: string; action: "START_REVIEW" | "DISMISS" | "RESOLVE" | "REDACT_CONTENT" | "WARN_MEMBER" | "SUSPEND_MEMBER" | "RESTORE_MEMBER"; operatorNote: string }): Promise<{ ok: true } | { ok: false; message: string }> {
   return runServerAction("resolvePlatformModerationReport", async (context) => {
     await requireAuthenticatedApiContext();
     const response = await apiFetch("/platform/moderation/reports/resolve", context.requestId, { method: "POST", body: JSON.stringify(input) });
