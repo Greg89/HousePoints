@@ -33,6 +33,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Expo dependency versions
+        working-directory: apps/mobile
+        run: npx expo install --check
+        env:
+          CI: true
+
+      - name: Report Expo project health
+        continue-on-error: true
+        working-directory: apps/mobile
+        run: npx expo-doctor
+        env:
+          CI: true
+
       - name: Build mobile workspace dependencies
         run: |
           npm run build -w @housepoints/theme

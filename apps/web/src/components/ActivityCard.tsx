@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { DotsThreeVertical, Eye, Smiley, Trash } from "@phosphor-icons/react";
+import { DotsThreeVertical, Eye, Flag, Smiley, Trash } from "@phosphor-icons/react";
 import type { ActivityItem, PointReactionKey } from "@housepoints/contracts";
 import { POINT_REACTION_LABELS, TRAIT_LABELS } from "@housepoints/contracts";
 import { REACTION_EMOJI, VISIBLE_REACTION_KEYS } from "./point-reactions";
+import { reportPointTransaction } from "@/app/actions/dashboard";
 
 interface ActivityCardProps {
   item: ActivityItem;
@@ -47,6 +48,11 @@ export function ActivityCard({
 }: ActivityCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [reactionsOpen, setReactionsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState<"HARASSMENT" | "INAPPROPRIATE_CONTENT" | "SPAM" | "PRIVACY" | "OTHER">("INAPPROPRIATE_CONTENT");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportState, setReportState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [reportError, setReportError] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const reactionsRef = useRef<HTMLDivElement>(null);
   const isDeduction = item.type === "DEDUCTION";
@@ -54,7 +60,7 @@ export function ActivityCard({
   const attributionLabel = isDeduction ? "Deducted by" : "Recognized by";
   const actionsMenuId = `activity-actions-${item.id}`;
   const reactionsMenuId = `activity-reactions-${item.id}`;
-  const hasActions = canDelete || canViewReactions;
+  const hasActions = true;
   const canShowReactions = canReact && !isDeduction && Boolean(onReact);
   const reactionCounts = new Map(
     (item.reactions ?? []).map((reaction) => [reaction.reactionKey, reaction.count]),
@@ -248,6 +254,7 @@ export function ActivityCard({
                             View reactions
                           </button>
                         ) : null}
+                        <button type="button" role="menuitem" onClick={() => { setActionsOpen(false); setReportOpen(true); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/10"><Flag size={16} />Report activity</button>
                         {canDelete ? (
                           <button
                             type="button"
@@ -331,6 +338,7 @@ export function ActivityCard({
           </div>
         </div>
       </div>
+      {reportOpen ? <div role="dialog" aria-modal="true" aria-label="Report activity" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onSubmit={async (event) => { event.preventDefault(); setReportState("saving"); setReportError(null); const result = await reportPointTransaction({ transactionId: item.id, category: reportCategory, details: reportDetails.trim() || undefined }); if (result.ok) { setReportState("saved"); } else { setReportState("error"); setReportError(result.message); } }}><h2 className="font-display text-xl font-semibold">Report this activity</h2><p className="mt-1 text-sm text-muted-foreground">A platform operator will review the saved activity snapshot.</p>{reportState === "saved" ? <><p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">Report submitted. Thank you.</p><button type="button" onClick={() => setReportOpen(false)} className="mt-4 w-full rounded-lg border px-3 py-2 font-semibold">Close</button></> : <><label className="mt-4 block text-sm font-semibold">Reason<select value={reportCategory} onChange={(event) => setReportCategory(event.target.value as typeof reportCategory)} className="mt-1 w-full rounded-lg border bg-background px-3 py-2 font-normal"><option value="INAPPROPRIATE_CONTENT">Inappropriate content</option><option value="HARASSMENT">Harassment</option><option value="SPAM">Spam</option><option value="PRIVACY">Privacy</option><option value="OTHER">Other</option></select></label><label className="mt-3 block text-sm font-semibold">Details (optional)<textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} maxLength={1000} className="mt-1 min-h-24 w-full rounded-lg border bg-background p-3 font-normal" /></label>{reportError ? <p role="alert" className="mt-3 text-sm text-destructive">{reportError}</p> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setReportOpen(false)} className="rounded-lg border px-3 py-2 text-sm font-semibold">Cancel</button><button disabled={reportState === "saving"} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">{reportState === "saving" ? "Submitting…" : "Submit report"}</button></div></>}</form></div> : null}
     </motion.div>
   );
 }

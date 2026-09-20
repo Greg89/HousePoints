@@ -13,11 +13,14 @@ vi.mock("@housepoints/db", () => ({
   updateUserDisplayName: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
+    $executeRawUnsafe: vi.fn(),
     organization: {
       upsert: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
+      findMany: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -26,12 +29,30 @@ vi.mock("@housepoints/db", () => ({
       update: vi.fn(),
     },
     organizationMembership: {
+      count: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    platformSettings: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+    },
+    platformAuditEvent: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+    platformSupportCase: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    platformSupportNote: { create: vi.fn() },
+    moderationReport: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), groupBy: vi.fn() },
+    organizationErrorSignal: { upsert: vi.fn() },
     authIdentity: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -63,6 +84,7 @@ vi.mock("@housepoints/db", () => ({
       createMany: vi.fn(),
       findMany: vi.fn(),
       updateMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     releaseAnnouncement: {
       findUnique: vi.fn(),
@@ -88,11 +110,13 @@ vi.mock("@housepoints/db", () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      deleteMany: vi.fn(),
     },
     deviceRegistration: {
       upsert: vi.fn(),
       updateMany: vi.fn(),
       findMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
@@ -124,6 +148,25 @@ const mockAuthIdentityCreate = prisma.authIdentity.create as ReturnType<typeof v
 const mockOrgUpsert = prisma.organization.upsert as ReturnType<typeof vi.fn>;
 const mockOrgCreate = prisma.organization.create as ReturnType<typeof vi.fn>;
 const mockOrgUpdate = prisma.organization.update as ReturnType<typeof vi.fn>;
+const mockOrgCount = prisma.organization.count as ReturnType<typeof vi.fn>;
+const mockOrgFindMany = prisma.organization.findMany as ReturnType<typeof vi.fn>;
+const mockOrgFindUnique = prisma.organization.findUnique as ReturnType<typeof vi.fn>;
+const mockMembershipCount = prisma.organizationMembership.count as ReturnType<typeof vi.fn>;
+const mockPlatformSettingsFindUnique = prisma.platformSettings.findUnique as ReturnType<typeof vi.fn>;
+const mockPlatformSettingsUpsert = prisma.platformSettings.upsert as ReturnType<typeof vi.fn>;
+const mockPlatformAuditFindMany = prisma.platformAuditEvent.findMany as ReturnType<typeof vi.fn>;
+const mockPlatformAuditCreate = prisma.platformAuditEvent.create as ReturnType<typeof vi.fn>;
+const mockSupportCaseFindMany = prisma.platformSupportCase.findMany as ReturnType<typeof vi.fn>;
+const mockSupportCaseFindUnique = prisma.platformSupportCase.findUnique as ReturnType<typeof vi.fn>;
+const mockSupportCaseCreate = prisma.platformSupportCase.create as ReturnType<typeof vi.fn>;
+const mockSupportNoteCreate = prisma.platformSupportNote.create as ReturnType<typeof vi.fn>;
+const mockModerationReportCreate = prisma.moderationReport.create as ReturnType<typeof vi.fn>;
+const mockModerationReportFindMany = prisma.moderationReport.findMany as ReturnType<typeof vi.fn>;
+const mockModerationReportGroupBy = prisma.moderationReport.groupBy as ReturnType<typeof vi.fn>;
+const mockModerationReportFindUnique = prisma.moderationReport.findUnique as ReturnType<typeof vi.fn>;
+const mockModerationReportUpdate = prisma.moderationReport.update as ReturnType<typeof vi.fn>;
+const mockErrorSignalUpsert = prisma.organizationErrorSignal.upsert as ReturnType<typeof vi.fn>;
+const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
@@ -145,6 +188,7 @@ const mockNotificationCount = prisma.notification.count as ReturnType<typeof vi.
 const mockNotificationCreateMany = prisma.notification.createMany as ReturnType<typeof vi.fn>;
 const mockNotificationFindMany = prisma.notification.findMany as ReturnType<typeof vi.fn>;
 const mockNotificationUpdateMany = prisma.notification.updateMany as ReturnType<typeof vi.fn>;
+const mockNotificationDeleteMany = prisma.notification.deleteMany as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementFindUnique = prisma.releaseAnnouncement.findUnique as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementUpsert = prisma.releaseAnnouncement.upsert as ReturnType<typeof vi.fn>;
 const mockReleaseAnnouncementUpdate = prisma.releaseAnnouncement.update as ReturnType<typeof vi.fn>;
@@ -162,9 +206,11 @@ const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof
 const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
 const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
 const mockPointReactionUpdate = prisma.pointReaction.update as ReturnType<typeof vi.fn>;
+const mockPointReactionDeleteMany = prisma.pointReaction.deleteMany as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationUpsert = prisma.deviceRegistration.upsert as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationUpdateMany = prisma.deviceRegistration.updateMany as ReturnType<typeof vi.fn>;
 const mockDeviceRegistrationFindMany = prisma.deviceRegistration.findMany as ReturnType<typeof vi.fn>;
+const mockDeviceRegistrationDeleteMany = prisma.deviceRegistration.deleteMany as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const TEST_CORS_ORIGINS = ["http://localhost:3000"];
 
@@ -302,6 +348,17 @@ beforeEach(() => {
   mockInviteCount.mockResolvedValue(0);
   mockInviteFindMany.mockResolvedValue([]);
   mockIsOrganizationSlugReserved.mockResolvedValue(false);
+  mockOrgCount.mockResolvedValue(0);
+  mockOrgFindMany.mockResolvedValue([]);
+  mockMembershipCount.mockResolvedValue(0);
+  mockPlatformSettingsFindUnique.mockResolvedValue(null);
+  mockPlatformSettingsUpsert.mockResolvedValue({});
+  mockPlatformAuditFindMany.mockResolvedValue([]);
+  mockPlatformAuditCreate.mockResolvedValue({});
+  mockSupportCaseFindMany.mockResolvedValue([]);
+  mockModerationReportFindMany.mockResolvedValue([]);
+  mockModerationReportGroupBy.mockResolvedValue([]);
+  mockExecuteRawUnsafe.mockResolvedValue(1);
   mockCreatePrimaryOrganizationSlugAlias.mockResolvedValue(undefined);
   mockResolveOrganizationSlug.mockResolvedValue(null);
   mockUpdateUserDisplayName.mockImplementation(
@@ -361,11 +418,15 @@ async function buildTestApp(
     idTokenSubject?: string;
     idTokenClaims?: Record<string, unknown>;
     pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
+    organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
+    platformOwnerAuth0Subjects?: ReadonlySet<string>;
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
+    organizationCreationPolicy: options.organizationCreationPolicy,
+    platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
     pushDispatcher: options.pushDispatcher,
     verifyAccessToken: vi.fn().mockResolvedValue({
       subject,
@@ -4426,6 +4487,38 @@ describe("POST /admin/org/archive", () => {
 });
 
 describe("POST /admin/org/restore", () => {
+  it("does not restore an archived organization when active capacity is full", async () => {
+    mockAuthIdentityFindUnique.mockResolvedValue({
+      user: {
+        id: "user-owner",
+        displayName: "Olivia",
+        memberships: [{
+          id: "membership-owner",
+          organizationId: "org-1",
+          role: "OWNER",
+          houseId: "house-1",
+          organization: { name: "Acme Corp", slug: "acme" },
+        }],
+      },
+    });
+    mockOrgCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|owner", {}, {
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 2 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/org/restore",
+      payload: { slug: "acme" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ORGANIZATION_CAPACITY_REACHED");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("allows an archived organization owner to restore it and writes an audit event", async () => {
     mockAuthIdentityFindUnique.mockResolvedValue({
       user: {
@@ -6207,6 +6300,45 @@ describe("POST /orgs/create", () => {
     firstHouseColor: "#7c3aed",
   };
 
+  it("reports when public organization creation is disabled", async () => {
+    const app = await buildTestApp("auth0|member", {}, {
+      organizationCreationPolicy: { enabled: false, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/orgs/create-availability",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ canCreate: false, reason: "DISABLED" });
+    expect(mockOrgCount).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects creation at capacity without creating organization records", async () => {
+    mockOrgCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|member", {}, {
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 2 },
+    });
+
+    const res = await app.inject({ method: "POST", url: "/orgs/create", payload });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({
+      code: "ORGANIZATION_CAPACITY_REACHED",
+      message: "HousePoints has reached its current organization capacity. You can still join an existing organization with an invitation.",
+    });
+    expect(mockExecuteRawUnsafe).toHaveBeenCalledWith(
+      "SELECT pg_advisory_xact_lock($1)",
+      expect.any(Number),
+    );
+    expect(mockOrgCount).toHaveBeenCalledWith({ where: { archivedAt: null } });
+    expect(mockOrgCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("returns SLUG_TAKEN before starting setup when organization slug already exists", async () => {
     mockIsOrganizationSlugReserved.mockResolvedValue(true);
     const app = await buildTestApp("auth0|member");
@@ -6422,6 +6554,310 @@ describe("POST /orgs/create", () => {
       message: "Internal server error",
     });
     expect(mockTransaction).toHaveBeenCalledOnce();
+    await app.close();
+  });
+});
+
+describe("platform support routes", () => {
+  it("submits an organization-scoped point report with an immutable evidence snapshot", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", type: "AWARD", delta: 10, reason: "Great work", trait: "LEADERSHIP", createdAt: new Date("2026-09-20T12:00:00.000Z"), actor: { id: "user-2", displayName: "Sam" }, targetUser: { id: "user-3", displayName: "Alex" }, targetHouse: { id: "house-1", name: "Phoenix" } });
+    mockModerationReportCreate.mockResolvedValue({ id: "report-1" });
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/moderation/reports/submit", payload: { targetType: "POINT_TRANSACTION", targetId: "tx-1", category: "INAPPROPRIATE_CONTENT", details: "The award message needs review." } });
+    expect(res.statusCode).toBe(201);
+    expect(mockModerationReportCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        reporterUserId: "user-1",
+        targetId: "tx-1",
+        evidenceSnapshot: expect.objectContaining({
+          reason: "Great work",
+          actor: { id: "user-2", displayName: "Sam" },
+        }),
+      }),
+      select: { id: true },
+    });
+    await app.close();
+  });
+
+  it("redacts reported point activity with organization and platform audit evidence", async () => {
+    mockModerationReportFindUnique.mockResolvedValue({ id: "report-1", status: "OPEN", organizationId: "org-1", targetType: "POINT_TRANSACTION", targetId: "tx-1" });
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", delta: 10, targetUserId: "user-3", targetHouseId: "house-1", reason: "Bad message", trait: "LEADERSHIP", deletedAt: null, targetUser: { displayName: "Alex" }, targetHouse: { name: "Phoenix" } });
+    mockModerationReportUpdate.mockResolvedValue({});
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/moderation/reports/resolve", payload: { reportId: "report-1", action: "REDACT_CONTENT", operatorNote: "Message violates the content policy." } });
+    expect(res.statusCode).toBe(200);
+    expect(mockTxUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "tx-1" }, data: expect.objectContaining({ deletedAt: expect.any(Date), deletedByUserId: null }) }));
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ organizationId: "org-1", eventType: "POINT_DELETED", metadata: expect.objectContaining({ moderationReportId: "report-1" }) }) });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "MODERATION_REPORT_UPDATED", metadata: expect.objectContaining({ action: "REDACT_CONTENT" }) }) });
+    expect(mockModerationReportUpdate).toHaveBeenCalledWith({ where: { id: "report-1" }, data: expect.objectContaining({ status: "RESOLVED", operatorNote: "Message violates the content policy.", resolvedByAuth0Sub: "auth0|platform-owner" }) });
+    await app.close();
+  });
+
+  it("warns a reported organization member and records the escalation", async () => {
+    mockModerationReportFindUnique.mockResolvedValue({ id: "report-2", status: "REVIEWING", organizationId: "org-1", targetType: "USER", targetId: "user-3" });
+    mockMembershipFindFirst.mockResolvedValue({ id: "membership-3", role: "MEMBER", isActive: true, suspendedAt: null, user: { id: "user-3", displayName: "Alex" } });
+    mockModerationReportUpdate.mockResolvedValue({});
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/moderation/reports/resolve", payload: { reportId: "report-2", action: "WARN_MEMBER", operatorNote: "First substantiated conduct incident." } });
+    expect(res.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ recipientUserId: "user-3", type: "MODERATION_WARNING", severity: "WARNING" })], skipDuplicates: true });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "MODERATION_WARNING_ISSUED", metadata: expect.objectContaining({ moderationReportId: "report-2" }) }) });
+    expect(mockModerationReportUpdate).toHaveBeenCalledWith({ where: { id: "report-2" }, data: expect.objectContaining({ status: "RESOLVED" }) });
+    await app.close();
+  });
+
+  it("rejects authenticated users who are not platform owners", async () => {
+    const app = await buildTestApp("auth0|member", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+    });
+
+    const res = await app.inject({ method: "POST", url: "/platform/overview", payload: {} });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("PLATFORM_OWNER_REQUIRED");
+    expect(mockOrgFindMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns organization inventory to an allowlisted platform owner", async () => {
+    mockOrgFindMany.mockResolvedValue([{
+      id: "org-1",
+      name: "Acme Corp",
+      slug: "acme",
+      archivedAt: null,
+      createdAt: new Date("2026-09-01T12:00:00.000Z"),
+      memberships: [{ role: "OWNER" }, { role: "MEMBER" }],
+      transactions: [{ createdAt: new Date("2026-09-18T12:00:00.000Z") }],
+    }]);
+    mockMembershipCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|platform-owner", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({ method: "POST", url: "/platform/overview", payload: {} });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      activeOrganizationCount: 1,
+      archivedOrganizationCount: 0,
+      totalMemberCount: 2,
+      settings: {
+        hardMaxActiveOrganizations: 10,
+        effectiveMaxActiveOrganizations: 10,
+      },
+      organizations: [{ name: "Acme Corp", memberCount: 2, ownerCount: 1, status: "ACTIVE" }],
+    });
+    await app.close();
+  });
+
+  it("persists lower operating limits with a platform audit event", async () => {
+    mockPlatformSettingsFindUnique.mockResolvedValue({
+      organizationCreationEnabled: false,
+      maxActiveOrganizations: 8,
+    });
+    const app = await buildTestApp("auth0|platform-owner", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/platform/settings",
+      payload: { organizationCreationEnabled: false, maxActiveOrganizations: 8 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockPlatformSettingsUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "global" },
+      update: expect.objectContaining({ maxActiveOrganizations: 8 }),
+    }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorAuth0Sub: "auth0|platform-owner",
+        eventType: "PLATFORM_SETTINGS_UPDATED",
+      }),
+    });
+    expect(res.json().effectiveOrganizationCreationEnabled).toBe(false);
+    await app.close();
+  });
+
+  it("does not let dashboard settings exceed the Railway hard cap", async () => {
+    const app = await buildTestApp("auth0|platform-owner", {}, {
+      platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]),
+      organizationCreationPolicy: { enabled: true, maxActiveOrganizations: 10 },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/platform/settings",
+      payload: { organizationCreationEnabled: true, maxActiveOrganizations: 11 },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("PLATFORM_HARD_CAP_EXCEEDED");
+    expect(mockPlatformSettingsUpsert).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("suspends an organization and records the operator action atomically", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme", archivedAt: null, suspendedAt: null });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/status", payload: { organizationId: "org-1", action: "SUSPEND", confirmationSlug: "acme", reason: "Abuse investigation" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ id: "org-1", status: "SUSPENDED" });
+    expect(mockOrgUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "org-1" }, data: expect.objectContaining({ suspendedAt: expect.any(Date), suspensionReason: "Abuse investigation" }) }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_SUSPENDED", actorAuth0Sub: "auth0|platform-owner" }) });
+    await app.close();
+  });
+
+  it("requires the exact organization slug before changing lifecycle state", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme", archivedAt: null, suspendedAt: null });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/status", payload: { organizationId: "org-1", action: "SUSPEND", confirmationSlug: "wrong", reason: "Abuse investigation" } });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("CONFIRMATION_MISMATCH");
+    expect(mockOrgUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("archives an organization and clears any suspension state", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme", archivedAt: null, suspendedAt: new Date() });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/status", payload: { organizationId: "org-1", action: "ARCHIVE", confirmationSlug: "acme" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ status: "ARCHIVED", archivedAt: expect.any(String) });
+    expect(mockOrgUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ archivedAt: expect.any(Date), suspendedAt: null, suspensionReason: null }) }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_ARCHIVED" }) });
+    await app.close();
+  });
+
+  it("revokes every outstanding invite and audits the count", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme" });
+    mockInviteUpdateMany.mockResolvedValue({ count: 3 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/revoke-invites", payload: { organizationId: "org-1", confirmationSlug: "acme", reason: "Owner requested cleanup" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revokedCount: 3 });
+    expect(mockInviteUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId: "org-1", usedAt: null }), data: { expiresAt: expect.any(Date) } }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_INVITES_REVOKED", metadata: expect.objectContaining({ revokedCount: 3 }) }) });
+    await app.close();
+  });
+
+  it("searches users and calculates effective permissions across organization states", async () => {
+    mockUserFindMany.mockResolvedValue([{ id: "user-1", displayName: "Alex Owner", email: "alex@example.com", auth0Sub: "auth0|alex", deletionRequestedAt: null, deviceRegistrations: [{ id: "device-1", organizationId: "org-1", platform: "ANDROID", appVersion: "1.2.3", locale: "en-US", createdAt: new Date("2026-09-01T12:00:00.000Z"), lastSeenAt: new Date("2026-09-19T12:00:00.000Z"), organization: { name: "Acme" } }], memberships: [
+      { organizationId: "org-1", role: "OWNER", isActive: true, archivedAt: null, organization: { name: "Acme", slug: "acme", archivedAt: null, suspendedAt: null } },
+      { organizationId: "org-2", role: "ADMIN", isActive: true, archivedAt: null, organization: { name: "Paused", slug: "paused", archivedAt: null, suspendedAt: new Date() } },
+    ] }]);
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/users/search", payload: { query: "alex" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ users: [{ displayName: "Alex Owner", activeDeviceCount: 1, memberships: [
+      { organizationSlug: "acme", effectiveAccess: "ALLOWED", capabilities: ["VIEW_ORGANIZATION", "AWARD_POINTS", "MANAGE_MEMBERS", "MANAGE_ORGANIZATION"] },
+      { organizationSlug: "paused", effectiveAccess: "BLOCKED_ORGANIZATION", capabilities: [] },
+    ] }] });
+    expect(mockUserFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 50, where: { OR: expect.any(Array) } }));
+    await app.close();
+  });
+
+  it("revokes one active invitation with a reason and audit record", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1", name: "Acme Corp", slug: "acme" });
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/organizations/revoke-invite", payload: { organizationId: "org-1", inviteId: "invite-1", confirmationSlug: "acme", reason: "Invite sent in error" } });
+    expect(res.statusCode).toBe(200);
+    expect(mockInviteUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: "invite-1", organizationId: "org-1" }) }));
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ORGANIZATION_INVITE_REVOKED", metadata: expect.objectContaining({ reason: "Invite sent in error" }) }) });
+    await app.close();
+  });
+
+  it("revokes a user's selected device registration with confirmation and a reason", async () => {
+    mockFindUnique.mockResolvedValue({ id: "user-1", displayName: "Alex Owner" });
+    mockDeviceRegistrationUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/users/revoke-devices", payload: { userId: "user-1", deviceRegistrationId: "device-1", confirmationDisplayName: "Alex Owner", reason: "Lost device" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ revokedCount: 1 });
+    expect(mockDeviceRegistrationUpdateMany).toHaveBeenCalledWith({ where: { userId: "user-1", revokedAt: null, id: "device-1" }, data: { revokedAt: expect.any(Date) } });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "USER_DEVICE_REVOKED", metadata: expect.objectContaining({ reason: "Lost device" }) }) });
+    await app.close();
+  });
+
+  it("lists pending and completed account-deletion requests with ownership conflicts", async () => {
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-pending", displayName: "Pending User", email: "pending@example.com", deletionRequestedAt: new Date("2026-09-18T12:00:00.000Z"), deletionCompletedAt: null, deletionCompletedByAuth0Sub: null, deletionCompletionNote: null, deletionCompletionEvidence: null, memberships: [{ role: "OWNER", organizationId: "org-1", organization: { name: "Acme", archivedAt: null, memberships: [] } }] },
+      { id: "user-complete", displayName: "Deleted user", email: null, deletionRequestedAt: new Date("2026-09-17T12:00:00.000Z"), deletionCompletedAt: new Date("2026-09-19T12:00:00.000Z"), deletionCompletedByAuth0Sub: "auth0|platform-owner", deletionCompletionNote: "Verified and completed.", deletionCompletionEvidence: { deletedDeviceRegistrations: 1, deletedNotifications: 2, deletedReactions: 3, expiredInvitations: 0, retainedIdentityTombstones: 2, retainedMemberships: 1, retainedHistoricalPointRecords: 4 }, memberships: [] },
+    ]);
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/account-deletions", payload: {} });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ pending: [{ userId: "user-pending", lastOwnerConflicts: [{ organizationName: "Acme" }] }], recentlyCompleted: [{ userId: "user-complete", evidence: { deletedNotifications: 2 } }] });
+    await app.close();
+  });
+
+  it("anonymizes a requested account and records structured completion evidence", async () => {
+    mockFindUnique.mockResolvedValue({ id: "user-1", displayName: "Alex Owner", deletionRequestedAt: new Date("2026-09-18T12:00:00.000Z"), deletionCompletedAt: null, authIdentities: [{ id: "identity-1" }], memberships: [{ role: "MEMBER", organizationId: "org-1", organization: { name: "Acme", archivedAt: null, memberships: [{ userId: "other-owner" }] } }], _count: { deviceRegistrations: 2, notifications: 3, pointReactions: 4, pointTransactions: 5, receivedTransactions: 6 } });
+    mockInviteUpdateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/account-deletions/complete", payload: { userId: "user-1", confirmationDisplayName: "Alex Owner", completionNote: "Identity verified and request completed." } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ userId: "user-1", evidence: { deletedDeviceRegistrations: 2, deletedNotifications: 3, deletedReactions: 4, expiredInvitations: 1, retainedIdentityTombstones: 2, retainedHistoricalPointRecords: 11 } });
+    expect(mockDeviceRegistrationDeleteMany).toHaveBeenCalledWith({ where: { userId: "user-1" } });
+    expect(mockNotificationDeleteMany).toHaveBeenCalledWith({ where: { recipientUserId: "user-1" } });
+    expect(mockPointReactionDeleteMany).toHaveBeenCalledWith({ where: { actorUserId: "user-1" } });
+    expect(mockUserUpdate).toHaveBeenCalledWith({ where: { id: "user-1" }, data: expect.objectContaining({ email: null, displayName: "Deleted user", deletionCompletedAt: expect.any(Date), deletionCompletionNote: "Identity verified and request completed." }) });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "ACCOUNT_DELETION_COMPLETED", metadata: expect.objectContaining({ userId: "user-1" }) }) });
+    await app.close();
+  });
+
+  it("creates a linked private support case without copying case text into platform audit metadata", async () => {
+    mockOrgFindUnique.mockResolvedValue({ id: "org-1" });
+    mockFindUnique.mockResolvedValue({ id: "user-1" });
+    mockSupportCaseCreate.mockResolvedValue({ id: "case-1" });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/support-cases/create", payload: { title: "Member cannot sign in", summary: "Investigating a reported authentication loop.", priority: "HIGH", organizationId: "org-1", userId: "user-1" } });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toEqual({ id: "case-1" });
+    expect(mockSupportCaseCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ title: "Member cannot sign in", priority: "HIGH", organizationId: "org-1", userId: "user-1" }), select: { id: true } });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "SUPPORT_CASE_CREATED", metadata: { supportCaseId: "case-1", priority: "HIGH", organizationId: "org-1", userId: "user-1" } }) });
+    expect(JSON.stringify(mockPlatformAuditCreate.mock.calls.at(-1))).not.toContain("authentication loop");
+    await app.close();
+  });
+
+  it("adds an append-only private note while auditing only the case identifier", async () => {
+    mockSupportCaseFindUnique.mockResolvedValue({ id: "case-1" });
+    const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
+    const res = await app.inject({ method: "POST", url: "/platform/support-cases/notes", payload: { supportCaseId: "case-1", body: "Customer confirmed the issue is resolved." } });
+    expect(res.statusCode).toBe(200);
+    expect(mockSupportNoteCreate).toHaveBeenCalledWith({ data: { supportCaseId: "case-1", authorAuth0Sub: "auth0|platform-owner", body: "Customer confirmed the issue is resolved." } });
+    expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "SUPPORT_CASE_NOTE_ADDED", metadata: { supportCaseId: "case-1" } }) });
+    expect(JSON.stringify(mockPlatformAuditCreate.mock.calls.at(-1))).not.toContain("Customer confirmed");
+    await app.close();
+  });
+});
+
+describe("POST /telemetry/client-error", () => {
+  it("aggregates a sanitized browser error within the actor organization", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockErrorSignalUpsert.mockResolvedValue({ id: "error-1" });
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/telemetry/client-error", payload: { type: "error", message: "Dashboard failed", sourcePath: "/o/acme" } });
+    expect(res.statusCode).toBe(202);
+    expect(mockErrorSignalUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId_fingerprint: { organizationId: "org-1", fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) } },
+      create: expect.objectContaining({ organizationId: "org-1", message: "Dashboard failed", sourcePath: "/o/acme" }),
+      update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+    }));
+    await app.close();
+  });
+
+  it("rejects stack traces and arbitrary telemetry fields", async () => {
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/telemetry/client-error", payload: { type: "error", message: "Failure", sourcePath: "/", stack: "secret stack" } });
+    expect(res.statusCode).toBe(400);
+    expect(mockErrorSignalUpsert).not.toHaveBeenCalled();
     await app.close();
   });
 });

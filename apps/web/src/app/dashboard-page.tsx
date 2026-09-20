@@ -43,6 +43,7 @@ import { AdminForms } from "@/components/AdminForms";
 import { AdminUnavailablePanel } from "@/components/AdminUnavailablePanel";
 import { DashboardShell } from "@/components/DashboardShell";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
+import { readOrgCreationAvailability } from "@/app/actions/orgs";
 import { logInfo, logWarn, serializeErrorForLog } from "@/lib/logging";
 import { getRootOrganizationRedirect } from "./dashboard-routing";
 import type { PagedNotifications, Season, SeasonComparison } from "@housepoints/contracts";
@@ -83,7 +84,8 @@ export async function renderDashboardPage(route: string) {
   }
 
   if (session.needsOrg) {
-    return <OrgOnboarding userName={session.userName ?? "there"} />;
+    const creationAvailability = await readOrgCreationAvailability();
+    return <OrgOnboarding userName={session.userName ?? "there"} creationAvailability={creationAvailability} />;
   }
 
   if (session.needsHouseAssignment) {

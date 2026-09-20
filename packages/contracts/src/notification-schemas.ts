@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = [
   "POINT_DEDUCTION_RECEIVED",
   "POINT_REACTION_RECEIVED",
   "RELEASE_ANNOUNCEMENT",
+  "MODERATION_WARNING",
 ] as const;
 
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);

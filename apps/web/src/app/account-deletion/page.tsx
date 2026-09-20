@@ -43,12 +43,14 @@ export default function AccountDeletionPage() {
       <section>
         <h2>What happens to your data</h2>
         <p className="mt-4">
-          Your HousePoints access, authentication identity, email address,
-          display name, memberships, and notification registrations will be
-          removed during processing. Historical point and audit records may be
-          retained in anonymized form when needed for organization records,
-          security, dispute resolution, or legal compliance. Backups expire on
-          their normal retention schedule.
+          Your HousePoints access is disabled; your email address, display
+          name, device registrations, notifications, and reactions are removed
+          during processing. Historical memberships, point records, and audit
+          records remain under an anonymized “Deleted user” profile when needed
+          for organization records, security, dispute resolution, or legal
+          compliance. Authentication identifiers are retained only as blocked
+          registration tombstones so the deleted identity cannot silently
+          recreate an account. Backups expire on their normal retention schedule.
         </p>
       </section>
 

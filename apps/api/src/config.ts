@@ -45,6 +45,43 @@ export function parseBooleanFlag(value: string | undefined): boolean {
   return value?.trim().toLowerCase() === "true";
 }
 
+export type OrganizationCreationPolicy = {
+  enabled: boolean;
+  maxActiveOrganizations: number | null;
+};
+
+export function parseMaxActiveOrganizations(value: string | undefined): number | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || String(parsed) !== trimmed) {
+    throw new Error("MAX_ACTIVE_ORGANIZATIONS must be a positive integer");
+  }
+
+  return parsed;
+}
+
+export function readOrganizationCreationPolicyFromEnv(): OrganizationCreationPolicy {
+  return {
+    enabled: process.env.PUBLIC_ORGANIZATION_CREATION_ENABLED?.trim().toLowerCase() !== "false",
+    maxActiveOrganizations: parseMaxActiveOrganizations(process.env.MAX_ACTIVE_ORGANIZATIONS),
+  };
+}
+
+export function parsePlatformOwnerAuth0Subjects(value: string | undefined): ReadonlySet<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((subject) => subject.trim())
+      .filter(Boolean),
+  );
+}
+
+export function readPlatformOwnerAuth0SubjectsFromEnv(): ReadonlySet<string> {
+  return parsePlatformOwnerAuth0Subjects(process.env.PLATFORM_OWNER_AUTH0_SUBS);
+}
+
 export function readPointAdjustmentsEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.POINT_ADJUSTMENTS_ENABLED);
 }

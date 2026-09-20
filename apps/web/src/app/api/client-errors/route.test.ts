@@ -4,9 +4,11 @@ vi.mock("@/lib/logging", () => ({
   logError: vi.fn(),
   logWarn: vi.fn(),
 }));
+vi.mock("@/lib/api-client", () => ({ apiFetch: vi.fn().mockResolvedValue(new Response(null, { status: 202 })) }));
 
 import { logError, logWarn } from "@/lib/logging";
 import { POST } from "./route";
+import { apiFetch } from "@/lib/api-client";
 
 const logErrorMock = vi.mocked(logError);
 const logWarnMock = vi.mocked(logWarn);
@@ -47,6 +49,9 @@ describe("POST /api/client-errors", () => {
       }),
     );
     expect(logWarnMock).not.toHaveBeenCalled();
+    expect(vi.mocked(apiFetch)).toHaveBeenCalledWith("/telemetry/client-error", expect.any(String), expect.objectContaining({
+      body: JSON.stringify({ type: "error", message: "Hydration failed", sourcePath: "/" }),
+    }));
   });
 
   it("rejects malformed report payloads without logging them as browser errors", async () => {

@@ -84,6 +84,19 @@ describe("OrgOnboarding", () => {
     expect(pushMock).toHaveBeenCalledWith("/o/acme");
   });
 
+  it("disables organization creation when registration is at capacity", () => {
+    render(
+      <OrgOnboarding
+        userName="User One"
+        creationAvailability={{ canCreate: false, reason: "CAPACITY_REACHED" }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Create a new organisation/ })).toBeDisabled();
+    expect(screen.getByText(/registration is currently full/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Join with an invite link/ })).toBeEnabled();
+  });
+
   it("shows a safe create error when the typed result fails", async () => {
     createOrgMock.mockResolvedValue({
       ok: false,

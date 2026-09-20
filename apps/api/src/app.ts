@@ -18,6 +18,9 @@ import {
   readExpoAccessTokenFromEnv,
   readPointAdjustmentsEnabledFromEnv,
   readPushDispatchEnabledFromEnv,
+  readOrganizationCreationPolicyFromEnv,
+  readPlatformOwnerAuth0SubjectsFromEnv,
+  type OrganizationCreationPolicy,
 } from "./config.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
@@ -26,9 +29,11 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerPointRoutes } from "./routes/points.js";
+import { registerPlatformRoutes } from "./routes/platform.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
 import { registerUserRoutes } from "./routes/users.js";
+import { registerTelemetryRoutes } from "./routes/telemetry.js";
 import { createApiLogger } from "./logging.js";
 import {
   applyMutationRateLimit,
@@ -46,6 +51,8 @@ type BuildAppOptions = {
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
   pushDispatcher?: PushDispatcher | null;
+  organizationCreationPolicy?: OrganizationCreationPolicy;
+  platformOwnerAuth0Subjects?: ReadonlySet<string>;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -58,6 +65,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const pointAdjustmentsEnabled =
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
+  const organizationCreationPolicy =
+    options.organizationCreationPolicy ?? readOrganizationCreationPolicyFromEnv();
+  const platformOwnerAuth0Subjects =
+    options.platformOwnerAuth0Subjects ?? readPlatformOwnerAuth0SubjectsFromEnv();
   const pushDispatcher = options.pushDispatcher === undefined
     ? readPushDispatchEnabledFromEnv()
       ? new ExpoPushDispatcher(readExpoAccessTokenFromEnv())
@@ -114,14 +125,19 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   await registerHealthRoutes(app);
   await registerSeasonRoutes(app, { pushDispatcher });
-  await registerAdminRoutes(app, { pushDispatcher });
+  await registerAdminRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerDeviceRoutes(app);
   await registerNotificationRoutes(app);
-  await registerOrgRoutes(app, { pushDispatcher });
+  await registerOrgRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerUserRoutes(app, { verifyIdToken });
   await registerPointRoutes(app, { pointAdjustmentsEnabled, pushDispatcher });
+  await registerPlatformRoutes(app, {
+    hardOrganizationCreationPolicy: organizationCreationPolicy,
+    platformOwnerAuth0Subjects,
+  });
   await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
+  await registerTelemetryRoutes(app);
 
   return app;
 }

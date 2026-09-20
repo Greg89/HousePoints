@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import {
   appUserSchema,
   joinInvitePreviewResponseSchema,
+  orgCreationAvailabilitySchema,
   orgRouteContextSchema,
+  type OrgCreationAvailability,
   type OrgRouteContext,
 } from "@housepoints/contracts";
 import {
@@ -26,6 +28,21 @@ export type InviteLinkPreviewResult =
       memberOrganizationSlug: string | null;
     }
   | { ok: false; code: string; message: string };
+
+export async function readOrgCreationAvailability(): Promise<OrgCreationAvailability> {
+  return runServerAction("readOrgCreationAvailability", async (context) => {
+    await requireAuthenticatedApiContext();
+    const response = await apiFetch("/orgs/create-availability", context.requestId, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return parseApiResponse(
+      response,
+      orgCreationAvailabilitySchema,
+      "Organization registration availability could not be loaded.",
+    );
+  });
+}
 
 export async function readOrgRouteContext(
   organizationSlug: string,

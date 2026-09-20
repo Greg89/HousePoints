@@ -78,6 +78,11 @@ analytics, performance monitoring, or session replay.
   deletion of the global HousePoints user or Auth0 identity.
 - General access, correction, and deletion requests are accepted through the
   published support channel.
+- Completion removes profile/email data, device registrations, notifications,
+  reactions, and unused invitations created by the requester. Membership and
+  point history remains under an anonymized user row for ledger integrity.
+  Authentication subjects remain only as access-blocking tombstones so a
+  deleted identity cannot silently register again.
 
 ### Account-deletion decision and blocker
 

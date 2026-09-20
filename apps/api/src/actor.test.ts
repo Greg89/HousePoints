@@ -33,6 +33,7 @@ const actorUserSelect = {
       archivedAt: null,
       organization: {
         archivedAt: null,
+        suspendedAt: null,
       },
     },
     select: {
@@ -57,6 +58,7 @@ const orgContextUserSelect = {
       archivedAt: null,
       organization: {
         archivedAt: null,
+        suspendedAt: null,
       },
     },
     select: {
@@ -527,6 +529,7 @@ describe("getUserRouteOrgContextBySub", () => {
         organizationName: "Second Org",
         organizationSlug: "second-org",
         organizationArchivedAt: null,
+        organizationSuspendedAt: null,
         role: "MEMBER",
       },
     });
@@ -568,6 +571,7 @@ describe("getUserRouteOrgContextBySub", () => {
         organizationName: "Archived Org",
         organizationSlug: "archived-org",
         organizationArchivedAt: archivedAt,
+        organizationSuspendedAt: null,
         role: "MEMBER",
       },
     });

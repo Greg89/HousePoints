@@ -54,6 +54,9 @@ enum AuditEventType {
   USER_HOUSE_ASSIGNED
   USER_ROLE_CHANGED
   USER_REMOVED_FROM_ORG
+  MODERATION_WARNING_ISSUED
+  MEMBER_SUSPENDED
+  MEMBER_RESTORED
 }
 
 enum NotificationType {
@@ -65,6 +68,7 @@ enum NotificationType {
   POINT_DEDUCTION_RECEIVED
   POINT_REACTION_RECEIVED
   RELEASE_ANNOUNCEMENT
+  MODERATION_WARNING
 }
 
 enum NotificationSeverity {
@@ -83,12 +87,40 @@ enum DevicePlatform {
   ANDROID
 }
 
+enum PlatformSupportCaseStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum PlatformSupportCasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ModerationReportTargetType {
+  USER
+  POINT_TRANSACTION
+}
+
+enum ModerationReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
 model Organization {
   id             String                   @id @default(cuid())
   name           String
   slug           String                   @unique
   archivedAt     DateTime?
   archivedById   String?
+  suspendedAt    DateTime?
+  suspendedByAuth0Sub String?
+  suspensionReason String?
   memberships    OrganizationMembership[]
   houses         House[]
   transactions   PointTransaction[]
@@ -99,11 +131,15 @@ model Organization {
   notifications  Notification[]
   pointReactions PointReaction[]
   deviceRegistrations DeviceRegistration[]
+  errorSignals   OrganizationErrorSignal[]
+  platformSupportCases PlatformSupportCase[]
+  moderationReports ModerationReport[]
   archivedBy     User?                    @relation("ArchivedOrganizations", fields: [archivedById], references: [id], onDelete: SetNull)
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
 
   @@index([archivedAt])
+  @@index([suspendedAt])
   @@index([archivedById])
 }
 
@@ -163,6 +199,10 @@ model User {
   displayName              String
   houseThemeEnabled        Boolean                  @default(false)
   deletionRequestedAt      DateTime?
+  deletionCompletedAt      DateTime?
+  deletionCompletedByAuth0Sub String?
+  deletionCompletionNote   String?
+  deletionCompletionEvidence Json?
   pointTransactions        PointTransaction[]       @relation("ActorTransactions")
   receivedTransactions     PointTransaction[]       @relation("PointsReceived")
   deletedPointTransactions PointTransaction[]       @relation("DeletedPointTransactions")
@@ -176,10 +216,13 @@ model User {
   notifications            Notification[]           @relation("NotificationRecipient")
   pointReactions           PointReaction[]          @relation("PointReactionActor")
   deviceRegistrations      DeviceRegistration[]
+  platformSupportCases     PlatformSupportCase[]
+  moderationReports        ModerationReport[] @relation("ModerationReporter")
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
   @@index([deletionRequestedAt])
+  @@index([deletionCompletedAt])
 }
 
 model OrganizationMembership {
@@ -189,7 +232,10 @@ model OrganizationMembership {
   role           Role      @default(MEMBER)
   houseId        String?
   isActive       Boolean   @default(true)
-  archivedAt     DateTime?
+    archivedAt     DateTime?
+    suspendedAt    DateTime?
+    suspensionReason String?
+    suspendedByAuth0Sub String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -341,6 +387,99 @@ model ReleaseAnnouncement {
 
   @@index([releasedAt])
   @@index([broadcastAt])
+}
+
+model PlatformSettings {
+  id                         String   @id
+  organizationCreationEnabled Boolean @default(true)
+  maxActiveOrganizations     Int?
+  updatedByAuth0Sub           String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+model PlatformAuditEvent {
+  id             String   @id @default(cuid())
+  actorAuth0Sub  String
+  eventType      String
+  summary        String
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorAuth0Sub, createdAt])
+}
+
+model PlatformSupportCase {
+  id                   String                      @id @default(cuid())
+  title                String
+  summary              String
+  status               PlatformSupportCaseStatus  @default(OPEN)
+  priority             PlatformSupportCasePriority @default(NORMAL)
+  organizationId       String?
+  userId               String?
+  createdByAuth0Sub     String
+  resolvedAt           DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  organization         Organization?                @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user                 User?                        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notes                PlatformSupportNote[]
+
+  @@index([status, updatedAt])
+  @@index([organizationId, updatedAt])
+  @@index([userId, updatedAt])
+}
+
+model PlatformSupportNote {
+  id               String              @id @default(cuid())
+  supportCaseId    String
+  authorAuth0Sub   String
+  body             String
+  createdAt        DateTime            @default(now())
+  supportCase      PlatformSupportCase @relation(fields: [supportCaseId], references: [id], onDelete: Cascade)
+
+  @@index([supportCaseId, createdAt])
+}
+
+model ModerationReport {
+  id                String                     @id @default(cuid())
+  organizationId    String
+  reporterUserId    String
+  targetType        ModerationReportTargetType
+  targetId          String
+  category          String
+  details           String?
+  evidenceSnapshot  Json
+    status            ModerationReportStatus     @default(OPEN)
+    resolvedAt        DateTime?
+    resolvedByAuth0Sub String?
+    operatorNote      String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reporter          User                       @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([reporterUserId, createdAt])
+}
+
+model OrganizationErrorSignal {
+  id              String       @id @default(cuid())
+  organizationId  String
+  fingerprint     String
+  errorType       String
+  message         String
+  sourcePath      String?
+  occurrenceCount Int          @default(1)
+  firstSeenAt     DateTime     @default(now())
+  lastSeenAt      DateTime     @default(now())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, fingerprint])
+  @@index([organizationId, lastSeenAt])
 }
 
 model DeviceRegistration {

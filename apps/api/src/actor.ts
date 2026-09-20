@@ -31,6 +31,7 @@ const actorUserSelect = {
       archivedAt: null,
       organization: {
         archivedAt: null,
+        suspendedAt: null,
       },
     },
     select: {
@@ -96,6 +97,7 @@ export type UserRouteMembershipContext = {
   organizationName: string;
   organizationSlug: string;
   organizationArchivedAt: Date | null;
+  organizationSuspendedAt: Date | null;
   role: UserRole;
 };
 
@@ -117,6 +119,7 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
         archivedAt: null,
         organization: {
           archivedAt: null,
+          suspendedAt: null,
         },
       },
       select: {
@@ -150,7 +153,7 @@ export async function getUserOrgContextBySub(auth0Sub: string): Promise<UserOrgC
 type PreferredOrgContextSource = {
   memberships?: Array<{
     organizationId: string;
-    organization: { name: string; slug: string; archivedAt?: Date | null };
+    organization: { name: string; slug: string; archivedAt?: Date | null; suspendedAt?: Date | null };
   }>;
 };
 
@@ -170,7 +173,7 @@ function resolvePreferredMembership(user: PreferredMembershipSource) {
 
 function resolvePreferredOrgContext(user: PreferredOrgContextSource): UserOrgContext {
   const preferredMembership = user.memberships?.find(
-    (membership) => !membership.organization.archivedAt,
+    (membership) => !membership.organization.archivedAt && !membership.organization.suspendedAt,
   ) ?? null;
 
   if (preferredMembership) {
@@ -248,6 +251,7 @@ export async function getUserRouteOrgContextBySub(
             name: true,
             slug: true,
             archivedAt: true,
+            suspendedAt: true,
           },
         },
       },
@@ -279,6 +283,7 @@ export async function getUserRouteOrgContextBySub(
           organizationName: requestedMembership.organization.name,
           organizationSlug: requestedMembership.organization.slug,
           organizationArchivedAt: requestedMembership.organization.archivedAt ?? null,
+          organizationSuspendedAt: requestedMembership.organization.suspendedAt ?? null,
           role: requestedMembership.role,
         }
       : null,
