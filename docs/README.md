@@ -15,6 +15,8 @@ The documents in this folder serve three purposes:
 - [Execution plan](./refactor-pass-1/04-execution-plan.md): recommended order for the first refactor pass.
 - [Acceptance criteria](./refactor-pass-1/05-acceptance-criteria.md): release-blocker and pass-one criteria.
 - [Pass one closeout](./refactor-pass-1/09-closeout.md): completion evidence, done definition, deferred work, and recommended next tracks.
+- [Second refactor pass](./refactor-pass-2/README.md): July 2026 structural debt pass (handler bloat, notification factories, contracts split, Prisma select-derived types). Status: complete.
+- [Third refactor and enhancement pass](./refactor-pass-3/README.md): September 2026 application-wide review covering web streaming/caching, mobile screen composition and production polish, platform observability and typed errors, plus enhancement recommendations. Status: drafted, not scheduled.
 
 ## Roadmap And Planning
 
