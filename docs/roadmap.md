@@ -3,6 +3,10 @@
 Production readiness work organised into tiers by priority.
 Each tier has its own file with detailed task breakdowns.
 
+## Next-quarter product design
+
+Design is in progress for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and a spike for platform-managed monthly organization subscriptions. See the [quarterly product design](./quarterly-product-design/README.md) for scope, proposed decisions, dependencies, and acceptance criteria. These are not yet estimated or scheduled implementation slices; billing production launch is not committed.
+
 ## Status key
 - [done] Done
 - [doing] In progress
