@@ -19,21 +19,21 @@
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\""
   },
   "dependencies": {
-    "@fastify/cors": "^11.1.0",
-    "@fastify/rate-limit": "^11.0.0",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@housepoints/contracts": "*",
     "@housepoints/db": "*",
     "dotenv": "^17.2.3",
-    "fastify": "^5.6.1",
-    "jose": "^6.2.3",
+    "fastify": "^5.12.5",
+    "jose": "^6.2.12",
     "pino": "^10.3.1",
     "pino-seq": "^4.0.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@vitest/coverage-v8": "^4.1.8",
-    "tsx": "^4.20.6",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^4.1.8"
   }
