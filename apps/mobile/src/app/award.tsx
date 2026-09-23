@@ -5,8 +5,9 @@ import {
   type Trait,
 } from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { Stack, router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -27,15 +28,19 @@ import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { eligibleAwardMembers } from "@/lib/award-members";
+import {
+  AWARD_POINTS_DEFAULT,
+  AWARD_POINTS_MAX,
+  AWARD_POINTS_MIN,
+  parseAwardPoints,
+  stepAwardPoints,
+} from "@/lib/award-points";
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
 
-const DELTA_MIN = 1;
-const DELTA_MAX = 100;
 const REASON_MIN = 3;
 const REASON_MAX = 240;
-const DELTA_DEFAULT = 5;
 const DELTA_QUICK_VALUES = [1, 5, 10, 25] as const;
 
 export default function AwardPointsScreen() {
@@ -43,10 +48,20 @@ export default function AwardPointsScreen() {
   const { activeOrgSlug } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const headerHeight = useHeaderHeight();
+  const formRef = useRef<ScrollView>(null);
+  const reasonRef = useRef<TextInput>(null);
+
+  const revealFocusedReason = () => {
+    if (reasonRef.current?.isFocused()) {
+      formRef.current?.scrollToEnd({ animated: true });
+    }
+  };
 
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedTrait, setSelectedTrait] = useState<Trait | null>(null);
-  const [delta, setDelta] = useState(DELTA_DEFAULT);
+  const [pointsInput, setPointsInput] = useState(String(AWARD_POINTS_DEFAULT));
+  const delta = parseAwardPoints(pointsInput);
   const [reason, setReason] = useState("");
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [traitPickerOpen, setTraitPickerOpen] = useState(false);
@@ -82,8 +97,7 @@ export default function AwardPointsScreen() {
   const canSubmit =
     Boolean(selectedMemberId) &&
     Boolean(selectedTrait) &&
-    delta >= DELTA_MIN &&
-    delta <= DELTA_MAX &&
+    delta !== null &&
     reasonLength >= REASON_MIN &&
     reasonLength <= REASON_MAX;
 
@@ -91,6 +105,9 @@ export default function AwardPointsScreen() {
     mutationFn: async () => {
       if (!selectedMemberId || !selectedTrait) {
         throw new Error("Missing target user or trait selection");
+      }
+      if (delta === null) {
+        throw new Error("Invalid award points");
       }
       const accessToken = await getAccessToken();
       return callApi(
@@ -131,9 +148,10 @@ export default function AwardPointsScreen() {
     },
   });
 
-  const step = (change: number) => {
-    setDelta((current) => clamp(current + change, DELTA_MIN, DELTA_MAX));
+  const step = (change: -1 | 1) => {
+    setPointsInput((current) => stepAwardPoints(current, change));
   };
+  const submitLabel = delta === null ? "Award points" : `Award ${delta} points`;
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
@@ -146,12 +164,16 @@ export default function AwardPointsScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={headerHeight}
       >
         <ScrollView
+          ref={formRef}
           style={styles.flex}
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onLayout={revealFocusedReason}
         >
           <Section title="Recipient">
             {membersQuery.isPending ? (
@@ -179,10 +201,20 @@ export default function AwardPointsScreen() {
                 />
               </Section>
 
-              <Section title={`Points (${DELTA_MIN}\u2013${DELTA_MAX})`}>
+              <Section title={`Points (${AWARD_POINTS_MIN}\u2013${AWARD_POINTS_MAX})`}>
                 <View style={styles.stepperRow}>
                   <StepperButton label={"\u2212"} onPress={() => step(-1)} />
-                  <Text style={styles.deltaValue}>{delta}</Text>
+                  <TextInput
+                    testID="mobile.award.points"
+                    accessibilityLabel="Points to award"
+                    accessibilityHint="Enter a whole number from 1 to 100"
+                    style={styles.deltaValue}
+                    value={pointsInput}
+                    onChangeText={setPointsInput}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    selectTextOnFocus
+                  />
                   <StepperButton label="+" onPress={() => step(1)} />
                 </View>
                 <View style={styles.quickRow}>
@@ -192,7 +224,7 @@ export default function AwardPointsScreen() {
                       <Pressable
                         key={value}
                         style={[styles.quickChip, active && styles.chipActive]}
-                        onPress={() => setDelta(value)}
+                        onPress={() => setPointsInput(String(value))}
                       >
                         <Text
                           style={[
@@ -206,10 +238,16 @@ export default function AwardPointsScreen() {
                     );
                   })}
                 </View>
+                {delta === null ? (
+                  <Text style={styles.pointsError} accessibilityLiveRegion="polite">
+                    Enter a whole number from 1 to 100.
+                  </Text>
+                ) : null}
               </Section>
 
               <Section title="Reason">
                 <TextInput
+                  ref={reasonRef}
                   testID="mobile.award.reason"
                   accessibilityLabel="Award reason"
                   style={styles.reasonInput}
@@ -217,6 +255,7 @@ export default function AwardPointsScreen() {
                   placeholderTextColor="#94a3b8"
                   value={reason}
                   onChangeText={setReason}
+                  onFocus={revealFocusedReason}
                   multiline
                   maxLength={REASON_MAX}
                   textAlignVertical="top"
@@ -232,7 +271,7 @@ export default function AwardPointsScreen() {
         <View style={styles.footer}>
           <Pressable
             testID="mobile.award.submit"
-            accessibilityLabel={`Award ${delta} points`}
+            accessibilityLabel={submitLabel}
             style={[
               styles.submitButton,
               (!canSubmit || submitMutation.isPending) &&
@@ -244,7 +283,7 @@ export default function AwardPointsScreen() {
             {submitMutation.isPending ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.submitLabel}>Award {delta} points</Text>
+              <Text style={styles.submitLabel}>{submitLabel}</Text>
             )}
           </Pressable>
         </View>
@@ -533,10 +572,6 @@ function ErrorText({ children }: { children: React.ReactNode }) {
   return <Text style={styles.errorText}>{children}</Text>;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f8fafc" },
   flex: { flex: 1 },
@@ -666,7 +701,13 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "700",
     color: "#0f172a",
-    minWidth: 60,
+    width: 96,
+    minHeight: 52,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
     textAlign: "center",
     fontVariant: ["tabular-nums"],
   },
@@ -703,6 +744,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
     marginTop: 4,
   },
+  pointsError: { color: "#b91c1c", fontSize: 13, textAlign: "center", marginTop: 8 },
   errorText: {
     color: "#64748b",
     fontSize: 13,

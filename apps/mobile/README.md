@@ -78,6 +78,31 @@ The resulting `.env` is ignored by Git. Do not commit it or paste its contents
 into issues, logs, or documentation. Confirm that preview points to the beta web
 and API services before creating test data.
 
+## macOS Android preview builds with EAS
+
+Cloud builds need Node.js, npm, Git, and an Expo login. Android Studio, Java,
+and Xcode are only needed for local native builds or simulators, not for an
+Android EAS cloud build. Use `npm` and `npx` on macOS instead of `npm.cmd` and
+`npx.cmd`.
+
+Run the repository checks, then from `apps/mobile`:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest whoami
+npx eas-cli@latest build --profile preview --platform android
+```
+
+This uploads the local project to EAS and uses the EAS `preview` Environment.
+It does not commit or push to GitHub. Commit and push the reviewed candidate
+to `develop` separately so GitHub and the preview artifact represent the same
+change. Open the resulting build link to install its APK on an Android device.
+
+Dispatch `Mobile Staging E2E` on `develop` with that build's APK download URL
+as `android_app_url`. The workflow currently runs manually or on its weekday
+schedule; a push to `develop` runs CI but does not trigger mobile E2E. After
+verification, follow the existing store release workflow below.
+
 ## Windows Android local-testing runbook
 
 ### First-time workstation setup
@@ -257,6 +282,16 @@ for the native Auth0 application does not match `AUTH0_AUDIENCE`.
 
 ## Verify (dev laptop, no device)
 
+The award form adjusts for the keyboard and navigation header on both platforms
+and scrolls the focused reason into view as the available height changes. The
+Maestro award flow keeps the keyboard open through submission to exercise this
+path. Also check a multiline reason on a small physical iOS and Android device
+before release; desktop unit tests cannot verify native keyboard layout.
+
+Tap the point total to enter a whole number from 1 to 100 directly. The plus,
+minus, and quick preset controls remain available. Empty, fractional, or
+out-of-range amounts disable submission and show an inline validation message.
+
 Even without a simulator, these gates must pass before landing changes:
 
 ```powershell
@@ -354,7 +389,7 @@ First release rehearsal:
 
 `apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
 readiness, and a point award using stable native test IDs. The
-`Mobile Staging E2E` workflow runs on pushes to `develop` or manually. It
+`Mobile Staging E2E` workflow runs on a weekday schedule or manually. It
 downloads a configured staging APK, starts a GitHub-hosted Android emulator,
 and runs the free Maestro CLI without a Maestro Cloud subscription. Failure
 artifacts are retained for seven days. See

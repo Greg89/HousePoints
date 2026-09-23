@@ -57,9 +57,25 @@ tags:
     id: "mobile.award.trait.*"
     index: 0
 - tapOn:
+    id: "mobile.award.points"
+- eraseText
+- inputText: "101"
+- assertVisible: "Enter a whole number from 1 to 100."
+- eraseText
+- inputText: "100"
+- assertVisible: "Award 100 points"
+# Exercise a custom amount while keeping staging awards small.
+- eraseText
+- inputText: "7"
+- assertVisible: "Award 7 points"
+- hideKeyboard
+- tapOn:
     id: "mobile.award.reason"
 - inputText: "Maestro staging award"
-- hideKeyboard
+# Keep the keyboard open: both the reason and submit action must stay reachable.
+- assertVisible:
+    id: "mobile.award.reason"
+- assertVisible: "Maestro staging award"
 - extendedWaitUntil:
     visible:
       id: "mobile.award.submit"
