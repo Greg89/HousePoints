@@ -56,6 +56,17 @@ tags:
 - tapOn:
     id: "mobile.award.trait.*"
     index: 0
+# Focus reason first, without first opening the numeric keyboard.
+- tapOn:
+    id: "mobile.award.reason"
+- inputText: "Reason first keyboard check"
+- assertVisible:
+    id: "mobile.award.reason"
+- assertVisible: "Reason first keyboard check"
+- assertVisible:
+    id: "mobile.award.submit"
+- takeScreenshot: award-reason-first-keyboard-open
+- hideKeyboard
 - tapOn:
     id: "mobile.award.points"
 - eraseText
@@ -90,6 +101,7 @@ tags:
 - takeScreenshot: award-points-keyboard-dismissed
 - tapOn:
     id: "mobile.award.reason"
+- eraseText
 - inputText: "Maestro staging award"
 # Keep the keyboard open: both the reason and submit action must stay reachable.
 - assertVisible:
