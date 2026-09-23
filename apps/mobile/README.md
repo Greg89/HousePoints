@@ -282,11 +282,16 @@ for the native Auth0 application does not match `AUTH0_AUDIENCE`.
 
 ## Verify (dev laptop, no device)
 
-The award form adjusts for the keyboard and navigation header on both platforms
-and scrolls the focused reason into view as the available height changes. The
-Maestro award flow keeps the keyboard open through submission to exercise this
-path. Also check a multiline reason on a small physical iOS and Android device
-before release; desktop unit tests cannot verify native keyboard layout.
+The award form uses Android's native window resizing and iOS keyboard padding;
+it does not apply a second height adjustment on Android. Both the points and
+reason inputs scroll only as far as needed to stay inside the visible form,
+above the submit footer. The Maestro award flow checks numeric input visibility
+across keyboard reopen/dismiss cycles and keeps the reason keyboard open through
+submission. Screenshots capture these states for checking footer placement.
+On a physical Android device, verify that the footer sits just above the open
+keyboard and returns to the bottom after dismissal, without a large blank gap.
+Also check a multiline reason on a small physical iOS and Android device before
+release; desktop unit tests cannot verify native keyboard layout.
 
 Tap the point total to enter a whole number from 1 to 100 directly. The plus,
 minus, and quick preset controls remain available. Empty, fractional, or

@@ -63,12 +63,31 @@ tags:
 - assertVisible: "Enter a whole number from 1 to 100."
 - eraseText
 - inputText: "100"
+- assertVisible:
+    id: "mobile.award.points"
 - assertVisible: "Award 100 points"
 # Exercise a custom amount while keeping staging awards small.
 - eraseText
 - inputText: "7"
+- assertVisible:
+    id: "mobile.award.points"
 - assertVisible: "Award 7 points"
+- takeScreenshot: award-points-keyboard-open
 - hideKeyboard
+# Reopen the numeric keyboard to catch stale layout after dismissal.
+- tapOn:
+    id: "mobile.award.points"
+- eraseText
+- inputText: "7"
+- assertVisible:
+    id: "mobile.award.points"
+- takeScreenshot: award-points-keyboard-reopened
+- hideKeyboard
+- assertVisible:
+    id: "mobile.award.reason"
+- assertVisible:
+    id: "mobile.award.submit"
+- takeScreenshot: award-points-keyboard-dismissed
 - tapOn:
     id: "mobile.award.reason"
 - inputText: "Maestro staging award"
@@ -76,6 +95,7 @@ tags:
 - assertVisible:
     id: "mobile.award.reason"
 - assertVisible: "Maestro staging award"
+- takeScreenshot: award-reason-keyboard-open
 - extendedWaitUntil:
     visible:
       id: "mobile.award.submit"

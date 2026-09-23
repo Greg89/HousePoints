@@ -7,10 +7,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Stack, router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -28,6 +29,7 @@ import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { eligibleAwardMembers } from "@/lib/award-members";
+import { focusedInputScrollOffset } from "@/lib/focused-input-scroll";
 import {
   AWARD_POINTS_DEFAULT,
   AWARD_POINTS_MAX,
@@ -50,13 +52,33 @@ export default function AwardPointsScreen() {
   const queryClient = useQueryClient();
   const headerHeight = useHeaderHeight();
   const formRef = useRef<ScrollView>(null);
+  const pointsRef = useRef<TextInput>(null);
   const reasonRef = useRef<TextInput>(null);
+  const scrollOffset = useRef(0);
 
-  const revealFocusedReason = () => {
-    if (reasonRef.current?.isFocused()) {
-      formRef.current?.scrollToEnd({ animated: true });
-    }
-  };
+  const revealFocusedInput = useCallback(() => {
+    if (!Keyboard.isVisible()) return;
+    const input = [pointsRef.current, reasonRef.current].find((field) => field?.isFocused());
+    const form = formRef.current;
+    if (!input || !form) return;
+    const offset = scrollOffset.current;
+
+    form.getNativeScrollRef()?.measureInWindow((_x, viewportTop, _width, viewportHeight) => {
+      input.measureInWindow((_inputX, inputTop, _inputWidth, inputHeight) => {
+        if (!input.isFocused() || !Keyboard.isVisible() || viewportHeight <= 0 || scrollOffset.current !== offset) return;
+        const y = focusedInputScrollOffset({
+          offset, viewportTop, viewportHeight, inputTop, inputHeight,
+        });
+        // Avoid overlapping animated scrolls during keyboard/layout changes.
+        if (y !== offset) form.scrollTo({ y, animated: false });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const subscription = Keyboard.addListener("keyboardDidShow", revealFocusedInput);
+    return () => subscription.remove();
+  }, [revealFocusedInput]);
 
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedTrait, setSelectedTrait] = useState<Trait | null>(null);
@@ -164,8 +186,11 @@ export default function AwardPointsScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={headerHeight}
+        // Android already resizes the window; a second height adjustment leaves
+        // stale space below the footer when the keyboard opens or closes.
+        enabled={Platform.OS === "ios"}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
       >
         <ScrollView
           ref={formRef}
@@ -173,7 +198,10 @@ export default function AwardPointsScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          onLayout={revealFocusedReason}
+          onLayout={revealFocusedInput}
+          onContentSizeChange={revealFocusedInput}
+          onScroll={(event) => { scrollOffset.current = event.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
         >
           <Section title="Recipient">
             {membersQuery.isPending ? (
@@ -205,12 +233,14 @@ export default function AwardPointsScreen() {
                 <View style={styles.stepperRow}>
                   <StepperButton label={"\u2212"} onPress={() => step(-1)} />
                   <TextInput
+                    ref={pointsRef}
                     testID="mobile.award.points"
                     accessibilityLabel="Points to award"
                     accessibilityHint="Enter a whole number from 1 to 100"
                     style={styles.deltaValue}
                     value={pointsInput}
                     onChangeText={setPointsInput}
+                    onFocus={revealFocusedInput}
                     keyboardType="number-pad"
                     maxLength={3}
                     selectTextOnFocus
@@ -255,7 +285,7 @@ export default function AwardPointsScreen() {
                   placeholderTextColor="#94a3b8"
                   value={reason}
                   onChangeText={setReason}
-                  onFocus={revealFocusedReason}
+                  onFocus={revealFocusedInput}
                   multiline
                   maxLength={REASON_MAX}
                   textAlignVertical="top"
