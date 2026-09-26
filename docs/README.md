@@ -20,7 +20,8 @@ The documents in this folder serve three purposes:
 
 ## Roadmap And Planning
 
-- [Quarterly product design](./quarterly-product-design/README.md): draft designs for custom recognition categories, leaderboard drill-through, season kickoff/reporting, and platform-managed paid organization membership. Includes proposed defaults and open decisions; implementation slicing follows review.
+- [Quarterly product design](./quarterly-product-design/README.md): reviewed product direction for custom recognition categories, leaderboard drill-through, season kickoff/reporting, and platform-managed paid organization membership; remaining implementation/commercial decisions are identified.
+- [Quarterly execution plan](./quarterly-product-design/execution-plan.md): ordered deliverable slices, acceptance checks, dependencies, compatibility gates, and a separately gated billing spike/pilot. Implementation not started.
 - [Roadmap](./roadmap.md): current production-readiness tiers and feature work.
 - [Upcoming features](./upcoming-features.md): unscheduled product concepts and open design questions.
 - [Manage resource workspaces design](./manage-workspaces-design.md): phased refactor from administrative form galleries to Overview, Members, Houses, Seasons, Organization, and Audit workspaces.

@@ -2,7 +2,7 @@
 
 Created September 20, 2026. Target planning horizon: Q4 2026.
 
-Status: design draft for review. The four workstreams are requested; decisions explicitly marked approved are settled; all other defaults remain recommendations. Implementation, estimates, and commit-sized slices follow design review.
+Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. No implementation has started.
 
 ## Product direction
 
@@ -69,4 +69,4 @@ D1-D6, the D7 capacity-band/counting/join/downgrade direction, D8, and D9 are ap
 
 Targeted reliability prerequisites are request idempotency, atomic deduction cooldown enforcement, season/write coordination, bounded push delivery, and correct notification organization targeting. Attach each to the affected feature rather than requiring the entire pass-3 refactor backlog.
 
-The next planning step is to turn approved designs into vertical slices with user-visible behavior, migration/compatibility steps, tests, and rollout/rollback criteria. No work estimates or implementation commitments are implied by this document.
+The [execution plan](./execution-plan.md) now defines deliverable slices with user-visible behavior, migration/compatibility steps, tests, and rollout/rollback criteria. Begin with F1; billing discovery can proceed independently. Production billing remains conditional on the spike decision. No calendar estimates or commitment to every provisional slice are implied.

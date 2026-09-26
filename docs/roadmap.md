@@ -5,7 +5,7 @@ Each tier has its own file with detailed task breakdowns.
 
 ## Next-quarter product design
 
-Design is in progress for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and a spike for platform-managed monthly organization subscriptions. See the [quarterly product design](./quarterly-product-design/README.md) for scope, proposed decisions, dependencies, and acceptance criteria. These are not yet estimated or scheduled implementation slices; billing production launch is not committed.
+The main product decisions for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and platform-managed organization subscriptions have been reviewed. See the [quarterly product design](./quarterly-product-design/README.md) for approved direction and the [execution plan](./quarterly-product-design/execution-plan.md) for ordered slices and release gates. Implementation has not started. Begin with F1 (scoring concurrency); billing discovery B1–B3 can proceed independently. Production billing P1–P7 remains conditional on the spike outcome, with no launch date committed.
 
 ## Status key
 - [done] Done
