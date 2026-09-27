@@ -1,16 +1,8 @@
 import type { ActorRecord } from "./actor.js";
 import { prisma } from "@housepoints/db";
 
-export class SeasonScopeError extends Error {
-  constructor(
-    readonly statusCode: number,
-    readonly code: "SEASON_NOT_FOUND" | "ACTIVE_SEASON_REQUIRED",
-    message: string,
-  ) {
-    super(message);
-    this.name = "SeasonScopeError";
-  }
-}
+import { SeasonScopeError } from "./scoring-errors.js";
+export { SeasonScopeError } from "./scoring-errors.js";
 
 export function mapSeason(season: {
   id: string;

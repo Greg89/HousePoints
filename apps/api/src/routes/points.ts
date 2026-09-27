@@ -16,6 +16,7 @@ import {
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { activeScoringSeason, scoringWriteTime, ScoringWriteError, withScoringWrite } from "../scoring-write.js";
 import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
 import {
@@ -172,7 +173,6 @@ export async function findTargetMembership(organizationId: string, targetUserId:
 
 export async function createPointAward(params: {
   organizationId: string;
-  seasonId: string;
   actorId: string;
   actorDisplayName: string;
   targetUserId: string;
@@ -182,11 +182,14 @@ export async function createPointAward(params: {
   reason: string;
   trait: Trait;
 }) {
-  return prisma.$transaction(async (tx) => {
+  return withScoringWrite(params.organizationId, async (tx) => {
+    const season = await activeScoringSeason(tx, params.organizationId);
+    const now = await scoringWriteTime(tx);
     const award = await tx.pointTransaction.create({
       data: {
         organizationId: params.organizationId,
-        seasonId: params.seasonId,
+        seasonId: season.id,
+        createdAt: now,
         actorUserId: params.actorId,
         targetUserId: params.targetUserId,
         targetHouseId: params.targetHouseId,
@@ -215,15 +218,15 @@ export async function createPointAward(params: {
   });
 }
 
-export async function checkDeductionCooldowns(params: {
+async function checkDeductionCooldowns(tx: Prisma.TransactionClient, now: Date, params: {
   organizationId: string;
   seasonId: string;
   actorHouseId: string;
   targetUserId: string;
 }) {
-  const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const cooldownWindowStartsAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const actorHouseMemberships = await prisma.organizationMembership.findMany({
+  const actorHouseMemberships = await tx.organizationMembership.findMany({
     where: {
       organizationId: params.organizationId,
       houseId: params.actorHouseId,
@@ -234,8 +237,8 @@ export async function checkDeductionCooldowns(params: {
   });
   const actorHouseUserIds = actorHouseMemberships.map((membership) => membership.userId);
 
-  return Promise.all([
-    prisma.pointTransaction.findFirst({
+  return [
+    await tx.pointTransaction.findFirst({
       where: {
         organizationId: params.organizationId,
         seasonId: params.seasonId,
@@ -246,7 +249,7 @@ export async function checkDeductionCooldowns(params: {
       select: { id: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.pointTransaction.findFirst({
+    await tx.pointTransaction.findFirst({
       where: {
         organizationId: params.organizationId,
         seasonId: params.seasonId,
@@ -257,13 +260,12 @@ export async function checkDeductionCooldowns(params: {
       select: { id: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
-  ]);
+  ] as const;
 }
 
 export async function createPointDeduction(params: {
   organizationId: string;
-  seasonId: string;
-  seasonName: string;
+  actorHouseId: string;
   actorId: string;
   actorDisplayName: string;
   targetUserId: string;
@@ -271,14 +273,25 @@ export async function createPointDeduction(params: {
   targetHouseId: string;
   reason: string;
 }) {
-  return prisma.$transaction(async (tx) => {
+  return withScoringWrite(params.organizationId, async (tx) => {
+    const season = await activeScoringSeason(tx, params.organizationId);
+    const now = await scoringWriteTime(tx);
+    const [houseDeduction, targetDeduction] = await checkDeductionCooldowns(tx, now, {
+      organizationId: params.organizationId,
+      seasonId: season.id,
+      actorHouseId: params.actorHouseId,
+      targetUserId: params.targetUserId,
+    });
+    if (houseDeduction) throw new ScoringWriteError(409, "DEDUCTION_COOLDOWN_ACTIVE", "This house has already deducted points in the last 24 hours");
+    if (targetDeduction) throw new ScoringWriteError(409, "TARGET_DEDUCTION_LIMIT_ACTIVE", "This member has already received a deduction in the last 24 hours");
     const deduction = await tx.pointTransaction.create({
       data: {
         organizationId: params.organizationId,
-        seasonId: params.seasonId,
+        seasonId: season.id,
         actorUserId: params.actorId,
         targetUserId: params.targetUserId,
         targetHouseId: params.targetHouseId,
+        createdAt: now,
         type: "DEDUCTION",
         delta: -10,
         reason: params.reason,
@@ -298,8 +311,8 @@ export async function createPointDeduction(params: {
           targetUserId: params.targetUserId,
           targetUserName: params.targetUserDisplayName,
           targetHouseId: params.targetHouseId,
-          seasonId: params.seasonId,
-          seasonName: params.seasonName,
+          seasonId: season.id,
+          seasonName: season.name,
           delta: -10,
           reason: params.reason,
         },
@@ -705,11 +718,17 @@ export async function softDeleteTransaction(params: {
   organizationId: string;
   deletionReason: string | null;
 }) {
-  return prisma.$transaction(async (tx) => {
+  return withScoringWrite(params.organizationId, async (tx) => {
+    const existing = await tx.pointTransaction.findUnique({
+      where: { id: params.transactionId },
+      select: { organizationId: true, deletedAt: true },
+    });
+    if (!existing || existing.organizationId !== params.organizationId) throw new ScoringWriteError(404, "POINT_TRANSACTION_NOT_FOUND", "Point transaction not found");
+    if (existing.deletedAt) throw new ScoringWriteError(409, "POINT_TRANSACTION_ALREADY_DELETED", "Point transaction is already deleted");
     const point = await tx.pointTransaction.update({
       where: { id: params.transactionId },
       data: {
-        deletedAt: new Date(),
+        deletedAt: await scoringWriteTime(tx),
         deletedByUserId: params.actorId,
         deletionReason: params.deletionReason,
       },
@@ -813,12 +832,9 @@ export async function registerPointRoutes(
 
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
-    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
-    if (!activeSeason) return;
 
     const transaction = await createPointAward({
       organizationId: actor.organizationId,
-      seasonId: activeSeason.id,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
       targetUserId: targetUser.id,
@@ -938,50 +954,10 @@ export async function registerPointRoutes(
 
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
-    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
-    if (!activeSeason) return;
-
-    const [recentHouseDeduction, recentTargetDeduction] = await checkDeductionCooldowns({
-      organizationId: actor.organizationId,
-      seasonId: activeSeason.id,
-      actorHouseId: actor.houseId,
-      targetUserId: targetUser.id,
-    });
-
-    if (recentHouseDeduction) {
-      warn(request.log, "points.deduct.cooldown_active", {
-        actorUserId: actor.id,
-        actorHouseId: actor.houseId,
-        organizationId: actor.organizationId,
-        seasonId: activeSeason.id,
-        previousTransactionId: recentHouseDeduction.id,
-        previousCreatedAt: recentHouseDeduction.createdAt.toISOString(),
-      });
-      return reply.status(409).send({
-        message: "This house has already deducted points in the last 24 hours",
-        code: "DEDUCTION_COOLDOWN_ACTIVE",
-      });
-    }
-
-    if (recentTargetDeduction) {
-      warn(request.log, "points.deduct.target_limit_active", {
-        actorUserId: actor.id,
-        targetUserId: targetUser.id,
-        organizationId: actor.organizationId,
-        seasonId: activeSeason.id,
-        previousTransactionId: recentTargetDeduction.id,
-        previousCreatedAt: recentTargetDeduction.createdAt.toISOString(),
-      });
-      return reply.status(409).send({
-        message: "This member has already received a deduction in the last 24 hours",
-        code: "TARGET_DEDUCTION_LIMIT_ACTIVE",
-      });
-    }
 
     const transaction = await createPointDeduction({
       organizationId: actor.organizationId,
-      seasonId: activeSeason.id,
-      seasonName: activeSeason.name,
+      actorHouseId: actor.houseId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
       targetUserId: targetUser.id,

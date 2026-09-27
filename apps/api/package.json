@@ -15,8 +15,9 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "benchmark:dashboard": "tsx src/benchmarks/dashboard-baseline.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\""
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
+    "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "test:integration": "tsx --import dotenv/config tests/scoring.integration.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

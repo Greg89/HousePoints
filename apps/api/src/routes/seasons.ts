@@ -6,6 +6,7 @@ import {
   seasonCompareRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { activeScoringSeason, scoringWriteTime, withScoringWrite } from "../scoring-write.js";
 import type { ActorRecord } from "../actor.js";
 import { SeasonScopeError, mapSeason } from "../season-scope.js";
 import { parseBody, requireActor, requireOwnerActor } from "../route-helpers.js";
@@ -153,17 +154,9 @@ export async function loadContributorNames(
 }
 
 export async function startSeasonTransaction(actor: ActorRecord, seasonName: string) {
-  return prisma.$transaction(async (tx) => {
-    const currentSeason = await tx.season.findFirst({
-      where: { organizationId: actor.organizationId, isActive: true },
-      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
-    });
-
-    if (!currentSeason) {
-      throw new SeasonScopeError(409, "ACTIVE_SEASON_REQUIRED", "An active season is required");
-    }
-
-    const now = new Date();
+  return withScoringWrite(actor.organizationId, async (tx) => {
+    const currentSeason = await activeScoringSeason(tx, actor.organizationId);
+    const now = await scoringWriteTime(tx);
     const previousSeason = await tx.season.update({
       where: { id: currentSeason.id },
       data: { isActive: false, endsAt: now },

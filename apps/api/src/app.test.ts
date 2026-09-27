@@ -13,6 +13,7 @@ vi.mock("@housepoints/db", () => ({
   updateUserDisplayName: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
+    $queryRaw: vi.fn(),
     $executeRawUnsafe: vi.fn(),
     organization: {
       upsert: vi.fn(),
@@ -335,6 +336,7 @@ const makeActorMembership = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "org-1", now: new Date() }]);
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
@@ -1450,7 +1452,7 @@ describe("POST /points/deduct", () => {
         }),
       }),
     );
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockTxCreate).not.toHaveBeenCalled();
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -1488,7 +1490,7 @@ describe("POST /points/deduct", () => {
         }),
       }),
     );
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockTxCreate).not.toHaveBeenCalled();
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -1520,6 +1522,7 @@ describe("POST /points/deduct", () => {
         actorUserId: "user-2",
         targetUserId: "user-1",
         targetHouseId: "house-2",
+        createdAt: expect.any(Date),
         type: "DEDUCTION",
         delta: -10,
         reason: "Duplicate award correction",

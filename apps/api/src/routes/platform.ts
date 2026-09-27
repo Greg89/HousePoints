@@ -1,3 +1,4 @@
+import { lockOrganizationScoring } from "../scoring-write.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   platformOverviewRequestSchema,
@@ -504,6 +505,7 @@ export async function registerPlatformRoutes(
     const now = new Date();
     await prisma.$transaction(async (tx) => {
       if (parsed.action === "REDACT_CONTENT") {
+        await lockOrganizationScoring(tx, report.organizationId);
         const point = await tx.pointTransaction.findFirst({ where: { id: report.targetId, organizationId: report.organizationId }, select: { id: true, delta: true, targetUserId: true, targetHouseId: true, reason: true, trait: true, deletedAt: true, targetUser: { select: { displayName: true } }, targetHouse: { select: { name: true } } } });
         if (!point) throw Object.assign(new Error("Moderation target not found"), { code: "MODERATION_TARGET_NOT_FOUND" });
         if (!point.deletedAt) {

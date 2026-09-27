@@ -22,7 +22,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e -w @housepoints/web",
     "test:coverage": "npm run test:coverage --workspaces --if-present",
-    "test:integration": "npm run test:integration -w @housepoints/db",
+    "test:integration": "npm run test:integration -w @housepoints/db && npm run test:integration -w @housepoints/api",
     "benchmark:dashboard": "npm run benchmark:dashboard -w @housepoints/api",
     "typecheck": "npm run build -w @housepoints/theme && npm run build -w @housepoints/contracts && npm run build -w @housepoints/db && npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces",
