@@ -32,7 +32,7 @@ import {
 import { awardPoints, deductPoints } from "./actions/points";
 import { awardCategoryPoints } from "./actions/points";
 import { archiveRecognitionCategory, createRecognitionCategory, readRecognitionCategories } from "./actions/recognition";
-import { recognitionCategoriesWebEnabled } from "@/lib/recognition-gate";
+import { recognitionCategoriesWebEnabledForOrganization } from "@/lib/recognition-gate";
 import { readSessionSummary } from "./actions/profile";
 import {
   readMemberScores,
@@ -128,6 +128,8 @@ export async function renderDashboardPage(route: string) {
     redirect(rootRedirect);
   }
 
+  const recognitionEnabledForOrg = recognitionCategoriesWebEnabledForOrganization(session.organizationId);
+
   const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext, recognitionCategories] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
@@ -137,7 +139,7 @@ export async function renderDashboardPage(route: string) {
     readSeasonContext(requestId),
     readNotificationsForDashboard(requestId, route),
     readAdminContextForDashboard(session.role, requestId, route),
-    recognitionCategoriesWebEnabled ? readRecognitionCategories(requestId) : Promise.resolve(undefined),
+    recognitionEnabledForOrg ? readRecognitionCategories(requestId) : Promise.resolve(undefined),
   ]);
   const initialSeasonComparison = await readInitialSeasonComparison(seasonContext.seasons, requestId, route);
 
@@ -187,9 +189,9 @@ export async function renderDashboardPage(route: string) {
       onStartSeason={startSeason}
       onRenameSeason={renameSeason}
       recognitionCategories={recognitionCategories}
-      onListRecognitionCategories={recognitionCategoriesWebEnabled ? readRecognitionCategories : undefined}
-      onCreateRecognitionCategory={recognitionCategoriesWebEnabled ? createRecognitionCategory : undefined}
-      onArchiveRecognitionCategory={recognitionCategoriesWebEnabled ? archiveRecognitionCategory : undefined}
+      onListRecognitionCategories={recognitionEnabledForOrg ? readRecognitionCategories : undefined}
+      onCreateRecognitionCategory={recognitionEnabledForOrg ? createRecognitionCategory : undefined}
+      onArchiveRecognitionCategory={recognitionEnabledForOrg ? archiveRecognitionCategory : undefined}
     />
   ) : undefined;
 
@@ -226,8 +228,8 @@ export async function renderDashboardPage(route: string) {
       onMarkAllNotificationsRead={markAllNotificationsRead}
       onAward={awardPoints}
       recognitionCategories={recognitionCategories}
-      onLoadRecognitionCategories={recognitionCategoriesWebEnabled ? readRecognitionCategories : undefined}
-      onAwardCategory={recognitionCategoriesWebEnabled ? awardCategoryPoints : undefined}
+      onLoadRecognitionCategories={recognitionEnabledForOrg ? readRecognitionCategories : undefined}
+      onAwardCategory={recognitionEnabledForOrg ? awardCategoryPoints : undefined}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
       onReactToPoint={reactToPointTransaction}

@@ -1,0 +1,67 @@
+appId: com.housepoints.app
+name: Award a custom category and read its fixed activity label
+tags:
+  - staging
+  - recognition-categories
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.login.sign-in"
+    timeout: 30000
+- tapOn:
+    id: "mobile.login.sign-in"
+- tapOn:
+    text: "Use without an account"
+    optional: true
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Email address.*"
+    timeout: 30000
+- tapOn: "Email address.*"
+- inputText: ${MOBILE_E2E_USER_EMAIL}
+- tapOn: "Password.*"
+- inputText: ${MOBILE_E2E_USER_PASSWORD}
+- hideKeyboard
+- tapOn: "Continue"
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.home.dashboard"
+    timeout: 60000
+- tapOn:
+    id: "mobile.home.award-points"
+- extendedWaitUntil:
+    visible:
+      id: "mobile.award.member-select"
+    timeout: 30000
+- tapOn:
+    id: "mobile.award.member-select"
+- tapOn: ${MOBILE_E2E_TARGET_MEMBER}
+- tapOn:
+    id: "mobile.award.category-select"
+- extendedWaitUntil:
+    visible: ${MOBILE_E2E_CATEGORY_NAME}
+    timeout: 10000
+- tapOn: ${MOBILE_E2E_CATEGORY_NAME}
+- tapOn:
+    id: "mobile.award.reason"
+- inputText: "Maestro custom category award"
+- hideKeyboard
+- assertVisible:
+    id: "mobile.award.submit"
+- tapOn:
+    id: "mobile.award.submit"
+
+- extendedWaitUntil:
+    visible:
+      id: "mobile.home.dashboard"
+    timeout: 30000
+- tapOn:
+    id: "mobile.nav.activity"
+- extendedWaitUntil:
+    visible: "Maestro custom category award"
+    timeout: 30000
+- assertVisible: ${MOBILE_E2E_CATEGORY_NAME}

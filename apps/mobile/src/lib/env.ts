@@ -18,6 +18,7 @@ export const env = createMobileEnvironment({
   pointAdjustmentsEnabled: process.env.EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED,
   mobileAdminEnabled: process.env.EXPO_PUBLIC_MOBILE_ADMIN_ENABLED,
   recognitionCategoriesEnabled: process.env.EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED,
+  recognitionCategoryRolloutOrganizationIds: process.env.EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS,
 });
 
 export type { MobileEnv } from "./env-core";

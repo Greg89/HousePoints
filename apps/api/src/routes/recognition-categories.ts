@@ -12,6 +12,7 @@ import { scoringWriteTime, ScoringWriteError, withScoringWrite } from "../scorin
 
 type RecognitionCategoryRouteOptions = {
   mutationsEnabled: boolean;
+  rolloutOrganizationIds: ReadonlySet<string>;
 };
 
 function mapCategory(category: {
@@ -189,6 +190,12 @@ export async function registerRecognitionCategoryRoutes(
     if (!parsed) return;
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
+    if (!options.rolloutOrganizationIds.has(actor.organizationId)) {
+      return reply.status(404).send({
+        code: "RECOGNITION_CATEGORY_MUTATIONS_DISABLED",
+        message: "Recognition category management is not enabled.",
+      });
+    }
     const category = await createRecognitionCategory({
       organizationId: actor.organizationId,
       actorId: actor.id,
@@ -214,6 +221,12 @@ export async function registerRecognitionCategoryRoutes(
     if (!parsed) return;
     const actor = await requireOwnerActor(request, reply);
     if (!actor) return;
+    if (!options.rolloutOrganizationIds.has(actor.organizationId)) {
+      return reply.status(404).send({
+        code: "RECOGNITION_CATEGORY_MUTATIONS_DISABLED",
+        message: "Recognition category management is not enabled.",
+      });
+    }
     const category = await archiveRecognitionCategory({
       organizationId: actor.organizationId,
       actorId: actor.id,

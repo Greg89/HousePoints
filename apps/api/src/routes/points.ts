@@ -153,6 +153,7 @@ export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: 
 type PointRouteOptions = {
   pointAdjustmentsEnabled: boolean;
   recognitionCategoryMutationsEnabled: boolean;
+  recognitionCategoryRolloutOrganizationIds: ReadonlySet<string>;
   pushDispatcher?: PushDispatcher;
 };
 
@@ -844,6 +845,13 @@ export async function registerPointRoutes(
 
     const actor = await requireActor(request, reply);
     if (!actor) return;
+
+    if ("categoryId" in parsed && !options.recognitionCategoryRolloutOrganizationIds.has(actor.organizationId)) {
+      return reply.status(404).send({
+        code: "RECOGNITION_CATEGORY_MUTATIONS_DISABLED",
+        message: "Recognition categories are not enabled.",
+      });
+    }
 
     if (!actor.houseId) {
       warn(request.log, "points.actor_house_unassigned", {

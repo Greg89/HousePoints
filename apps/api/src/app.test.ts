@@ -463,12 +463,14 @@ async function buildTestApp(
     organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
     platformOwnerAuth0Subjects?: ReadonlySet<string>;
     recognitionCategoryMutationsEnabled?: boolean;
+    recognitionCategoryRolloutOrganizationIds?: ReadonlySet<string>;
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
     recognitionCategoryMutationsEnabled: options.recognitionCategoryMutationsEnabled,
+    recognitionCategoryRolloutOrganizationIds: options.recognitionCategoryRolloutOrganizationIds ?? new Set(["org-1"]),
     organizationCreationPolicy: options.organizationCreationPolicy,
     platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
     pushDispatcher: options.pushDispatcher,
@@ -1087,6 +1089,23 @@ describe("recognition category routes", () => {
     await app.close();
   });
 
+  it("keeps create and archive disabled outside the rollout organization", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    const app = await buildTestApp("auth0|owner", {}, {
+      recognitionCategoryMutationsEnabled: true,
+      recognitionCategoryRolloutOrganizationIds: new Set(["org-2"]),
+    });
+    const create = await app.inject({ method: "POST", url: "/recognition-categories/create", payload: { idempotencyKey: category.creationKey, name: category.name } });
+    const archive = await app.inject({ method: "POST", url: "/recognition-categories/archive", payload: { categoryId: category.id } });
+    expect(create.statusCode).toBe(404);
+    expect(archive.statusCode).toBe(404);
+    expect(create.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(archive.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(mockCategoryCreate).not.toHaveBeenCalled();
+    expect(mockCategoryUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("requires an owner when category mutations are enabled", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
     const app = await buildTestApp("auth0|admin", {}, { recognitionCategoryMutationsEnabled: true });
@@ -1348,6 +1367,26 @@ describe("POST /points/adjust", () => {
     });
     expect(res.statusCode).toBe(404);
     expect(res.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects category awards outside the rollout organization", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin", {}, {
+      recognitionCategoryMutationsEnabled: true,
+      recognitionCategoryRolloutOrganizationIds: new Set(["org-2"]),
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1", delta: 20, reason: "Supported the community",
+        categoryApiVersion: "categories-v1", categoryId: "category-custom",
+      },
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
     expect(mockTxCreate).not.toHaveBeenCalled();
     await app.close();
   });

@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F4 and C1–C3 implemented and locally verified; C4 code is locally verified with device acceptance pending. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 and C1–C3 implemented and locally verified; C4 code is locally verified with device acceptance pending; C5 cohort gate, rehearsal code, and runbook are prepared locally, with live checks pending. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -111,6 +111,8 @@ Support custom-category selection, fixed historical names, archived/unavailable 
 Done when the upgraded app completes an award and renders archived/custom categories on a device, and the currently supported old binary follows the documented compatibility path rather than crashing on strict enum parsing.
 
 ### C5 — Enable categories with a cross-client release rehearsal
+
+Status: **rehearsal automation, organization-ID cohort gates, rollback-safe web reads, and staging runbook prepared locally September 27, 2026; deployment, device, and old-binary evidence pending**. No category flags have been enabled. See the [C5 runbook](./recognition-categories.md#c5-release-rehearsal--prepared-not-enabled).
 
 Dependencies: C3, C4. Surfaces: deployment/release docs, compatibility gate and targeted E2E.
 
@@ -226,6 +228,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Recommended next checkpoint: **C4 Android device and old-binary verification**, then C5 release rehearsal. Keep category mutation disabled until C5 and preserve the legacy enum boundary for unsupported clients.
+Recommended next checkpoint: **C4 Android device and old-binary verification, then the C5 staging rehearsal**. Keep category mutation disabled until the controlled staging run and preserve the legacy enum boundary for unsupported clients.

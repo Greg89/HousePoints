@@ -635,6 +635,20 @@ describe("DashboardShell", () => {
     expect(screen.getByText("Community Impact")).toBeInTheDocument();
   });
 
+  it("keeps custom-category report labels when category management is rolled back", () => {
+    const category = { id: "category-old", name: "Community Impact", legacyTrait: null, archivedAt: "2026-09-21T12:00:00.000Z" };
+    render(<DashboardShell
+      {...baseProps}
+      dashboardSummary={{
+        ...baseProps.dashboardSummary,
+        categoryLeaders: [{ houseId: "house-1", houseName: "Slytherin", houseColor: "#22c55e", category, count: 1 }],
+      }}
+    />);
+
+    expect(screen.getByText("Category leader per house")).toBeInTheDocument();
+    expect(screen.getByText("Community Impact")).toBeInTheDocument();
+  });
+
   it("keeps the dashboard tabs focused for members", () => {
     render(<DashboardShell {...baseProps} />);
 

@@ -39,7 +39,7 @@ import {
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
-import { availableRecognitionCategories, selectedRecognitionCategory } from "@/lib/recognition-categories";
+import { availableRecognitionCategories, recognitionCategoryAwardsEnabled, selectedRecognitionCategory } from "@/lib/recognition-categories";
 import { generateRequestId } from "@/lib/request-id";
 
 const REASON_MIN = 3;
@@ -48,7 +48,12 @@ const DELTA_QUICK_VALUES = [1, 5, 10, 25] as const;
 
 export default function AwardPointsScreen() {
   const { user, getAccessToken } = useAppAuth();
-  const { activeOrgSlug } = useActiveOrg();
+  const { activeOrgSlug, activeMembership } = useActiveOrg();
+  const categoriesEnabled = recognitionCategoryAwardsEnabled(
+    env.recognitionCategoriesEnabled,
+    env.recognitionCategoryRolloutOrganizationIds,
+    activeMembership?.organizationId,
+  );
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -92,7 +97,7 @@ export default function AwardPointsScreen() {
 
   const categoriesQuery = useQuery({
     queryKey: mobileQueryKeys.recognitionCategories(activeOrgSlug),
-    enabled: env.recognitionCategoriesEnabled && activeOrgSlug !== null,
+    enabled: categoriesEnabled && activeOrgSlug !== null,
     staleTime: 0,
     queryFn: async ({ signal }) => {
       const accessToken = await getAccessToken();
@@ -105,10 +110,10 @@ export default function AwardPointsScreen() {
   const availableCategories = useMemo(() => availableRecognitionCategories(categories), [categories]);
   const selectedCategory = selectedRecognitionCategory(categories, selectedCategoryId);
   const categoryUnavailable = Boolean(selectedCategoryId) && (!selectedCategory || selectedCategory.archivedAt !== null);
-  const recognitionOptions = useMemo(() => env.recognitionCategoriesEnabled
+  const recognitionOptions = useMemo(() => categoriesEnabled
     ? availableCategories.map((category) => ({ value: category.id, label: category.name }))
-    : TRAITS.map((trait) => ({ value: trait, label: TRAIT_LABELS[trait] })), [availableCategories]);
-  const selectedRecognitionLabel = env.recognitionCategoriesEnabled
+    : TRAITS.map((trait) => ({ value: trait, label: TRAIT_LABELS[trait] })), [availableCategories, categoriesEnabled]);
+  const selectedRecognitionLabel = categoriesEnabled
     ? selectedCategory?.name ?? null
     : selectedTrait ? TRAIT_LABELS[selectedTrait] : null;
 
@@ -128,7 +133,7 @@ export default function AwardPointsScreen() {
   const reasonLength = trimmedReason.length;
   const canSubmit =
     Boolean(selectedMemberId) &&
-    (env.recognitionCategoriesEnabled
+    (categoriesEnabled
       ? Boolean(selectedCategoryId) && !categoryUnavailable && !categoryError
       : Boolean(selectedTrait)) &&
     delta !== null &&
@@ -137,13 +142,13 @@ export default function AwardPointsScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedMemberId || (env.recognitionCategoriesEnabled ? !selectedCategoryId : !selectedTrait)) {
+      if (!selectedMemberId || (categoriesEnabled ? !selectedCategoryId : !selectedTrait)) {
         throw new Error("Missing target user or recognition selection");
       }
       if (delta === null) {
         throw new Error("Invalid award points");
       }
-      const payload = env.recognitionCategoriesEnabled
+      const payload = categoriesEnabled
         ? { targetUserId: selectedMemberId, categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION, categoryId: selectedCategoryId!, delta, reason: trimmedReason }
         : { targetUserId: selectedMemberId, trait: selectedTrait!, delta, reason: trimmedReason };
       const idempotencyKey = submissionKeys.current.keyFor([activeOrgSlug, payload]);
@@ -175,7 +180,7 @@ export default function AwardPointsScreen() {
       }
     },
     onError: (error) => {
-      if (env.recognitionCategoriesEnabled && error instanceof ApiResponseError && error.code === "RECOGNITION_CATEGORY_UNAVAILABLE") {
+      if (categoriesEnabled && error instanceof ApiResponseError && error.code === "RECOGNITION_CATEGORY_UNAVAILABLE") {
         setCategoryError("This category is no longer available. Your draft is saved; choose another category.");
         void categoriesQuery.refetch();
       }
@@ -229,11 +234,11 @@ export default function AwardPointsScreen() {
 
           {selectedMember ? (
             <>
-              <Section title={env.recognitionCategoriesEnabled ? "Category" : "Trait"}>
+              <Section title={categoriesEnabled ? "Category" : "Trait"}>
                 <RecognitionSelect
-                  mode={env.recognitionCategoriesEnabled ? "category" : "trait"}
+                  mode={categoriesEnabled ? "category" : "trait"}
                   selectedLabel={selectedRecognitionLabel}
-                  onPress={() => { if (env.recognitionCategoriesEnabled) void categoriesQuery.refetch(); setRecognitionPickerOpen(true); }}
+                  onPress={() => { if (categoriesEnabled) void categoriesQuery.refetch(); setRecognitionPickerOpen(true); }}
                 />
                 {categoryUnavailable || categoryError ? <ErrorText>{categoryError ?? "This category is no longer available. Choose another category."}</ErrorText> : null}
               </Section>
@@ -339,15 +344,15 @@ export default function AwardPointsScreen() {
       />
       <RecognitionSelectModal
         visible={recognitionPickerOpen}
-        mode={env.recognitionCategoriesEnabled ? "category" : "trait"}
+        mode={categoriesEnabled ? "category" : "trait"}
         options={recognitionOptions}
-        selectedValue={env.recognitionCategoriesEnabled ? selectedCategoryId : selectedTrait}
-        loading={env.recognitionCategoriesEnabled && categoriesQuery.isPending}
-        error={env.recognitionCategoriesEnabled && categoriesQuery.error ? "Categories could not load. Tap to retry." : null}
+        selectedValue={categoriesEnabled ? selectedCategoryId : selectedTrait}
+        loading={categoriesEnabled && categoriesQuery.isPending}
+        error={categoriesEnabled && categoriesQuery.error ? "Categories could not load. Tap to retry." : null}
         onRetry={() => void categoriesQuery.refetch()}
         onClose={() => setRecognitionPickerOpen(false)}
         onSelect={(value) => {
-          if (env.recognitionCategoriesEnabled) { setSelectedCategoryId(value); setCategoryError(null); }
+          if (categoriesEnabled) { setSelectedCategoryId(value); setCategoryError(null); }
           else setSelectedTrait(value as Trait);
           setRecognitionPickerOpen(false);
         }}

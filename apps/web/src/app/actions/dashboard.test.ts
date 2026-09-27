@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { reactToPointTransaction, readPointReactionDetails } from "./dashboard";
+import { reactToPointTransaction, readActivityPage, readDashboardSummary, readPointReactionDetails } from "./dashboard";
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUserForRequest: vi.fn(),
@@ -30,6 +30,37 @@ const getCurrentUserForRequestMock = vi.mocked(getCurrentUserForRequest);
 const logServerActionFailedMock = vi.mocked(logServerActionFailed);
 const parseApiResponseMock = vi.mocked(parseApiResponse);
 const runServerActionMock = vi.mocked(runServerAction);
+
+describe("category-capable dashboard reads", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetchMock.mockResolvedValue(Response.json({}));
+    parseApiResponseMock.mockResolvedValue({});
+  });
+
+  it("declares category support on paged activity even with management disabled", async () => {
+    await readActivityPage({ cursor: "point-1", seasonId: "season-1" }, "request-activity");
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/transactions/recent", "request-activity", {
+      method: "POST",
+      body: JSON.stringify({ cursor: "point-1", seasonId: "season-1", categoryApiVersion: "categories-v1" }),
+    });
+  });
+
+  it("declares category support on historical and current summaries", async () => {
+    await readDashboardSummary("season-1", "request-historical");
+    await readDashboardSummary(undefined, "request-current");
+
+    expect(apiFetchMock).toHaveBeenNthCalledWith(1, "/dashboard/summary", "request-historical", {
+      method: "POST",
+      body: JSON.stringify({ seasonId: "season-1", categoryApiVersion: "categories-v1" }),
+    });
+    expect(apiFetchMock).toHaveBeenNthCalledWith(2, "/dashboard/summary", "request-current", {
+      method: "POST",
+      body: JSON.stringify({ categoryApiVersion: "categories-v1" }),
+    });
+  });
+});
 
 describe("reactToPointTransaction", () => {
   beforeEach(() => {

@@ -582,7 +582,7 @@ export function DashboardShell({
             ) : null}
             <div className="mt-8">
               <OverviewReports
-                categoryMode={recognitionCategories !== undefined}
+                categoryMode={recognitionCategories !== undefined || displayedDashboardSummary.categoryLeaders.some((entry) => entry.category?.legacyTrait === null)}
                 dashboardSummary={displayedDashboardSummary}
                 selectedHouse={selectedHouse}
                 onShowActivity={() => {

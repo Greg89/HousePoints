@@ -2,7 +2,7 @@
 
 Created September 20, 2026. Target planning horizon: Q4 2026.
 
-Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1–F4 and C1–C3 category persistence/API/web compatibility are implemented and locally verified. C4 mobile code is locally verified; Android device and old-binary compatibility checks remain pending.
+Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1–F4 and C1–C3 category persistence/API/web compatibility are implemented and locally verified. C4 mobile code is locally verified, with Android device and old-binary compatibility checks pending. C5 cohort gates, rehearsal checks, and rollback notes are prepared, with live evidence and supported-version policy pending.
 
 ## Product direction
 

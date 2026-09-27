@@ -7,6 +7,7 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  RECOGNITION_CATEGORY_API_VERSION,
   pointReactionDetailsRequestSchema,
   pointReactionDetailsResponseSchema,
   pointReactionResponseSchema,
@@ -22,7 +23,6 @@ import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import type { PointReactionDetailsResult, PointReactionResult } from "@/lib/action-results";
 import { getCurrentUserForRequest } from "@/lib/current-user";
-import { recognitionCategoriesWebEnabled } from "@/lib/recognition-gate";
 
 type ActivityPageRequest = Pick<
   ActivityFeedRequest,
@@ -87,7 +87,7 @@ export async function readActivityPage(
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
-    body: JSON.stringify(recognitionCategoriesWebEnabled ? { ...request, categoryApiVersion: "categories-v1" } : request),
+    body: JSON.stringify({ ...request, categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION }),
   });
   return parseApiResponse(
     response,
@@ -209,7 +209,7 @@ export async function readDashboardSummary(
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/dashboard/summary", requestId, {
     method: "POST",
-    body: JSON.stringify({ ...(seasonId ? { seasonId } : {}), ...(recognitionCategoriesWebEnabled ? { categoryApiVersion: "categories-v1" } : {}) }),
+    body: JSON.stringify({ ...(seasonId ? { seasonId } : {}), categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION }),
   });
   return parseApiResponse(
     response,

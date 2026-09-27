@@ -7,6 +7,11 @@ on:
         description: "Optional staging base URL override"
         required: false
         type: string
+      category_rehearsal:
+        description: "Run the stateful recognition-category release rehearsal"
+        required: true
+        default: false
+        type: boolean
   schedule:
     - cron: "17 8 * * 1-5"
 
@@ -40,6 +45,8 @@ jobs:
       E2E_ROLE_TARGET_MEMBER: ${{ secrets.E2E_ROLE_TARGET_MEMBER }}
       E2E_LIFECYCLE_ORG_SLUG: ${{ secrets.E2E_LIFECYCLE_ORG_SLUG }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
+      E2E_RECOGNITION_ROLLOUT: ${{ inputs.category_rehearsal || false }}
+      E2E_RECOGNITION_CATEGORY_NAME: ${{ vars.E2E_RECOGNITION_CATEGORY_NAME }}
 
     steps:
       - uses: actions/checkout@v7

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RecognitionCategory } from "@housepoints/contracts";
-import { availableRecognitionCategories, CATEGORY_READ_CAPABILITY, selectedRecognitionCategory } from "./recognition-categories";
+import { availableRecognitionCategories, CATEGORY_READ_CAPABILITY, recognitionCategoryAwardsEnabled, selectedRecognitionCategory } from "./recognition-categories";
 
 const category = (id: string, archivedAt: string | null = null): RecognitionCategory => ({
   id,
@@ -14,6 +14,13 @@ const category = (id: string, archivedAt: string | null = null): RecognitionCate
 describe("mobile recognition categories", () => {
   it("declares read support even while category awards are gated", () => {
     expect(CATEGORY_READ_CAPABILITY).toEqual({ categoryApiVersion: "categories-v1" });
+  });
+
+  it("shows category awards only for organizations in the enabled cohort", () => {
+    expect(recognitionCategoryAwardsEnabled(true, ["org-1"], "org-1")).toBe(true);
+    expect(recognitionCategoryAwardsEnabled(true, ["org-1"], "org-2")).toBe(false);
+    expect(recognitionCategoryAwardsEnabled(false, ["org-1"], "org-1")).toBe(false);
+    expect(recognitionCategoryAwardsEnabled(true, [], "org-1")).toBe(false);
   });
 
   it("excludes archived categories from selection while retaining their historical identity", () => {

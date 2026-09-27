@@ -101,6 +101,10 @@ Define every variable from `apps/mobile/.env.example` in each Environment:
 - [x] Leave optional `EXPO_PUBLIC_DEFAULT_ORG_SLUG` unset.
 - [x] `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED`
 - [x] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
+- [ ] `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` — keep `false` until the C5
+  staging rehearsal; record the preview and production values separately.
+- [ ] `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS` — keep empty
+  until the C5 controlled-organization rehearsal, then match API/web IDs.
 
 Environment mapping:
 
@@ -302,4 +306,3 @@ Fill these in as work completes:
 - Google Play production submission:
 - Live App Store listing:
 - Live Google Play listing:
-

@@ -13,6 +13,7 @@ const requiredEnvironment = {
   pointAdjustmentsEnabled: undefined,
   mobileAdminEnabled: undefined,
   recognitionCategoriesEnabled: undefined,
+  recognitionCategoryRolloutOrganizationIds: undefined,
 };
 
 describe("mobile environment", () => {
@@ -27,6 +28,7 @@ describe("mobile environment", () => {
         pointAdjustmentsEnabled: "true",
         mobileAdminEnabled: "false",
         recognitionCategoriesEnabled: "true",
+        recognitionCategoryRolloutOrganizationIds: " org-1,org-2, ",
       }),
     ).toEqual({
       apiBaseUrl: "https://api.example.com",
@@ -39,6 +41,7 @@ describe("mobile environment", () => {
       pointAdjustmentsEnabled: true,
       mobileAdminEnabled: false,
       recognitionCategoriesEnabled: true,
+      recognitionCategoryRolloutOrganizationIds: ["org-1", "org-2"],
     });
   });
 

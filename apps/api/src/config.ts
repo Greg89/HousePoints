@@ -90,6 +90,17 @@ export function readRecognitionCategoryMutationsEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.RECOGNITION_CATEGORY_MUTATIONS_ENABLED);
 }
 
+export function parseRecognitionCategoryRolloutOrganizationIds(value: string | undefined): ReadonlySet<string> {
+  return new Set((value ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean));
+}
+
+export function readRecognitionCategoryRolloutOrganizationIdsFromEnv(): ReadonlySet<string> {
+  return parseRecognitionCategoryRolloutOrganizationIds(process.env.RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS);
+}
+
 export function readPushDispatchEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.PUSH_DISPATCH_ENABLED);
 }
