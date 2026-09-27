@@ -1,3 +1,5 @@
+import type { AppUserOrganizationContext } from "@housepoints/contracts";
+
 export type HousePointsDeepLink =
   | { kind: "dashboard"; organizationSlug: string }
   | { kind: "activity"; organizationSlug: string; pointId: string }
@@ -57,24 +59,33 @@ export function routeForDeepLink(link: HousePointsDeepLink): string {
   return `/invite/${encodeURIComponent(link.token)}`;
 }
 
+export type NotificationMembership = Pick<AppUserOrganizationContext, "organizationId" | "organizationSlug">;
+
+/** Resolve only from notification identity, never from the selected organization. */
 export function deepLinkFromNotificationData(
   data: Record<string, unknown>,
-  activeOrgSlug: string | null,
+  memberships: readonly NotificationMembership[],
 ): HousePointsDeepLink | null {
-  if (typeof data.url === "string") {
-    return parseHousePointsUrl(data.url);
+  const explicitLink = typeof data.url === "string" ? parseHousePointsUrl(data.url) : null;
+  if (data.url !== undefined && !explicitLink) return null;
+
+  if (data.organizationId !== undefined) {
+    if (typeof data.organizationId !== "string" || !data.organizationId) return null;
+    const membership = memberships.find(item => item.organizationId === data.organizationId);
+    if (!membership) return null;
+    // Reject conflicting identities instead of following a URL into another tenant.
+    if (explicitLink && (explicitLink.kind === "invite" || explicitLink.organizationSlug !== membership.organizationSlug)) return null;
+    if (explicitLink) return explicitLink;
+    if (data.type === "POINT_AWARD_RECEIVED" || data.type === "POINT_DEDUCTION_RECEIVED") {
+      if (typeof data.entityId !== "string" || !validSegment(data.entityId)) return null;
+      return { kind: "activity", organizationSlug: membership.organizationSlug, pointId: data.entityId };
+    }
+    // Reaction entityIds identify reactions, not point transactions.
+    return { kind: "dashboard", organizationSlug: membership.organizationSlug };
   }
-  if (!activeOrgSlug) return null;
-  if (
-    typeof data.entityId === "string" &&
-    (data.type === "POINT_AWARD_RECEIVED" ||
-      data.type === "POINT_DEDUCTION_RECEIVED")
-  ) {
-    return {
-      kind: "activity",
-      organizationSlug: activeOrgSlug,
-      pointId: data.entityId,
-    };
-  }
-  return { kind: "dashboard", organizationSlug: activeOrgSlug };
+
+  // Legacy canonical URLs carry an explicit identity and remain supported.
+  if (explicitLink?.kind === "invite") return explicitLink;
+  return explicitLink && memberships.some(item => item.organizationSlug === explicitLink.organizationSlug)
+    ? explicitLink : null;
 }

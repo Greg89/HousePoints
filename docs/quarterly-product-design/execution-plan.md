@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F3 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -24,7 +24,7 @@ The [decision register](./README.md#decision-register) is the product authority.
 | Billing decision | B1–B3 | Cost-informed commercial specification and tested sandbox architecture |
 | Conditional paid pilot | P1–P7, after billing decision | Verified owner subscriptions, platform oversight, and recovery workflows |
 
-F1–F3 are implemented; continue with F4. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
+F1–F4 are implemented; continue with C1. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
 
 ## F — Targeted scoring and navigation reliability
 
@@ -59,6 +59,8 @@ Require a nonblank reason server-side for corrections to a closed season. Commit
 Done when missing reasons fail, failed audit persistence rolls back correction, unauthorized/cross-org corrections fail, and a valid correction changes historical totals. Final co-winner-change notices are integrated in S3 after ranking rules converge.
 
 ### F4 — Route notification taps to their actual organization
+
+Status: **implementation complete, locally verified September 26, 2026**. See the [routing behavior, lifecycle, tests, and mobile release rehearsal](./notification-organization-routing.md). Mobile deployment and device verification remain pending.
 
 Dependencies: none. Surfaces: push payload/parser, mobile route adapters/tests.
 
