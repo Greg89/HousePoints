@@ -2,9 +2,17 @@
 
 Status: category defaults, owner-only add/archive-only management, fixed names, archived-name reuse as a separate identity, and historical reporting approved September 20, 2026. Remaining validation and implementation details are proposed. See [shared decisions](./README.md#decision-register), especially D1 and D9.
 
-## Current foundation
+## C1 persistence foundation
 
-`packages/contracts/src/point-schemas.ts` defines a fixed `TRAITS` list and strict award input. `PointTransaction.trait` is a Prisma enum. Web/mobile pickers, activity labels, notification text, and trait-based reports depend on it. Existing awards have one trait; deductions have none.
+Implemented and locally verified September 26, 2026. Deployment is pending. The additive schema retains the fixed `TRAITS` list and `PointTransaction.trait` enum while introducing organization-owned `RecognitionCategory` records and nullable award category references. Existing API and client behavior remains enum-based until C2; C1 exposes no owner controls.
+
+The migration seeds the 20 current labels once for every existing organization and maps legacy awards by trait. An organization-insert trigger seeds the same versioned defaults inside the creation transaction; reads never seed or restore categories. The rerunnable maintenance function only fills missing mappings, rejects legacy awards without a trait, preserves archived mappings, and uses organization-scoped foreign keys so an award cannot reference another tenant's category.
+
+Names and descriptions are fixed after creation. The database trims and collapses name whitespace, stores a lowercase normalized name, and permits only one active normalized name per organization. Archiving leaves the record and historical references intact, while a replacement may reuse the archived name with a new ID. Deductions cannot receive a category.
+
+Apply `20260927020000_recognition_categories` after the F1 and F2 migrations. It takes access-exclusive locks on organizations and point transactions with a five-second lock timeout, so schedule a maintenance window and retry the migration if active traffic prevents lock acquisition. No environment variables, secrets, client deployment, or feature flags are added. On application rollback, retain the additive table, column, trigger, and mappings. Before C2/custom writes there is no user-visible category behavior to disable; after custom awards exist, enum-only database rollback is unsafe.
+
+Local PostgreSQL 16 verification applied every migration to a fresh database and covered 20-category seeding, transactional rollback, legacy award backfill, unchanged award counts/totals, zero-change rerun, tenant reference rejection, immutable names/descriptions, active-name normalization/uniqueness, archived-name reuse, and deduction exclusion. Database lint and typechecks passed. No staging or production migration was applied.
 
 ## Confirmed direction — September 20, 2026
 

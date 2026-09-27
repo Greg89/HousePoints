@@ -2,7 +2,7 @@
 
 Created September 20, 2026. Target planning horizon: Q4 2026.
 
-Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1 scoring concurrency, F2 safe submission retries, F3 closed-season corrections, and F4 notification organization routing are implemented and locally verified; deployment and F2/F4 native device verification are pending.
+Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1–F4 and C1 category persistence/backfill are implemented and locally verified; deployment and F2/F4 native device verification are pending.
 
 ## Product direction
 
@@ -69,4 +69,4 @@ D1-D6, the D7 capacity-band/counting/join/downgrade direction, D8, and D9 are ap
 
 Targeted reliability prerequisites are request idempotency, atomic deduction cooldown enforcement, season/write coordination, bounded push delivery, and correct notification organization targeting. Attach each to the affected feature rather than requiring the entire pass-3 refactor backlog.
 
-The [execution plan](./execution-plan.md) now defines deliverable slices with user-visible behavior, migration/compatibility steps, tests, and rollout/rollback criteria. Continue with C1 after the completed F1–F4 implementation; billing discovery can proceed independently. Production billing remains conditional on the spike decision. No calendar estimates or commitment to every provisional slice are implied.
+The [execution plan](./execution-plan.md) now defines deliverable slices with user-visible behavior, migration/compatibility steps, tests, and rollout/rollback criteria. Continue with C2 after the completed F1–F4 and C1 implementation; billing discovery can proceed independently. Production billing remains conditional on the spike decision. No calendar estimates or commitment to every provisional slice are implied.
