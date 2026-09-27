@@ -124,3 +124,7 @@ for closed-season corrections. Neither is silently bundled into F1.
 ## Retry protection
 
 F2 adds [keyed award/deduction retries and bounded post-commit push delivery](./point-submission-retries.md) within this locking protocol. Legacy requests remain compatible but are not protected against lost-response retries.
+
+## Closed-season corrections
+
+F3 enforces [reasons and atomic audit evidence for closed-season point corrections](./closed-season-corrections.md) after acquiring this same organization lock, including when a rollover closes the season while a correction is waiting.

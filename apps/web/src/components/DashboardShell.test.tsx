@@ -843,6 +843,7 @@ describe("DashboardShell", () => {
     expect(onSeasonChange).toHaveBeenCalledWith("season-0");
     expect(await screen.findByText("Historical view")).toBeInTheDocument();
     expect(screen.getByText("Historical season view")).toBeInTheDocument();
+    expect(screen.getByText("Historical totals and winners reflect recorded corrections and may change.")).toBeInTheDocument();
     expect(screen.getByLabelText("Season recap")).toHaveTextContent("Winning house");
     expect(screen.getByLabelText("Season recap")).toHaveTextContent("Ravenclaw");
     expect(screen.getByLabelText("Season recap")).toHaveTextContent("10 points");

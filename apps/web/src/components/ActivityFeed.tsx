@@ -50,7 +50,7 @@ interface ActivityFeedProps {
   nextCursor: string | null;
   onLoadMore: (request: ActivityFilterRequest) => Promise<PagedActivityFeed>;
   canDelete?: boolean;
-  onDelete?: (transactionId: string) => Promise<DeletePointResult>;
+  onDelete?: (transactionId: string, reason?: string) => Promise<DeletePointResult>;
   onReact?: (
     transactionId: string,
     reactionKey: PointReactionKey | null,
@@ -76,6 +76,9 @@ export function ActivityFeed({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState<ActivityItem | null>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [reasonRequired, setReasonRequired] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reactingIds, setReactingIds] = useState<Set<string>>(() => new Set());
   const [reactionError, setReactionError] = useState<string | null>(null);
@@ -189,27 +192,22 @@ export function ActivityFeed({
       return;
     }
 
-    const transactionLabel = item.type === "DEDUCTION" ? "deduction" : "award";
-    const confirmed = window.confirm(
-      `Delete this ${item.delta}-point ${transactionLabel} to ${item.targetUserName}? Scores will be recalculated without it.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
+    if (reasonRequired && !correctionReason.trim()) return;
 
     setDeleteError(null);
     setDeletingIds((current) => new Set(current).add(item.id));
 
     try {
-      const result = await onDelete(item.id);
+      const result = await onDelete(item.id, correctionReason.trim() || undefined);
 
       if (!result.ok) {
+        if (result.code === "CORRECTION_REASON_REQUIRED") setReasonRequired(true);
         setDeleteError(result.message);
         return;
       }
 
       setVisibleItems((current) => current.filter((visibleItem) => visibleItem.id !== item.id));
+      setDeleteTarget(null);
     } catch {
       setDeleteError("The point award could not be deleted. Please try again.");
     } finally {
@@ -395,7 +393,12 @@ export function ActivityFeed({
                 index={index}
                 canDelete={canDelete && Boolean(onDelete)}
                 isDeleting={deletingIds.has(item.id)}
-                onDelete={() => handleDelete(item)}
+                onDelete={() => {
+                  setDeleteTarget(item);
+                  setCorrectionReason("");
+                  setReasonRequired(!item.season?.isActive);
+                  setDeleteError(null);
+                }}
                 canReact={Boolean(onReact)}
                 isReacting={reactingIds.has(item.id)}
                 onReact={(reactionKey) => handleReact(item, reactionKey)}
@@ -414,7 +417,7 @@ export function ActivityFeed({
               {loadMoreError}
             </p>
           ) : null}
-          {deleteError ? (
+          {deleteError && !deleteTarget ? (
             <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {deleteError}
             </p>
@@ -438,6 +441,40 @@ export function ActivityFeed({
           ) : null}
         </div>
       </div>
+      <Dialog.Root open={Boolean(deleteTarget)} onOpenChange={(open) => {
+        if (!open && deletingIds.size === 0) {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }
+      }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100vw_-_2rem)] max-w-md overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-background p-6 shadow-xl">
+            <Dialog.Title className="text-xl font-semibold">Remove point transaction</Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-muted-foreground">
+              Remove this {deleteTarget?.delta}-point {deleteTarget?.type === "DEDUCTION" ? "deduction" : "award"} for {deleteTarget?.targetUserName}? Scores will be recalculated without it.
+              {reasonRequired ? " This corrects a historical result and requires a reason." : " If the season closes before confirmation, a reason will be required."}
+            </Dialog.Description>
+            <label className="mt-4 block text-sm font-medium" htmlFor="point-correction-reason">
+              Reason {reasonRequired ? "(required)" : "(optional)"}
+            </label>
+            <textarea id="point-correction-reason" value={correctionReason} maxLength={240}
+              required={reasonRequired} disabled={deletingIds.size > 0}
+              onChange={(event) => setCorrectionReason(event.target.value)}
+              className="mt-2 w-full rounded-lg border bg-background p-3" />
+            {deleteError ? <p role="alert" className="mt-2 text-sm text-destructive">{deleteError}</p> : null}
+            <div className="mt-4 flex justify-end gap-3">
+              <Dialog.Close asChild><button type="button" disabled={deletingIds.size > 0} className="rounded-lg border px-4 py-2">Cancel</button></Dialog.Close>
+              <button type="button" disabled={deletingIds.size > 0 || (reasonRequired && !correctionReason.trim())}
+                onClick={() => deleteTarget && void handleDelete(deleteTarget)}
+                className="rounded-lg bg-destructive px-4 py-2 text-destructive-foreground disabled:opacity-50">
+                {deletingIds.size > 0 ? "Removing..." : "Confirm removal"}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <Dialog.Root
         open={reactionDetailsOpen}
         onOpenChange={(open) => {

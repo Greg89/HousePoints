@@ -16,6 +16,7 @@ vi.mock("@housepoints/db", () => ({
     $queryRaw: vi.fn(),
     $executeRawUnsafe: vi.fn(),
     organization: {
+      findUniqueOrThrow: vi.fn(),
       upsert: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -337,6 +338,7 @@ const makeActorMembership = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(prisma.organization.findUniqueOrThrow).mockResolvedValue({ reportingRevision: 2n } as never);
   vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "org-1", now: new Date() }]);
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
@@ -1667,6 +1669,7 @@ describe("POST /points/delete", () => {
       id: "tx-1",
       organizationId: "org-1",
       deletedAt: null,
+      season: { id: "season-active", name: "Q3 2026", isActive: true, endsAt: null },
     });
     mockTxUpdate.mockResolvedValue(deletedPoint);
     const app = await buildTestApp("auth0|admin");
@@ -1709,9 +1712,18 @@ describe("POST /points/delete", () => {
         organizationId: "org-1",
         actorUserId: "user-2",
         eventType: "POINT_DELETED",
+        createdAt: expect.any(Date),
         summary: "Bob deleted 15 points from Alice.",
         metadata: {
           transactionId: "tx-1",
+          seasonId: "season-active",
+          seasonName: "Q3 2026",
+          isClosedSeason: false,
+          correctedAt: expect.any(String),
+          scoreContributionBefore: 15,
+          scoreContributionAfter: 0,
+          scoreChange: -15,
+          reportingRevision: "2",
           targetUserId: "user-1",
           targetUserName: "Alice",
           targetHouseId: "house-1",
@@ -1726,12 +1738,37 @@ describe("POST /points/delete", () => {
     await app.close();
   });
 
+  it.each([undefined, "", "   "])("requires a closed-season correction reason (%s)", async reason => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({ id: "tx-1", organizationId: "org-1", deletedAt: null,
+      season: { id: "closed", name: "Q2", isActive: false, endsAt: new Date() } });
+    const app = await buildTestApp("auth0|admin");
+    const response = await app.inject({ method: "POST", url: "/points/delete", payload: { transactionId: "tx-1", reason } });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().code).toBe("CORRECTION_REASON_REQUIRED");
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("keeps active-season deletion compatible without a reason", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({ id: "tx-1", organizationId: "org-1", deletedAt: null,
+      season: { id: "season-active", name: "Q3", isActive: true, endsAt: null } });
+    mockTxUpdate.mockResolvedValue({ ...deletedPoint, deletionReason: null });
+    const app = await buildTestApp("auth0|admin");
+    const response = await app.inject({ method: "POST", url: "/points/delete", payload: { transactionId: "tx-1" } });
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  });
+
   it("does not reveal transactions from another organization", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockTxFindUnique.mockResolvedValue({
       id: "tx-1",
       organizationId: "org-other",
       deletedAt: null,
+      season: { id: "season-active", name: "Q3 2026", isActive: true, endsAt: null },
     });
     const app = await buildTestApp("auth0|admin");
 

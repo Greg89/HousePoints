@@ -192,13 +192,21 @@ export function RecentAdminActionsReport({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full border bg-background px-2 py-1 text-xs font-medium text-muted-foreground">
-                        {actionLabels[action.type]}
+                        {action.type === "POINT_DELETED" && action.metadata.isClosedSeason === "true" ? "Closed-season correction" : actionLabels[action.type]}
                       </span>
                       {action.actorName ? (
                         <span className="text-xs text-muted-foreground">by {action.actorName}</span>
                       ) : null}
                     </div>
                     <p className="mt-2 text-sm font-semibold">{action.summary}</p>
+                    {action.type === "POINT_DELETED" && action.metadata.deletionReason ? (
+                      <p className="mt-1 text-sm text-muted-foreground">Reason: {action.metadata.deletionReason}</p>
+                    ) : null}
+                    {action.type === "POINT_DELETED" && action.metadata.scoreContributionBefore != null ? (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {action.metadata.seasonName}: score contribution {action.metadata.scoreContributionBefore} → {action.metadata.scoreContributionAfter} points.
+                      </p>
+                    ) : null}
                   </div>
                   <time
                     dateTime={action.occurredAt}

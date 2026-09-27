@@ -64,7 +64,7 @@ export function OverviewReports({
             : `A quick read on recognition during ${seasonName}.`}
         </p>
         {isHistoricalSeason ? (
-          <p className="text-xs font-semibold text-amber-700">Historical season view</p>
+          <div><p className="text-xs font-semibold text-amber-700">Historical season view</p><p className="text-xs text-muted-foreground">Historical totals and winners reflect recorded corrections and may change.</p></div>
         ) : null}
       </div>
 

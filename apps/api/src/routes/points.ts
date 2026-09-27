@@ -724,16 +724,22 @@ export async function softDeleteTransaction(params: {
   return withScoringWrite(params.organizationId, async (tx) => {
     const existing = await tx.pointTransaction.findUnique({
       where: { id: params.transactionId },
-      select: { organizationId: true, deletedAt: true },
+      select: { organizationId: true, deletedAt: true, season: { select: { id: true, name: true, isActive: true, endsAt: true } } },
     });
     if (!existing || existing.organizationId !== params.organizationId) throw new ScoringWriteError(404, "POINT_TRANSACTION_NOT_FOUND", "Point transaction not found");
     if (existing.deletedAt) throw new ScoringWriteError(409, "POINT_TRANSACTION_ALREADY_DELETED", "Point transaction is already deleted");
+    const isClosedSeason = !existing.season.isActive || existing.season.endsAt !== null;
+    const deletionReason = params.deletionReason?.trim() || null;
+    if (isClosedSeason && !deletionReason) {
+      throw new ScoringWriteError(422, "CORRECTION_REASON_REQUIRED", "A reason is required to correct points in a closed season.");
+    }
+    const correctedAt = await scoringWriteTime(tx);
     const point = await tx.pointTransaction.update({
       where: { id: params.transactionId },
       data: {
-        deletedAt: await scoringWriteTime(tx),
+        deletedAt: correctedAt,
         deletedByUserId: params.actorId,
-        deletionReason: params.deletionReason,
+        deletionReason,
       },
       select: {
         id: true, type: true, delta: true, reason: true, trait: true,
@@ -747,14 +753,29 @@ export async function softDeleteTransaction(params: {
       },
     });
 
+    const { reportingRevision } = await tx.organization.findUniqueOrThrow({
+      where: { id: params.organizationId },
+      select: { reportingRevision: true },
+    });
     await tx.auditEvent.create({
       data: {
         organizationId: params.organizationId,
         actorUserId: params.actorId,
         eventType: "POINT_DELETED",
-        summary: `${params.actorDisplayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
+        createdAt: correctedAt,
+        summary: isClosedSeason
+          ? `${params.actorDisplayName} corrected ${existing.season.name} by removing a ${point.delta}-point transaction for ${point.targetUser?.displayName ?? "Unknown member"}.`
+          : `${params.actorDisplayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
         metadata: {
           transactionId: point.id,
+          seasonId: existing.season.id,
+          seasonName: existing.season.name,
+          isClosedSeason,
+          correctedAt: correctedAt.toISOString(),
+          scoreContributionBefore: point.delta,
+          scoreContributionAfter: 0,
+          scoreChange: -point.delta,
+          reportingRevision: reportingRevision.toString(),
           targetUserId: point.targetUserId,
           targetUserName: point.targetUser?.displayName ?? null,
           targetHouseId: point.targetHouseId,
@@ -762,7 +783,7 @@ export async function softDeleteTransaction(params: {
           delta: point.delta,
           trait: point.trait,
           awardReason: point.reason,
-          deletionReason: params.deletionReason,
+          deletionReason,
         },
       },
     });

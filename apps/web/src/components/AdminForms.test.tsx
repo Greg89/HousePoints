@@ -666,6 +666,17 @@ describe("AdminForms", () => {
     expect(adjustmentActivity.getAllByText("10")).toHaveLength(2);
   });
 
+  it("labels closed-season corrections and shows their reason and score effect", () => {
+    setupAdminForms({ recentAdminActions: [{ ...recentAdminActions[0], metadata: {
+      ...recentAdminActions[0].metadata, isClosedSeason: "true", seasonName: "Q2 2026",
+      scoreContributionBefore: "12", scoreContributionAfter: "0",
+    } }] });
+    switchToManageSection("Audit");
+    expect(screen.getByText("Closed-season correction")).toBeInTheDocument();
+    expect(screen.getByText("Reason: Entered twice")).toBeInTheDocument();
+    expect(screen.getByText("Q2 2026: score contribution 12 → 0 points.")).toBeInTheDocument();
+  });
+
   it("filters audit history by event type", async () => {
     const filteredActions = recentAdminActions.filter((action) => action.type === "POINT_DELETED");
     const { user, props } = setupAdminForms({

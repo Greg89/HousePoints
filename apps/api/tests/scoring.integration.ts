@@ -244,7 +244,69 @@ async function testIdempotency() {
   console.log("PASS retry scope isolation and atomic request rollback");
 }
 
+async function testClosedSeasonCorrections() {
+  for (const deduction of [false, true]) {
+    const f = await fixture();
+    const point = deduction ? (await createPointDeduction(f.deduction())).transaction : await createPointAward(f.award());
+    await startSeasonTransaction(f.actor(0), "New season");
+    const before = await revision(f.org.id);
+    const params = { transactionId: point.id, actorId: f.actor(0).id, actorDisplayName: f.actor(0).displayName, organizationId: f.org.id, deletionReason: null as string | null };
+    for (const deletionReason of [null, "", "   "]) {
+      await assert.rejects(softDeleteTransaction({ ...params, deletionReason }), { code: "CORRECTION_REASON_REQUIRED" });
+    }
+    const other = await fixture();
+    await assert.rejects(softDeleteTransaction({ ...params, organizationId: other.org.id, deletionReason: "Cross org" }), { code: "POINT_TRANSACTION_NOT_FOUND" });
+    assert.equal(await revision(f.org.id), before);
+    const total = async () => (await prisma.pointTransaction.aggregate({ where: { organizationId: f.org.id, seasonId: f.season.id, deletedAt: null }, _sum: { delta: true } }))._sum.delta ?? 0;
+    const delta = deduction ? -10 : 5;
+    assert.equal(await total(), delta);
+    // A real database constraint rejects audit persistence after the ledger UPDATE.
+    // Only this fixture's organization is affected; remove the constraint in finally.
+    assert.match(f.org.id, /^[a-z0-9]+$/i);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "AuditEvent" ADD CONSTRAINT "f3_reject_fixture_audit" CHECK ("organizationId" <> '${f.org.id}') NOT VALID`);
+    try {
+      await assert.rejects(softDeleteTransaction({ ...params, deletionReason: "Duplicate record" }));
+    } finally {
+      await prisma.$executeRawUnsafe('ALTER TABLE "AuditEvent" DROP CONSTRAINT "f3_reject_fixture_audit"');
+    }
+    assert.equal(await total(), delta);
+    assert.equal(await revision(f.org.id), before);
+    assert.equal((await prisma.pointTransaction.findUniqueOrThrow({ where: { id: point.id } })).deletedAt, null);
+    assert.equal(await prisma.auditEvent.count({ where: { organizationId: f.org.id, eventType: "POINT_DELETED" } }), 0);
+    const corrected = await softDeleteTransaction({ ...params, deletionReason: "  Duplicate record  " });
+    assert.equal(await total(), 0);
+    assert.equal(corrected.deletionReason, "Duplicate record");
+    assert.equal(await revision(f.org.id), before + 1n);
+    const audit = await prisma.auditEvent.findFirstOrThrow({ where: { organizationId: f.org.id, eventType: "POINT_DELETED" } });
+    assert.equal(audit.actorUserId, params.actorId);
+    assert.equal(audit.createdAt.toISOString(), corrected.deletedAt!.toISOString());
+    const metadata = audit.metadata as Record<string, unknown>;
+    assert.equal(metadata.transactionId, point.id);
+    assert.equal(metadata.seasonId, f.season.id);
+    assert.equal(metadata.isClosedSeason, true);
+    assert.equal(metadata.deletionReason, "Duplicate record");
+    assert.equal(metadata.scoreContributionBefore, delta);
+    assert.equal(metadata.scoreContributionAfter, 0);
+    assert.equal(metadata.scoreChange, -delta);
+    assert.equal(metadata.reportingRevision, (before + 1n).toString());
+  }
+  const f = await fixture();
+  const point = await createPointAward(f.award());
+  const lock = await holdLock(f.org.id);
+  const rollover = startSeasonTransaction(f.actor(0), "Rollover before correction");
+  let correction!: Promise<unknown>;
+  try {
+    await waitForBlockedWrites(1);
+    correction = assert.rejects(softDeleteTransaction({ transactionId: point.id, actorId: f.actor(0).id, actorDisplayName: f.actor(0).displayName, organizationId: f.org.id, deletionReason: null }), { code: "CORRECTION_REASON_REQUIRED" });
+    await waitForBlockedWrites(2);
+  } finally { lock.release(); await lock.done; }
+  await Promise.all([rollover, correction]);
+  assert.equal((await prisma.pointTransaction.findUniqueOrThrow({ where: { id: point.id } })).deletedAt, null);
+  console.log("PASS closed-season award/deduction corrections, missing reasons, scope, audit failure rollback, totals/revision and rollover race");
+}
+
 try {
+  await testClosedSeasonCorrections();
   await testIdempotency();
   await testDeductions(true);
   await testDeductions(false);
