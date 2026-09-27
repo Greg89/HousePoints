@@ -79,6 +79,8 @@ export const adminAuditActionSchema = z.object({
     "MODERATION_WARNING_ISSUED",
     "MEMBER_SUSPENDED",
     "MEMBER_RESTORED",
+    "RECOGNITION_CATEGORY_CREATED",
+    "RECOGNITION_CATEGORY_ARCHIVED",
   ]),
   occurredAt: z.string().datetime(),
   actorName: z.string().nullable(),

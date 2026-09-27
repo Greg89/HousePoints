@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import {
+  dashboardSummaryRequestSchema,
   seasonScopedRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -92,6 +93,8 @@ export async function loadDashboardSummaryData(
     houseTotals,
     transactionTypeTotals,
     memberships,
+    categoryTotals,
+    categories,
   ] = await Promise.all([
     prisma.house.findMany({
       where: { organizationId },
@@ -114,6 +117,7 @@ export async function loadDashboardSummaryData(
       take: 10,
       select: {
         id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+        category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
         actor: { select: { displayName: true } },
         targetUser: { select: { displayName: true } },
         targetHouse: { select: { name: true, color: true } },
@@ -155,6 +159,21 @@ export async function loadDashboardSummaryData(
         },
       },
     }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId", "categoryId"],
+      where: {
+        organizationId,
+        seasonId,
+        deletedAt: null,
+        type: "AWARD",
+        categoryId: { not: null },
+      },
+      _count: { categoryId: true },
+    }),
+    prisma.recognitionCategory.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, legacyTrait: true, archivedAt: true },
+    }),
   ]);
   const members = memberships.map((membership) => ({
     id: membership.user.id,
@@ -162,7 +181,7 @@ export async function loadDashboardSummaryData(
     role: membership.role,
     houseId: membership.houseId,
   }));
-  return { houses, monthlyMemberTotals, monthlyTraitTotals, recentTransactions, velocityTransactions, memberTotals, houseTotals, transactionTypeTotals, members };
+  return { houses, monthlyMemberTotals, monthlyTraitTotals, recentTransactions, velocityTransactions, memberTotals, houseTotals, transactionTypeTotals, members, categoryTotals, categories };
 }
 
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
@@ -188,7 +207,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post("/dashboard/summary", async (request, reply) => {
-    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    const parsed = await parseBody(dashboardSummaryRequestSchema, request, reply);
     if (!parsed) return;
 
     const actor = await requireActor(request, reply);
@@ -211,7 +230,25 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       houseTotals,
       transactionTypeTotals,
       members,
+      categoryTotals,
+      categories,
     } = await loadDashboardSummaryData(actor.organizationId, season.id, velocityStartsAt);
+
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    const hasCustomCategoryAwards = categoryTotals.some((total) => {
+      const category = total.categoryId ? categoryById.get(total.categoryId) : null;
+      return category?.legacyTrait === null;
+    });
+
+    if (
+      parsed.categoryApiVersion !== "categories-v1" &&
+      hasCustomCategoryAwards
+    ) {
+      return reply.status(426).send({
+        code: "RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED",
+        message: "Update HousePoints to view custom recognition activity.",
+      });
+    }
 
     const houseById = new Map(houses.map((house) => [house.id, house]));
     const memberById = new Map(members.map((member) => [member.id, member]));
@@ -268,6 +305,26 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         houseColor: house.color,
         trait: topTrait?.trait ?? null,
         count: topTrait?._count.trait ?? 0,
+      };
+    });
+    const categoryLeaders = houses.map((house) => {
+      const topCategory = categoryTotals
+        .filter((row) => row.targetHouseId === house.id && row.categoryId)
+        .sort((a, b) => b._count.categoryId - a._count.categoryId)[0];
+      const category = topCategory?.categoryId ? categoryById.get(topCategory.categoryId) : null;
+      return {
+        houseId: house.id,
+        houseName: house.name,
+        houseColor: house.color,
+        category: category
+          ? {
+              id: category.id,
+              name: category.name,
+              legacyTrait: category.legacyTrait,
+              archivedAt: category.archivedAt?.toISOString() ?? null,
+            }
+          : null,
+        count: topCategory?._count.categoryId ?? 0,
       };
     });
 
@@ -358,6 +415,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       monthlyStandout: seasonStandout,
       monthlyStandoutsByHouse: seasonStandoutsByHouse,
       traitLeaders,
+      categoryLeaders,
       recentActivity: recentTransactions.map((transaction) => mapActivityItem(transaction)),
       pointsVelocity: houses.map((house) => ({
         houseId: house.id,

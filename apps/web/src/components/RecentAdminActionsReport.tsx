@@ -46,6 +46,8 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   MODERATION_WARNING_ISSUED: "Moderation warning issued",
   MEMBER_SUSPENDED: "Member suspended",
   MEMBER_RESTORED: "Member restored",
+  RECOGNITION_CATEGORY_CREATED: "Recognition category created",
+  RECOGNITION_CATEGORY_ARCHIVED: "Recognition category archived",
 };
 
 const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
@@ -65,6 +67,8 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   MODERATION_WARNING_ISSUED: ShieldCheck,
   MEMBER_SUSPENDED: UserMinus,
   MEMBER_RESTORED: UserPlus,
+  RECOGNITION_CATEGORY_CREATED: ClipboardText,
+  RECOGNITION_CATEGORY_ARCHIVED: Trash,
 };
 
 const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
@@ -78,6 +82,8 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "MODERATION_WARNING_ISSUED", label: "Moderation warnings" },
   { value: "MEMBER_SUSPENDED", label: "Member suspensions" },
   { value: "MEMBER_RESTORED", label: "Member restorations" },
+  { value: "RECOGNITION_CATEGORY_CREATED", label: "Recognition categories created" },
+  { value: "RECOGNITION_CATEGORY_ARCHIVED", label: "Recognition categories archived" },
   { value: "USER_HOUSE_ASSIGNED", label: "House assignments" },
   { value: "ORG_SETTINGS_UPDATED", label: "Organization updates" },
   { value: "ORG_ARCHIVED", label: "Organization archives" },

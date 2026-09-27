@@ -30,6 +30,7 @@ import type { PushDispatcher } from "../push-dispatcher.js";
 
 export const ACTIVITY_ITEM_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+  category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
   actor: { select: { displayName: true } },
   targetUser: { select: { displayName: true } },
   targetHouse: { select: { name: true, color: true } },
@@ -91,6 +92,14 @@ export function mapActivityItem(
     delta: tx.delta,
     reason: tx.reason,
     trait: tx.trait ?? null,
+    ...(tx.category
+      ? { category: {
+          id: tx.category.id,
+          name: tx.category.name,
+          legacyTrait: tx.category.legacyTrait,
+          archivedAt: tx.category.archivedAt?.toISOString() ?? null,
+        } }
+      : {}),
     createdAt: tx.createdAt.toISOString(),
     season: tx.season
       ? {
@@ -110,6 +119,7 @@ export function mapActivityItem(
 
 export const DELETED_POINT_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true,
+  category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
   createdAt: true, deletedAt: true, deletionReason: true,
   actor: { select: { displayName: true } },
   targetUser: { select: { displayName: true } },
@@ -131,6 +141,7 @@ export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: 
     delta: activityItem.delta,
     reason: activityItem.reason,
     trait: activityItem.trait,
+    ...(activityItem.category ? { category: activityItem.category } : {}),
     createdAt: activityItem.createdAt,
     season: activityItem.season,
     deletedAt: (tx.deletedAt ?? tx.createdAt).toISOString(),
@@ -141,6 +152,7 @@ export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: 
 
 type PointRouteOptions = {
   pointAdjustmentsEnabled: boolean;
+  recognitionCategoryMutationsEnabled: boolean;
   pushDispatcher?: PushDispatcher;
 };
 
@@ -182,42 +194,62 @@ export async function createPointAward(params: {
   targetHouseId: string;
   delta: number;
   reason: string;
-  trait: Trait;
+  trait?: Trait;
+  categoryId?: string;
 }) {
-  return withScoringWrite(params.organizationId, (tx) => idempotentPointMutation(tx, params, "AWARD", async () => {
-    const season = await activeScoringSeason(tx, params.organizationId);
-    const now = await scoringWriteTime(tx);
-    const award = await tx.pointTransaction.create({
-      data: {
-        organizationId: params.organizationId,
-        seasonId: season.id,
-        createdAt: now,
-        actorUserId: params.actorId,
-        targetUserId: params.targetUserId,
-        targetHouseId: params.targetHouseId,
-        type: "AWARD",
-        delta: params.delta,
-        reason: params.reason,
-        trait: params.trait,
-      },
-    });
-
-    if (params.targetUserId !== params.actorId) {
-      await tx.notification.createMany({
-        data: [buildPointAwardNotificationData({
+  return withScoringWrite(params.organizationId, async (tx) => {
+    let categoryName: string | undefined;
+    const result = await idempotentPointMutation(tx, params, "AWARD", async () => {
+      const category = params.categoryId
+        ? await tx.recognitionCategory.findFirst({
+            where: { id: params.categoryId, organizationId: params.organizationId, archivedAt: null },
+          })
+        : await tx.recognitionCategory.findFirst({
+            where: { organizationId: params.organizationId, legacyTrait: params.trait, archivedAt: null },
+          });
+      if (!category) {
+        throw new ScoringWriteError(409, "RECOGNITION_CATEGORY_UNAVAILABLE", "The selected recognition category is unavailable. Refresh and choose another category.");
+      }
+      categoryName = category.name;
+      const season = await activeScoringSeason(tx, params.organizationId);
+      const now = await scoringWriteTime(tx);
+      const award = await tx.pointTransaction.create({
+        data: {
           organizationId: params.organizationId,
-          recipientUserId: params.targetUserId,
-          actorDisplayName: params.actorDisplayName,
+          seasonId: season.id,
+          createdAt: now,
+          actorUserId: params.actorId,
+          targetUserId: params.targetUserId,
+          targetHouseId: params.targetHouseId,
+          type: "AWARD",
           delta: params.delta,
-          trait: params.trait,
-          transactionId: award.id,
-        })],
-        skipDuplicates: true,
+          reason: params.reason,
+          trait: params.trait ?? null,
+          categoryId: category.id,
+        },
       });
-    }
 
-    return award;
-  }));
+      if (params.targetUserId !== params.actorId) {
+        await tx.notification.createMany({
+          data: [buildPointAwardNotificationData({
+            organizationId: params.organizationId,
+            recipientUserId: params.targetUserId,
+            actorDisplayName: params.actorDisplayName,
+            delta: params.delta,
+            trait: params.trait,
+            categoryName: category.name,
+            transactionId: award.id,
+          })],
+          skipDuplicates: true,
+        });
+      }
+
+      return award;
+    });
+    const response: typeof result & { categoryName?: string } = result;
+    if (categoryName) response.categoryName = categoryName;
+    return response;
+  });
 }
 
 async function checkDeductionCooldowns(tx: Prisma.TransactionClient, now: Date, params: {
@@ -743,6 +775,7 @@ export async function softDeleteTransaction(params: {
       },
       select: {
         id: true, type: true, delta: true, reason: true, trait: true,
+        category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
         targetUserId: true, targetHouseId: true, createdAt: true,
         deletedAt: true, deletionReason: true,
         actor: { select: { displayName: true } },
@@ -799,6 +832,13 @@ export async function registerPointRoutes(
   app.post("/points/adjust", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = await parseBody(adjustPointsSchema, request, reply);
     if (!parsed) return;
+
+    if ("categoryId" in parsed && !options.recognitionCategoryMutationsEnabled) {
+      return reply.status(404).send({
+        code: "RECOGNITION_CATEGORY_MUTATIONS_DISABLED",
+        message: "Recognition categories are not enabled.",
+      });
+    }
 
     const actor = await requireActor(request, reply);
     if (!actor) return;
@@ -857,7 +897,9 @@ export async function registerPointRoutes(
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
 
-    const { transaction, replayed } = await createPointAward({
+    const trait = "trait" in parsed ? parsed.trait : undefined;
+    const categoryId = "categoryId" in parsed ? parsed.categoryId : undefined;
+    const { transaction, replayed, categoryName } = await createPointAward({
       idempotencyKey: parsed.idempotencyKey,
       organizationId: actor.organizationId,
       actorId: actor.id,
@@ -867,7 +909,8 @@ export async function registerPointRoutes(
       targetHouseId,
       delta: parsed.delta,
       reason: parsed.reason,
-      trait: parsed.trait,
+      trait,
+      categoryId,
     });
     if (!replayed && targetUser.id !== actor.id) {
       await dispatchPushForNotifications({
@@ -879,7 +922,8 @@ export async function registerPointRoutes(
           recipientUserId: targetUser.id,
           actorDisplayName: actor.displayName,
           delta: parsed.delta,
-          trait: parsed.trait,
+          trait,
+          categoryName,
           transactionId: transaction.id,
         })],
       });
@@ -1054,6 +1098,16 @@ export async function registerPointRoutes(
       seasonId: parsed.seasonId,
     });
     const nextCursor = hasNextPage ? items.at(-1)?.id ?? null : null;
+
+    if (
+      parsed.categoryApiVersion !== "categories-v1" &&
+      items.some((item) => item.category?.legacyTrait === null)
+    ) {
+      return reply.status(426).send({
+        code: "RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED",
+        message: "Update HousePoints to view custom recognition activity.",
+      });
+    }
 
     return {
       items: items.map((item) => mapActivityItem(item, actor.id)),

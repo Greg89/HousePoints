@@ -12,6 +12,7 @@ type Submission = {
   reason: string;
   delta?: number;
   trait?: string;
+  categoryId?: string;
 };
 
 // Called only while holding F1's organization lock. Never cache authorization.
@@ -48,7 +49,7 @@ export async function idempotentPointMutation<T extends { id: string }>(
   await authorize(tx, input, operation);
   const fingerprint = createHash("sha256").update(JSON.stringify([
     input.targetUserId, operation === "AWARD" ? input.delta : -10,
-    input.reason, operation === "AWARD" ? input.trait : null,
+    input.reason, operation === "AWARD" ? input.categoryId ?? input.trait : null,
   ])).digest("hex");
   const scope = { organizationId: input.organizationId, actorUserId: input.actorId, operation, key: input.idempotencyKey };
   const prior = await tx.pointMutationRequest.findUnique({

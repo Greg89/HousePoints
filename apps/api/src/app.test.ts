@@ -3,7 +3,7 @@
  * Prisma is mocked per test so we control exactly what the DB "returns".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { READ_ARCHIVED_NOTIFICATION_TYPES } from "@housepoints/contracts";
+import { READ_ARCHIVED_NOTIFICATION_TYPES, TRAIT_LABELS, type Trait } from "@housepoints/contracts";
 
 // Mock @housepoints/db before importing anything that uses it.
 vi.mock("@housepoints/db", () => ({
@@ -100,7 +100,16 @@ vi.mock("@housepoints/db", () => ({
       update: vi.fn(),
     },
     pointMutationRequest: { findUnique: vi.fn(), create: vi.fn() },
+    recognitionCategory: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
     pointTransaction: {
+      count: vi.fn(),
       create: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -200,11 +209,18 @@ const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
 const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
+const mockTxCount = prisma.pointTransaction.count as ReturnType<typeof vi.fn>;
 const mockTxFindUnique = prisma.pointTransaction.findUnique as ReturnType<typeof vi.fn>;
 const mockTxFindFirst = prisma.pointTransaction.findFirst as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
 const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
+const mockCategoryFindUnique = prisma.recognitionCategory.findUnique as ReturnType<typeof vi.fn>;
+const mockCategoryFindFirst = prisma.recognitionCategory.findFirst as ReturnType<typeof vi.fn>;
+const mockCategoryFindMany = prisma.recognitionCategory.findMany as ReturnType<typeof vi.fn>;
+const mockCategoryCreate = prisma.recognitionCategory.create as ReturnType<typeof vi.fn>;
+const mockCategoryUpdate = prisma.recognitionCategory.update as ReturnType<typeof vi.fn>;
+const mockCategoryCount = prisma.recognitionCategory.count as ReturnType<typeof vi.fn>;
 const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof vi.fn>;
 const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
 const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
@@ -343,6 +359,27 @@ beforeEach(() => {
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
+  mockTxCount.mockResolvedValue(0);
+  mockCategoryFindUnique.mockResolvedValue(null);
+  mockCategoryFindFirst.mockImplementation(async ({ where }) => {
+    const legacyTrait = where?.legacyTrait as Trait | undefined;
+    if (!legacyTrait) return null;
+    return {
+      id: `category-${legacyTrait.toLowerCase()}`,
+      organizationId: "org-1",
+      creationKey: null,
+      name: TRAIT_LABELS[legacyTrait],
+      normalizedName: TRAIT_LABELS[legacyTrait].toLowerCase(),
+      description: null,
+      legacyTrait,
+      createdAt: new Date("2026-09-26T12:00:00.000Z"),
+      createdById: null,
+      archivedAt: null,
+      archivedById: null,
+    };
+  });
+  mockCategoryFindMany.mockResolvedValue([]);
+  mockCategoryCount.mockResolvedValue(20);
   mockPointReactionCreate.mockResolvedValue({ id: "reaction-1", reactionKey: "clap" });
   mockPointReactionFindFirst.mockResolvedValue(null);
   mockPointReactionFindMany.mockResolvedValue([]);
@@ -425,11 +462,13 @@ async function buildTestApp(
     pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
     organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
     platformOwnerAuth0Subjects?: ReadonlySet<string>;
+    recognitionCategoryMutationsEnabled?: boolean;
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
+    recognitionCategoryMutationsEnabled: options.recognitionCategoryMutationsEnabled,
     organizationCreationPolicy: options.organizationCreationPolicy,
     platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
     pushDispatcher: options.pushDispatcher,
@@ -994,6 +1033,128 @@ describe("POST /users/bootstrap", () => {
   });
 });
 
+describe("recognition category routes", () => {
+  const category = {
+    id: "category-1",
+    organizationId: "org-1",
+    creationKey: "29b2f600-1d44-401b-b18a-bf02c6d58d98",
+    name: "Community Impact",
+    normalizedName: "community impact",
+    description: "Recognizes impact beyond the team.",
+    legacyTrait: null,
+    createdAt: new Date("2026-09-26T12:00:00.000Z"),
+    createdById: "user-owner",
+    archivedAt: null,
+    archivedById: null,
+  };
+
+  it("lists active categories for members", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockCategoryFindMany.mockResolvedValue([category]);
+    const app = await buildTestApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/list",
+      payload: { includeArchived: false },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      apiVersion: "categories-v1",
+      categories: [{
+        id: "category-1",
+        name: "Community Impact",
+        description: "Recognizes impact beyond the team.",
+        legacyTrait: null,
+        createdAt: "2026-09-26T12:00:00.000Z",
+        archivedAt: null,
+      }],
+    });
+    expect(mockCategoryFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId: "org-1", archivedAt: null },
+    }));
+    await app.close();
+  });
+
+  it("keeps category mutations disabled by default", async () => {
+    const app = await buildTestApp("auth0|owner");
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/create",
+      payload: { idempotencyKey: category.creationKey, name: category.name },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    await app.close();
+  });
+
+  it("requires an owner when category mutations are enabled", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/create",
+      payload: { idempotencyKey: category.creationKey, name: category.name },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    await app.close();
+  });
+
+  it("creates a category with one audit and replays its creation key", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockCategoryCreate.mockResolvedValue(category);
+    const app = await buildTestApp("auth0|owner", {}, { recognitionCategoryMutationsEnabled: true });
+    const request = {
+      method: "POST" as const,
+      url: "/recognition-categories/create",
+      payload: {
+        idempotencyKey: category.creationKey,
+        name: "  Community   Impact  ",
+        description: "  Recognizes impact beyond the team.  ",
+      },
+    };
+    const created = await app.inject(request);
+    expect(created.statusCode).toBe(201);
+    expect(created.json().category.id).toBe(category.id);
+    expect(mockCategoryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        creationKey: category.creationKey,
+        name: "Community Impact",
+        description: "Recognizes impact beyond the team.",
+        createdById: "user-owner",
+      }),
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: "RECOGNITION_CATEGORY_CREATED" }),
+    });
+
+    mockCategoryFindUnique.mockResolvedValue(category);
+    const replay = await app.inject(request);
+    expect(replay.statusCode).toBe(201);
+    expect(replay.json()).toEqual(created.json());
+    expect(mockCategoryCreate).toHaveBeenCalledOnce();
+    expect(mockAuditEventCreate).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("rejects archiving the final active category", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockCategoryFindFirst.mockResolvedValue(category);
+    mockCategoryCount.mockResolvedValue(1);
+    const app = await buildTestApp("auth0|owner", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/archive",
+      payload: { categoryId: category.id },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_LAST_ACTIVE");
+    expect(mockCategoryUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /points/adjust", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);
@@ -1169,6 +1330,62 @@ describe("POST /points/adjust", () => {
         actionHref: "/?tab=activity",
       },
     }], expect.any(AbortSignal));
+    await app.close();
+  });
+
+  it("keeps category awards disabled before the release gate", async () => {
+    const app = await buildTestApp("auth0|admin");
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1",
+        delta: 20,
+        reason: "Supported the whole community",
+        categoryApiVersion: "categories-v1",
+        categoryId: "category-custom",
+      },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("accepts a category award and uses its fixed name in notifications", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockCategoryFindFirst.mockResolvedValue({
+      id: "category-custom",
+      organizationId: "org-1",
+      name: "Community Impact",
+      legacyTrait: null,
+      archivedAt: null,
+    });
+    mockTxCreate.mockResolvedValue({ id: "tx-category" });
+    const app = await buildTestApp("auth0|admin", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1",
+        delta: 20,
+        reason: "Supported the whole community",
+        categoryApiVersion: "categories-v1",
+        categoryId: "category-custom",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(mockTxCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ trait: null, categoryId: "category-custom" }),
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        body: "Bob awarded you 20 points for Community Impact.",
+      })],
+      skipDuplicates: true,
+    });
     await app.close();
   });
 
@@ -4914,6 +5131,50 @@ describe("POST /transactions/recent", () => {
     await app.close();
   });
 
+  it("requires category capability before returning custom-category activity", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([{
+      id: "tx-custom",
+      type: "AWARD",
+      delta: 10,
+      reason: "Community contribution",
+      trait: null,
+      category: {
+        id: "category-custom",
+        name: "Community Impact",
+        legacyTrait: null,
+        archivedAt: null,
+      },
+      createdAt: new Date("2026-09-26T12:00:00.000Z"),
+      actor: { displayName: "Bob" },
+      targetUser: { displayName: "Alice" },
+      targetHouse: { name: "Phoenix", color: "#7c3aed" },
+      season: { id: "season-active", name: "Q3 2026", isActive: true },
+      reactions: [],
+    }]);
+    const app = await buildTestApp();
+    const unsupported = await app.inject({ method: "POST", url: "/transactions/recent", payload: {} });
+    expect(unsupported.statusCode).toBe(426);
+    expect(unsupported.json().code).toBe("RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED");
+
+    const supported = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { categoryApiVersion: "categories-v1" },
+    });
+    expect(supported.statusCode).toBe(200);
+    expect(supported.json().items[0]).toEqual(expect.objectContaining({
+      trait: null,
+      category: {
+        id: "category-custom",
+        name: "Community Impact",
+        legacyTrait: null,
+        archivedAt: null,
+      },
+    }));
+    await app.close();
+  });
+
   it("uses the provided activity cursor for the next page", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockTxFindMany.mockResolvedValue([]);
@@ -6036,6 +6297,27 @@ describe("POST /dashboard/summary", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
+    await app.close();
+  });
+
+  it("requires category capability when the season contains custom awards", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxGroupBy.mockImplementation(async ({ by }) => (
+      by.includes("categoryId")
+        ? [{ targetHouseId: "house-1", categoryId: "category-custom", _count: { categoryId: 1 } }]
+        : []
+    ));
+    mockCategoryFindMany.mockResolvedValue([{
+      id: "category-custom",
+      name: "Community Impact",
+      legacyTrait: null,
+      archivedAt: null,
+    }]);
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/dashboard/summary", payload: {} });
+    expect(res.statusCode).toBe(426);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED");
     await app.close();
   });
 

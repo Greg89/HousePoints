@@ -105,7 +105,8 @@ export function buildPointAwardNotificationData(input: {
   recipientUserId: string;
   actorDisplayName: string;
   delta: number;
-  trait: keyof typeof TRAIT_LABELS;
+  trait?: keyof typeof TRAIT_LABELS;
+  categoryName?: string;
   transactionId: string;
 }): NotificationRow {
   return {
@@ -114,7 +115,7 @@ export function buildPointAwardNotificationData(input: {
     type: "POINT_AWARD_RECEIVED",
     severity: "INFO",
     title: "Points awarded",
-    body: `${input.actorDisplayName} awarded you ${input.delta} points for ${TRAIT_LABELS[input.trait]}.`,
+    body: `${input.actorDisplayName} awarded you ${input.delta} points for ${input.categoryName ?? (input.trait ? TRAIT_LABELS[input.trait] : "recognition")}.`,
     actionLabel: "View activity",
     actionHref: "/?tab=activity",
     entityType: "PointTransaction",

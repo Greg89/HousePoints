@@ -17,6 +17,7 @@ import {
   readCorsAllowedOriginsFromEnv,
   readExpoAccessTokenFromEnv,
   readPointAdjustmentsEnabledFromEnv,
+  readRecognitionCategoryMutationsEnabledFromEnv,
   readPushDispatchEnabledFromEnv,
   readOrganizationCreationPolicyFromEnv,
   readPlatformOwnerAuth0SubjectsFromEnv,
@@ -29,6 +30,7 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerPointRoutes } from "./routes/points.js";
+import { registerRecognitionCategoryRoutes } from "./routes/recognition-categories.js";
 import { registerPlatformRoutes } from "./routes/platform.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
@@ -50,6 +52,7 @@ type BuildAppOptions = {
   corsAllowedOrigins?: readonly string[];
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
+  recognitionCategoryMutationsEnabled?: boolean;
   pushDispatcher?: PushDispatcher | null;
   organizationCreationPolicy?: OrganizationCreationPolicy;
   platformOwnerAuth0Subjects?: ReadonlySet<string>;
@@ -65,6 +68,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const pointAdjustmentsEnabled =
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
+  const recognitionCategoryMutationsEnabled =
+    options.recognitionCategoryMutationsEnabled ?? readRecognitionCategoryMutationsEnabledFromEnv();
   const organizationCreationPolicy =
     options.organizationCreationPolicy ?? readOrganizationCreationPolicyFromEnv();
   const platformOwnerAuth0Subjects =
@@ -130,7 +135,12 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerNotificationRoutes(app);
   await registerOrgRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerUserRoutes(app, { verifyIdToken });
-  await registerPointRoutes(app, { pointAdjustmentsEnabled, pushDispatcher });
+  await registerPointRoutes(app, {
+    pointAdjustmentsEnabled,
+    recognitionCategoryMutationsEnabled,
+    pushDispatcher,
+  });
+  await registerRecognitionCategoryRoutes(app, { mutationsEnabled: recognitionCategoryMutationsEnabled });
   await registerPlatformRoutes(app, {
     hardOrganizationCreationPolicy: organizationCreationPolicy,
     platformOwnerAuth0Subjects,

@@ -378,6 +378,7 @@ const baseProps = {
         count: 1,
       },
     ],
+    categoryLeaders: [],
     recentActivity: [
       {
         id: "activity-1",
@@ -556,6 +557,7 @@ const baseProps = {
           count: 1,
         },
       ],
+      categoryLeaders: [],
       recentActivity: [
         {
           id: "activity-historical",

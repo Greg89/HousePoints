@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { prisma } from "@housepoints/db";
 import { createPointAward as submitPointAward, createPointDeduction, softDeleteTransaction } from "../src/routes/points.js";
+import { archiveRecognitionCategory, createRecognitionCategory } from "../src/routes/recognition-categories.js";
 import { startSeasonTransaction } from "../src/routes/seasons.js";
 import { lockOrganizationScoring, withScoringWrite } from "../src/scoring-write.js";
 import { idempotentPointMutation } from "../src/point-idempotency.js";
@@ -305,7 +306,105 @@ async function testClosedSeasonCorrections() {
   console.log("PASS closed-season award/deduction corrections, missing reasons, scope, audit failure rollback, totals/revision and rollover race");
 }
 
+async function testRecognitionCategories() {
+  const f = await fixture();
+  const owner = f.actor(0);
+  const creationKey = randomUUID();
+  const create = () => createRecognitionCategory({
+    organizationId: f.org.id,
+    actorId: owner.id,
+    actorDisplayName: owner.displayName,
+    idempotencyKey: creationKey,
+    name: "  Community   Impact  ",
+    description: "  Recognizes work beyond the team.  ",
+  });
+  const [first, replay] = await Promise.all([create(), create()]);
+  assert.equal(first.id, replay.id);
+  assert.equal(first.name, "Community Impact");
+  assert.equal(first.normalizedName, "community impact");
+  assert.equal(first.description, "Recognizes work beyond the team.");
+  assert.equal(await prisma.auditEvent.count({
+    where: { organizationId: f.org.id, eventType: "RECOGNITION_CATEGORY_CREATED" },
+  }), 1);
+  await assert.rejects(createRecognitionCategory({
+    organizationId: f.org.id,
+    actorId: owner.id,
+    actorDisplayName: owner.displayName,
+    idempotencyKey: creationKey,
+    name: "Different category",
+  }), { code: "IDEMPOTENCY_KEY_CONFLICT" });
+
+  const other = await fixture();
+  const otherCategory = await prisma.recognitionCategory.findFirstOrThrow({
+    where: { organizationId: other.org.id },
+  });
+  await assert.rejects(createPointAward({ ...f.award(), trait: undefined, categoryId: otherCategory.id }), {
+    code: "RECOGNITION_CATEGORY_UNAVAILABLE",
+  });
+
+  const lock = await holdLock(f.org.id);
+  const archive = archiveRecognitionCategory({
+    organizationId: f.org.id,
+    actorId: owner.id,
+    actorDisplayName: owner.displayName,
+    categoryId: first.id,
+  });
+  const award = createPointAward({ ...f.award(), trait: undefined, categoryId: first.id });
+  try { await waitForBlockedWrites(2); } finally { lock.release(); await lock.done; }
+  const [archiveResult, awardResult] = await Promise.allSettled([archive, award]);
+  assert.equal(archiveResult.status, "fulfilled");
+  if (awardResult.status === "fulfilled") {
+    assert.equal(awardResult.value.categoryId, first.id);
+  } else {
+    assert.equal(awardResult.reason.code, "RECOGNITION_CATEGORY_UNAVAILABLE");
+  }
+  assert.equal((await prisma.recognitionCategory.findUniqueOrThrow({ where: { id: first.id } })).archivedAt instanceof Date, true);
+
+  const replacement = await createRecognitionCategory({
+    organizationId: f.org.id,
+    actorId: owner.id,
+    actorDisplayName: owner.displayName,
+    idempotencyKey: randomUUID(),
+    name: "community impact",
+    description: "A separate category identity.",
+  });
+  assert.notEqual(replacement.id, first.id);
+
+  const active = await prisma.recognitionCategory.findMany({
+    where: { organizationId: f.org.id, archivedAt: null },
+    orderBy: { id: "asc" },
+  });
+  for (const category of active.slice(0, -2)) {
+    await archiveRecognitionCategory({
+      organizationId: f.org.id,
+      actorId: owner.id,
+      actorDisplayName: owner.displayName,
+      categoryId: category.id,
+    });
+  }
+  const finalTwo = await prisma.recognitionCategory.findMany({
+    where: { organizationId: f.org.id, archivedAt: null },
+    orderBy: { id: "asc" },
+  });
+  assert.equal(finalTwo.length, 2);
+  const finalArchives = await Promise.allSettled(finalTwo.map((category) => archiveRecognitionCategory({
+    organizationId: f.org.id,
+    actorId: owner.id,
+    actorDisplayName: owner.displayName,
+    categoryId: category.id,
+  })));
+  assert.equal(finalArchives.filter((result) => result.status === "fulfilled").length, 1);
+  const rejectedArchive = finalArchives.find((result) => result.status === "rejected");
+  assert(rejectedArchive?.status === "rejected");
+  assert.equal(rejectedArchive.reason.code, "RECOGNITION_CATEGORY_LAST_ACTIVE");
+  assert.equal(await prisma.recognitionCategory.count({
+    where: { organizationId: f.org.id, archivedAt: null },
+  }), 1);
+  console.log("PASS recognition category retries, tenant scope, archive/award ordering, name reuse and final-category race");
+}
+
 try {
+  await testRecognitionCategories();
   await testClosedSeasonCorrections();
   await testIdempotency();
   await testDeductions(true);

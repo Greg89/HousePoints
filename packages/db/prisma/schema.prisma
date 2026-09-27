@@ -57,6 +57,8 @@ enum AuditEventType {
   MODERATION_WARNING_ISSUED
   MEMBER_SUSPENDED
   MEMBER_RESTORED
+  RECOGNITION_CATEGORY_CREATED
+  RECOGNITION_CATEGORY_ARCHIVED
 }
 
 enum NotificationType {
@@ -533,6 +535,7 @@ model PointMutationRequest {
 model RecognitionCategory {
   id             String @id @default(cuid())
   organizationId String
+  creationKey    String?
   name           String
   normalizedName String @default("")
   description    String?
@@ -549,6 +552,7 @@ model RecognitionCategory {
 
   @@unique([organizationId, id])
   @@unique([organizationId, legacyTrait])
+  @@unique([organizationId, creationKey])
   @@index([organizationId, archivedAt])
   @@index([createdById])
   @@index([archivedById])

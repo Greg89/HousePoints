@@ -5,7 +5,7 @@ Each tier has its own file with detailed task breakdowns.
 
 ## Next-quarter product design
 
-The main product decisions for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and platform-managed organization subscriptions have been reviewed. See the [quarterly product design](./quarterly-product-design/README.md) for approved direction and the [execution plan](./quarterly-product-design/execution-plan.md) for ordered slices and release gates. F1–F4 and C1 category persistence/backfill are implemented and locally verified; deployment and native device gates remain pending where documented. Continue with C2 category-aware API compatibility; billing discovery B1–B3 can proceed independently. Production billing P1–P7 remains conditional on the spike outcome, with no launch date committed.
+The main product decisions for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and platform-managed organization subscriptions have been reviewed. See the [quarterly product design](./quarterly-product-design/README.md) for approved direction and the [execution plan](./quarterly-product-design/execution-plan.md) for ordered slices and release gates. F1–F4 and C1–C2 category persistence/API compatibility are implemented and locally verified; deployment and native device gates remain pending where documented. Continue with C3 web category management and award selection; billing discovery B1–B3 can proceed independently. Production billing P1–P7 remains conditional on the spike outcome, with no launch date committed.
 
 ## Status key
 - [done] Done

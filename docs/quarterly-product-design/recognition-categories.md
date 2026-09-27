@@ -1,6 +1,6 @@
 # Custom recognition categories
 
-Status: category defaults, owner-only add/archive-only management, fixed names, archived-name reuse as a separate identity, and historical reporting approved September 20, 2026. Remaining validation and implementation details are proposed. See [shared decisions](./README.md#decision-register), especially D1 and D9.
+Status: C1 persistence and C2 category-aware API compatibility are implemented and locally verified. Category management and category-ID awards remain disabled pending the C3–C5 client rollout. See [shared decisions](./README.md#decision-register), especially D1 and D9.
 
 ## C1 persistence foundation
 
@@ -13,6 +13,29 @@ Names and descriptions are fixed after creation. The database trims and collapse
 Apply `20260927020000_recognition_categories` after the F1 and F2 migrations. It takes access-exclusive locks on organizations and point transactions with a five-second lock timeout, so schedule a maintenance window and retry the migration if active traffic prevents lock acquisition. No environment variables, secrets, client deployment, or feature flags are added. On application rollback, retain the additive table, column, trigger, and mappings. Before C2/custom writes there is no user-visible category behavior to disable; after custom awards exist, enum-only database rollback is unsafe.
 
 Local PostgreSQL 16 verification applied every migration to a fresh database and covered 20-category seeding, transactional rollback, legacy award backfill, unchanged award counts/totals, zero-change rerun, tenant reference rejection, immutable names/descriptions, active-name normalization/uniqueness, archived-name reuse, and deduction exclusion. Database lint and typechecks passed. No staging or production migration was applied.
+
+## C2 category-aware API compatibility
+
+Implemented and locally verified September 27, 2026. The typed `categories-v1` contract adds category list/create/archive operations, category-ID awards, fixed category identity on activity, and category leaders on dashboard summaries. Owners may create and archive; authenticated organization members may list. Create uses an organization-scoped idempotency key, and create, archive, and award writes share the scoring lock. Archiving the final active category fails even under concurrent requests, and archive-versus-award ordering produces one consistent outcome. Creation and archival write dedicated audit events.
+
+`RECOGNITION_CATEGORY_MUTATIONS_ENABLED` defaults to `false`. While disabled, create, archive, and category-ID awards return `RECOGNITION_CATEGORY_MUTATIONS_DISABLED`; legacy trait awards and compatible reads continue unchanged. This flag must remain false through C3 and C4 and is enabled only through the C5 release rehearsal.
+
+Compatibility matrix:
+
+| Client/request | No custom-category awards in result | Custom-category award in result |
+|---|---|---|
+| Legacy trait award | Maps to that organization's active seeded category | Same; fails if the mapped category is archived |
+| `categories-v1` category award | Accepted only while the mutation flag is enabled | Accepted only for an active category in the actor's organization |
+| Legacy activity/dashboard read | Preserves the legacy response shape | Returns HTTP 426 with `RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED` |
+| `categories-v1` activity/dashboard read | Returns category-capable response fields | Returns fixed category IDs/names, including archived categories |
+
+Notification text is resolved from the category's fixed name rather than inventing a legacy trait for a custom category. Existing seeded categories retain their legacy mapping. Unknown and cross-organization category IDs share the unavailable response and do not disclose another organization's data.
+
+Deploy `20260927030000_recognition_category_api` after C1, then deploy the compatible API with `RECOGNITION_CATEGORY_MUTATIONS_ENABLED=false`. Release category-capable web and mobile clients before enabling the flag in C5. The migration adds category audit values, idempotent creation keys, category-only award validation, and the remaining category immutability enforcement. It requires no secrets and no new infrastructure.
+
+Rollback before enablement may restore the prior application while retaining the additive migration. After category creation or category-ID awards are enabled, rollback means setting the mutation flag to false while keeping category-capable readers and schema in place. Dropping the migration or returning to enum-only readers is unsafe once custom data exists.
+
+Local verification covered shared contract parsing, route authorization and disabled behavior, idempotent create, fixed-name responses, legacy response compatibility, HTTP 426 recovery, fresh application of all 46 migrations on PostgreSQL 16, tenant integrity, archived-name reuse, archive/award ordering, simultaneous final-category archives, and point-write retry/concurrency suites. No staging or production migration was applied, and old native binary/device verification remains part of C4/C5.
 
 ## Confirmed direction — September 20, 2026
 

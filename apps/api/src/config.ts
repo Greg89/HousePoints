@@ -86,6 +86,10 @@ export function readPointAdjustmentsEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.POINT_ADJUSTMENTS_ENABLED);
 }
 
+export function readRecognitionCategoryMutationsEnabledFromEnv(): boolean {
+  return parseBooleanFlag(process.env.RECOGNITION_CATEGORY_MUTATIONS_ENABLED);
+}
+
 export function readPushDispatchEnabledFromEnv(): boolean {
   return parseBooleanFlag(process.env.PUSH_DISPATCH_ENABLED);
 }

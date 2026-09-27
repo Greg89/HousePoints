@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F4 and C1 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 and C1–C2 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -24,7 +24,7 @@ The [decision register](./README.md#decision-register) is the product authority.
 | Billing decision | B1–B3 | Cost-informed commercial specification and tested sandbox architecture |
 | Conditional paid pilot | P1–P7, after billing decision | Verified owner subscriptions, platform oversight, and recovery workflows |
 
-F1–F4 and C1 are implemented; continue with C2. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
+F1–F4 and C1–C2 are implemented; continue with C3. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
 
 ## F — Targeted scoring and navigation reliability
 
@@ -81,6 +81,8 @@ Add organization-owned immutable categories and nullable award category referenc
 Done when a migration rehearsal and rerun preserve award counts/totals, every migrated award maps to its own organization's category, and ordinary reads never reseed archived defaults. Default seeding and organization creation are atomic. No owner controls enabled yet.
 
 ### C2 — Introduce category-aware API compatibility
+
+Status: **implementation complete, locally verified September 27, 2026**. See the [API compatibility, release gate, and verification notes](./recognition-categories.md#c2-category-aware-api-compatibility). Deployment is pending; category mutations remain disabled by default.
 
 Dependencies: C1, F2. Surfaces: contracts, API award/read/report/notification mapping.
 

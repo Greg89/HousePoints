@@ -2,6 +2,11 @@ import { z } from "zod";
 import { traitSchema, activityItemSchema } from "./point-schemas.js";
 import { seasonSchema } from "./season-schemas.js";
 
+export const dashboardSummaryRequestSchema = z.object({
+  seasonId: z.string().min(1).optional(),
+  categoryApiVersion: z.literal("categories-v1").optional(),
+}).strict();
+
 const dashboardStandoutSchema = z.object({
   memberId: z.string(),
   memberName: z.string(),
@@ -55,6 +60,18 @@ export const dashboardSummarySchema = z.object({
     trait: traitSchema.nullable(),
     count: z.number().int().nonnegative(),
   })),
+  categoryLeaders: z.array(z.object({
+    houseId: z.string(),
+    houseName: z.string(),
+    houseColor: z.string(),
+    category: z.object({
+      id: z.string(),
+      name: z.string(),
+      legacyTrait: traitSchema.nullable(),
+      archivedAt: z.string().datetime().nullable(),
+    }).nullable(),
+    count: z.number().int().nonnegative(),
+  })).default([]),
   recentActivity: z.array(activityItemSchema),
   pointsVelocity: z.array(z.object({
     houseId: z.string(),

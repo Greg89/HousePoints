@@ -84,13 +84,27 @@ export const traitSchema = z.enum(TRAITS);
 
 export const pointMutationKeySchema = z.string().uuid();
 
-export const adjustPointsSchema = z.object({
+export const legacyAdjustPointsSchema = z.object({
   idempotencyKey: pointMutationKeySchema.optional(),
   targetUserId: z.string().min(1),
   delta: z.number().int().min(1).max(100),
   reason: z.string().min(3).max(240),
   trait: traitSchema,
 }).strict();
+
+export const categoryAdjustPointsSchema = z.object({
+  idempotencyKey: pointMutationKeySchema.optional(),
+  targetUserId: z.string().min(1),
+  delta: z.number().int().min(1).max(100),
+  reason: z.string().min(3).max(240),
+  categoryApiVersion: z.literal("categories-v1"),
+  categoryId: z.string().min(1),
+}).strict();
+
+export const adjustPointsSchema = z.union([
+  legacyAdjustPointsSchema,
+  categoryAdjustPointsSchema,
+]);
 
 export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
 
@@ -173,6 +187,12 @@ export const deletedPointSchema = z.object({
   delta: z.number().int(),
   reason: z.string(),
   trait: traitSchema.nullable(),
+  category: z.object({
+    id: z.string().min(1),
+    name: z.string().min(2),
+    legacyTrait: traitSchema.nullable(),
+    archivedAt: z.string().datetime().nullable(),
+  }).nullable().optional(),
   createdAt: z.string().datetime(),
   deletedAt: z.string().datetime(),
   deletedByName: z.string().nullable(),
@@ -197,6 +217,12 @@ export const activityItemSchema = z.object({
   delta: z.number().int(),
   reason: z.string(),
   trait: traitSchema.nullable(),
+  category: z.object({
+    id: z.string().min(1),
+    name: z.string().min(2),
+    legacyTrait: traitSchema.nullable(),
+    archivedAt: z.string().datetime().nullable(),
+  }).nullable().optional(),
   createdAt: z.string(),
   season: z.object({
     id: z.string().min(1),
@@ -211,6 +237,7 @@ export type ActivityItem = z.infer<typeof activityItemSchema>;
 export const activityFeedSchema = z.array(activityItemSchema);
 
 export const activityFeedRequestSchema = z.object({
+  categoryApiVersion: z.literal("categories-v1").optional(),
   cursor: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).default(50),
   type: pointTransactionTypeSchema.optional(),
