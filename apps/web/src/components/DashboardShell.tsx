@@ -549,7 +549,7 @@ export function DashboardShell({
                 <HouseCard
                   key={house.id}
                   house={house}
-                  rank={index + 1}
+                  rank={house.rank ?? index + 1}
                   selected={house.id === selectedHouseId}
                   onSelect={() => setSelectedHouseId((current) => current === house.id ? null : house.id)}
                 />

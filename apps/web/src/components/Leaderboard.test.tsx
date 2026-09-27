@@ -36,4 +36,18 @@ describe("Leaderboard", () => {
     expect(screen.getByText("Alice").closest(".flex.items-center")?.querySelector(".text-yellow-500")).toBeTruthy();
     expect(screen.getByText("Cora").closest(".flex.items-center")?.querySelector(".text-slate-400")).toBeTruthy();
   });
+
+  it("gives equal scores the same rank", () => {
+    render(<Leaderboard
+      members={[
+        { id: "a", displayName: "Alice", role: "MEMBER", houseId: "h", houseName: "House", houseColor: "#000000" },
+        { id: "b", displayName: "Bob", role: "MEMBER", houseId: "h", houseName: "House", houseColor: "#000000" },
+        { id: "c", displayName: "Cora", role: "MEMBER", houseId: "h", houseName: "House", houseColor: "#000000" },
+      ]}
+      memberPoints={[{ memberId: "b", points: 5 }, { memberId: "c", points: 4 }, { memberId: "a", points: 5 }]}
+    />);
+    expect(screen.getByText("Alice").closest(".flex.items-center")?.querySelector(".text-yellow-500")).toBeTruthy();
+    expect(screen.getByText("Bob").closest(".flex.items-center")?.querySelector(".text-yellow-500")).toBeTruthy();
+    expect(screen.getByText("Cora").closest(".border")?.querySelector(".text-orange-600")).toBeTruthy();
+  });
 });

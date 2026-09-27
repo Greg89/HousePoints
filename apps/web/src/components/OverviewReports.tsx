@@ -51,6 +51,8 @@ export function OverviewReports({
     ? dashboardSummary.houseMemberRankings.find((entry) => entry.houseId === selectedHouse.id)?.members ?? []
     : [];
   const winnerSummary = !selectedHouse && isHistoricalSeason ? dashboardSummary.seasonWinnerSummary : null;
+  const winningHouses = winnerSummary?.winningHouses ?? (winnerSummary?.winningHouse ? [winnerSummary.winningHouse] : []);
+  const topContributors = winnerSummary?.topContributors ?? (winnerSummary?.topContributor ? [winnerSummary.topContributor] : []);
 
   return (
     <section className="space-y-4" aria-label={`${scopeLabel} reporting widgets`}>
@@ -83,23 +85,22 @@ export function OverviewReports({
                 {formatDate(winnerSummary.startsAt)} to {formatDate(winnerSummary.endsAt)}
               </p>
             </div>
-            {winnerSummary.winningHouse ? (
+            {winningHouses.length > 0 ? (
               <div className="rounded-xl border bg-background/60 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Winning house
+                  {winningHouses.length > 1 ? "Co-winning houses" : "Winning house"}
                 </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: winnerSummary.winningHouse.houseColor }}
-                  />
-                  <span className="font-display text-xl font-semibold">
-                    {winnerSummary.winningHouse.houseName}
-                  </span>
-                </div>
-                <p className="mt-1 font-number text-2xl font-bold" style={{ color: winnerSummary.winningHouse.houseColor }}>
-                  {winnerSummary.winningHouse.points.toLocaleString()} points
-                </p>
+                {winningHouses.map((house) => (
+                  <div key={house.houseId}>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: house.houseColor }} />
+                      <span className="font-display text-xl font-semibold">{house.houseName}</span>
+                    </div>
+                    <p className="mt-1 font-number text-2xl font-bold" style={{ color: house.houseColor }}>
+                      {house.points.toLocaleString()} points
+                    </p>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="rounded-xl border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
@@ -109,13 +110,13 @@ export function OverviewReports({
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border bg-background/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top contributor</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{topContributors.length > 1 ? "Top contributors" : "Top contributor"}</p>
               <p className="mt-2 text-sm font-semibold">
-                {winnerSummary.topContributor?.memberName ?? "No contributor yet"}
+                {topContributors.map((contributor) => contributor.memberName).join(", ") || "No contributor yet"}
               </p>
-              {winnerSummary.topContributor ? (
+              {topContributors.length > 0 ? (
                 <p className="font-number text-lg font-bold">
-                  {winnerSummary.topContributor.points.toLocaleString()} points
+                  {topContributors[0].points.toLocaleString()} points
                 </p>
               ) : null}
             </div>
@@ -300,14 +301,14 @@ export function OverviewReports({
           <div className="divide-y">
             {rankedMembers.length > 0 ? (
               rankedMembers.map((member, index) => (
-                <div key={member.memberId} className="flex items-center justify-between gap-4 p-4">
+                <div key={member.memberId ?? "unattributed"} className="flex items-center justify-between gap-4 p-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 text-center text-sm font-semibold text-muted-foreground">
-                      {index + 1}
+                      {member.rank ?? index + 1}
                     </span>
                     <div>
                       <p className="text-sm font-semibold">{member.displayName}</p>
-                      <p className="text-xs text-muted-foreground">{member.role}</p>
+                      <p className="text-xs text-muted-foreground">{member.role ?? (member.memberId ? "Former member" : "Identity unavailable")}</p>
                     </div>
                   </div>
                   <span

@@ -1,8 +1,9 @@
-import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
+import { rankScores, type DashboardSummary, type LeaderboardEntry } from "@housepoints/contracts";
 
 type HouseRanking = DashboardSummary["houseMemberRankings"][number];
 
 export type TopContributor = HouseRanking["members"][number] & {
+  memberId: string;
   houseName: string;
   houseColor: string;
   rank: number;
@@ -15,24 +16,34 @@ export function topContributors(
 ): TopContributor[] {
   const housesById = new Map(houses.map((house) => [house.id, house]));
 
-  return rankings
-    .flatMap((ranking) => {
+  const byMember = new Map<string, Omit<TopContributor, "rank">>();
+  for (const ranking of rankings) {
       const house = housesById.get(ranking.houseId);
-      if (!house) return [];
+      if (!house) continue;
+      for (const member of ranking.members) {
+        if (!member.memberId || member.isCurrentMember === false) continue;
+        const existing = byMember.get(member.memberId);
+        const currentHouse = member.currentHouseId ? housesById.get(member.currentHouseId) : null;
+        byMember.set(member.memberId, {
+          ...member,
+          memberId: member.memberId,
+          houseName: currentHouse?.name ?? existing?.houseName ?? house.name,
+          houseColor: currentHouse?.color ?? existing?.houseColor ?? house.color,
+          points: (existing?.points ?? 0) + member.points,
+        });
+      }
+  }
 
-      return ranking.members.map((member) => ({
-        ...member,
-        houseName: house.name,
-        houseColor: house.color,
-      }));
-    })
+  return rankScores([...byMember.values()]
     .filter((member) => member.points > 0)
-    .sort(
-      (a, b) =>
-        b.points - a.points || a.displayName.localeCompare(b.displayName),
-    )
+    .map((member) => ({ ...member, id: member.memberId, name: member.displayName })))
     .slice(0, limit)
-    .map((member, index) => ({ ...member, rank: index + 1 }));
+    .map((member) => ({
+      memberId: member.memberId, displayName: member.displayName, role: member.role,
+      points: member.points, rank: member.rank, isCurrentMember: member.isCurrentMember,
+      currentHouseId: member.currentHouseId,
+      houseName: member.houseName, houseColor: member.houseColor,
+    }));
 }
 
 export function contributorInitials(displayName: string): string {

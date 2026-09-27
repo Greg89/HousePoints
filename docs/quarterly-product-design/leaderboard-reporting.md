@@ -4,7 +4,7 @@ Status: proposed reporting design. D1 (category lifecycle), D2 (audited historic
 
 ## Current foundation
 
-The app has house standings, top member scores, activity pagination, overview widgets, and season comparisons. `loadLeaderboard` and `loadDashboardSummaryData` live in `apps/api/src/routes/dashboard.ts`; activity contracts live in `point-schemas.ts`. Some current member reporting filters to active membership. House totals use transaction house IDs, so simply reusing current-member lists will not explain every historical total.
+The app has house standings, top member scores, activity pagination, overview widgets, and season comparisons. R1 aligns their ranking rules through `rankScores` and keeps house member contributions with the transaction's house, including former and unattributed recipients. Compact web/mobile contributor views still show active members with positive personal totals; mobile labels a moved member with their current house. The dashboard recap exposes `winningHouses` and `topContributors` arrays; singular fields remain for older clients. Detailed scoped reports and revision-bound pagination are R2 work.
 
 ## User journey
 

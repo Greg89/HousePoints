@@ -124,6 +124,8 @@ Done when deployment order and rollback are executable. Once custom awards exist
 
 ### R1 — Unify score attribution and tied rankings
 
+Implementation status: complete locally; verification covers moved/former/anonymized recipients, net deductions, shared ranks and co-winners. Web and mobile compact contributor views keep active positive-score members while historical house reports retain every transaction recipient.
+
 Dependencies: C2, F3. Surfaces: shared report service/contracts, existing standings/comparison/recap consumers on web/mobile.
 
 Define one tested scoring/ranking implementation: transaction-time house, personal totals across houses, former/anonymized recipients retained, net = awards minus deductions, and competition ranks (1, 1, 3). Represent all co-winners; empty seasons have no winner. Adapt existing winner contracts and both clients before enabling the behavior so surfaces do not disagree.

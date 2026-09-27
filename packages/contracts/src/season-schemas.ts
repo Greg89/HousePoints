@@ -59,7 +59,7 @@ export const seasonCompareRequestSchema = z.object({
 export type SeasonCompareRequest = z.infer<typeof seasonCompareRequestSchema>;
 
 const seasonComparisonContributorSchema = z.object({
-  userId: z.string().min(1),
+  userId: z.string().min(1).nullable(),
   displayName: z.string().min(1),
   points: z.number().int(),
 });
@@ -70,6 +70,7 @@ const seasonComparisonHouseMetricsSchema = z.object({
   transactions: z.number().int().nonnegative(),
   averagePointsPerDay: z.number(),
   topContributor: seasonComparisonContributorSchema.nullable(),
+  topContributors: z.array(seasonComparisonContributorSchema).optional(),
 });
 
 export const seasonComparisonHouseSchema = z.object({

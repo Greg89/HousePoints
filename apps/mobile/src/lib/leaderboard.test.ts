@@ -62,6 +62,26 @@ describe("topContributors", () => {
 
     expect(result.map((member) => member.memberId)).toEqual(["positive"]);
   });
+
+  it("combines a current member's points across houses and shares tied ranks", () => {
+    const result = topContributors([
+      { houseId: "red", members: [
+        { memberId: "moved", displayName: "Alex", role: "MEMBER", points: 8, isCurrentMember: true, currentHouseId: "blue" },
+        { memberId: "former", displayName: "Former", role: null, points: 30, isCurrentMember: false },
+      ] },
+      { houseId: "blue", members: [
+        { memberId: "moved", displayName: "Alex", role: "MEMBER", points: -3, isCurrentMember: true, currentHouseId: "blue" },
+        { memberId: "current", displayName: "Casey", role: "MEMBER", points: 5, isCurrentMember: true },
+        { memberId: null, displayName: "Unattributed", role: null, points: 10, isCurrentMember: false },
+      ] },
+    ], houses);
+
+    expect(result.map(({ memberId, points, rank }) => ({ memberId, points, rank }))).toEqual([
+      { memberId: "moved", points: 5, rank: 1 },
+      { memberId: "current", points: 5, rank: 1 },
+    ]);
+    expect(result[0].houseName).toBe("Dragon");
+  });
 });
 
 describe("contributorInitials", () => {

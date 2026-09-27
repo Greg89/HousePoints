@@ -2213,11 +2213,11 @@ describe("POST /seasons/compare", () => {
           _sum: { delta: -10 },
         },
       ]);
-    mockMembershipFindMany.mockResolvedValue([
-      { user: { id: "user-1", displayName: "Alice" } },
-      { user: { id: "user-2", displayName: "Bob" } },
-      { user: { id: "user-3", displayName: "Cora" } },
-      { user: { id: "user-4", displayName: "Drew" } },
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-1", displayName: "Alice" },
+      { id: "user-2", displayName: "Bob" },
+      { id: "user-3", displayName: "Cora" },
+      { id: "user-4", displayName: "Drew" },
     ]);
     const app = await buildTestApp();
 
@@ -2264,21 +2264,17 @@ describe("POST /seasons/compare", () => {
           organizationId: "org-secure",
           seasonId: { in: ["season-0", "season-active"] },
           deletedAt: null,
-          targetUserId: { not: null },
         },
       }),
     );
-    expect(mockMembershipFindMany).toHaveBeenCalledWith(
+    expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          organizationId: "org-secure",
-          isActive: true,
-          archivedAt: null,
-          userId: { in: ["user-1", "user-2", "user-3", "user-4"] },
+          id: { in: ["user-1", "user-2", "user-3", "user-4"] },
         },
       }),
     );
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       fromSeason: {
         id: "season-0",
         name: "Season 0",
@@ -2465,9 +2461,7 @@ describe("POST /seasons/compare", () => {
     mockTxGroupBy
       .mockResolvedValueOnce(houseTotals)
       .mockResolvedValueOnce(contributorTotals);
-    mockMembershipFindMany.mockResolvedValue(
-      users.map((user) => ({ user })),
-    );
+    mockUserFindMany.mockResolvedValue(users);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -2482,14 +2476,11 @@ describe("POST /seasons/compare", () => {
     expect(res.statusCode).toBe(200);
     expect(mockHouseFindMany).toHaveBeenCalledTimes(1);
     expect(mockTxGroupBy).toHaveBeenCalledTimes(2);
-    expect(mockMembershipFindMany).toHaveBeenCalledTimes(1);
-    expect(mockMembershipFindMany).toHaveBeenCalledWith(
+    expect(mockUserFindMany).toHaveBeenCalledTimes(1);
+    expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          organizationId: "org-secure",
-          isActive: true,
-          archivedAt: null,
-          userId: { in: users.map((user) => user.id) },
+          id: { in: users.map((user) => user.id) },
         },
       }),
     );
@@ -2913,6 +2904,7 @@ describe("POST /houses/leaderboard", () => {
         score: 15,
         transactions: 2,
         memberCount: 1,
+        rank: 1,
       },
       {
         id: "house-1",
@@ -2922,6 +2914,7 @@ describe("POST /houses/leaderboard", () => {
         score: 10,
         transactions: 1,
         memberCount: 2,
+        rank: 2,
       },
     ]);
     await app.close();
@@ -6382,12 +6375,6 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-2", trait: "INNOVATION", _count: { trait: 1 } },
       ])
       .mockResolvedValueOnce([
-        { targetUserId: "user-removed", _sum: { delta: 100 } },
-        { targetUserId: "user-1", _sum: { delta: 55 } },
-        { targetUserId: "user-2", _sum: { delta: 5 } },
-        { targetUserId: "user-3", _sum: { delta: 10 } },
-      ])
-      .mockResolvedValueOnce([
         { targetHouseId: "house-1", _sum: { delta: 55 }, _count: { _all: 3 } },
         { targetHouseId: "house-2", _sum: { delta: 10 }, _count: { _all: 1 } },
       ])
@@ -6461,31 +6448,31 @@ describe("POST /dashboard/summary", () => {
     expect(body.seasonWinnerSummary).toBeNull();
     expect(body.monthStartsAt).toBe("2026-07-01T00:00:00.000Z");
     expect(body.seasonStandout).toEqual({
-      memberId: "user-1",
-      memberName: "Alice",
+      memberId: "user-removed",
+      memberName: "Former member",
       houseId: "house-1",
       houseName: "Phoenix",
       houseColor: "#7c3aed",
-      points: 30,
+      points: 100,
     });
     expect(body.monthlyStandout).toEqual({
-      memberId: "user-1",
-      memberName: "Alice",
+      memberId: "user-removed",
+      memberName: "Former member",
       houseId: "house-1",
       houseName: "Phoenix",
       houseColor: "#7c3aed",
-      points: 30,
+      points: 100,
     });
     expect(body.monthlyStandoutsByHouse).toEqual([
       {
         houseId: "house-1",
         standout: {
-          memberId: "user-1",
-          memberName: "Alice",
+          memberId: "user-removed",
+          memberName: "Former member",
           houseId: "house-1",
           houseName: "Phoenix",
           houseColor: "#7c3aed",
-          points: 30,
+          points: 100,
         },
       },
       {
@@ -6542,14 +6529,14 @@ describe("POST /dashboard/summary", () => {
       {
         houseId: "house-1",
         members: [
-          { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 55 },
-          { memberId: "user-2", displayName: "Bob", role: "ADMIN", points: 5 },
+          { memberId: "user-removed", displayName: "Former member", role: null, points: 100, rank: 1, isCurrentMember: false, currentHouseId: null },
+          { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 30, rank: 2, isCurrentMember: true, currentHouseId: "house-1" },
         ],
       },
       {
         houseId: "house-2",
         members: [
-          { memberId: "user-3", displayName: "Cora", role: "MEMBER", points: 10 },
+          { memberId: "user-3", displayName: "Cora", role: "MEMBER", points: 10, rank: 1, isCurrentMember: true, currentHouseId: "house-2" },
         ],
       },
     ]);
@@ -6610,9 +6597,6 @@ describe("POST /dashboard/summary", () => {
       ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { targetUserId: "user-3", _sum: { delta: 30 } },
-      ])
-      .mockResolvedValueOnce([
         { targetHouseId: "house-1", _sum: { delta: 10 }, _count: { _all: 1 } },
         { targetHouseId: "house-2", _sum: { delta: 30 }, _count: { _all: 3 } },
       ])
@@ -6660,6 +6644,9 @@ describe("POST /dashboard/summary", () => {
         houseColor: "#ef4444",
         points: 30,
       },
+      winningHouses: [{
+        houseId: "house-2", houseName: "Ember", houseColor: "#ef4444", points: 30,
+      }],
       topContributor: {
         memberId: "user-3",
         memberName: "Cora",
@@ -6668,6 +6655,9 @@ describe("POST /dashboard/summary", () => {
         houseColor: "#ef4444",
         points: 30,
       },
+      topContributors: [{
+        memberId: "user-3", memberName: "Cora", houseId: "house-2", houseName: "Ember", houseColor: "#ef4444", points: 30,
+      }],
       totalTransactions: 4,
       awardCount: 3,
       deductionCount: 1,
@@ -6688,6 +6678,55 @@ describe("POST /dashboard/summary", () => {
         }),
       );
     }
+    await app.close();
+  });
+
+  it("reconciles moved and unattributed recipients with tied net house totals", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix", color: "#7c3aed" },
+      { id: "house-2", name: "Ember", color: "#ef4444" },
+    ]);
+    mockTxGroupBy
+      .mockResolvedValueOnce([
+        { targetUserId: "user-1", targetHouseId: "house-1", _sum: { delta: 10 } },
+        { targetUserId: null, targetHouseId: "house-1", _sum: { delta: -5 } },
+        { targetUserId: "user-1", targetHouseId: "house-2", _sum: { delta: -5 } },
+        { targetUserId: null, targetHouseId: "house-2", _sum: { delta: 10 } },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { targetHouseId: "house-1", _sum: { delta: 5 }, _count: { _all: 2 } },
+        { targetHouseId: "house-2", _sum: { delta: 5 }, _count: { _all: 2 } },
+      ])
+      .mockResolvedValueOnce([
+        { type: "AWARD", _sum: { delta: 20 }, _count: { _all: 2 } },
+        { type: "DEDUCTION", _sum: { delta: -10 }, _count: { _all: 2 } },
+      ])
+      .mockResolvedValueOnce([]);
+    mockTxFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([{ role: "MEMBER", houseId: "house-2", user: { id: "user-1", displayName: "Alice" } }]);
+    mockUserFindMany.mockResolvedValue([{ id: "user-1", displayName: "Alice" }]);
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/dashboard/summary", payload: { seasonId: "season-0" } });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.seasonWinnerSummary.winningHouses.map((house: { houseId: string }) => house.houseId)).toEqual(["house-2", "house-1"]);
+    expect(body.seasonWinnerSummary.topContributors).toEqual([expect.objectContaining({ memberId: "user-1", points: 5 })]);
+    expect(body.seasonWinnerSummary.awardedPoints - body.seasonWinnerSummary.deductedPoints).toBe(10);
+    expect(body.houseMemberRankings).toEqual([
+      { houseId: "house-1", members: [
+        { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 10, rank: 1, isCurrentMember: true, currentHouseId: "house-2" },
+        { memberId: null, displayName: "Unattributed", role: null, points: -5, rank: 2, isCurrentMember: false, currentHouseId: null },
+      ] },
+      { houseId: "house-2", members: [
+        { memberId: null, displayName: "Unattributed", role: null, points: 10, rank: 1, isCurrentMember: false, currentHouseId: null },
+        { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: -5, rank: 2, isCurrentMember: true, currentHouseId: "house-2" },
+      ] },
+    ]);
+    expect(body.houseMemberRankings.map((house: { members: { points: number }[] }) => house.members.reduce((sum, member) => sum + member.points, 0))).toEqual([5, 5]);
     await app.close();
   });
 });

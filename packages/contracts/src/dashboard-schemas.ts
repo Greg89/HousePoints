@@ -27,7 +27,11 @@ const seasonWinnerSummarySchema = z.object({
     houseColor: z.string(),
     points: z.number().int(),
   }).nullable(),
+  winningHouses: z.array(z.object({
+    houseId: z.string(), houseName: z.string(), houseColor: z.string(), points: z.number().int(),
+  })).optional(),
   topContributor: dashboardStandoutSchema.nullable(),
+  topContributors: z.array(dashboardStandoutSchema).optional(),
   totalTransactions: z.number().int().nonnegative(),
   awardCount: z.number().int().nonnegative(),
   deductionCount: z.number().int().nonnegative(),
@@ -85,10 +89,13 @@ export const dashboardSummarySchema = z.object({
   houseMemberRankings: z.array(z.object({
     houseId: z.string(),
     members: z.array(z.object({
-      memberId: z.string(),
+      memberId: z.string().nullable(),
       displayName: z.string(),
-      role: z.enum(["MEMBER", "ADMIN", "OWNER"]),
+      role: z.enum(["MEMBER", "ADMIN", "OWNER"]).nullable(),
       points: z.number().int(),
+      rank: z.number().int().positive().optional(),
+      isCurrentMember: z.boolean().optional(),
+      currentHouseId: z.string().nullable().optional(),
     })),
   })),
 });
@@ -103,6 +110,7 @@ export const leaderboardEntrySchema = z.object({
   score: z.number().int(),
   transactions: z.number().int().nonnegative(),
   memberCount: z.number().int().nonnegative(),
+  rank: z.number().int().positive().optional(),
 });
 
 export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
