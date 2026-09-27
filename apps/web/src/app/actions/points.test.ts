@@ -59,6 +59,14 @@ describe("awardPoints", () => {
     parseApiResponseMock.mockResolvedValue({ id: "tx-1" });
   });
 
+  it("forwards client retry keys unchanged for both operations", async () => {
+    const key = "29b2f600-1d44-401b-b18a-bf02c6d58d98";
+    await awardPoints("target-1", 10, "Great work", "TEAM_SUPPORT", key);
+    await deductPoints("target-1", "Missed cleanup", key);
+    const bodies = apiFetchMock.mock.calls.map(call => JSON.parse(call[2]!.body as string));
+    expect(bodies.map(body => body.idempotencyKey)).toEqual([key, key]);
+  });
+
   it("returns ok and revalidates the dashboard when the award succeeds", async () => {
     await expect(
       awardPoints("target-1", 10, "Great teamwork", "TEAM_SUPPORT"),

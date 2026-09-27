@@ -11,3 +11,4 @@ export * from "./device-schemas.js";
 export * from "./platform-schemas.js";
 export * from "./telemetry-schemas.js";
 export * from "./api-contracts.js";
+export * from "./point-submission.js";

@@ -82,7 +82,10 @@ export const TRAIT_LABELS: Record<Trait, string> = {
 
 export const traitSchema = z.enum(TRAITS);
 
+export const pointMutationKeySchema = z.string().uuid();
+
 export const adjustPointsSchema = z.object({
+  idempotencyKey: pointMutationKeySchema.optional(),
   targetUserId: z.string().min(1),
   delta: z.number().int().min(1).max(100),
   reason: z.string().min(3).max(240),
@@ -92,6 +95,7 @@ export const adjustPointsSchema = z.object({
 export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
 
 export const deductPointsSchema = z.object({
+  idempotencyKey: pointMutationKeySchema.optional(),
   targetUserId: z.string().min(1),
   reason: z.string().trim().min(3).max(240),
 }).strict();

@@ -85,8 +85,8 @@ interface DashboardShellProps {
   onRefreshNotifications: () => Promise<PagedNotifications>;
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
-  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
-  onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait, idempotencyKey?: string) => Promise<AwardPointsResult>;
+  onDeduct?: (targetUserId: string, reason: string, idempotencyKey?: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
   onReactToPoint: (
     transactionId: string,

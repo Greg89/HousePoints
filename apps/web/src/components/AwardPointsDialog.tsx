@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createPointSubmissionKeys } from "@housepoints/contracts";
+import { useRef, useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Select from "@radix-ui/react-select";
 import { Star, CaretDown, Check, Info, X } from "@phosphor-icons/react";
@@ -22,7 +23,7 @@ interface AwardPointsDialogProps {
   /** Houses available for display context only */
   houses: LeaderboardEntry[];
   /** Server action to submit the award */
-  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait, idempotencyKey?: string) => Promise<AwardPointsResult>;
 }
 
 const QUICK_AMOUNTS = [5, 10, 25, 50];
@@ -34,6 +35,7 @@ export function AwardPointsDialog({
   currentUserId,
   onAward,
 }: AwardPointsDialogProps) {
+  const submissionKeys = useRef(createPointSubmissionKeys(() => crypto.randomUUID()));
   const [targetUserId, setTargetUserId] = useState("");
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
@@ -93,9 +95,10 @@ export function AwardPointsDialog({
 
   function handleSubmit() {
     if (!canSubmit) return;
+    const key = submissionKeys.current.keyFor([targetUserId, deltaNum, reason, trait]);
     startTransition(async () => {
       try {
-        const result = await onAward(targetUserId, deltaNum, reason, trait as Trait);
+        const result = await onAward(targetUserId, deltaNum, reason, trait as Trait, key);
 
         if (!result.ok) {
           toast.error("Failed to award points", {
@@ -104,6 +107,7 @@ export function AwardPointsDialog({
           return;
         }
 
+        submissionKeys.current.complete(key);
         toast.success("Points awarded!", {
           description: `+${deltaNum} pts to ${selectedMember?.displayName}`,
         });

@@ -16,6 +16,7 @@ import {
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { idempotentPointMutation } from "../point-idempotency.js";
 import { activeScoringSeason, scoringWriteTime, ScoringWriteError, withScoringWrite } from "../scoring-write.js";
 import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
@@ -172,6 +173,7 @@ export async function findTargetMembership(organizationId: string, targetUserId:
 }
 
 export async function createPointAward(params: {
+  idempotencyKey?: string;
   organizationId: string;
   actorId: string;
   actorDisplayName: string;
@@ -182,7 +184,7 @@ export async function createPointAward(params: {
   reason: string;
   trait: Trait;
 }) {
-  return withScoringWrite(params.organizationId, async (tx) => {
+  return withScoringWrite(params.organizationId, (tx) => idempotentPointMutation(tx, params, "AWARD", async () => {
     const season = await activeScoringSeason(tx, params.organizationId);
     const now = await scoringWriteTime(tx);
     const award = await tx.pointTransaction.create({
@@ -215,7 +217,7 @@ export async function createPointAward(params: {
     }
 
     return award;
-  });
+  }));
 }
 
 async function checkDeductionCooldowns(tx: Prisma.TransactionClient, now: Date, params: {
@@ -264,6 +266,7 @@ async function checkDeductionCooldowns(tx: Prisma.TransactionClient, now: Date, 
 }
 
 export async function createPointDeduction(params: {
+  idempotencyKey?: string;
   organizationId: string;
   actorHouseId: string;
   actorId: string;
@@ -273,7 +276,7 @@ export async function createPointDeduction(params: {
   targetHouseId: string;
   reason: string;
 }) {
-  return withScoringWrite(params.organizationId, async (tx) => {
+  return withScoringWrite(params.organizationId, (tx) => idempotentPointMutation(tx, params, "DEDUCTION", async () => {
     const season = await activeScoringSeason(tx, params.organizationId);
     const now = await scoringWriteTime(tx);
     const [houseDeduction, targetDeduction] = await checkDeductionCooldowns(tx, now, {
@@ -331,7 +334,7 @@ export async function createPointDeduction(params: {
     });
 
     return deduction;
-  });
+  }));
 }
 
 export async function getUserScoresByMember(organizationId: string, seasonId: string) {
@@ -833,7 +836,8 @@ export async function registerPointRoutes(
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
 
-    const transaction = await createPointAward({
+    const { transaction, replayed } = await createPointAward({
+      idempotencyKey: parsed.idempotencyKey,
       organizationId: actor.organizationId,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
@@ -844,7 +848,7 @@ export async function registerPointRoutes(
       reason: parsed.reason,
       trait: parsed.trait,
     });
-    if (targetUser.id !== actor.id) {
+    if (!replayed && targetUser.id !== actor.id) {
       await dispatchPushForNotifications({
         client: prisma,
         dispatcher: options.pushDispatcher,
@@ -867,7 +871,8 @@ export async function registerPointRoutes(
       organizationId: actor.organizationId,
       targetUserId: targetUser.id,
       targetHouseId,
-      delta: transaction.delta,
+      delta: parsed.delta,
+      replayed,
     });
 
     return reply.status(201).send(transaction);
@@ -955,7 +960,8 @@ export async function registerPointRoutes(
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
 
-    const transaction = await createPointDeduction({
+    const { transaction, replayed } = await createPointDeduction({
+      idempotencyKey: parsed.idempotencyKey,
       organizationId: actor.organizationId,
       actorHouseId: actor.houseId,
       actorId: actor.id,
@@ -965,7 +971,7 @@ export async function registerPointRoutes(
       targetHouseId,
       reason: parsed.reason,
     });
-    await dispatchPushForNotifications({
+    if (!replayed) await dispatchPushForNotifications({
       client: prisma,
       dispatcher: options.pushDispatcher,
       logger: request.log,
@@ -986,6 +992,7 @@ export async function registerPointRoutes(
       targetUserId: targetUser.id,
       targetHouseId,
       delta: -10,
+      replayed,
     });
 
     return reply.status(201).send(transaction);

@@ -12,14 +12,15 @@ export async function awardPoints(
   targetUserId: string,
   delta: number,
   reason: string,
-  trait: Trait
+  trait: Trait,
+  idempotencyKey?: string,
 ): Promise<AwardPointsResult> {
   return runServerAction("awardPoints", async (context) => {
     const { requestId } = context;
     await getCurrentUserForRequest(requestId);
     const response = await apiFetch("/points/adjust", requestId, {
       method: "POST",
-      body: JSON.stringify({ targetUserId, delta, reason, trait }),
+      body: JSON.stringify({ targetUserId, delta, reason, trait, idempotencyKey }),
     });
 
     try {
@@ -60,13 +61,14 @@ function isExpectedAwardFailure(error: unknown): error is ApiResponseError {
 export async function deductPoints(
   targetUserId: string,
   reason: string,
+  idempotencyKey?: string,
 ): Promise<DeductPointsResult> {
   return runServerAction("deductPoints", async (context) => {
     const { requestId } = context;
     await getCurrentUserForRequest(requestId);
     const response = await apiFetch("/points/deduct", requestId, {
       method: "POST",
-      body: JSON.stringify({ targetUserId, reason }),
+      body: JSON.stringify({ targetUserId, reason, idempotencyKey }),
     });
 
     try {

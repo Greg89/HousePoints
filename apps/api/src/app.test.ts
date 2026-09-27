@@ -98,6 +98,7 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    pointMutationRequest: { findUnique: vi.fn(), create: vi.fn() },
     pointTransaction: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -1165,9 +1166,47 @@ describe("POST /points/adjust", () => {
         entityId: "tx-abc",
         actionHref: "/?tab=activity",
       },
-    }]);
+    }], expect.any(AbortSignal));
     await app.close();
   });
+
+  it("confirms after a push timeout and replays a lost keyed response without duplicate effects", async () => {
+    const pushDispatcher = { send: vi.fn().mockReturnValue(new Promise(() => {})) };
+    mockDeviceRegistrationFindMany.mockResolvedValue([{ organizationId: "org-1", userId: "user-1", pushToken: "ExponentPushToken[test]" }]);
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
+    mockMembershipFindMany.mockResolvedValue([
+      { userId: "user-2", role: "ADMIN", houseId: "house-2" },
+      { userId: "user-1", role: "MEMBER", houseId: "house-1" },
+    ]);
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxCreate.mockResolvedValue({ id: "tx-retry" });
+    let stored: unknown = null;
+    (prisma.pointMutationRequest.findUnique as ReturnType<typeof vi.fn>).mockImplementation(async () => stored);
+    (prisma.pointMutationRequest.create as ReturnType<typeof vi.fn>).mockImplementation(async ({ data }) => { stored = data; return data; });
+    const app = await buildTestApp("auth0|member", {}, { pushDispatcher });
+    try {
+      const request = { method: "POST" as const, url: "/points/adjust", payload: {
+        targetUserId: "user-1", delta: 15, reason: "Great work", trait: "TECHNICAL_EXCELLENCE",
+        idempotencyKey: "29b2f600-1d44-401b-b18a-bf02c6d58d98",
+      } };
+      const first = await app.inject(request);
+      expect(first.statusCode).toBe(201);
+      const replay = await app.inject(request);
+      expect(replay.statusCode).toBe(201);
+      expect(replay.json()).toEqual(first.json());
+      expect(mockTxCreate).toHaveBeenCalledOnce();
+      expect(prisma.notification.createMany).toHaveBeenCalledOnce();
+      expect(pushDispatcher.send).toHaveBeenCalledOnce();
+      const conflict = await app.inject({ ...request, payload: { ...request.payload, delta: 20 } });
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json().code).toBe("IDEMPOTENCY_KEY_CONFLICT");
+      mockMembershipFindMany.mockResolvedValue([]);
+      const revoked = await app.inject(request);
+      expect(revoked.statusCode).toBe(403);
+      expect(revoked.json().code).toBe("POINT_MUTATION_NOT_AUTHORIZED");
+    } finally { await app.close(); }
+  }, 8_000);
 
   it("rejects self-awards before resolving or creating the transaction", async () => {
     const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });

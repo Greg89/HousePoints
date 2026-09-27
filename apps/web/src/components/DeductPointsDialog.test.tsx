@@ -212,11 +212,25 @@ describe("DeductPointsDialog", () => {
     await waitFor(() => expect(props.onDeduct).toHaveBeenCalledWith(
       "member-2",
       "Missed the agreed cleanup rotation",
+      expect.any(String),
     ));
     expect(toast.success).toHaveBeenCalledWith("Points deducted", {
       description: "-10 pts from Cara Otherhouse",
     });
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
+  }, 10_000);
+
+  it("reuses the submission key after a lost response", async () => {
+    const submit = vi.fn().mockRejectedValueOnce(new Error("Response lost")).mockResolvedValue({ ok: true });
+    const { user } = setupDialog({ onDeduct: submit });
+    await fillDeductForm(user);
+    await user.click(screen.getByRole("button", { name: "Deduct 10 Points" }));
+    await user.click(screen.getByRole("button", { name: "Confirm Deduction" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Confirm Deduction" }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    expect(submit.mock.calls[0][2]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0]);
   }, 10_000);
 
   it("shows a safe error toast without closing when the typed result fails", async () => {

@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F2 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -24,7 +24,7 @@ The [decision register](./README.md#decision-register) is the product authority.
 | Billing decision | B1–B3 | Cost-informed commercial specification and tested sandbox architecture |
 | Conditional paid pilot | P1–P7, after billing decision | Verified owner subscriptions, platform oversight, and recovery workflows |
 
-F1 is implemented; continue with F2. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
+F1–F2 are implemented; continue with F3. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
 
 ## F — Targeted scoring and navigation reliability
 
@@ -39,6 +39,8 @@ Choose and document a shared transaction/locking protocol. Resolve the active se
 Done when real database tests prove concurrent deductions cannot bypass cooldowns, a concurrent award/rollover belongs to exactly one correctly ordered season, rollback leaves no partial changes, and score changes advance revision atomically. No UI change required. Profile lock contention before broadening the protocol.
 
 ### F2 — Make award/deduction retries safe and bound push latency
+
+Status: **implementation complete, locally verified September 26, 2026**. See the [retry contract, limitations, verification, and release order](./point-submission-retries.md). Deployment and native device verification remain pending.
 
 Dependencies: F1. Surfaces: contracts, DB, API, web/mobile submission flows, push dispatcher.
 

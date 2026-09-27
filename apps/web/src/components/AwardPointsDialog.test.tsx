@@ -216,11 +216,24 @@ describe("AwardPointsDialog", () => {
       10,
       "Great teamwork",
       "TEAM_SUPPORT",
+      expect.any(String),
     ));
     expect(toast.success).toHaveBeenCalledWith("Points awarded!", {
       description: "+10 pts to Alice Assigned",
     });
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
+  }, 10_000);
+
+  it("reuses the submission key after a lost response", async () => {
+    const submit = vi.fn().mockRejectedValueOnce(new Error("Response lost")).mockResolvedValue({ ok: true });
+    const { user } = setupDialog({ onAward: submit });
+    await fillAwardForm(user);
+    await user.click(screen.getByRole("button", { name: "Award Points" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Award Points" }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    expect(submit.mock.calls[0][4]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0]);
   }, 10_000);
 
   it("shows a safe error toast without closing when the typed result fails", async () => {

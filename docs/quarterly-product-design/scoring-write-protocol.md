@@ -120,3 +120,7 @@ business operations. No production performance claim follows from this fixture.
 No production migration, deployment, commit, or push is authorized by this note.
 F2 handles idempotent retries and bounded external push calls; F3 adds reasons
 for closed-season corrections. Neither is silently bundled into F1.
+
+## Retry protection
+
+F2 adds [keyed award/deduction retries and bounded post-commit push delivery](./point-submission-retries.md) within this locking protocol. Legacy requests remain compatible but are not protected against lost-response retries.

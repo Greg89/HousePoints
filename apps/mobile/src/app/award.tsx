@@ -1,3 +1,5 @@
+import { createPointSubmissionKeys } from "@housepoints/contracts";
+import { generateRequestId } from "@/lib/request-id";
 import {
   TRAIT_LABELS,
   TRAITS,
@@ -6,7 +8,7 @@ import {
 } from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -48,6 +50,7 @@ export default function AwardPointsScreen() {
   const insets = useSafeAreaInsets();
   const [footerHeight, setFooterHeight] = useState(85);
 
+  const submissionKeys = useRef(createPointSubmissionKeys(generateRequestId));
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedTrait, setSelectedTrait] = useState<Trait | null>(null);
   const [pointsInput, setPointsInput] = useState(String(AWARD_POINTS_DEFAULT));
@@ -99,17 +102,16 @@ export default function AwardPointsScreen() {
       if (delta === null) {
         throw new Error("Invalid award points");
       }
+      const payload = { targetUserId: selectedMemberId, trait: selectedTrait, delta, reason: trimmedReason };
+      const idempotencyKey = submissionKeys.current.keyFor([activeOrgSlug, payload]);
       const accessToken = await getAccessToken();
-      return callApi(
+      const transaction = await callApi(
         "/points/adjust",
-        {
-          targetUserId: selectedMemberId,
-          trait: selectedTrait,
-          delta,
-          reason: trimmedReason,
-        },
+        { ...payload, idempotencyKey },
         { accessToken, organizationSlug: activeOrgSlug },
       );
+      submissionKeys.current.complete(idempotencyKey);
+      return transaction;
     },
     onSuccess: () => {
       showToast({ message: "Points awarded", variant: "success" });
