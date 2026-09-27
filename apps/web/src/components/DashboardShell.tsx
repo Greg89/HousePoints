@@ -45,6 +45,7 @@ import type {
   PointReactionResponse,
   AppUserOrganizationContext,
   ActivityFeedRequest,
+  RecognitionCategory,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -86,6 +87,9 @@ interface DashboardShellProps {
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
   onAward: (targetUserId: string, delta: number, reason: string, trait: Trait, idempotencyKey?: string) => Promise<AwardPointsResult>;
+  recognitionCategories?: RecognitionCategory[];
+  onLoadRecognitionCategories?: () => Promise<RecognitionCategory[]>;
+  onAwardCategory?: (targetUserId: string, delta: number, reason: string, categoryId: string, idempotencyKey?: string) => Promise<AwardPointsResult>;
   onDeduct?: (targetUserId: string, reason: string, idempotencyKey?: string) => Promise<DeductPointsResult>;
   onDeletePoint?: (transactionId: string, reason?: string) => Promise<DeletePointResult>;
   onReactToPoint: (
@@ -201,6 +205,9 @@ export function DashboardShell({
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   onAward,
+  recognitionCategories,
+  onLoadRecognitionCategories,
+  onAwardCategory,
   onDeduct,
   onDeletePoint,
   onReactToPoint,
@@ -575,6 +582,7 @@ export function DashboardShell({
             ) : null}
             <div className="mt-8">
               <OverviewReports
+                categoryMode={recognitionCategories !== undefined}
                 dashboardSummary={displayedDashboardSummary}
                 selectedHouse={selectedHouse}
                 onShowActivity={() => {
@@ -661,6 +669,9 @@ export function DashboardShell({
         members={members}
         currentUserId={session.userId}
         onAward={onAward}
+        categories={recognitionCategories}
+        onLoadCategories={onLoadRecognitionCategories}
+        onAwardCategory={onAwardCategory}
       />
       {onDeduct ? (
         <DeductPointsDialog

@@ -275,4 +275,26 @@ describe("AwardPointsDialog", () => {
     expect(screen.getByRole("status")).toHaveTextContent("enter 1–100 whole points");
     expect(screen.getByRole("button", { name: "Award Points" })).toBeDisabled();
   });
+
+  it("uses active category IDs and keeps the draft when the selected category is archived", async () => {
+    const available = { id: "category-1", name: "Community Impact", description: null, legacyTrait: null, createdAt: "2026-09-20T12:00:00.000Z", archivedAt: null };
+    const archived = { ...available, archivedAt: "2026-09-27T12:00:00.000Z" };
+    const old = { ...available, id: "category-old", name: "Old Category", archivedAt: "2026-09-21T12:00:00.000Z" };
+    const load = vi.fn().mockResolvedValueOnce([available, old]).mockResolvedValueOnce([archived, old]);
+    const submit = vi.fn().mockResolvedValue({ ok: false, code: "RECOGNITION_CATEGORY_UNAVAILABLE", message: "Category unavailable." });
+    const { user } = setupDialog({ categories: [available, old], onLoadCategories: load, onAwardCategory: submit });
+    const dialog = screen.getByRole("dialog", { name: "Award Points" });
+    await user.click(within(dialog).getAllByRole("combobox")[0]);
+    await user.click(await screen.findByRole("option", { name: /Alice Assigned/ }));
+    await user.click(within(dialog).getAllByRole("combobox")[1]);
+    expect(screen.queryByRole("option", { name: "Old Category" })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("option", { name: "Community Impact" }));
+    await user.click(within(dialog).getByRole("button", { name: "+10" }));
+    await user.type(within(dialog).getByPlaceholderText("Describe what they did well…"), "Great teamwork");
+    await user.click(screen.getByRole("button", { name: "Award Points" }));
+    await waitFor(() => expect(submit).toHaveBeenCalledWith("member-1", 10, "Great teamwork", "category-1", expect.any(String)));
+    expect(await screen.findByText(/Your draft is saved/)).toBeInTheDocument();
+    expect(within(dialog).getByPlaceholderText("Describe what they did well…")).toHaveValue("Great teamwork");
+    expect(screen.getByRole("button", { name: "Award Points" })).toBeDisabled();
+  }, 10_000);
 });

@@ -30,6 +30,9 @@ import {
   readNotifications,
 } from "./actions/notifications";
 import { awardPoints, deductPoints } from "./actions/points";
+import { awardCategoryPoints } from "./actions/points";
+import { archiveRecognitionCategory, createRecognitionCategory, readRecognitionCategories } from "./actions/recognition";
+import { recognitionCategoriesWebEnabled } from "@/lib/recognition-gate";
 import { readSessionSummary } from "./actions/profile";
 import {
   readMemberScores,
@@ -125,7 +128,7 @@ export async function renderDashboardPage(route: string) {
     redirect(rootRedirect);
   }
 
-  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext] = await Promise.all([
+  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext, recognitionCategories] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
     readActivityPage({}, requestId),
@@ -134,6 +137,7 @@ export async function renderDashboardPage(route: string) {
     readSeasonContext(requestId),
     readNotificationsForDashboard(requestId, route),
     readAdminContextForDashboard(session.role, requestId, route),
+    recognitionCategoriesWebEnabled ? readRecognitionCategories(requestId) : Promise.resolve(undefined),
   ]);
   const initialSeasonComparison = await readInitialSeasonComparison(seasonContext.seasons, requestId, route);
 
@@ -182,6 +186,10 @@ export async function renderDashboardPage(route: string) {
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
       onRenameSeason={renameSeason}
+      recognitionCategories={recognitionCategories}
+      onListRecognitionCategories={recognitionCategoriesWebEnabled ? readRecognitionCategories : undefined}
+      onCreateRecognitionCategory={recognitionCategoriesWebEnabled ? createRecognitionCategory : undefined}
+      onArchiveRecognitionCategory={recognitionCategoriesWebEnabled ? archiveRecognitionCategory : undefined}
     />
   ) : undefined;
 
@@ -217,6 +225,9 @@ export async function renderDashboardPage(route: string) {
       onMarkNotificationRead={markNotificationRead}
       onMarkAllNotificationsRead={markAllNotificationsRead}
       onAward={awardPoints}
+      recognitionCategories={recognitionCategories}
+      onLoadRecognitionCategories={recognitionCategoriesWebEnabled ? readRecognitionCategories : undefined}
+      onAwardCategory={recognitionCategoriesWebEnabled ? awardCategoryPoints : undefined}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
       onReactToPoint={reactToPointTransaction}

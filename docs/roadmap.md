@@ -5,7 +5,7 @@ Each tier has its own file with detailed task breakdowns.
 
 ## Next-quarter product design
 
-The main product decisions for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and platform-managed organization subscriptions have been reviewed. See the [quarterly product design](./quarterly-product-design/README.md) for approved direction and the [execution plan](./quarterly-product-design/execution-plan.md) for ordered slices and release gates. F1–F4 and C1–C2 category persistence/API compatibility are implemented and locally verified; deployment and native device gates remain pending where documented. Continue with C3 web category management and award selection; billing discovery B1–B3 can proceed independently. Production billing P1–P7 remains conditional on the spike outcome, with no launch date committed.
+The main product decisions for custom recognition categories, leaderboard drill-through reporting, season kickoff/reporting, and platform-managed organization subscriptions have been reviewed. See the [quarterly product design](./quarterly-product-design/README.md) for approved direction and the [execution plan](./quarterly-product-design/execution-plan.md) for ordered slices and release gates. F1–F4 and C1–C3 category persistence/API/web compatibility are implemented and locally verified; deployment and native device gates remain pending where documented. Continue with C4 mobile category compatibility; billing discovery B1–B3 can proceed independently. Production billing P1–P7 remains conditional on the spike outcome, with no launch date committed.
 
 ## Status key
 - [done] Done
@@ -163,4 +163,3 @@ Key context for whoever picks this up next:
   Manage workspace for intentionally out-of-scope flows.
 - **TanStack Query gotcha (documented in `/memories/repo/ui-notes.md`)** — `z.output<generic>` collapses to `any` at the queryFn boundary. Workaround: destructure to a local with an explicit annotation, e.g. `const data: PagedNotifications | undefined = query.data`. Continue this pattern in 6.5c reactions and 6.6b admin screens.
 - **Working agreement (from `AGENTS.md`)** — one focused slice per commit; agent does not commit or push. Definition of done for a slice touching production runtime: typecheck + test + build + lint green for touched workspaces. Contracts must be rebuilt (`npm.cmd run build -w @housepoints/contracts`) after schema edits so downstream workspaces see them.
-

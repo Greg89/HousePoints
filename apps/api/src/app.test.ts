@@ -1947,6 +1947,8 @@ describe("POST /points/delete", () => {
           targetHouseName: "Phoenix",
           delta: 15,
           trait: "TECHNICAL_EXCELLENCE",
+          categoryId: null,
+          categoryName: null,
           awardReason: "Crushed the demo",
           deletionReason: "Duplicate award",
         },
@@ -6922,7 +6924,7 @@ describe("POST /orgs/create", () => {
 describe("platform support routes", () => {
   it("submits an organization-scoped point report with an immutable evidence snapshot", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
-    mockTxFindFirst.mockResolvedValue({ id: "tx-1", type: "AWARD", delta: 10, reason: "Great work", trait: "LEADERSHIP", createdAt: new Date("2026-09-20T12:00:00.000Z"), actor: { id: "user-2", displayName: "Sam" }, targetUser: { id: "user-3", displayName: "Alex" }, targetHouse: { id: "house-1", name: "Phoenix" } });
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", type: "AWARD", delta: 10, reason: "Great work", trait: null, category: { id: "custom-1", name: "Community Impact" }, createdAt: new Date("2026-09-20T12:00:00.000Z"), actor: { id: "user-2", displayName: "Sam" }, targetUser: { id: "user-3", displayName: "Alex" }, targetHouse: { id: "house-1", name: "Phoenix" } });
     mockModerationReportCreate.mockResolvedValue({ id: "report-1" });
     const app = await buildTestApp();
     const res = await app.inject({ method: "POST", url: "/moderation/reports/submit", payload: { targetType: "POINT_TRANSACTION", targetId: "tx-1", category: "INAPPROPRIATE_CONTENT", details: "The award message needs review." } });
@@ -6934,6 +6936,7 @@ describe("platform support routes", () => {
         targetId: "tx-1",
         evidenceSnapshot: expect.objectContaining({
           reason: "Great work",
+          category: { id: "custom-1", name: "Community Impact" },
           actor: { id: "user-2", displayName: "Sam" },
         }),
       }),
@@ -6944,13 +6947,13 @@ describe("platform support routes", () => {
 
   it("redacts reported point activity with organization and platform audit evidence", async () => {
     mockModerationReportFindUnique.mockResolvedValue({ id: "report-1", status: "OPEN", organizationId: "org-1", targetType: "POINT_TRANSACTION", targetId: "tx-1" });
-    mockTxFindFirst.mockResolvedValue({ id: "tx-1", delta: 10, targetUserId: "user-3", targetHouseId: "house-1", reason: "Bad message", trait: "LEADERSHIP", deletedAt: null, targetUser: { displayName: "Alex" }, targetHouse: { name: "Phoenix" } });
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", delta: 10, targetUserId: "user-3", targetHouseId: "house-1", reason: "Bad message", trait: null, category: { id: "custom-1", name: "Community Impact" }, deletedAt: null, targetUser: { displayName: "Alex" }, targetHouse: { name: "Phoenix" } });
     mockModerationReportUpdate.mockResolvedValue({});
     const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
     const res = await app.inject({ method: "POST", url: "/platform/moderation/reports/resolve", payload: { reportId: "report-1", action: "REDACT_CONTENT", operatorNote: "Message violates the content policy." } });
     expect(res.statusCode).toBe(200);
     expect(mockTxUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "tx-1" }, data: expect.objectContaining({ deletedAt: expect.any(Date), deletedByUserId: null }) }));
-    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ organizationId: "org-1", eventType: "POINT_DELETED", metadata: expect.objectContaining({ moderationReportId: "report-1" }) }) });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ organizationId: "org-1", eventType: "POINT_DELETED", metadata: expect.objectContaining({ moderationReportId: "report-1", categoryId: "custom-1", categoryName: "Community Impact" }) }) });
     expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "MODERATION_REPORT_UPDATED", metadata: expect.objectContaining({ action: "REDACT_CONTENT" }) }) });
     expect(mockModerationReportUpdate).toHaveBeenCalledWith({ where: { id: "report-1" }, data: expect.objectContaining({ status: "RESOLVED", operatorNote: "Message violates the content policy.", resolvedByAuth0Sub: "auth0|platform-owner" }) });
     await app.close();

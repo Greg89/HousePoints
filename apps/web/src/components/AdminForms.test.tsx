@@ -253,8 +253,24 @@ describe("AdminForms", () => {
     window.history.replaceState(null, "", "/");
   });
 
+  it("shows Recognition only when the web category gate supplies category data", async () => {
+    setupAdminForms({
+      actorRole: "ADMIN",
+      recognitionCategories: [{ id: "category-1", name: "Community Impact", description: null, legacyTrait: null, createdAt: "2026-09-20T12:00:00.000Z", archivedAt: null }],
+      onListRecognitionCategories: vi.fn().mockResolvedValue([]),
+      onCreateRecognitionCategory: vi.fn().mockResolvedValue({ ok: true }),
+      onArchiveRecognitionCategory: vi.fn().mockResolvedValue({ ok: true }),
+    });
+    const tab = screen.getByRole("tab", { name: /Recognition/ });
+    fireEvent.click(tab);
+    expect(screen.getByText(/Only organization owners/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add category" })).not.toBeInTheDocument();
+  });
+
   it("defaults to the Manage overview and exposes focused section navigation", () => {
     setupAdminForms();
+
+    expect(screen.queryByRole("tab", { name: /Recognition/ })).not.toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "false");

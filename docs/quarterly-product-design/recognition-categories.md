@@ -1,6 +1,6 @@
 # Custom recognition categories
 
-Status: C1 persistence and C2 category-aware API compatibility are implemented and locally verified. Category management and category-ID awards remain disabled pending the C3–C5 client rollout. See [shared decisions](./README.md#decision-register), especially D1 and D9.
+Status: C1 persistence, C2 category-aware API compatibility, and C3 web management and awards are implemented and locally verified. Category management and category-ID awards remain disabled pending the C4–C5 rollout. See [shared decisions](./README.md#decision-register), especially D1 and D9.
 
 ## C1 persistence foundation
 
@@ -36,6 +36,14 @@ Deploy `20260927030000_recognition_category_api` after C1, then deploy the compa
 Rollback before enablement may restore the prior application while retaining the additive migration. After category creation or category-ID awards are enabled, rollback means setting the mutation flag to false while keeping category-capable readers and schema in place. Dropping the migration or returning to enum-only readers is unsafe once custom data exists.
 
 Local verification covered shared contract parsing, route authorization and disabled behavior, idempotent create, fixed-name responses, legacy response compatibility, HTTP 426 recovery, fresh application of all 46 migrations on PostgreSQL 16, tenant integrity, archived-name reuse, archive/award ordering, simultaneous final-category archives, and point-write retry/concurrency suites. No staging or production migration was applied, and old native binary/device verification remains part of C4/C5.
+
+The C2 review also closed a moderation evidence gap: point-report snapshots and point-deletion audit metadata now retain the category ID and fixed name, including for custom awards whose legacy trait is null.
+
+## C3 web category management and awards
+
+Implemented and locally verified September 27, 2026. `RECOGNITION_CATEGORIES_WEB_ENABLED=false` is the default; add this variable to the web environment only during the C5 compatibility rollout. While false, the web app keeps the legacy trait picker and request shapes. While true, category-aware dashboard and activity requests declare `categories-v1`, the award picker lists only active categories, and the Manage > Recognition section shows active and archived records. Owners can add and archive, while admins can inspect the list with controls disabled. The last-active category cannot be archived and the API remains authoritative under concurrent changes. Adding a category with an archived name creates a separate identity; archived history stays visible.
+
+If a category is archived while an award form is open, the API rejects the award, the web app refreshes categories, and the recipient, points, and reason remain in the draft until another active category is chosen. Activity and overview reports display the category's fixed name, including archived names. Create retries reuse their idempotency key. Web and API mutation flags both remain off until C5; C4 still needs to make the mobile client category-capable before either flag is enabled. On web rollback after custom awards exist, keep category-aware read capability and the C2 API/schema in place; returning to enum-only readers is unsafe.
 
 ## Confirmed direction — September 20, 2026
 

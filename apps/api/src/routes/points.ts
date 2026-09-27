@@ -815,6 +815,8 @@ export async function softDeleteTransaction(params: {
           targetHouseName: point.targetHouse.name,
           delta: point.delta,
           trait: point.trait,
+          categoryId: point.category?.id ?? null,
+          categoryName: point.category?.name ?? null,
           awardReason: point.reason,
           deletionReason,
         },

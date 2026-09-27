@@ -6,6 +6,7 @@ import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import type { AwardPointsResult, DeductPointsResult } from "@/lib/action-results";
+import { recognitionCategoriesWebEnabled } from "@/lib/recognition-gate";
 
 /** Called by AwardPointsDialog - takes typed args instead of FormData */
 export async function awardPoints(
@@ -49,6 +50,34 @@ export async function awardPoints(
 
     revalidatePath("/");
 
+    return { ok: true };
+  });
+}
+
+export async function awardCategoryPoints(
+  targetUserId: string,
+  delta: number,
+  reason: string,
+  categoryId: string,
+  idempotencyKey?: string,
+): Promise<AwardPointsResult> {
+  if (!recognitionCategoriesWebEnabled) {
+    return { ok: false, code: "RECOGNITION_CATEGORIES_DISABLED", message: "Recognition categories are not enabled." };
+  }
+  return runServerAction("awardCategoryPoints", async (context) => {
+    await getCurrentUserForRequest(context.requestId);
+    const response = await apiFetch("/points/adjust", context.requestId, {
+      method: "POST",
+      body: JSON.stringify({ targetUserId, delta, reason, categoryId, categoryApiVersion: "categories-v1", idempotencyKey }),
+    });
+    try {
+      await parseApiResponse(response, pointAdjustmentResponseSchema, "Points could not be awarded. Please try again.");
+    } catch (error) {
+      if (!isExpectedAwardFailure(error)) throw error;
+      logServerActionFailed(context, error, { targetUserId, delta, categoryId });
+      return { ok: false, code: error.code, message: error.message };
+    }
+    revalidatePath("/");
     return { ok: true };
   });
 }

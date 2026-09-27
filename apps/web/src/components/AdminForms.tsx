@@ -8,9 +8,10 @@ import {
   ClipboardText,
   Buildings,
   House,
+  Sparkle,
   UsersThree,
 } from "@phosphor-icons/react";
-import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, RecognitionCategory, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   ArchiveOrganizationResult,
@@ -22,6 +23,7 @@ import type {
   RenameSeasonResult,
   RoleChangeResult,
   StartSeasonResult,
+  MutationResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
 import { HouseManagement } from "./HouseManagement";
@@ -30,6 +32,7 @@ import { ManageAudit } from "./ManageAudit";
 import { OrgSettingsManagement } from "./OrgSettingsManagement";
 import { SeasonManagement } from "./SeasonManagement";
 import { TeamManagement } from "./TeamManagement";
+import { RecognitionManagement } from "./RecognitionManagement";
 
 interface AdminFormsProps {
   users: AdminUser[];
@@ -60,9 +63,13 @@ interface AdminFormsProps {
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
+  recognitionCategories?: RecognitionCategory[];
+  onListRecognitionCategories?: () => Promise<RecognitionCategory[]>;
+  onCreateRecognitionCategory?: (input: { name: string; description?: string; idempotencyKey: string }) => Promise<MutationResult>;
+  onArchiveRecognitionCategory?: (categoryId: string) => Promise<MutationResult>;
 }
 
-type ManageSectionId = "overview" | "members" | "houses" | "seasons" | "organization" | "audit";
+type ManageSectionId = "overview" | "members" | "houses" | "seasons" | "recognition" | "organization" | "audit";
 type ReadableSearchParams = Pick<URLSearchParams, "get" | "toString">;
 
 const MANAGE_SECTIONS: Array<{
@@ -99,6 +106,12 @@ const MANAGE_SECTIONS: Array<{
     ownerOnly: true,
   },
   {
+    id: "recognition",
+    label: "Recognition",
+    description: "Manage award categories and history.",
+    icon: Sparkle,
+  },
+  {
     id: "organization",
     label: "Organization",
     description: "Manage organization identity, URL, ownership, and lifecycle.",
@@ -116,11 +129,12 @@ const MANAGE_SECTIONS: Array<{
 function getManageSectionFromSearchParams(
   searchParams: ReadableSearchParams,
   isOwner: boolean,
+  recognitionEnabled: boolean,
 ): ManageSectionId | null {
   const requestedSection = searchParams.get("manage");
   const section = MANAGE_SECTIONS.find(({ id }) => id === requestedSection);
 
-  if (!section || (section.ownerOnly && !isOwner)) {
+  if (!section || (section.ownerOnly && !isOwner) || (section.id === "recognition" && !recognitionEnabled)) {
     return null;
   }
 
@@ -175,12 +189,16 @@ export function AdminForms({
   onCreateInvite,
   onStartSeason,
   onRenameSeason,
+  recognitionCategories,
+  onListRecognitionCategories,
+  onCreateRecognitionCategory,
+  onArchiveRecognitionCategory,
 }: AdminFormsProps) {
   const searchParams = useSearchParams();
   const isOwner = actorRole === "OWNER";
   const manageQuery = searchParams.toString();
   const urlSection =
-    getManageSectionFromSearchParams(searchParams, isOwner) ?? "overview";
+    getManageSectionFromSearchParams(searchParams, isOwner, recognitionCategories !== undefined) ?? "overview";
   const [selection, setSelection] = useState<{
     query: string;
     section: ManageSectionId;
@@ -192,7 +210,7 @@ export function AdminForms({
     ({ id }) => id === selection.section,
   );
   const canUseSelectedSection =
-    selectedSectionDefinition && (!selectedSectionDefinition.ownerOnly || isOwner);
+    selectedSectionDefinition && (!selectedSectionDefinition.ownerOnly || isOwner) && (selectedSectionDefinition.id !== "recognition" || recognitionCategories !== undefined);
   const activeSection =
     selection.query === manageQuery && canUseSelectedSection
       ? selection.section
@@ -215,7 +233,7 @@ export function AdminForms({
         <aside className="hidden lg:block">
           <nav aria-label="Manage sections">
             <ul className="space-y-1">
-              {MANAGE_SECTIONS.map((section) => {
+              {MANAGE_SECTIONS.filter((section) => section.id !== "recognition" || recognitionCategories !== undefined).map((section) => {
                 const isActive = section.id === activeSection;
                 const isDisabled = section.ownerOnly === true && !isOwner;
                 const Icon = section.icon;
@@ -268,7 +286,7 @@ export function AdminForms({
             onChange={(e) => handleSectionChange(e.target.value as ManageSectionId)}
             className="w-full rounded-xl border bg-card px-3 py-2 text-sm font-medium focus:outline-none"
           >
-            {MANAGE_SECTIONS.map((section) => {
+            {MANAGE_SECTIONS.filter((section) => section.id !== "recognition" || recognitionCategories !== undefined).map((section) => {
               const isDisabled = section.ownerOnly === true && !isOwner;
               return (
                 <option key={section.id} value={section.id} disabled={isDisabled}>
@@ -335,6 +353,10 @@ export function AdminForms({
               onStartSeason={onStartSeason}
               onRenameSeason={onRenameSeason}
             />
+          ) : null}
+
+          {activeSection === "recognition" && recognitionCategories && onListRecognitionCategories && onCreateRecognitionCategory && onArchiveRecognitionCategory ? (
+            <RecognitionManagement initialCategories={recognitionCategories} isOwner={isOwner} onList={onListRecognitionCategories} onCreate={onCreateRecognitionCategory} onArchive={onArchiveRecognitionCategory} />
           ) : null}
 
           {activeSection === "audit" ? (

@@ -145,9 +145,9 @@ export function ActivityCard({
         <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
           <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{item.reason}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {item.trait ? (
+            {item.category || item.trait ? (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                {TRAIT_LABELS[item.trait]}
+                {item.category?.name ?? (item.trait ? TRAIT_LABELS[item.trait] : "")}
               </span>
             ) : null}
             {item.season ? (

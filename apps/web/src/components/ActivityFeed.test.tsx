@@ -71,6 +71,15 @@ const seasons = [
 ];
 
 describe("ActivityFeed", () => {
+  it("shows the fixed name of an archived custom category on historical activity", () => {
+    render(<ActivityFeed
+      items={[{ ...baseActivity, trait: null, category: { id: "category-old", name: "Community Impact", legacyTrait: null, archivedAt: "2026-09-21T12:00:00.000Z" } }]}
+      members={members}
+      nextCursor={null}
+      onLoadMore={vi.fn()}
+    />);
+    expect(within(screen.getByTestId("activity-card")).getByText("Community Impact")).toBeInTheDocument();
+  });
   it("presents the recipient as the primary identity and the giver as attribution", () => {
     render(
       <ActivityFeed

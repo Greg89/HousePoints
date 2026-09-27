@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F4 and C1–C2 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 and C1–C3 implemented and locally verified; remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -24,7 +24,7 @@ The [decision register](./README.md#decision-register) is the product authority.
 | Billing decision | B1–B3 | Cost-informed commercial specification and tested sandbox architecture |
 | Conditional paid pilot | P1–P7, after billing decision | Verified owner subscriptions, platform oversight, and recovery workflows |
 
-F1–F4 and C1–C2 are implemented; continue with C3. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
+F1–F4 and C1–C3 are implemented; continue with C4. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
 
 ## F — Targeted scoring and navigation reliability
 
@@ -91,6 +91,8 @@ Add list/create/archive operations with owner authorization, audited changes, id
 Done when archive-vs-award and simultaneous-last-archive races are safe, reused names remain distinct, and unsupported clients have a tested recovery/version path. Category mutation remains disabled until C5; API compatibility is not permission to enable it early.
 
 ### C3 — Web category management and award selection
+
+Status: **implementation complete, locally verified September 27, 2026**. The web category UI is disabled by default through `RECOGNITION_CATEGORIES_WEB_ENABLED`; API mutations remain disabled until C5. See the [category rollout notes](./recognition-categories.md#c3-web-category-management-and-awards).
 
 Dependencies: C2. Surfaces: Manage Recognition, award dialog, activity/report labels.
 
@@ -222,6 +224,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1: **implementation complete with local verification; deployment pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Recommended next implementation request: **C2 — introduce category-aware API compatibility**. Keep category mutation disabled until C5 and preserve the legacy enum boundary for unsupported clients.
+Recommended next implementation request: **C4 — mobile category compatibility**. Keep category mutation disabled until C5 and preserve the legacy enum boundary for unsupported clients.
