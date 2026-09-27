@@ -32,6 +32,7 @@ import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerPointRoutes } from "./routes/points.js";
 import { registerRecognitionCategoryRoutes } from "./routes/recognition-categories.js";
+import { registerReportRoutes } from "./routes/reports.js";
 import { registerPlatformRoutes } from "./routes/platform.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
@@ -58,6 +59,7 @@ type BuildAppOptions = {
   pushDispatcher?: PushDispatcher | null;
   organizationCreationPolicy?: OrganizationCreationPolicy;
   platformOwnerAuth0Subjects?: ReadonlySet<string>;
+  reportCursorSecret?: string;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -155,8 +157,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
   await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
+  await registerReportRoutes(app, { cursorSecret: options.reportCursorSecret ?? process.env.REPORT_CURSOR_SECRET });
   await registerTelemetryRoutes(app);
 
   return app;
 }
-

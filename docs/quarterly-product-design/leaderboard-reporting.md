@@ -4,7 +4,7 @@ Status: proposed reporting design. D1 (category lifecycle), D2 (audited historic
 
 ## Current foundation
 
-The app has house standings, top member scores, activity pagination, overview widgets, and season comparisons. R1 aligns their ranking rules through `rankScores` and keeps house member contributions with the transaction's house, including former and unattributed recipients. Compact web/mobile contributor views still show active members with positive personal totals; mobile labels a moved member with their current house. The dashboard recap exposes `winningHouses` and `topContributors` arrays; singular fields remain for older clients. Detailed scoped reports and revision-bound pagination are R2 work.
+The app has house standings, top member scores, activity pagination, overview widgets, and season comparisons. R1 aligns their ranking rules through `rankScores` and keeps house member contributions with the transaction's house, including former and unattributed recipients. Compact web/mobile contributor views still show active members with positive personal totals; mobile labels a moved member with their current house. The dashboard recap exposes `winningHouses` and `topContributors` arrays; singular fields remain for older clients. R2's [scoped report query API](./report-query-api.md) supplies consistent ledger pages; the web drill-through is R3/R4 work.
 
 ## User journey
 

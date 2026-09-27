@@ -52,11 +52,11 @@ cooldown reads safe: those callers must still adopt the transaction protocol.
 Do not disable triggers for imports or maintenance. Maintenance touching existing
 ledger/season rows must lock organizations first, including before bulk deletes.
 
-The revision is internal groundwork. Do not serialize Prisma BigInt directly as
-JSON; future R2 cursors must encode it losslessly, such as a decimal string.
+The revision backs R2's signed report cursors and is serialized as a decimal
+string, never as a Prisma BigInt in JSON.
 It does not yet represent every display-name, membership, house-label, or
 reaction change, and must not be used as a general cache key for existing legacy
-views. R1/R2 will define consistent reporting reads and cursor invalidation.
+views. R1 rankings and R2 report reads use it only for score/season consistency.
 
 ## Mutation inventory
 

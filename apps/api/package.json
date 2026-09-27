@@ -17,7 +17,8 @@
     "benchmark:dashboard": "tsx src/benchmarks/dashboard-baseline.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "test:integration": "tsx --import dotenv/config tests/scoring.integration.ts"
+    "test:integration": "tsx --import dotenv/config tests/scoring.integration.ts",
+    "test:reporting-integration": "tsx --import dotenv/config tests/reporting.integration.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

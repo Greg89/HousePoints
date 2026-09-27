@@ -124,7 +124,7 @@ Done when deployment order and rollback are executable. Once custom awards exist
 
 ### R1 — Unify score attribution and tied rankings
 
-Implementation status: complete locally; verification covers moved/former/anonymized recipients, net deductions, shared ranks and co-winners. Web and mobile compact contributor views keep active positive-score members while historical house reports retain every transaction recipient.
+Implementation status: complete and committed; verification covers moved/former/anonymized recipients, net deductions, shared ranks and co-winners. Web and mobile compact contributor views keep active positive-score members while historical house reports retain every transaction recipient.
 
 Dependencies: C2, F3. Surfaces: shared report service/contracts, existing standings/comparison/recap consumers on web/mobile.
 
@@ -133,6 +133,8 @@ Define one tested scoring/ranking implementation: transaction-time house, person
 Done when house moves, departures, negative/zero totals, deductions, ties, and corrections reconcile across existing reports. Preserve safe display-name anonymization.
 
 ### R2 — Add scoped report queries and consistent pagination
+
+Implementation status: complete locally. The authenticated report API and shared contracts support all planned scopes, a same-snapshot summary and first page, signed revision-bound cursors, and typed refresh-required errors. PostgreSQL integration fixtures verify page reconciliation and access checks; measured query counts, payloads, and plans are recorded in [Report query API](report-query-api.md). Web drill-through remains R3.
 
 Dependencies: R1. Surfaces: typed report API/contracts, DB queries and cursor validation.
 

@@ -62,6 +62,7 @@ vi.mock("@housepoints/db", () => ({
     house: {
       upsert: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
@@ -182,6 +183,7 @@ const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
+const mockHouseFindFirst = prisma.house.findFirst as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
 const mockInviteCount = prisma.orgInvite.count as ReturnType<typeof vi.fn>;
@@ -464,6 +466,7 @@ async function buildTestApp(
     platformOwnerAuth0Subjects?: ReadonlySet<string>;
     recognitionCategoryMutationsEnabled?: boolean;
     recognitionCategoryRolloutOrganizationIds?: ReadonlySet<string>;
+    reportCursorSecret?: string;
   } = {},
 ) {
   const app = await buildApp({
@@ -471,6 +474,7 @@ async function buildTestApp(
     pointAdjustmentsEnabled: true,
     recognitionCategoryMutationsEnabled: options.recognitionCategoryMutationsEnabled,
     recognitionCategoryRolloutOrganizationIds: options.recognitionCategoryRolloutOrganizationIds ?? new Set(["org-1"]),
+    reportCursorSecret: options.reportCursorSecret ?? "test-report-cursor-secret-with-more-than-32-characters",
     organizationCreationPolicy: options.organizationCreationPolicy,
     platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
     pushDispatcher: options.pushDispatcher,
@@ -6314,6 +6318,177 @@ describe("POST /members", () => {
         },
       },
     });
+    await app.close();
+  });
+});
+
+describe("POST /reports/query", () => {
+  const baseTime = new Date("2026-09-27T12:00:00.000Z");
+  const reportRow = (id: string, minute: number, delta: number, type: "AWARD" | "DEDUCTION") => ({
+    id, type, delta, reason: `Reason for ${id}`, trait: type === "AWARD" ? "COLLABORATION" : null,
+    createdAt: new Date(baseTime.getTime() + minute * 60_000),
+    category: type === "AWARD" ? { id: "cat-1", name: "Teamwork", archivedAt: null } : null,
+    targetHouse: { id: "house-1", name: "Phoenix", color: "#7c3aed" },
+    targetUser: { id: "user-2", displayName: "Bob" },
+    actor: { id: "user-1", displayName: "Alice" },
+  });
+
+  function arrangeAccess() {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockMembershipFindFirst.mockResolvedValue({ id: "membership-user-1" });
+    mockOrgFindUnique.mockResolvedValue({ reportingRevision: 7n });
+    mockSeasonFindFirst.mockResolvedValue({ id: "season-1" });
+  }
+
+  it("reads a summary and stable pages in a repeatable-read snapshot", async () => {
+    arrangeAccess();
+    const rows = [
+      reportRow("p3", 3, 10, "AWARD"),
+      reportRow("p2", 2, -5, "DEDUCTION"),
+      reportRow("p1", 1, 2, "AWARD"),
+    ];
+    mockTxGroupBy.mockResolvedValue([
+      { type: "AWARD", _sum: { delta: 12 }, _count: { _all: 2 } },
+      { type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } },
+    ]);
+    mockTxFindMany.mockResolvedValueOnce(rows).mockResolvedValueOnce([rows[2]]);
+    const app = await buildTestApp();
+    const first = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 2 } });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({
+      scope: { seasonId: "season-1" }, revision: "7",
+      summary: { netPoints: 7, awardedPoints: 12, deductedPoints: 5, transactionCount: 3, awardCount: 2, deductionCount: 1, deductionsOutsideCategory: null },
+      items: [{ id: "p3" }, { id: "p2" }],
+    });
+    const cursor = first.json().nextCursor as string;
+    expect(cursor).toEqual(expect.any(String));
+    const second = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 2, cursor } });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().items.map((item: { id: string }) => item.id)).toEqual(["p1"]);
+    expect(second.json().nextCursor).toBeNull();
+    expect(mockTxFindMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        organizationId: "org-1", seasonId: "season-1", deletedAt: null,
+        OR: [
+          { createdAt: { lt: rows[1].createdAt } },
+          { createdAt: rows[1].createdAt, id: { lt: "p2" } },
+        ],
+      }),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 3,
+    }));
+    expect(mockTransaction).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({ isolationLevel: "RepeatableRead" }));
+    await app.close();
+  });
+
+  it("requires refresh after a correction changes the reporting revision", async () => {
+    arrangeAccess();
+    mockTxFindMany.mockResolvedValue([reportRow("p2", 2, 2, "AWARD"), reportRow("p1", 1, 1, "AWARD")]);
+    const app = await buildTestApp();
+    const first = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1 } });
+    const cursor = first.json().nextCursor as string;
+    mockOrgFindUnique.mockResolvedValue({ reportingRevision: 8n });
+    const second = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1, cursor } });
+    expect(second.statusCode).toBe(409);
+    expect(second.json().code).toBe("REPORT_REFRESH_REQUIRED");
+    expect(mockTxFindMany).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
+  it("rejects altered cursors and revoked membership", async () => {
+    arrangeAccess();
+    mockTxFindMany.mockResolvedValue([reportRow("p2", 2, 2, "AWARD"), reportRow("p1", 1, 1, "AWARD")]);
+    const app = await buildTestApp();
+    const first = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1 } });
+    const cursor = first.json().nextCursor as string;
+    const altered = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1, cursor: `${cursor}x` } });
+    expect(altered.statusCode).toBe(400);
+    expect(altered.json().code).toBe("INVALID_REPORT_CURSOR");
+    mockMembershipFindFirst.mockResolvedValue(null);
+    const revoked = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1, cursor } });
+    expect(revoked.statusCode).toBe(403);
+    expect(revoked.json().code).toBe("REPORT_ACCESS_REVOKED");
+    await app.close();
+  });
+
+  it("rejects report IDs outside the actor's organization", async () => {
+    arrangeAccess();
+    mockMembershipFindFirst.mockImplementation(async ({ where }) => where?.id ? { id: where.id } : null);
+    const app = await buildTestApp();
+    for (const payload of [
+      { seasonId: "season-1", houseId: "other-house" },
+      { seasonId: "season-1", categoryId: "other-category" },
+      { seasonId: "season-1", memberId: "other-member" },
+      { seasonId: "season-1", giverId: "other-giver" },
+    ]) {
+      const response = await app.inject({ method: "POST", url: "/reports/query", payload });
+      expect(response.statusCode).toBe(404);
+      expect(response.json().code).toBe("REPORT_SCOPE_NOT_FOUND");
+    }
+    expect(mockHouseFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "other-house", organizationId: "org-1" } }));
+    await app.close();
+  });
+
+  it("keeps category awards separate from uncategorized deductions", async () => {
+    arrangeAccess();
+    mockCategoryFindFirst.mockResolvedValue({ id: "cat-1" });
+    mockTxGroupBy.mockImplementation(async ({ where }) => where?.type === "DEDUCTION"
+      ? [{ type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } }]
+      : [{ type: "AWARD", _sum: { delta: 10 }, _count: { _all: 1 } }]);
+    mockTxFindMany.mockResolvedValue([reportRow("p3", 3, 10, "AWARD")]);
+    const app = await buildTestApp();
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", categoryId: "cat-1" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().summary).toEqual({
+      netPoints: 10, awardedPoints: 10, deductedPoints: 0, transactionCount: 1,
+      awardCount: 1, deductionCount: 0, deductionsOutsideCategory: { points: 5, count: 1 },
+    });
+    expect(mockTxGroupBy).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: { organizationId: "org-1", seasonId: "season-1", deletedAt: null, type: "DEDUCTION" },
+    }));
+    await app.close();
+  });
+
+  it("filters anonymous recipients and returns a zero summary for empty seasons", async () => {
+    arrangeAccess();
+    const app = await buildTestApp();
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", memberId: null, type: "DEDUCTION" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().summary).toEqual({
+      netPoints: 0, awardedPoints: 0, deductedPoints: 0, transactionCount: 0,
+      awardCount: 0, deductionCount: 0, deductionsOutsideCategory: null,
+    });
+    expect(mockTxGroupBy).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId: "org-1", seasonId: "season-1", deletedAt: null, targetUserId: null, type: "DEDUCTION" },
+    }));
+    await app.close();
+  });
+
+  it("combines house, recipient, category, giver, and type without widening scope", async () => {
+    arrangeAccess();
+    mockHouseFindFirst.mockResolvedValue({ id: "house-1" });
+    mockCategoryFindFirst.mockResolvedValue({ id: "cat-1" });
+    mockTxGroupBy.mockResolvedValue([]);
+    const app = await buildTestApp();
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: {
+      seasonId: "season-1", houseId: "house-1", memberId: "user-2",
+      categoryId: "cat-1", giverId: "user-1", type: "AWARD",
+    } });
+    expect(response.statusCode).toBe(200);
+    expect(mockTxFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      organizationId: "org-1", seasonId: "season-1", deletedAt: null,
+      targetHouseId: "house-1", targetUserId: "user-2", categoryId: "cat-1",
+      actorUserId: "user-1", type: "AWARD",
+    } }));
+    await app.close();
+  });
+
+  it("returns a typed unavailable response until cursor signing is configured", async () => {
+    arrangeAccess();
+    const app = await buildTestApp("auth0|member", {}, { reportCursorSecret: "" });
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1" } });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().code).toBe("REPORTS_NOT_CONFIGURED");
     await app.close();
   });
 });

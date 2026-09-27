@@ -14,3 +14,4 @@ export * from "./api-contracts.js";
 export * from "./point-submission.js";
 export * from "./recognition-category-schemas.js";
 export * from "./score-ranking.js";
+export * from "./report-schemas.js";

@@ -1,0 +1,19 @@
+# Scoped report query API (R2)
+
+`POST /reports/query` is the read-only foundation for the web drill-through in R3/R4. Every request requires an explicit `seasonId`. Optional `houseId`, `memberId`, `categoryId`, `giverId`, and `type` filters combine by intersection. `memberId: null` selects transactions without a recipient identity. Page size defaults to 25 and is limited to 1–50. All IDs are checked against the authenticated organization, including archived categories and people who formerly contributed. Current organization membership is checked again inside each report read. Deleted transactions are excluded.
+
+The response returns the normalized scope, decimal-string `revision`, summary, ledger `items`, and an opaque `nextCursor`. Summary and the first page are read in one PostgreSQL `REPEATABLE READ` transaction. Later pages use descending `(createdAt, id)` keyset ordering. The cursor is signed with HMAC-SHA256 and binds the organization, exact filters, reporting revision, and last position. Changing the cursor or filters returns `400 INVALID_REPORT_CURSOR`; a score or season change returns `409 REPORT_REFRESH_REQUIRED`, after which the client should request page one again. Revoked access returns 403. The underlying revision advances atomically through the existing database triggers on transaction and season writes, including corrections and moderation.
+
+`netPoints = awardedPoints - deductedPoints` for the selected ledger rows. A category ID selects awards bearing that identity, even when archived; another category with the same name remains separate. Deductions have no category. With a category filter, `deductionsOutsideCategory` shows their count and magnitude under the other filters (ignoring the category and type filters), but does **not** subtract them from that category's net or add them to its ledger page. This lets a category award subtotal and the separate deduction adjustment be explained without attributing a deduction to an arbitrary category.
+
+Before using this endpoint in staging or production, set `REPORT_CURSOR_SECRET` on the API service to the same randomly generated value of at least 32 characters on every replica. The endpoint returns `503 REPORTS_NOT_CONFIGURED` without it. Changing the secret invalidates existing cursors; clients can recover by refreshing page one. No new migration or GitHub Environment secret is required for R2. Keep the F1 reporting-revision migration and database triggers deployed before enabling report reads.
+
+The integration command is `npm run test:reporting-integration -w @housepoints/api` with `DATABASE_URL` pointed at a disposable PostgreSQL 16 database after migrations. It seeds and cleans up isolated empty, typical, and larger organizations; verifies full-page reconciliation, corrections, category identity, moved/former/anonymized recipients, tenant scope, and revoked access; and measures five warmed first-page samples. On a local disposable PostgreSQL 16 instance (September 27, 2026), the baseline was:
+
+| Scenario | Houses | Members | Transactions | Pages at 50 | SQL statements per first page | First-page bytes | P50 / P95 response | Page scan / plan execution |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Empty | 4 | 1 | 0 | 1 | 10 | 245 | 5.1 / 7.5 ms | Sequential / 0.013 ms |
+| Typical | 4 | 24 | 120 | 3 | 10 | 22,794 | 4.2 / 4.5 ms | Sequential / 0.036 ms |
+| Larger | 8 | 200 | 1,000 | 20 | 10 | 22,901 | 4.7 / 5.1 ms | Existing `PointTransaction_organizationId_deletedAt_idx` / 0.21 ms |
+
+The statement count includes transaction control and Prisma-generated reads. These are local baselines, not production capacity guarantees. The current indexes support these fixtures; no new index is justified by this evidence. R3 adds the authenticated web route and navigation; R4 adds category/giver presentation and combinations on that UI.
