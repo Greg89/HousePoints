@@ -5,6 +5,7 @@ export const mobileQueryKeys = {
   houseLeaderboard: (slug: string | null) => ["houses", "leaderboard", slug] as const,
   activityRecent: (slug: string | null) => ["activity", "recent", slug] as const,
   members: (slug: string | null) => ["members", slug] as const,
+  recognitionCategories: (slug: string | null) => ["recognition-categories", slug] as const,
   adminContext: (slug: string | null) => ["admin-context", slug] as const,
   notificationList: (slug: string | null) => ["notifications", "list", slug, "all"] as const,
   notificationBadge: (slug: string | null) => ["notifications", "badge", slug] as const,

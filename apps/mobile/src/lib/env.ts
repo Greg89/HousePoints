@@ -17,6 +17,7 @@ export const env = createMobileEnvironment({
   defaultOrgSlug: process.env.EXPO_PUBLIC_DEFAULT_ORG_SLUG,
   pointAdjustmentsEnabled: process.env.EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED,
   mobileAdminEnabled: process.env.EXPO_PUBLIC_MOBILE_ADMIN_ENABLED,
+  recognitionCategoriesEnabled: process.env.EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED,
 });
 
 export type { MobileEnv } from "./env-core";

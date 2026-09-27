@@ -36,7 +36,7 @@ describe("activityCardPresentation", () => {
       deltaLabel: "+15",
       isDeduction: false,
       targetInitial: "B",
-      traitLabel: "Leadership",
+      recognitionLabel: "Leadership",
       relativeTime: "5m ago",
     });
   });
@@ -65,7 +65,15 @@ describe("activityCardPresentation", () => {
       attributionLabel: "Deducted by",
       deltaLabel: "-5",
       isDeduction: true,
-      traitLabel: null,
+      recognitionLabel: null,
     });
+  });
+
+  it("uses an archived category's fixed name instead of the legacy trait", () => {
+    expect(activityCardPresentation({
+      ...baseItem,
+      trait: null,
+      category: { id: "category-old", name: "Community Impact", legacyTrait: null, archivedAt: "2026-09-21T12:00:00.000Z" },
+    }).recognitionLabel).toBe("Community Impact");
   });
 });

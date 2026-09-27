@@ -10,7 +10,7 @@ export type ActivityCardPresentation = {
   deltaLabel: string;
   isDeduction: boolean;
   targetInitial: string;
-  traitLabel: string | null;
+  recognitionLabel: string | null;
   relativeTime: string;
   topReactions: Array<{
     reactionKey: PointReactionKey;
@@ -40,7 +40,7 @@ export function activityCardPresentation(
     deltaLabel: `${item.delta > 0 ? "+" : ""}${item.delta}`,
     isDeduction,
     targetInitial: item.targetUserName.charAt(0).toUpperCase(),
-    traitLabel: item.trait ? TRAIT_LABELS[item.trait] : null,
+    recognitionLabel: item.category?.name ?? (item.trait ? TRAIT_LABELS[item.trait] : null),
     relativeTime: formatRelativeTime(item.createdAt, now),
     topReactions,
   };

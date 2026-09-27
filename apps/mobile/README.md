@@ -55,6 +55,11 @@ Fill in:
 - `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
   mobile Manage tab during the Phase 3 rollout.
+- `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` — defaults to `false`. Keep it
+  false in EAS environments until the C5 category rollout; a preview build with
+  it enabled can select and award active custom categories after the API
+  mutation gate is enabled. Category-aware dashboard and activity reads remain
+  active in upgraded binaries regardless of this flag.
 
 Android push builds also require `apps/mobile/google-services.json` for the
 Firebase project registered to `com.housepoints.app`. This file contains the

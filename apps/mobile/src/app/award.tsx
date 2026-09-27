@@ -1,14 +1,15 @@
-import { createPointSubmissionKeys } from "@housepoints/contracts";
-import { generateRequestId } from "@/lib/request-id";
 import {
+  createPointSubmissionKeys,
+  RECOGNITION_CATEGORY_API_VERSION,
   TRAIT_LABELS,
   TRAITS,
   type OrgMember,
+  type RecognitionCategory,
   type Trait,
 } from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -26,6 +27,7 @@ import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
+import { env } from "@/lib/env";
 import { eligibleAwardMembers } from "@/lib/award-members";
 import {
   AWARD_POINTS_DEFAULT,
@@ -37,6 +39,8 @@ import {
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
+import { availableRecognitionCategories, selectedRecognitionCategory } from "@/lib/recognition-categories";
+import { generateRequestId } from "@/lib/request-id";
 
 const REASON_MIN = 3;
 const REASON_MAX = 240;
@@ -53,11 +57,24 @@ export default function AwardPointsScreen() {
   const submissionKeys = useRef(createPointSubmissionKeys(generateRequestId));
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedTrait, setSelectedTrait] = useState<Trait | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [pointsInput, setPointsInput] = useState(String(AWARD_POINTS_DEFAULT));
   const delta = parseAwardPoints(pointsInput);
   const [reason, setReason] = useState("");
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
-  const [traitPickerOpen, setTraitPickerOpen] = useState(false);
+  const [recognitionPickerOpen, setRecognitionPickerOpen] = useState(false);
+  const previousOrgSlug = useRef(activeOrgSlug);
+
+  useEffect(() => {
+    if (previousOrgSlug.current === activeOrgSlug) return;
+    previousOrgSlug.current = activeOrgSlug;
+    setSelectedMemberId(null);
+    setSelectedTrait(null);
+    setSelectedCategoryId(null);
+    setCategoryError(null);
+    submissionKeys.current = createPointSubmissionKeys(generateRequestId);
+  }, [activeOrgSlug]);
 
   const membersQuery = useQuery({
     queryKey: mobileQueryKeys.members(activeOrgSlug),
@@ -72,6 +89,28 @@ export default function AwardPointsScreen() {
       );
     },
   });
+
+  const categoriesQuery = useQuery({
+    queryKey: mobileQueryKeys.recognitionCategories(activeOrgSlug),
+    enabled: env.recognitionCategoriesEnabled && activeOrgSlug !== null,
+    staleTime: 0,
+    queryFn: async ({ signal }) => {
+      const accessToken = await getAccessToken();
+      const response = await callApi("/recognition-categories/list", { includeArchived: true }, { accessToken, organizationSlug: activeOrgSlug, signal });
+      return response.categories;
+    },
+  });
+
+  const categories: RecognitionCategory[] | undefined = categoriesQuery.data;
+  const availableCategories = useMemo(() => availableRecognitionCategories(categories), [categories]);
+  const selectedCategory = selectedRecognitionCategory(categories, selectedCategoryId);
+  const categoryUnavailable = Boolean(selectedCategoryId) && (!selectedCategory || selectedCategory.archivedAt !== null);
+  const recognitionOptions = useMemo(() => env.recognitionCategoriesEnabled
+    ? availableCategories.map((category) => ({ value: category.id, label: category.name }))
+    : TRAITS.map((trait) => ({ value: trait, label: TRAIT_LABELS[trait] })), [availableCategories]);
+  const selectedRecognitionLabel = env.recognitionCategoriesEnabled
+    ? selectedCategory?.name ?? null
+    : selectedTrait ? TRAIT_LABELS[selectedTrait] : null;
 
   const members: OrgMember[] | undefined = membersQuery.data;
 
@@ -89,20 +128,24 @@ export default function AwardPointsScreen() {
   const reasonLength = trimmedReason.length;
   const canSubmit =
     Boolean(selectedMemberId) &&
-    Boolean(selectedTrait) &&
+    (env.recognitionCategoriesEnabled
+      ? Boolean(selectedCategoryId) && !categoryUnavailable && !categoryError
+      : Boolean(selectedTrait)) &&
     delta !== null &&
     reasonLength >= REASON_MIN &&
     reasonLength <= REASON_MAX;
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedMemberId || !selectedTrait) {
-        throw new Error("Missing target user or trait selection");
+      if (!selectedMemberId || (env.recognitionCategoriesEnabled ? !selectedCategoryId : !selectedTrait)) {
+        throw new Error("Missing target user or recognition selection");
       }
       if (delta === null) {
         throw new Error("Invalid award points");
       }
-      const payload = { targetUserId: selectedMemberId, trait: selectedTrait, delta, reason: trimmedReason };
+      const payload = env.recognitionCategoriesEnabled
+        ? { targetUserId: selectedMemberId, categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION, categoryId: selectedCategoryId!, delta, reason: trimmedReason }
+        : { targetUserId: selectedMemberId, trait: selectedTrait!, delta, reason: trimmedReason };
       const idempotencyKey = submissionKeys.current.keyFor([activeOrgSlug, payload]);
       const accessToken = await getAccessToken();
       const transaction = await callApi(
@@ -119,6 +162,7 @@ export default function AwardPointsScreen() {
         targetUserId: selectedMemberId,
         delta,
         trait: selectedTrait,
+        categoryId: selectedCategoryId,
       });
       void invalidateMobileQueries(
         queryClient,
@@ -131,6 +175,10 @@ export default function AwardPointsScreen() {
       }
     },
     onError: (error) => {
+      if (env.recognitionCategoriesEnabled && error instanceof ApiResponseError && error.code === "RECOGNITION_CATEGORY_UNAVAILABLE") {
+        setCategoryError("This category is no longer available. Your draft is saved; choose another category.");
+        void categoriesQuery.refetch();
+      }
       const message =
         error instanceof ApiResponseError
           ? error.message
@@ -181,11 +229,13 @@ export default function AwardPointsScreen() {
 
           {selectedMember ? (
             <>
-              <Section title="Trait">
-                <TraitSelect
-                  selectedTrait={selectedTrait}
-                  onPress={() => setTraitPickerOpen(true)}
+              <Section title={env.recognitionCategoriesEnabled ? "Category" : "Trait"}>
+                <RecognitionSelect
+                  mode={env.recognitionCategoriesEnabled ? "category" : "trait"}
+                  selectedLabel={selectedRecognitionLabel}
+                  onPress={() => { if (env.recognitionCategoriesEnabled) void categoriesQuery.refetch(); setRecognitionPickerOpen(true); }}
                 />
+                {categoryUnavailable || categoryError ? <ErrorText>{categoryError ?? "This category is no longer available. Choose another category."}</ErrorText> : null}
               </Section>
 
               <Section title={`Points (${AWARD_POINTS_MIN}\u2013${AWARD_POINTS_MAX})`}>
@@ -287,43 +337,46 @@ export default function AwardPointsScreen() {
           setMemberPickerOpen(false);
         }}
       />
-      <TraitSelectModal
-        visible={traitPickerOpen}
-        selectedTrait={selectedTrait}
-        onClose={() => setTraitPickerOpen(false)}
-        onSelect={(trait) => {
-          setSelectedTrait(trait);
-          setTraitPickerOpen(false);
+      <RecognitionSelectModal
+        visible={recognitionPickerOpen}
+        mode={env.recognitionCategoriesEnabled ? "category" : "trait"}
+        options={recognitionOptions}
+        selectedValue={env.recognitionCategoriesEnabled ? selectedCategoryId : selectedTrait}
+        loading={env.recognitionCategoriesEnabled && categoriesQuery.isPending}
+        error={env.recognitionCategoriesEnabled && categoriesQuery.error ? "Categories could not load. Tap to retry." : null}
+        onRetry={() => void categoriesQuery.refetch()}
+        onClose={() => setRecognitionPickerOpen(false)}
+        onSelect={(value) => {
+          if (env.recognitionCategoriesEnabled) { setSelectedCategoryId(value); setCategoryError(null); }
+          else setSelectedTrait(value as Trait);
+          setRecognitionPickerOpen(false);
         }}
       />
     </SafeAreaView>
   );
 }
 
-function TraitSelect({
-  selectedTrait,
-  onPress,
-}: {
-  selectedTrait: Trait | null;
+type RecognitionMode = "category" | "trait";
+type RecognitionOption = { value: string; label: string };
+
+function RecognitionSelect({ mode, selectedLabel, onPress }: {
+  mode: RecognitionMode;
+  selectedLabel: string | null;
   onPress: () => void;
 }) {
   return (
     <Pressable
-      testID="mobile.award.trait-select"
+      testID={`mobile.award.${mode}-select`}
       accessibilityRole="button"
-      accessibilityLabel={
-        selectedTrait
-          ? `Selected trait: ${TRAIT_LABELS[selectedTrait]}`
-          : "Select a trait"
-      }
-      accessibilityHint="Opens the list of traits"
+      accessibilityLabel={selectedLabel ? `Selected ${mode}: ${selectedLabel}` : `Select a ${mode}`}
+      accessibilityHint={`Opens the list of ${mode === "category" ? "categories" : "traits"}`}
       style={styles.selectField}
       onPress={onPress}
     >
       <Text
-        style={selectedTrait ? styles.selectedName : styles.memberPlaceholder}
+        style={selectedLabel ? styles.selectedName : styles.memberPlaceholder}
       >
-        {selectedTrait ? TRAIT_LABELS[selectedTrait] : "Select a trait..."}
+        {selectedLabel ?? `Select a ${mode}...`}
       </Text>
       <Text style={styles.caret} accessibilityElementsHidden>
         ▾
@@ -332,17 +385,28 @@ function TraitSelect({
   );
 }
 
-function TraitSelectModal({
+function RecognitionSelectModal({
   visible,
-  selectedTrait,
+  mode,
+  options,
+  selectedValue,
+  loading,
+  error,
+  onRetry,
   onClose,
   onSelect,
 }: {
   visible: boolean;
-  selectedTrait: Trait | null;
+  mode: RecognitionMode;
+  options: RecognitionOption[];
+  selectedValue: string | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onClose: () => void;
-  onSelect: (trait: Trait) => void;
+  onSelect: (value: string) => void;
 }) {
+  const title = mode === "category" ? "Select category" : "Select trait";
   return (
     <Modal
       visible={visible}
@@ -353,47 +417,45 @@ function TraitSelectModal({
       <View style={styles.modalRoot}>
         <Pressable
           style={StyleSheet.absoluteFill}
-          accessibilityLabel="Close trait list"
+          accessibilityLabel={`Close ${mode} list`}
           onPress={onClose}
         />
         <View style={styles.memberModal}>
           <View style={styles.memberModalHeader}>
             <View>
-              <Text style={styles.memberModalTitle}>Select trait</Text>
+              <Text style={styles.memberModalTitle}>{title}</Text>
               <Text style={styles.memberModalDescription}>
                 Choose what this award recognizes
               </Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close trait list"
+              accessibilityLabel={`Close ${mode} list`}
               onPress={onClose}
               style={styles.modalClose}
             >
               <Text style={styles.modalCloseLabel}>×</Text>
             </Pressable>
           </View>
-          <FlatList
-            data={TRAITS}
-            keyExtractor={(trait) => trait}
-            ItemSeparatorComponent={MemberSeparator}
-            renderItem={({ item: trait }) => {
-              const selected = trait === selectedTrait;
-              return (
-                <Pressable
-                  testID={`mobile.award.trait.${trait}`}
+          {loading ? <ActivityIndicator style={styles.pad} color="#0f172a" /> : error ? <Pressable onPress={onRetry}><ErrorText>{error}</ErrorText></Pressable> : options.length === 0 ? <ErrorText>No available categories. Ask an owner to add one.</ErrorText> : <FlatList
+              data={options}
+              keyExtractor={(option) => option.value}
+              ItemSeparatorComponent={MemberSeparator}
+              renderItem={({ item: option }) => {
+                const selected = option.value === selectedValue;
+                return <Pressable
+                  testID={`mobile.award.${mode}.${option.value}`}
                   accessibilityRole="button"
-                  accessibilityLabel={TRAIT_LABELS[trait]}
+                  accessibilityLabel={option.label}
                   accessibilityState={{ selected }}
                   style={[styles.traitRow, selected && styles.memberRowSelected]}
-                  onPress={() => onSelect(trait)}
+                  onPress={() => onSelect(option.value)}
                 >
-                  <Text style={styles.traitName}>{TRAIT_LABELS[trait]}</Text>
+                  <Text style={styles.traitName}>{option.label}</Text>
                   {selected ? <Text style={styles.selectedCheck}>✓</Text> : null}
-                </Pressable>
-              );
-            }}
-          />
+                </Pressable>;
+              }}
+            />}
         </View>
       </View>
     </Modal>

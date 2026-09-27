@@ -1,6 +1,6 @@
 # Custom recognition categories
 
-Status: C1 persistence, C2 category-aware API compatibility, and C3 web management and awards are implemented and locally verified. Category management and category-ID awards remain disabled pending the C4–C5 rollout. See [shared decisions](./README.md#decision-register), especially D1 and D9.
+Status: C1–C3 are implemented and locally verified. C4 mobile compatibility is implemented and locally verified, with Android device and old-binary checks still pending. Category management and category-ID awards remain disabled pending C5. See [shared decisions](./README.md#decision-register), especially D1 and D9.
 
 ## C1 persistence foundation
 
@@ -44,6 +44,14 @@ The C2 review also closed a moderation evidence gap: point-report snapshots and 
 Implemented and locally verified September 27, 2026. `RECOGNITION_CATEGORIES_WEB_ENABLED=false` is the default; add this variable to the web environment only during the C5 compatibility rollout. While false, the web app keeps the legacy trait picker and request shapes. While true, category-aware dashboard and activity requests declare `categories-v1`, the award picker lists only active categories, and the Manage > Recognition section shows active and archived records. Owners can add and archive, while admins can inspect the list with controls disabled. The last-active category cannot be archived and the API remains authoritative under concurrent changes. Adding a category with an archived name creates a separate identity; archived history stays visible.
 
 If a category is archived while an award form is open, the API rejects the award, the web app refreshes categories, and the recipient, points, and reason remain in the draft until another active category is chosen. Activity and overview reports display the category's fixed name, including archived names. Create retries reuse their idempotency key. Web and API mutation flags both remain off until C5; C4 still needs to make the mobile client category-capable before either flag is enabled. On web rollback after custom awards exist, keep category-aware read capability and the C2 API/schema in place; returning to enum-only readers is unsafe.
+
+## C4 mobile compatibility
+
+Implemented and locally verified September 27, 2026; Android device and currently supported old-binary checks remain pending. The upgraded app declares `categories-v1` on dashboard and activity reads even while category awards are disabled. Activity uses the category's fixed name, including archived custom categories, and dashboard summary parsing accepts category leaders and custom recent activity. Notification bodies already come from the C2 API's category name and need no native management screen or enum substitution.
+
+`EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` defaults to `false` in the mobile app. With the flag off, the legacy trait award flow remains available. When C5 enables it in an EAS build, the picker fetches organization-scoped categories, excludes archived entries, and submits a `categories-v1` category ID with the existing retry key. An archive race keeps the recipient, amount, reason, and selected identity in the draft, refreshes categories, and requires a new available selection. The app does not expose Add or Archive controls.
+
+The C4 rollout adds no database migration. EAS preview and production environments must set the new Expo public flag only during C5 after the API/web/device compatibility rehearsal; changing it requires a new build or update containing the changed public environment. Keep `RECOGNITION_CATEGORY_MUTATIONS_ENABLED=false` on the API until then. To roll back mobile category awards, build with the mobile flag false while retaining the category-aware API readers and schema. Before enabling custom data, verify an upgraded Android build can award and display archived/custom categories and that the currently supported old binary surfaces HTTP 426's update guidance without a parsing crash. A supported app-update path is a C5 prerequisite.
 
 ## Confirmed direction — September 20, 2026
 
