@@ -20,7 +20,7 @@
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\""
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.8",
