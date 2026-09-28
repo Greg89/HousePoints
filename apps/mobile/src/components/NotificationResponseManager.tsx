@@ -23,7 +23,7 @@ export function NotificationResponseManager() {
     let receivedLiveResponse = false;
     const enqueue = (response: Notifications.NotificationResponse) => {
       if (cancelled) return;
-      queue.current.enqueue({ id: response.notification.request.identifier, data: response.notification.request.content.data });
+      queue.current.enqueue({ id: response.notification.request.identifier, data: response.notification.request.content.data ?? {} });
       setVersion(value => value + 1);
     };
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
