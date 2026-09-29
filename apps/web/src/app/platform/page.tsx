@@ -19,14 +19,12 @@ export default async function PlatformPage() {
 
   if (accessDenied || !overview) {
     return (
-      <main className="min-h-screen bg-background p-6">
-        <div className="mx-auto max-w-xl rounded-2xl border bg-card p-8 text-center">
-          <h1 className="font-display text-2xl font-bold">Platform access required</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            This area is restricted to configured HousePoints platform operators.
-          </p>
-        </div>
-      </main>
+      <div className="rounded-2xl border bg-card p-8 text-center">
+        <h2 className="font-display text-2xl font-bold">Platform access required</h2>
+        <p className="mt-3 text-sm text-muted-foreground">
+          This area is restricted to configured HousePoints platform operators.
+        </p>
+      </div>
     );
   }
 
