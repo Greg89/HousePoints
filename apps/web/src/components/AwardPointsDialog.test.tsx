@@ -230,7 +230,8 @@ describe("AwardPointsDialog", () => {
     await fillAwardForm(user);
     await user.click(screen.getByRole("button", { name: "Award Points" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: "Award Points" }));
+    // useTransition may not commit isPending=false in the same microtask as toast.error; wait for the label to swap back.
+    await user.click(await screen.findByRole("button", { name: "Award Points" }));
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
     expect(submit.mock.calls[0][4]).toMatch(/^[0-9a-f-]{36}$/);
     expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0]);
@@ -295,6 +296,6 @@ describe("AwardPointsDialog", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledWith("member-1", 10, "Great teamwork", "category-1", expect.any(String)));
     expect(await screen.findByText(/Your draft is saved/)).toBeInTheDocument();
     expect(within(dialog).getByPlaceholderText("Describe what they did well…")).toHaveValue("Great teamwork");
-    expect(screen.getByRole("button", { name: "Award Points" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "Award Points" })).toBeDisabled();
   }, 10_000);
 });
