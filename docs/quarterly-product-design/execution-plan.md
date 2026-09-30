@@ -134,7 +134,7 @@ Done when house moves, departures, negative/zero totals, deductions, ties, and c
 
 ### R2 — Add scoped report queries and consistent pagination
 
-Implementation status: complete locally. The authenticated report API and shared contracts support all planned scopes, a same-snapshot summary and first page, signed revision-bound cursors, and typed refresh-required errors. PostgreSQL integration fixtures verify page reconciliation and access checks; measured query counts, payloads, and plans are recorded in [Report query API](report-query-api.md). Web drill-through remains R3.
+Implementation status: complete locally. The authenticated report API and shared contracts support all planned scopes, a same-snapshot summary and first page, signed revision-bound cursors, and typed refresh-required errors. PostgreSQL integration fixtures verify page reconciliation and access checks; measured query counts, payloads, and plans are recorded in [Report query API](report-query-api.md). Web drill-through is now shipped locally under R3.
 
 Dependencies: R1. Surfaces: typed report API/contracts, DB queries and cursor validation.
 
@@ -149,6 +149,8 @@ Dependencies: R2, C5. Surfaces: standings links, authenticated report route, bre
 House → recipients → contributing transactions, plus member season totals across houses. Preserve organization/season/filter context and browser back/forward. Load reports on demand, outside initial dashboard loading. All current members can inspect normal details; administrative evidence stays restricted.
 
 Done when links, stale-revision refresh, revoked access, former-member contributions, empty/error states, and mobile-width layout pass targeted E2E. No public links or native reporting expansion.
+
+Implementation status: complete locally. Reports drill-through route (`/o/[slug]/reports`) is gated behind `REPORTS_DRILL_THROUGH_WEB_ENABLED` (off by default). Dashboard `HouseCard` renders a "Full report" link when the gate is on. The client `ReportsView` preserves scope via props-derived URLs, surfaces refresh-required and access-revoked errors with typed friendly messages, and paginates the ledger via the `readReportPage` server action. Ledger rows fall back to the trait label when `category` is null. Targeted E2E for revocation/former-member/mobile-layout still pending as part of R4 hardening.
 
 ### R4 — Add category/giver breakdown and filter combinations
 
@@ -232,6 +234,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. R1–R2: **implementation complete with local verification; deployment pending**. R3: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
 Recommended next checkpoint: **C4 Android device and old-binary verification, then the C5 staging rehearsal**. Keep category mutation disabled until the controlled staging run and preserve the legacy enum boundary for unsupported clients.

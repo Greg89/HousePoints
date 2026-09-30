@@ -33,6 +33,7 @@ import { awardPoints, deductPoints } from "./actions/points";
 import { awardCategoryPoints } from "./actions/points";
 import { archiveRecognitionCategory, createRecognitionCategory, readRecognitionCategories } from "./actions/recognition";
 import { recognitionCategoriesWebEnabledForOrganization } from "@/lib/recognition-gate";
+import { reportsDrillThroughWebEnabled } from "@/lib/reports-gate";
 import { readSessionSummary } from "./actions/profile";
 import {
   readMemberScores,
@@ -153,6 +154,10 @@ export async function renderDashboardPage(route: string) {
   const dashboardHref = session.organizationSlug
     ? `/o/${encodeURIComponent(session.organizationSlug)}`
     : "/";
+  const reportsHref =
+    reportsDrillThroughWebEnabled && session.organizationSlug
+      ? `/o/${encodeURIComponent(session.organizationSlug)}/reports`
+      : null;
   const releaseNotesUrl = readReleaseNotesUrl(requestId, route);
 
   const adminSection = adminContext === ADMIN_CONTEXT_FAILED ? (
@@ -235,6 +240,7 @@ export async function renderDashboardPage(route: string) {
       onReactToPoint={reactToPointTransaction}
       onReadPointReactionDetails={readPointReactionDetails}
       dashboardHref={dashboardHref}
+      reportsHref={reportsHref}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
       releaseNotesUrl={releaseNotesUrl}
