@@ -10,13 +10,17 @@ import {
   type LeaderboardEntry,
   type MemberScore,
   type OrgMember,
+  type RecognitionCategory,
   type ReportItem,
   type ReportPageRequest,
   type ReportPageResponse,
+  type ReportSummary,
   type SeasonContext,
 } from "@housepoints/contracts";
 import type { ReadReportPageResult, ReportPageErrorCode } from "@/app/actions/reports";
 import { cn } from "@/lib/cn";
+
+export type ReportTypeFilter = "AWARD" | "DEDUCTION";
 
 export interface ReportsViewProps {
   organizationSlug: string;
@@ -25,9 +29,14 @@ export interface ReportsViewProps {
   members: OrgMember[];
   memberPoints: MemberScore[];
   houseMemberRankings: DashboardSummary["houseMemberRankings"];
+  categories: RecognitionCategory[];
   seasonId: string;
   houseId: string | null;
   memberId: string | null;
+  categoryId: string | null;
+  giverId: string | null;
+  type: ReportTypeFilter | null;
+  baselineSummary: ReportSummary | null;
   initialResult: ReadReportPageResult;
   onLoadReport: (request: ReportPageRequest) => Promise<ReadReportPageResult>;
 }
@@ -36,6 +45,15 @@ type LoadState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; code: ReportPageErrorCode; message: string };
+
+type BuildHrefParams = {
+  seasonId?: string;
+  houseId?: string | null;
+  memberId?: string | null;
+  categoryId?: string | null;
+  giverId?: string | null;
+  type?: ReportTypeFilter | null;
+};
 
 const PAGE_SIZE = 25;
 
@@ -46,9 +64,14 @@ export function ReportsView({
   members,
   memberPoints,
   houseMemberRankings,
+  categories,
   seasonId,
   houseId,
   memberId,
+  categoryId,
+  giverId,
+  type,
+  baselineSummary,
   initialResult,
   onLoadReport,
 }: ReportsViewProps) {
@@ -89,6 +112,16 @@ export function ReportsView({
     return members.find((member) => member.id === memberId) ?? null;
   }, [memberId, members]);
 
+  const selectedCategory = useMemo(() => {
+    if (!categoryId) return null;
+    return categories.find((category) => category.id === categoryId) ?? null;
+  }, [categoryId, categories]);
+
+  const selectedGiver = useMemo(() => {
+    if (!giverId) return null;
+    return members.find((member) => member.id === giverId) ?? null;
+  }, [giverId, members]);
+
   const houseRecipients = useMemo(() => {
     if (!houseId) return [];
     const ranking = houseMemberRankings.find((entry) => entry.houseId === houseId);
@@ -101,7 +134,7 @@ export function ReportsView({
   }, [memberId, memberPoints]);
 
   const buildHref = useCallback(
-    (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => {
+    (params: BuildHrefParams) => {
       const next = new URLSearchParams();
       const nextSeasonId = params.seasonId ?? seasonId;
       if (nextSeasonId && nextSeasonId !== seasonContext.activeSeason.id) {
@@ -113,11 +146,20 @@ export function ReportsView({
       const nextMemberId =
         params.memberId === undefined ? memberId : params.memberId;
       if (nextMemberId) next.set("member", nextMemberId);
+      const nextCategoryId =
+        params.categoryId === undefined ? categoryId : params.categoryId;
+      if (nextCategoryId) next.set("category", nextCategoryId);
+      const nextGiverId =
+        params.giverId === undefined ? giverId : params.giverId;
+      if (nextGiverId) next.set("giver", nextGiverId);
+      const nextType =
+        params.type === undefined ? type : params.type;
+      if (nextType) next.set("type", nextType);
       const query = next.toString();
       const base = `/o/${encodeURIComponent(organizationSlug)}/reports`;
       return query ? `${base}?${query}` : base;
     },
-    [houseId, memberId, organizationSlug, seasonContext.activeSeason.id, seasonId],
+    [categoryId, giverId, houseId, memberId, organizationSlug, seasonContext.activeSeason.id, seasonId, type],
   );
 
   const applyPage = useCallback(
@@ -141,6 +183,9 @@ export function ReportsView({
         seasonId,
         houseId: houseId ?? undefined,
         memberId: memberId ?? undefined,
+        categoryId: categoryId ?? undefined,
+        giverId: giverId ?? undefined,
+        type: type ?? undefined,
         limit: PAGE_SIZE,
       });
       if (result.ok) {
@@ -150,7 +195,7 @@ export function ReportsView({
         handleFailure(result.code, result.message);
       }
     });
-  }, [applyPage, handleFailure, houseId, memberId, onLoadReport, seasonId]);
+  }, [applyPage, categoryId, giverId, handleFailure, houseId, memberId, onLoadReport, seasonId, type]);
 
   const loadMore = useCallback(() => {
     if (!nextCursor) return;
@@ -160,6 +205,9 @@ export function ReportsView({
         seasonId,
         houseId: houseId ?? undefined,
         memberId: memberId ?? undefined,
+        categoryId: categoryId ?? undefined,
+        giverId: giverId ?? undefined,
+        type: type ?? undefined,
         cursor: nextCursor,
         limit: PAGE_SIZE,
       });
@@ -170,7 +218,7 @@ export function ReportsView({
         handleFailure(result.code, result.message);
       }
     });
-  }, [applyPage, handleFailure, houseId, memberId, nextCursor, onLoadReport, seasonId]);
+  }, [applyPage, categoryId, giverId, handleFailure, houseId, memberId, nextCursor, onLoadReport, seasonId, type]);
 
   const dashboardHref = `/o/${encodeURIComponent(organizationSlug)}`;
 
@@ -212,13 +260,18 @@ export function ReportsView({
         />
       </header>
 
-      {(selectedHouse || selectedMember) ? (
+      {(selectedHouse || selectedMember || selectedCategory || selectedGiver || type) ? (
         <ScopeChips
           selectedHouse={selectedHouse}
           selectedMember={selectedMember}
+          selectedCategory={selectedCategory}
+          selectedGiver={selectedGiver}
+          type={type}
           buildHref={buildHref}
         />
       ) : null}
+
+      <TypeFilterToolbar type={type} buildHref={buildHref} />
 
       {loadState.status === "error" ? (
         <ErrorPanel state={loadState} onRefresh={refresh} pending={isPending} />
@@ -241,13 +294,15 @@ export function ReportsView({
       ) : null}
 
       {summary ? (
-        <SummaryCard summary={summary} />
+        <SummaryCard summary={summary} baselineSummary={baselineSummary} />
       ) : null}
 
       <LedgerList
         items={items}
         houseId={houseId}
         memberId={memberId}
+        categoryId={categoryId}
+        giverId={giverId}
         buildHref={buildHref}
         canLoadMore={Boolean(nextCursor) && loadState.status !== "error"}
         pending={isPending && loadState.status === "loading"}
@@ -270,7 +325,7 @@ function SeasonSelector({
 }: {
   seasonContext: SeasonContext;
   selectedSeasonId: string;
-  buildHref: (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => string;
+  buildHref: (params: BuildHrefParams) => string;
 }) {
   const router = useRouter();
   if (seasonContext.seasons.length <= 1) return null;
@@ -284,7 +339,14 @@ function SeasonSelector({
         onChange={(event) => {
           const nextSeasonId = event.currentTarget.value;
           if (nextSeasonId === selectedSeasonId) return;
-          router.push(buildHref({ seasonId: nextSeasonId, houseId: null, memberId: null }));
+          router.push(buildHref({
+            seasonId: nextSeasonId,
+            houseId: null,
+            memberId: null,
+            categoryId: null,
+            giverId: null,
+            type: null,
+          }));
         }}
       >
         {seasonContext.seasons.map((season) => (
@@ -298,14 +360,65 @@ function SeasonSelector({
   );
 }
 
+function TypeFilterToolbar({
+  type,
+  buildHref,
+}: {
+  type: ReportTypeFilter | null;
+  buildHref: (params: BuildHrefParams) => string;
+}) {
+  const options: Array<{ value: ReportTypeFilter | null; label: string }> = [
+    { value: null, label: "All" },
+    { value: "AWARD", label: "Awards only" },
+    { value: "DEDUCTION", label: "Deductions only" },
+  ];
+  return (
+    <div
+      role="group"
+      aria-label="Award/deduction filter"
+      className="flex flex-wrap items-center gap-2 text-sm"
+    >
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Show
+      </span>
+      <div className="inline-flex rounded-full border bg-card p-1">
+        {options.map((option) => {
+          const isActive = (option.value ?? null) === (type ?? null);
+          return (
+            <Link
+              key={option.label}
+              href={buildHref({ type: option.value })}
+              aria-pressed={isActive}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm font-semibold",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ScopeChips({
   selectedHouse,
   selectedMember,
+  selectedCategory,
+  selectedGiver,
+  type,
   buildHref,
 }: {
   selectedHouse: LeaderboardEntry | null;
   selectedMember: OrgMember | null;
-  buildHref: (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => string;
+  selectedCategory: RecognitionCategory | null;
+  selectedGiver: OrgMember | null;
+  type: ReportTypeFilter | null;
+  buildHref: (params: BuildHrefParams) => string;
 }) {
   return (
     <div className="flex flex-wrap gap-2 text-sm">
@@ -332,6 +445,41 @@ function ScopeChips({
           Member · {selectedMember.displayName}
           <span aria-hidden="true">×</span>
           <span className="sr-only">Remove member filter</span>
+        </Link>
+      ) : null}
+      {selectedCategory ? (
+        <Link
+          href={buildHref({ categoryId: null })}
+          className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 font-semibold text-foreground hover:border-primary/40"
+        >
+          Category · {selectedCategory.name}
+          {selectedCategory.archivedAt ? (
+            <span className="rounded-full border border-muted-foreground/40 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+              archived
+            </span>
+          ) : null}
+          <span aria-hidden="true">×</span>
+          <span className="sr-only">Remove category filter</span>
+        </Link>
+      ) : null}
+      {selectedGiver ? (
+        <Link
+          href={buildHref({ giverId: null })}
+          className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 font-semibold text-foreground hover:border-primary/40"
+        >
+          Giver · {selectedGiver.displayName}
+          <span aria-hidden="true">×</span>
+          <span className="sr-only">Remove giver filter</span>
+        </Link>
+      ) : null}
+      {type ? (
+        <Link
+          href={buildHref({ type: null })}
+          className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 font-semibold text-foreground hover:border-primary/40"
+        >
+          {type === "AWARD" ? "Awards only" : "Deductions only"}
+          <span aria-hidden="true">×</span>
+          <span className="sr-only">Remove type filter</span>
         </Link>
       ) : null}
     </div>
@@ -382,7 +530,7 @@ function HouseListCard({
   buildHref,
 }: {
   leaderboard: LeaderboardEntry[];
-  buildHref: (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => string;
+  buildHref: (params: BuildHrefParams) => string;
 }) {
   return (
     <section className="rounded-xl border bg-card" aria-label="Houses">
@@ -435,7 +583,7 @@ function HouseRecipientsCard({
 }: {
   house: LeaderboardEntry;
   recipients: DashboardSummary["houseMemberRankings"][number]["members"];
-  buildHref: (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => string;
+  buildHref: (params: BuildHrefParams) => string;
 }) {
   return (
     <section className="rounded-xl border bg-card" aria-label={`${house.name} recipients`}>
@@ -530,24 +678,54 @@ function MemberOverviewCard({
   );
 }
 
-function SummaryCard({ summary }: { summary: ReportPageResponse["summary"] }) {
+function SummaryCard({
+  summary,
+  baselineSummary,
+}: {
+  summary: ReportPageResponse["summary"];
+  baselineSummary: ReportSummary | null;
+}) {
+  const filtered = Boolean(baselineSummary);
   return (
     <section
       aria-label="Report summary"
       className="grid gap-3 rounded-xl border bg-card p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <SummaryStat label="Net points" value={summary.netPoints} />
-      <SummaryStat label="Awarded" value={summary.awardedPoints} sub={`${summary.awardCount} awards`} />
       <SummaryStat
-        label="Deducted"
+        label={filtered ? "Filtered net" : "Net points"}
+        value={summary.netPoints}
+        baseline={baselineSummary?.netPoints}
+        baselineLabel="of full-season net"
+      />
+      <SummaryStat
+        label={filtered ? "Filtered awarded" : "Awarded"}
+        value={summary.awardedPoints}
+        sub={`${summary.awardCount} awards`}
+        baseline={baselineSummary?.awardedPoints}
+        baselineLabel="of full-season awarded"
+      />
+      <SummaryStat
+        label={filtered ? "Filtered deducted" : "Deducted"}
         value={-summary.deductedPoints}
         sub={`${summary.deductionCount} deductions`}
+        baseline={baselineSummary ? -baselineSummary.deductedPoints : undefined}
+        baselineLabel="of full-season deducted"
       />
-      <SummaryStat label="Transactions" value={summary.transactionCount} />
+      <SummaryStat
+        label={filtered ? "Filtered transactions" : "Transactions"}
+        value={summary.transactionCount}
+        baseline={baselineSummary?.transactionCount}
+        baselineLabel="of full-season transactions"
+      />
       {summary.deductionsOutsideCategory ? (
         <p className="sm:col-span-2 lg:col-span-4 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
           {summary.deductionsOutsideCategory.count} deductions ({summary.deductionsOutsideCategory.points.toLocaleString()} points)
           fall outside this category and are not part of its subtotal.
+        </p>
+      ) : null}
+      {filtered ? (
+        <p className="sm:col-span-2 lg:col-span-4 text-xs text-muted-foreground">
+          Subtotals reflect the active filters. Full-season totals include every transaction in the current season/house/member scope.
         </p>
       ) : null}
     </section>
@@ -558,10 +736,14 @@ function SummaryStat({
   label,
   value,
   sub,
+  baseline,
+  baselineLabel,
 }: {
   label: string;
   value: number;
   sub?: string;
+  baseline?: number;
+  baselineLabel?: string;
 }) {
   return (
     <div>
@@ -572,6 +754,11 @@ function SummaryStat({
         {value.toLocaleString()}
       </p>
       {sub ? <p className="text-xs text-muted-foreground">{sub}</p> : null}
+      {baseline !== undefined && baselineLabel ? (
+        <p className="text-xs text-muted-foreground">
+          {value.toLocaleString()} of {baseline.toLocaleString()} {baselineLabel}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -580,6 +767,8 @@ function LedgerList({
   items,
   houseId,
   memberId,
+  categoryId,
+  giverId,
   buildHref,
   canLoadMore,
   pending,
@@ -588,7 +777,9 @@ function LedgerList({
   items: ReportItem[];
   houseId: string | null;
   memberId: string | null;
-  buildHref: (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => string;
+  categoryId: string | null;
+  giverId: string | null;
+  buildHref: (params: BuildHrefParams) => string;
   canLoadMore: boolean;
   pending: boolean;
   onLoadMore: () => void;
@@ -613,6 +804,8 @@ function LedgerList({
                 item={item}
                 showHouseLink={!houseId}
                 showMemberLink={!memberId}
+                showCategoryLink={!categoryId}
+                showGiverLink={!giverId}
                 buildHref={buildHref}
               />
             </li>
@@ -647,12 +840,16 @@ function LedgerRow({
   item,
   showHouseLink,
   showMemberLink,
+  showCategoryLink,
+  showGiverLink,
   buildHref,
 }: {
   item: ReportItem;
   showHouseLink: boolean;
   showMemberLink: boolean;
-  buildHref: (params: { seasonId?: string; houseId?: string | null; memberId?: string | null }) => string;
+  showCategoryLink: boolean;
+  showGiverLink: boolean;
+  buildHref: (params: BuildHrefParams) => string;
 }) {
   const label = item.category?.name ?? (item.trait ? TRAIT_LABELS[item.trait] : null);
   const memberLabel = item.member.displayName;
@@ -662,7 +859,16 @@ function LedgerRow({
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{formatDate(item.createdAt)}</p>
         <p className="mt-1 truncate text-sm">
-          <span className="font-semibold">{item.giver.displayName}</span>
+          {showGiverLink ? (
+            <Link
+              href={buildHref({ giverId: item.giver.id })}
+              className="font-semibold text-primary hover:underline"
+            >
+              {item.giver.displayName}
+            </Link>
+          ) : (
+            <span className="font-semibold">{item.giver.displayName}</span>
+          )}
           <span className="text-muted-foreground"> to </span>
           {showMemberLink && item.member.id ? (
             <Link
@@ -690,7 +896,18 @@ function LedgerRow({
           <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
         ) : null}
         <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
-          {label ? (
+          {label && item.category ? (
+            showCategoryLink ? (
+              <Link
+                href={buildHref({ categoryId: item.category.id })}
+                className="rounded-full bg-primary/10 px-2 py-0.5 text-primary hover:bg-primary/20"
+              >
+                {label}
+              </Link>
+            ) : (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{label}</span>
+            )
+          ) : label ? (
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{label}</span>
           ) : null}
           {item.category?.archivedAt ? (

@@ -21,6 +21,15 @@ const disabled: MutationResult = {
 
 export async function readRecognitionCategories(requestId: string = randomUUID()): Promise<RecognitionCategory[]> {
   if (!recognitionCategoriesWebEnabled) return [];
+  return fetchRecognitionCategoriesFromApi(requestId);
+}
+
+// Bypasses the management gate; used by reports to label category chips.
+export async function readRecognitionCategoriesForReports(requestId: string = randomUUID()): Promise<RecognitionCategory[]> {
+  return fetchRecognitionCategoriesFromApi(requestId);
+}
+
+async function fetchRecognitionCategoriesFromApi(requestId: string): Promise<RecognitionCategory[]> {
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/recognition-categories/list", requestId, {
     method: "POST",

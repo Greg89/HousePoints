@@ -160,6 +160,8 @@ Expose category and giver drill-through, award/deduction filters, and clear filt
 
 Done when combined filters, shareable authenticated URLs, and all breakdowns reconcile without losing scope. CSV, saved filters, and a custom report builder remain deferred.
 
+Implementation status: complete locally. `/o/[slug]/reports` accepts `category`, `giver`, and `type` search parameters that combine with the existing season/house/member scope. `ReportsView` renders a category/giver/type scope chip with removal links, an Awards/Deductions toolbar, and category/giver drill-through links directly on each ledger row. When any filter overlay is active the server route also fetches an unfiltered baseline summary (same season/house/member scope) and the summary card renders the filtered subtotal alongside the full-season baseline. Archived categories with reused names remain distinct because chips and links use category IDs, and archived state is surfaced on the chip. Feature gate `REPORTS_DRILL_THROUGH_WEB_ENABLED` continues to gate the entire route. Targeted E2E for shareable URLs across roles and mobile-width layout still pending.
+
 ## S — Season preparation and reporting
 
 ### S1 — Prepare the next season without changing the active one
@@ -234,6 +236,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. R1–R2: **implementation complete with local verification; deployment pending**. R3: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
 Recommended next checkpoint: **C4 Android device and old-binary verification, then the C5 staging rehearsal**. Keep category mutation disabled until the controlled staging run and preserve the legacy enum boundary for unsupported clients.

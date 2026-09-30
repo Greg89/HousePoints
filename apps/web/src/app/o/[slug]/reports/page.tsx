@@ -4,12 +4,13 @@ import { notFound, redirect } from "next/navigation";
 import { readDashboardSummary, readMembers, readSeasonLeaderboard } from "@/app/actions/dashboard";
 import { readOrgRouteContext } from "@/app/actions/orgs";
 import { readSessionSummary } from "@/app/actions/profile";
+import { readRecognitionCategoriesForReports } from "@/app/actions/recognition";
 import {
   readMemberScores,
   readSeasonContext,
 } from "@/app/actions/seasons";
 import { readReportPage } from "@/app/actions/reports";
-import { ReportsView } from "@/components/ReportsView";
+import { ReportsView, type ReportTypeFilter } from "@/components/ReportsView";
 import { WebAuthenticationError } from "@/lib/api-client";
 import { reportsDrillThroughWebEnabled } from "@/lib/reports-gate";
 import { logInfo } from "@/lib/logging";
@@ -20,6 +21,9 @@ type OrganizationReportsPageProps = {
     season?: string | string[];
     house?: string | string[];
     member?: string | string[];
+    category?: string | string[];
+    giver?: string | string[];
+    type?: string | string[];
   }>;
 };
 
@@ -28,6 +32,11 @@ export const dynamic = "force-dynamic";
 function readParam(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
+}
+
+function parseTypeParam(value: string | null): ReportTypeFilter | null {
+  if (value === "AWARD" || value === "DEDUCTION") return value;
+  return null;
 }
 
 export default async function OrganizationReportsPage({
@@ -71,10 +80,11 @@ export default async function OrganizationReportsPage({
     redirect(`/o/${encodeURIComponent(slug)}`);
   }
 
-  const [seasonContext, leaderboardBaseline, members] = await Promise.all([
+  const [seasonContext, leaderboardBaseline, members, categories] = await Promise.all([
     readSeasonContext(requestId),
     readSeasonLeaderboard(undefined, requestId),
     readMembers(requestId),
+    readRecognitionCategoriesForReports(requestId),
   ]);
 
   const seasonParam = readParam(query.season);
@@ -94,6 +104,9 @@ export default async function OrganizationReportsPage({
 
   const houseParam = readParam(query.house);
   const memberParam = readParam(query.member);
+  const categoryParam = readParam(query.category);
+  const giverParam = readParam(query.giver);
+  const typeParam = parseTypeParam(readParam(query.type));
 
   const houseId = houseParam && leaderboard.some((house: { id: string }) => house.id === houseParam)
     ? houseParam
@@ -101,13 +114,36 @@ export default async function OrganizationReportsPage({
   const memberId = memberParam && members.some((member: { id: string }) => member.id === memberParam)
     ? memberParam
     : null;
+  const categoryId = categoryParam && categories.some((category) => category.id === categoryParam)
+    ? categoryParam
+    : null;
+  const giverId = giverParam && members.some((member: { id: string }) => member.id === giverParam)
+    ? giverParam
+    : null;
+  const type = typeParam;
 
-  const initialResult = await readReportPage({
-    seasonId: selectedSeason.id,
-    houseId: houseId ?? undefined,
-    memberId: memberId ?? undefined,
-    limit: 25,
-  });
+  const hasFilterOverlay = Boolean(categoryId || giverId || type);
+
+  const [initialResult, baselineResult] = await Promise.all([
+    readReportPage({
+      seasonId: selectedSeason.id,
+      houseId: houseId ?? undefined,
+      memberId: memberId ?? undefined,
+      categoryId: categoryId ?? undefined,
+      giverId: giverId ?? undefined,
+      type: type ?? undefined,
+      limit: 25,
+    }),
+    hasFilterOverlay
+      ? readReportPage({
+          seasonId: selectedSeason.id,
+          houseId: houseId ?? undefined,
+          memberId: memberId ?? undefined,
+          limit: 1,
+        })
+      : Promise.resolve(null),
+  ]);
+  const baselineSummary = baselineResult && baselineResult.ok ? baselineResult.page.summary : null;
 
   logInfo("web.reports.render_completed", {
     requestId,
@@ -115,6 +151,9 @@ export default async function OrganizationReportsPage({
     seasonId: selectedSeason.id,
     houseId: houseId ?? undefined,
     memberId: memberId ?? undefined,
+    categoryId: categoryId ?? undefined,
+    giverId: giverId ?? undefined,
+    type: type ?? undefined,
     ok: initialResult.ok,
   });
 
@@ -127,9 +166,14 @@ export default async function OrganizationReportsPage({
         members={members}
         memberPoints={memberScores}
         houseMemberRankings={dashboardSummary.houseMemberRankings}
+        categories={categories}
         seasonId={selectedSeason.id}
         houseId={houseId}
         memberId={memberId}
+        categoryId={categoryId}
+        giverId={giverId}
+        type={type}
+        baselineSummary={baselineSummary}
         initialResult={initialResult}
         onLoadReport={readReportPage}
       />

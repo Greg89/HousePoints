@@ -6,6 +6,7 @@ import type {
   LeaderboardEntry,
   MemberScore,
   OrgMember,
+  RecognitionCategory,
   ReportPageResponse,
   SeasonContext,
 } from "@housepoints/contracts";
@@ -99,6 +100,25 @@ const houseMemberRankings: DashboardSummary["houseMemberRankings"] = [
   { houseId: "house-2", members: [] },
 ];
 
+const categories: RecognitionCategory[] = [
+  {
+    id: "cat-1",
+    name: "Teamwork",
+    description: null,
+    legacyTrait: "COLLABORATION",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    archivedAt: null,
+  },
+  {
+    id: "cat-2",
+    name: "Teamwork",
+    description: null,
+    legacyTrait: "COLLABORATION",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    archivedAt: "2025-12-31T00:00:00.000Z",
+  },
+];
+
 function makeItem(id: string): ReportPageResponse["items"][number] {
   return {
     id,
@@ -142,9 +162,14 @@ const baseProps = {
   members,
   memberPoints,
   houseMemberRankings,
+  categories,
   seasonId: "season-1",
   houseId: null,
   memberId: null,
+  categoryId: null,
+  giverId: null,
+  type: null,
+  baselineSummary: null,
 };
 
 beforeEach(() => {
@@ -236,6 +261,9 @@ describe("ReportsView", () => {
       seasonId: "season-1",
       houseId: undefined,
       memberId: undefined,
+      categoryId: undefined,
+      giverId: undefined,
+      type: undefined,
       limit: 25,
     });
     expect(await screen.findByText(/reason tx-2/i)).toBeInTheDocument();
@@ -280,6 +308,9 @@ describe("ReportsView", () => {
       seasonId: "season-1",
       houseId: undefined,
       memberId: undefined,
+      categoryId: undefined,
+      giverId: undefined,
+      type: undefined,
       cursor: "cursor-1",
       limit: 25,
     });
@@ -302,5 +333,98 @@ describe("ReportsView", () => {
     );
 
     expect(routerPushMock).toHaveBeenCalledWith("/o/acme/reports?season=season-0");
+  });
+
+  it("renders category, giver, and type chips with removal links", () => {
+    render(
+      <ReportsView
+        {...baseProps}
+        categoryId="cat-2"
+        giverId="member-2"
+        type="AWARD"
+        initialResult={makeSuccess([], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    const categoryChip = screen.getByRole("link", { name: /Remove category filter/i });
+    expect(categoryChip).toHaveTextContent(/Teamwork/i);
+    expect(categoryChip).toHaveTextContent(/archived/i);
+    expect(categoryChip).toHaveAttribute("href", "/o/acme/reports?giver=member-2&type=AWARD");
+
+    const giverChip = screen.getByRole("link", { name: /Remove giver filter/i });
+    expect(giverChip).toHaveAttribute("href", "/o/acme/reports?category=cat-2&type=AWARD");
+
+    const typeChip = screen.getByRole("link", { name: /Remove type filter/i });
+    expect(typeChip).toHaveAttribute("href", "/o/acme/reports?category=cat-2&giver=member-2");
+  });
+
+  it("links award/deduction toolbar buttons to the corresponding filter URL", () => {
+    render(
+      <ReportsView
+        {...baseProps}
+        initialResult={makeSuccess([], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    const toolbar = screen.getByRole("group", { name: /Award\/deduction filter/i });
+    const allLink = within(toolbar).getByRole("link", { name: "All" });
+    const awardsLink = within(toolbar).getByRole("link", { name: "Awards only" });
+    const deductionsLink = within(toolbar).getByRole("link", { name: "Deductions only" });
+
+    expect(allLink).toHaveAttribute("href", "/o/acme/reports");
+    expect(allLink).toHaveAttribute("aria-pressed", "true");
+    expect(awardsLink).toHaveAttribute("href", "/o/acme/reports?type=AWARD");
+    expect(deductionsLink).toHaveAttribute("href", "/o/acme/reports?type=DEDUCTION");
+  });
+
+  it("exposes category and giver drill-through links from a ledger row", () => {
+    const categorizedItem: ReportPageResponse["items"][number] = {
+      ...makeItem("tx-cat"),
+      category: {
+        id: "cat-1",
+        name: "Teamwork",
+        archivedAt: null,
+      },
+    };
+    render(
+      <ReportsView
+        {...baseProps}
+        initialResult={makeSuccess([categorizedItem], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    const categoryLink = screen.getByRole("link", { name: "Teamwork" });
+    expect(categoryLink).toHaveAttribute("href", "/o/acme/reports?category=cat-1");
+
+    const giverLink = screen.getByRole("link", { name: "Boss" });
+    expect(giverLink).toHaveAttribute("href", "/o/acme/reports?giver=member-9");
+  });
+
+  it("renders filtered subtotal versus baseline full-season totals when a filter is active", () => {
+    render(
+      <ReportsView
+        {...baseProps}
+        type="AWARD"
+        baselineSummary={{
+          netPoints: 150,
+          awardedPoints: 200,
+          deductedPoints: 50,
+          transactionCount: 20,
+          awardCount: 15,
+          deductionCount: 5,
+          deductionsOutsideCategory: null,
+        }}
+        initialResult={makeSuccess([makeItem("tx-1")], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    const summary = screen.getByRole("region", { name: /Report summary/i });
+    expect(within(summary).getByText(/Filtered net/i)).toBeInTheDocument();
+    expect(within(summary).getByText(/of full-season net/i)).toBeInTheDocument();
+    expect(within(summary).getByText(/full-season totals include every transaction/i)).toBeInTheDocument();
   });
 });
