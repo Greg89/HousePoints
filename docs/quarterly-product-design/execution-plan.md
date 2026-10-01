@@ -198,6 +198,8 @@ Estimate hosting at realistic member/activity levels; propose Standard price and
 
 Done when each unresolved item has a recommendation, evidence, and owner decision needed before implementation. Time-box discovery to producing this record, not building a generic billing framework.
 
+Draft status: a decision-record skeleton has been drafted at [B1 decision record (draft)](./b1-decision-record.md) that turns every open item from the billing design into a numbered section with a recommendation, an evidence requirement, and a specific owner sign-off. It does not commit to a price, provider, or hosting cost — those require primary-source evidence gathered during the spike. B1 remains "prepared, not decided" until every acceptance-checklist item in that record has a documented owner decision.
+
 ### B2 — Prove the lifecycle in an isolated sandbox
 
 Dependencies: B1 provider selection and sandbox access. Deliverable: small runnable harness/tests plus observed results; no production credentials or real charges.

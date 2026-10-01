@@ -12,6 +12,7 @@ Help an organization define meaningful recognition, explain its standings, run s
 2. [Leaderboard drill-through reporting](./leaderboard-reporting.md)
 3. [Season kickoff and reporting](./season-lifecycle.md)
 4. [Paid organization membership: design and spike](./organization-membership-billing.md)
+   — companion draft: [B1 decision record](./b1-decision-record.md).
 
 These designs extend the implemented product described in [the roadmap](../roadmap.md). Earlier season and reporting documents remain records of current behavior. Where this draft proposes a change, it is explicitly future behavior. The [independent repository review](../refactor-pass-3/04-independent-review.md) supplies supporting engineering observations, not the feature priorities.
 
