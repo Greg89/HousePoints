@@ -139,6 +139,14 @@ longer shell logic, invoke a checked-in script instead. Broadcast-idle messages
 such as `Test idle failed ... PERSISTENT` are polling diagnostics, not a test
 failure when they are followed by `All broadcast queues are idle!`.
 
+The legacy award flow submits seven points and exercises reason-first focus,
+numeric validation, and keyboard dismissal/reopening. Reopening the numeric
+keyboard must preserve the amount rather than re-enter it. Before replacing
+the reason, select all text and erase the selection: Maestro's `eraseText`
+simulates backspace at the cursor, so a middle-of-text tap can leave a suffix.
+Keep exact reason and seven-point assertions before submission to catch
+partial replacements or accidentally appended digits.
+
 The smoke flow also accepts Chrome's first-run **Use without an account** prompt
 because some Google APIs emulator images ignore Chrome's command-line
 first-run suppression flags.
@@ -154,7 +162,9 @@ The APK must target the staging API and staging Auth0 Native Application. The
 test account must belong to exactly one organization so the smoke reaches the
 dashboard without an organization-picker choice. The target member must be an
 assigned, active member in that organization and must not be the test actor.
-The smoke intentionally creates a five-point Teamwork award on each run.
+The legacy smoke intentionally creates a seven-point award using the first
+available trait. The category flow creates a five-point award using the
+configured category.
 
 The manual `android_app_url` input overrides
 `MOBILE_E2E_ANDROID_APP_URL` for one run. No new Railway variables are required;

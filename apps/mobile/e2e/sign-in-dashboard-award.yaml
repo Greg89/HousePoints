@@ -88,10 +88,10 @@ tags:
 # Reopen the numeric keyboard to catch stale layout after dismissal.
 - tapOn:
     id: "mobile.award.points"
-- eraseText
-- inputText: "7"
 - assertVisible:
     id: "mobile.award.points"
+    text: "7"
+- assertVisible: "Award 7 points"
 - takeScreenshot: award-points-keyboard-reopened
 - hideKeyboard
 - assertVisible:
@@ -101,17 +101,26 @@ tags:
 - takeScreenshot: award-points-keyboard-dismissed
 - tapOn:
     id: "mobile.award.reason"
-- eraseText
+# A tap may place the cursor mid-text; backspace alone leaves a suffix.
+- longPressOn:
+    id: "mobile.award.reason"
+- tapOn: "(?i)Select all"
+- eraseText: 1
+- assertNotVisible: "Reason first keyboard check"
 - inputText: "Maestro staging award"
 # Keep the keyboard open: both the reason and submit action must stay reachable.
 - assertVisible:
     id: "mobile.award.reason"
-- assertVisible: "Maestro staging award"
+    text: "Maestro staging award"
 - takeScreenshot: award-reason-keyboard-open
 - extendedWaitUntil:
     visible:
       id: "mobile.award.submit"
     timeout: 10000
+- assertVisible:
+    id: "mobile.award.points"
+    text: "7"
+- assertVisible: "Award 7 points"
 - tapOn:
     id: "mobile.award.submit"
 

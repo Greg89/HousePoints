@@ -72,3 +72,43 @@ describe("mobile E2E workflow shell commands", () => {
     expect(result.status).toBe(7);
   });
 });
+
+describe("legacy mobile E2E award input guards", () => {
+  const flow = readFileSync(
+    new URL("../../e2e/sign-in-dashboard-award.yaml", import.meta.url),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+
+  it("reopens the numeric keyboard without rewriting the amount", () => {
+    const reopen = flow.split("# Reopen the numeric keyboard")[1]?.split("- hideKeyboard")[0];
+    expect(reopen).toBeDefined();
+    expect(reopen).toContain('- tapOn:\n    id: "mobile.award.points"');
+    expect(reopen).not.toMatch(/- (?:eraseText|inputText)/);
+    expect(reopen).toContain('- assertVisible:\n    id: "mobile.award.points"\n    text: "7"');
+    expect(reopen).toContain('- assertVisible: "Award 7 points"');
+  });
+
+  it("selects the whole reason before deleting and replacing it", () => {
+    expect(flow).toContain([
+      "- longPressOn:",
+      '    id: "mobile.award.reason"',
+      '- tapOn: "(?i)Select all"',
+      "- eraseText: 1",
+      '- assertNotVisible: "Reason first keyboard check"',
+      '- inputText: "Maestro staging award"',
+    ].join("\n"));
+  });
+
+  it("checks the exact reason and amount before submission", () => {
+    const beforeSubmit = flow.split('- inputText: "Maestro staging award"')[1]
+      ?.split('- tapOn:\n    id: "mobile.award.submit"')[0];
+    expect(beforeSubmit).toBeDefined();
+    expect(beforeSubmit).toContain(
+      '- assertVisible:\n    id: "mobile.award.reason"\n    text: "Maestro staging award"',
+    );
+    expect(beforeSubmit).toContain(
+      '- assertVisible:\n    id: "mobile.award.points"\n    text: "7"',
+    );
+    expect(beforeSubmit).toContain('- assertVisible: "Award 7 points"');
+  });
+});
