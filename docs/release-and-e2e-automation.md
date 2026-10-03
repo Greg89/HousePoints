@@ -132,6 +132,13 @@ Auth0 Universal Login can open unattended, and executes the pinned free Maestro
 CLI. CI does not build or sign a native binary in this slice, and no Maestro
 Cloud account or subscription is required.
 
+The emulator runner executes each non-comment line of its `script` input in a
+separate `sh -c` process. Keep the award-mode conditional on one line; a
+multiline `if` block fails with `expecting "fi"` before Maestro starts. For
+longer shell logic, invoke a checked-in script instead. Broadcast-idle messages
+such as `Test idle failed ... PERSISTENT` are polling diagnostics, not a test
+failure when they are followed by `All broadcast queues are idle!`.
+
 The smoke flow also accepts Chrome's first-run **Use without an account** prompt
 because some Google APIs emulator images ignore Chrome's command-line
 first-run suppression flags.
