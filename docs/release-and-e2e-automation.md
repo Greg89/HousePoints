@@ -262,8 +262,10 @@ archived category history as evidence. The normal web award smoke accepts
 either trait or category mode; the optional staging Environment variable
 `E2E_RECOGNITION_CATEGORY_NAME` chooses a particular active category.
 Dispatch `Mobile Staging E2E` with `recognition_mode=categories` and the
-category-enabled APK URL. It additionally needs staging Environment variable
-`MOBILE_E2E_CATEGORY_NAME`. Scheduled mobile runs use
+category-enabled APK URL. It additionally needs staging GitHub Environment secret
+or variable `MOBILE_E2E_CATEGORY_NAME` (the secret takes precedence if both are
+configured). GitHub secrets and variables are separate namespaces; the workflow
+explicitly accepts either for this setting. Scheduled mobile runs use
 `MOBILE_E2E_RECOGNITION_MODE` (`legacy` by default); keep it aligned with the
 APK URL secret. The staging Railway API needs
 `RECOGNITION_CATEGORY_MUTATIONS_ENABLED=true` and web needs

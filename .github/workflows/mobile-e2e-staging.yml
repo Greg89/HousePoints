@@ -39,7 +39,7 @@ jobs:
       MOBILE_E2E_USER_PASSWORD: ${{ secrets.MOBILE_E2E_USER_PASSWORD }}
       MOBILE_E2E_TARGET_MEMBER: ${{ secrets.MOBILE_E2E_TARGET_MEMBER }}
       MOBILE_E2E_RECOGNITION_MODE: ${{ inputs.recognition_mode || vars.MOBILE_E2E_RECOGNITION_MODE || 'legacy' }}
-      MOBILE_E2E_CATEGORY_NAME: ${{ vars.MOBILE_E2E_CATEGORY_NAME }}
+      MOBILE_E2E_CATEGORY_NAME: ${{ secrets.MOBILE_E2E_CATEGORY_NAME || vars.MOBILE_E2E_CATEGORY_NAME }}
 
     steps:
       - uses: actions/checkout@v7
@@ -64,7 +64,7 @@ jobs:
             exit 1
           fi
           if [ "$MOBILE_E2E_RECOGNITION_MODE" = "categories" ] && [ -z "${MOBILE_E2E_CATEGORY_NAME//[[:space:]]/}" ]; then
-            echo "MOBILE_E2E_CATEGORY_NAME is required for the category award flow."
+            echo "MOBILE_E2E_CATEGORY_NAME must be configured as a staging GitHub Environment secret or variable for the category award flow."
             exit 1
           fi
 
