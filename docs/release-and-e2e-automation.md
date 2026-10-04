@@ -269,10 +269,14 @@ explicitly accepts either for this setting. Scheduled mobile runs use
 `MOBILE_E2E_RECOGNITION_MODE` (`legacy` by default); keep it aligned with the
 APK URL secret. The staging Railway API needs
 `RECOGNITION_CATEGORY_MUTATIONS_ENABLED=true` and web needs
-`RECOGNITION_CATEGORIES_WEB_ENABLED=true` only during the rehearsal. Both
-services need the same controlled organization ID in
-`RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS`; the EAS preview Environment
-needs it in `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS`. See the
+`RECOGNITION_CATEGORIES_WEB_ENABLED=true`. Set
+`EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED=true` in the EAS preview Environment
+and build a new preview APK. These flags enable categories for all organizations
+in that environment; no organization-ID list is required. Validate beta first,
+then set the same three flags in production and deliver a production mobile
+build or compatible update using the production EAS Environment. Previously
+configured category rollout organization-ID settings are ignored and can be
+removed from Railway and EAS. See the
 [C5 runbook](quarterly-product-design/recognition-categories.md#c5-release-rehearsal--prepared-not-enabled)
 for deployment order and rollback.
 

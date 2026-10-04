@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBooleanFlag, parseCorsAllowedOrigins, parseMaxActiveOrganizations, parsePlatformOwnerAuth0Subjects, parseRecognitionCategoryRolloutOrganizationIds, parseReleaseAutomationSecret } from "./config";
+import { parseBooleanFlag, parseCorsAllowedOrigins, parseMaxActiveOrganizations, parsePlatformOwnerAuth0Subjects, parseReleaseAutomationSecret } from "./config";
 
 describe("parseCorsAllowedOrigins", () => {
   it("normalizes and deduplicates comma-separated HTTP origins", () => {
@@ -31,13 +31,6 @@ describe("parseBooleanFlag", () => {
     expect(parseBooleanFlag("false")).toBe(false);
     expect(parseBooleanFlag("1")).toBe(false);
     expect(parseBooleanFlag(undefined)).toBe(false);
-  });
-});
-
-describe("parseRecognitionCategoryRolloutOrganizationIds", () => {
-  it("normalizes the cohort and defaults to no enabled organizations", () => {
-    expect([...parseRecognitionCategoryRolloutOrganizationIds(" org-1,org-2, org-1 ")]).toEqual(["org-1", "org-2"]);
-    expect([...parseRecognitionCategoryRolloutOrganizationIds(undefined)]).toEqual([]);
   });
 });
 

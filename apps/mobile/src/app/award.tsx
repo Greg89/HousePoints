@@ -39,7 +39,7 @@ import {
 import { logger, serializeError } from "@/lib/logger";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
 import { MOBILE_QUERY_STALE_MS } from "@/lib/query-policy";
-import { availableRecognitionCategories, recognitionCategoryAwardsEnabled, selectedRecognitionCategory } from "@/lib/recognition-categories";
+import { availableRecognitionCategories, selectedRecognitionCategory } from "@/lib/recognition-categories";
 import { generateRequestId } from "@/lib/request-id";
 
 const REASON_MIN = 3;
@@ -48,12 +48,8 @@ const DELTA_QUICK_VALUES = [1, 5, 10, 25] as const;
 
 export default function AwardPointsScreen() {
   const { user, getAccessToken } = useAppAuth();
-  const { activeOrgSlug, activeMembership } = useActiveOrg();
-  const categoriesEnabled = recognitionCategoryAwardsEnabled(
-    env.recognitionCategoriesEnabled,
-    env.recognitionCategoryRolloutOrganizationIds,
-    activeMembership?.organizationId,
-  );
+  const { activeOrgSlug } = useActiveOrg();
+  const categoriesEnabled = env.recognitionCategoriesEnabled;
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();

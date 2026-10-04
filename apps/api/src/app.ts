@@ -18,7 +18,6 @@ import {
   readExpoAccessTokenFromEnv,
   readPointAdjustmentsEnabledFromEnv,
   readRecognitionCategoryMutationsEnabledFromEnv,
-  readRecognitionCategoryRolloutOrganizationIdsFromEnv,
   readPushDispatchEnabledFromEnv,
   readOrganizationCreationPolicyFromEnv,
   readPlatformOwnerAuth0SubjectsFromEnv,
@@ -55,7 +54,6 @@ type BuildAppOptions = {
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
   recognitionCategoryMutationsEnabled?: boolean;
-  recognitionCategoryRolloutOrganizationIds?: ReadonlySet<string>;
   pushDispatcher?: PushDispatcher | null;
   organizationCreationPolicy?: OrganizationCreationPolicy;
   platformOwnerAuth0Subjects?: ReadonlySet<string>;
@@ -74,8 +72,6 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
   const recognitionCategoryMutationsEnabled =
     options.recognitionCategoryMutationsEnabled ?? readRecognitionCategoryMutationsEnabledFromEnv();
-  const recognitionCategoryRolloutOrganizationIds =
-    options.recognitionCategoryRolloutOrganizationIds ?? readRecognitionCategoryRolloutOrganizationIdsFromEnv();
   const organizationCreationPolicy =
     options.organizationCreationPolicy ?? readOrganizationCreationPolicyFromEnv();
   const platformOwnerAuth0Subjects =
@@ -144,12 +140,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerPointRoutes(app, {
     pointAdjustmentsEnabled,
     recognitionCategoryMutationsEnabled,
-    recognitionCategoryRolloutOrganizationIds,
     pushDispatcher,
   });
   await registerRecognitionCategoryRoutes(app, {
     mutationsEnabled: recognitionCategoryMutationsEnabled,
-    rolloutOrganizationIds: recognitionCategoryRolloutOrganizationIds,
   });
   await registerPlatformRoutes(app, {
     hardOrganizationCreationPolicy: organizationCreationPolicy,
