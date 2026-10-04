@@ -112,11 +112,11 @@ Done when the upgraded app completes an award and renders archived/custom catego
 
 ### C5 — Enable categories with a cross-client release rehearsal
 
-Status: **rehearsal automation, organization-ID cohort gates, rollback-safe web reads, and staging runbook prepared locally September 27, 2026; deployment, device, and old-binary evidence pending**. No category flags have been enabled. See the [C5 runbook](./recognition-categories.md#c5-release-rehearsal--prepared-not-enabled).
+Status: **rehearsal automation, rollback-safe web reads, and staging runbook prepared; rollout changed October 4, 2026 to environment-wide flags, beta before production, without organization-ID allowlists**. Code has been deployed per the release owner; category device, old-binary, and live enablement evidence remains to be recorded. See the [C5 runbook](./recognition-categories.md#c5-release-rehearsal--prepared-not-enabled).
 
 Dependencies: C3, C4. Surfaces: deployment/release docs, compatibility gate and targeted E2E.
 
-Rehearse migration plus old/new client combinations, then enable for a controlled organization. Verify add → award → archive → report → reuse-name across web/mobile. Record supported versions, required configuration, and backfill evidence.
+Rehearse migration plus old/new client combinations in beta, then enable production with environment-wide API, web, and mobile flags. Verify add → award → archive → report → reuse-name across web/mobile using dedicated test organizations. Record supported versions, required configuration, and backfill evidence.
 
 Done when deployment order and rollback are executable. Once custom awards exist, enum-only rollback is forbidden; disable management if needed while retaining compatible reads. Legacy enum removal is deferred, not bundled into this release.
 

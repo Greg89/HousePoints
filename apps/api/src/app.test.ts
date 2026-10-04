@@ -465,7 +465,6 @@ async function buildTestApp(
     organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
     platformOwnerAuth0Subjects?: ReadonlySet<string>;
     recognitionCategoryMutationsEnabled?: boolean;
-    recognitionCategoryRolloutOrganizationIds?: ReadonlySet<string>;
     reportCursorSecret?: string;
   } = {},
 ) {
@@ -473,7 +472,6 @@ async function buildTestApp(
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
     recognitionCategoryMutationsEnabled: options.recognitionCategoryMutationsEnabled,
-    recognitionCategoryRolloutOrganizationIds: options.recognitionCategoryRolloutOrganizationIds ?? new Set(["org-1"]),
     reportCursorSecret: options.reportCursorSecret ?? "test-report-cursor-secret-with-more-than-32-characters",
     organizationCreationPolicy: options.organizationCreationPolicy,
     platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
@@ -1093,19 +1091,43 @@ describe("recognition category routes", () => {
     await app.close();
   });
 
-  it("keeps create and archive disabled outside the rollout organization", async () => {
-    mockFindUnique.mockResolvedValue(makeOwner());
+  it.each(["org-1", "org-2"])("enables scoped create and archive for %s with only the write flag", async (organizationId) => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId }));
+    const scopedCategory = { ...category, organizationId };
+    mockCategoryCreate.mockResolvedValue(scopedCategory);
+    mockCategoryFindFirst.mockResolvedValue(scopedCategory);
+    mockCategoryUpdate.mockResolvedValue({ ...scopedCategory, archivedAt: new Date() });
     const app = await buildTestApp("auth0|owner", {}, {
       recognitionCategoryMutationsEnabled: true,
-      recognitionCategoryRolloutOrganizationIds: new Set(["org-2"]),
     });
     const create = await app.inject({ method: "POST", url: "/recognition-categories/create", payload: { idempotencyKey: category.creationKey, name: category.name } });
     const archive = await app.inject({ method: "POST", url: "/recognition-categories/archive", payload: { categoryId: category.id } });
-    expect(create.statusCode).toBe(404);
-    expect(archive.statusCode).toBe(404);
-    expect(create.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
-    expect(archive.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
-    expect(mockCategoryCreate).not.toHaveBeenCalled();
+    expect(create.statusCode).toBe(201);
+    expect(archive.statusCode).toBe(200);
+    expect(mockCategoryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ organizationId }),
+    });
+    expect(mockCategoryFindFirst).toHaveBeenCalledWith({
+      where: { id: category.id, organizationId },
+    });
+    expect(mockCategoryUpdate).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("cannot archive a category outside the owner's organization", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockCategoryFindFirst.mockResolvedValue(null);
+    const app = await buildTestApp("auth0|owner", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/archive",
+      payload: { categoryId: "other-org-category" },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_NOT_FOUND");
+    expect(mockCategoryFindFirst).toHaveBeenCalledWith({
+      where: { id: "other-org-category", organizationId: "org-1" },
+    });
     expect(mockCategoryUpdate).not.toHaveBeenCalled();
     await app.close();
   });
@@ -1375,11 +1397,12 @@ describe("POST /points/adjust", () => {
     await app.close();
   });
 
-  it("rejects category awards outside the rollout organization", async () => {
+  it("rejects category awards referencing another organization's category", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
+    mockCategoryFindFirst.mockResolvedValue(null);
     const app = await buildTestApp("auth0|admin", {}, {
       recognitionCategoryMutationsEnabled: true,
-      recognitionCategoryRolloutOrganizationIds: new Set(["org-2"]),
     });
     const response = await app.inject({
       method: "POST",
@@ -1389,19 +1412,22 @@ describe("POST /points/adjust", () => {
         categoryApiVersion: "categories-v1", categoryId: "category-custom",
       },
     });
-    expect(response.statusCode).toBe(404);
-    expect(response.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(response.statusCode).toBe(409);
+    expect(response.json().code).toBe("RECOGNITION_CATEGORY_UNAVAILABLE");
+    expect(mockCategoryFindFirst).toHaveBeenCalledWith({
+      where: { id: "category-custom", organizationId: "org-1", archivedAt: null },
+    });
     expect(mockTxCreate).not.toHaveBeenCalled();
     await app.close();
   });
 
-  it("accepts a category award and uses its fixed name in notifications", async () => {
-    mockFindUnique.mockResolvedValueOnce(makeAdmin());
-    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
+  it.each(["org-1", "org-2"])("accepts a scoped category award in %s with only the write flag", async (organizationId) => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin({}, { organizationId }));
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership({ organizationId }));
     mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
     mockCategoryFindFirst.mockResolvedValue({
       id: "category-custom",
-      organizationId: "org-1",
+      organizationId,
       name: "Community Impact",
       legacyTrait: null,
       archivedAt: null,
@@ -1421,7 +1447,10 @@ describe("POST /points/adjust", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(mockTxCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ trait: null, categoryId: "category-custom" }),
+      data: expect.objectContaining({ organizationId, trait: null, categoryId: "category-custom" }),
+    });
+    expect(mockCategoryFindFirst).toHaveBeenCalledWith({
+      where: { id: "category-custom", organizationId, archivedAt: null },
     });
     expect(mockNotificationCreateMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({

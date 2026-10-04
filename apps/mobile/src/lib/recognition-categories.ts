@@ -3,14 +3,6 @@ import { RECOGNITION_CATEGORY_API_VERSION, type RecognitionCategory } from "@hou
 // This binary understands category-aware read responses even while new awards are gated.
 export const CATEGORY_READ_CAPABILITY = { categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION } as const;
 
-export function recognitionCategoryAwardsEnabled(
-  enabled: boolean,
-  rolloutOrganizationIds: readonly string[],
-  organizationId: string | null | undefined,
-): boolean {
-  return enabled && Boolean(organizationId && rolloutOrganizationIds.includes(organizationId));
-}
-
 export function availableRecognitionCategories(categories: RecognitionCategory[] | undefined): RecognitionCategory[] {
   return (categories ?? []).filter((category) => category.archivedAt === null);
 }

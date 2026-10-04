@@ -1,7 +1,7 @@
 "use client";
 
 import { createPointSubmissionKeys } from "@housepoints/contracts";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Select from "@radix-ui/react-select";
 import { Star, CaretDown, Check, Info, X } from "@phosphor-icons/react";
@@ -53,13 +53,24 @@ export function AwardPointsDialog({
   const categoryMode = categories !== undefined && !!onAwardCategory;
   const selectedCategory = currentCategories.find((category) => category.id === categoryId);
   const categoryUnavailable = Boolean(categoryId) && !selectedCategory || Boolean(selectedCategory?.archivedAt);
+  const canLoadCategories = !!onLoadCategories;
+  const refreshCategoriesOnOpen = useEffectEvent((isLive: () => boolean) => {
+    onLoadCategories?.().then((result) => {
+      if (isLive()) {
+        setCurrentCategories(result);
+        setCategoryError(null);
+      }
+    }).catch(() => {
+      if (isLive()) setCategoryError("Categories could not refresh. Try again before awarding points.");
+    });
+  });
 
   useEffect(() => {
-    if (!open || !categoryMode || !onLoadCategories) return;
+    if (!open || !categoryMode || !canLoadCategories) return;
     let live = true;
-    onLoadCategories().then((result) => { if (live) setCurrentCategories(result); }).catch(() => { if (live) setCategoryError("Categories could not refresh. Try again before awarding points."); });
+    refreshCategoriesOnOpen(() => live);
     return () => { live = false; };
-  }, [open, categoryMode, onLoadCategories]);
+  }, [open, categoryMode, canLoadCategories]);
 
   const selectedMember = members.find((m) => m.id === targetUserId);
 

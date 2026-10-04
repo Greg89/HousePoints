@@ -142,8 +142,10 @@ Define every variable from `apps/mobile/.env.example` in each Environment:
 - [x] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
 - [ ] `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` — keep `false` until the C5
   staging rehearsal; record the preview and production values separately.
-- [ ] `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS` — keep empty
-  until the C5 controlled-organization rehearsal, then match API/web IDs.
+
+Category enablement is environment-wide, with beta verification before
+production. No organization-ID allowlist is needed; remove any obsolete category
+rollout ID-list setting from EAS.
 
 Environment mapping:
 

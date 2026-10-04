@@ -9,7 +9,6 @@ export type MobileEnvironmentInput = {
   pointAdjustmentsEnabled: string | undefined;
   mobileAdminEnabled: string | undefined;
   recognitionCategoriesEnabled: string | undefined;
-  recognitionCategoryRolloutOrganizationIds: string | undefined;
 };
 
 function readRequired(key: string, value: string | undefined): string {
@@ -53,10 +52,6 @@ export function createMobileEnvironment(input: MobileEnvironmentInput) {
       readOptional(input.pointAdjustmentsEnabled) === "true",
     mobileAdminEnabled: readOptional(input.mobileAdminEnabled) === "true",
     recognitionCategoriesEnabled: readOptional(input.recognitionCategoriesEnabled) === "true",
-    recognitionCategoryRolloutOrganizationIds: (input.recognitionCategoryRolloutOrganizationIds ?? "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
   };
 }
 

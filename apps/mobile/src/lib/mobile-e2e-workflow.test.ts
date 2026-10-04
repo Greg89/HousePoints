@@ -21,6 +21,52 @@ const shell = process.platform === "win32"
   ? join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "usr", "bin", "sh.exe")
   : "sh";
 
+describe("mobile E2E workflow configuration", () => {
+  it("reads the category name from a secret with a variable fallback", () => {
+    expect(workflow).toContain("environment: staging");
+    expect(workflow).toContain(
+      "MOBILE_E2E_CATEGORY_NAME: ${{ secrets.MOBILE_E2E_CATEGORY_NAME || vars.MOBILE_E2E_CATEGORY_NAME }}",
+    );
+  });
+
+  it.each([
+    { mode: "legacy", category: "", status: 0 },
+    { mode: "categories", category: "Custom Category", status: 0 },
+    { mode: "categories", category: "", status: 1 },
+    { mode: "categories", category: " \t ", status: 1 },
+  ])("validates $mode mode with category '$category'", ({ mode, category, status }) => {
+    const validation = workflow.match(
+      / {6}- name: Validate mobile E2E configuration\r?\n {8}shell: bash\r?\n {8}run: \|\r?\n([\s\S]*?) {10}node - <<'NODE'/,
+    )?.[1];
+    if (!validation) {
+      throw new Error("Mobile E2E configuration validation script was not found.");
+    }
+    const bash = process.platform === "win32"
+      ? join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "usr", "bin", "bash.exe")
+      : "bash";
+    const result = spawnSync(bash, ["-c", validation], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        MOBILE_E2E_ANDROID_APP_URL: "https://example.com/staging.apk",
+        MOBILE_E2E_USER_EMAIL: "smoke@example.com",
+        MOBILE_E2E_USER_PASSWORD: "test password with spaces",
+        MOBILE_E2E_TARGET_MEMBER: "Test Member",
+        MOBILE_E2E_RECOGNITION_MODE: mode,
+        MOBILE_E2E_CATEGORY_NAME: category,
+      },
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(status);
+    if (status === 1) {
+      expect(result.stdout).toContain(
+        "MOBILE_E2E_CATEGORY_NAME must be configured as a staging GitHub Environment secret or variable",
+      );
+    }
+  });
+});
+
 describe("mobile E2E workflow shell commands", () => {
   it.each(["legacy", "categories"])("runs only the %s award flow", (mode) => {
     const output: string[] = [];

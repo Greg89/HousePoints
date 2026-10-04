@@ -13,12 +13,14 @@ const requiredEnvironment = {
   pointAdjustmentsEnabled: undefined,
   mobileAdminEnabled: undefined,
   recognitionCategoriesEnabled: undefined,
-  recognitionCategoryRolloutOrganizationIds: undefined,
 };
 
 describe("mobile environment", () => {
-  it("keeps category awards disabled unless explicitly enabled", () => {
-    expect(createMobileEnvironment(requiredEnvironment).recognitionCategoriesEnabled).toBe(false);
+  it.each([undefined, "", "false", "1", "TRUE", "true"])("enables category awards only for flag value %j", (value) => {
+    expect(createMobileEnvironment({
+      ...requiredEnvironment,
+      recognitionCategoriesEnabled: value,
+    }).recognitionCategoriesEnabled).toBe(value === "true");
   });
   it("loads Expo public variables and normalizes base URLs", () => {
     expect(
@@ -28,7 +30,6 @@ describe("mobile environment", () => {
         pointAdjustmentsEnabled: "true",
         mobileAdminEnabled: "false",
         recognitionCategoriesEnabled: "true",
-        recognitionCategoryRolloutOrganizationIds: " org-1,org-2, ",
       }),
     ).toEqual({
       apiBaseUrl: "https://api.example.com",
@@ -41,7 +42,6 @@ describe("mobile environment", () => {
       pointAdjustmentsEnabled: true,
       mobileAdminEnabled: false,
       recognitionCategoriesEnabled: true,
-      recognitionCategoryRolloutOrganizationIds: ["org-1", "org-2"],
     });
   });
 

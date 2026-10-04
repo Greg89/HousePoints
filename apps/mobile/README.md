@@ -60,9 +60,10 @@ Fill in:
   it enabled can select and award active custom categories after the API
   mutation gate is enabled. Category-aware dashboard and activity reads remain
   active in upgraded binaries regardless of this flag.
-- `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS` — comma-separated
-  organization IDs allowed to use category awards when the flag is enabled.
-  Empty means no organizations; match the API and web cohort lists.
+
+Category rollout is environment-wide: enable the API, web, and mobile flags in
+beta first, then production. No organization-ID allowlist is required. Existing
+organization scoping and permissions still apply.
 
 Android push builds also require `apps/mobile/google-services.json` for the
 Firebase project registered to `com.housepoints.app`. This file contains the
@@ -113,9 +114,10 @@ verification, follow the existing store release workflow below.
 
 For the C5 category rehearsal, build a preview APK with
 `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED=true` only after staging API and
-web category flags and matching organization-ID allowlists are enabled. Set the staging GitHub Environment variable
+web category flags are enabled. Set the staging GitHub Environment secret or variable
 `MOBILE_E2E_CATEGORY_NAME` to an active custom category's exact name and
-dispatch `Mobile Staging E2E` with `recognition_mode=categories`. The scheduled
+dispatch `Mobile Staging E2E` with `recognition_mode=categories`. If both are
+configured, the secret takes precedence. The scheduled
 workflow uses `MOBILE_E2E_RECOGNITION_MODE` (default `legacy`); align that
 variable with the APK stored in `MOBILE_E2E_ANDROID_APP_URL`.
 

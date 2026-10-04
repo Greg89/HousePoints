@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
@@ -174,6 +174,69 @@ function setupDialog(overrides: Partial<React.ComponentProps<typeof AwardPointsD
 }
 
 describe("AwardPointsDialog", () => {
+  it("refreshes once per opening, not when the loader reference or recipient changes", async () => {
+    const category = { id: "category-1", name: "Community Impact", description: null, legacyTrait: null, createdAt: "2026-09-20T12:00:00.000Z", archivedAt: null };
+    const firstLoad = vi.fn().mockResolvedValue([category]);
+    const nextLoad = vi.fn().mockResolvedValue([category]);
+    const props = {
+      open: true,
+      onOpenChange: vi.fn(),
+      members,
+      currentUserId: "current-user",
+      houses,
+      categories: [category],
+      onAward: vi.fn(),
+      onAwardCategory: vi.fn(),
+      onLoadCategories: firstLoad,
+    };
+    const { rerender } = render(<AwardPointsDialog {...props} />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(firstLoad).toHaveBeenCalledTimes(1));
+    rerender(<AwardPointsDialog {...props} onLoadCategories={nextLoad} />);
+    await user.click(screen.getAllByRole("combobox")[0]);
+    await user.click(await screen.findByRole("option", { name: /Alice Assigned/ }));
+    expect(firstLoad).toHaveBeenCalledTimes(1);
+    expect(nextLoad).not.toHaveBeenCalled();
+
+    rerender(<AwardPointsDialog {...props} open={false} onLoadCategories={nextLoad} />);
+    rerender(<AwardPointsDialog {...props} onLoadCategories={nextLoad} />);
+    await waitFor(() => expect(nextLoad).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps a failed category refresh inline and retries only when requested", async () => {
+    const category = { id: "category-1", name: "Community Impact", description: null, legacyTrait: null, createdAt: "2026-09-20T12:00:00.000Z", archivedAt: null };
+    const load = vi.fn().mockRejectedValueOnce(new Error("Rate limited")).mockResolvedValue([category]);
+    const { props, user } = setupDialog({
+      categories: [category], onLoadCategories: load, onAwardCategory: vi.fn(),
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Categories could not refresh");
+    await user.click(screen.getAllByRole("combobox")[0]);
+    await user.click(await screen.findByRole("option", { name: /Alice Assigned/ }));
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Refresh categories" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("Alice Assigned");
+  });
+
+  it("ignores a refresh result after the dialog closes", async () => {
+    const category = { id: "category-1", name: "Community Impact", description: null, legacyTrait: null, createdAt: "2026-09-20T12:00:00.000Z", archivedAt: null };
+    let resolveLoad: (categories: typeof category[]) => void = () => { throw new Error("Refresh not started"); };
+    const pending = new Promise<typeof category[]>((resolve) => { resolveLoad = resolve; });
+    const load = vi.fn().mockReturnValueOnce(pending).mockResolvedValue([category]);
+    const props = {
+      open: true, onOpenChange: vi.fn(), members, currentUserId: "current-user", houses,
+      categories: [category], onLoadCategories: load, onAward: vi.fn(), onAwardCategory: vi.fn(),
+    };
+    const { rerender } = render(<AwardPointsDialog {...props} />);
+    rerender(<AwardPointsDialog {...props} open={false} />);
+    await act(async () => resolveLoad([{ ...category, name: "Stale Category" }]));
+    rerender(<AwardPointsDialog {...props} />);
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("option", { name: "Stale Category" })).not.toBeInTheDocument();
+  });
+
   it("excludes the signed-in user from recipient options", async () => {
     const { user } = setupDialog({ currentUserId: "member-1" });
 

@@ -8,7 +8,7 @@ import {
   type RecognitionCategory,
 } from "@housepoints/contracts";
 import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
-import { runServerAction } from "@/lib/action-context";
+import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import type { MutationResult } from "@/lib/action-results";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import { recognitionCategoriesWebEnabled } from "@/lib/recognition-gate";
@@ -30,13 +30,17 @@ export async function readRecognitionCategoriesForReports(requestId: string = ra
 }
 
 async function fetchRecognitionCategoriesFromApi(requestId: string): Promise<RecognitionCategory[]> {
-  await getCurrentUserForRequest(requestId);
-  const response = await apiFetch("/recognition-categories/list", requestId, {
-    method: "POST",
-    body: JSON.stringify({ includeArchived: true }),
-  });
-  const result = await parseApiResponse(response, recognitionCategoryListResponseSchema, "Recognition categories could not be loaded.");
-  return result.categories;
+  try {
+    const response = await apiFetch("/recognition-categories/list", requestId, {
+      method: "POST",
+      body: JSON.stringify({ includeArchived: true }),
+    });
+    const result = await parseApiResponse(response, recognitionCategoryListResponseSchema, "Recognition categories could not be loaded.");
+    return result.categories;
+  } catch (error) {
+    logServerActionFailed({ action: "readRecognitionCategories", requestId }, error);
+    throw error;
+  }
 }
 
 export async function createRecognitionCategory(input: {
