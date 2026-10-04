@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recognition Categories, Detailed Reports, and Mobile Progress | HousePoints</title>
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <p><a href="./">Back to release notes</a></p>
+
+      <section class="hero">
+        <p class="eyebrow">2026.10.04</p>
+        <h1>Recognition Categories, Detailed Reports, and Mobile Progress</h1>
+        <p class="summary">
+          Customize recognition with organization-owned categories, explore the
+          transactions behind house scores, and catch up on recent mobile improvements.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Recognition That Fits Your Organization</h2>
+          <ul class="section-list">
+            <li>Owners can add recognition categories with a name and optional description from Manage &gt; Recognition.</li>
+            <li>Members choose from active categories when awarding points, while admins can inspect category settings without changing them.</li>
+            <li>Archive categories to remove them from future awards without changing scores or losing the labels on past awards.</li>
+            <li>Existing recognition labels carry forward as starting categories. Creating a new category with an archived name keeps its history separate from the original.</li>
+            <li>Activity and recognition summaries retain the category associated with each award, including archived categories.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>See the Transactions Behind the Score</h2>
+          <ul class="section-list">
+            <li>Open the new Full report link on a dashboard house card to explore its contributing transactions.</li>
+            <li>Review the current or a historical season, drill into a house or recipient, and narrow the ledger by category, giver, or awards versus deductions.</li>
+            <li>Filtered totals sit alongside the full-season totals for the selected house/member scope, making subtotals easier to understand.</li>
+            <li>Load more transactions without losing the selected filters, or share a filtered report link with someone who has access to the organization.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Fixes and Polish</h2>
+          <ul class="section-list">
+            <li>Changing report filters now replaces the previous transaction list, totals, pagination, and error state instead of leaving stale results visible.</li>
+            <li>Choosing Deductions only for a house with no deductions shows an empty ledger and zero filtered totals. Switching back to All restores the award results.</li>
+            <li>The category award picker refreshes once when opened rather than repeatedly when the recipient changes, and category-loading failures are surfaced explicitly.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Recent Mobile Progress</h2>
+          <p>
+            Recent committed work prepares the next mobile update. Availability
+            depends on the installed build and the mobile release rollout; this
+            announcement does not mean a new version is already available in app stores.
+          </p>
+          <ul class="section-list">
+            <li>Category-aware award selection and activity let updated mobile clients use the same recognition categories as the web app.</li>
+            <li>Award-form input validation, point controls, scrolling, and keyboard handling have been improved.</li>
+            <li>Retry protection for awards and deductions reduces duplicate submissions when a response is uncertain and the same submission is retried within the open form.</li>
+            <li>Notification navigation now targets the notification's organization, including when another organization is selected or the app needs to finish signing in.</li>
+            <li>Score attribution and tied rankings are aligned across reporting views.</li>
+            <li>The mobile release candidate is now 1.0.2, with Expo compatibility updates and expanded Android checks for award input and category flows.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Operations Notes</h2>
+          <ul class="section-list">
+            <li><code>RECOGNITION_CATEGORY_MUTATIONS_ENABLED</code> (API): enables category creation, archival, and category-based awards.</li>
+            <li><code>RECOGNITION_CATEGORIES_WEB_ENABLED</code> (web): enables category management and award selection.</li>
+            <li><code>EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED</code> (mobile): enables category award selection.</li>
+            <li><code>REPORTS_DRILL_THROUGH_WEB_ENABLED</code> (web): enables detailed report pages and dashboard links.</li>
+            <li><code>POST /users/bootstrap</code> currently allows 30 requests per minute per authenticated user, per API replica. The limit may be relaxed in a future update if normal navigation and report use show it is too restrictive; this release does not change it.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Verification</h2>
+          <ul class="section-list">
+            <li>The release owner verified the report-filter fix in beta before production promotion.</li>
+            <li>The report-filter fix passed targeted regression tests, the full unit/component test suite, repository typechecks, and the production build.</li>
+            <li>Web lint passed with one unrelated existing warning.</li>
+            <li>Mobile device, older-binary compatibility, and store-release checks remain separate gates; committed code and automated checks do not establish public store availability.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
