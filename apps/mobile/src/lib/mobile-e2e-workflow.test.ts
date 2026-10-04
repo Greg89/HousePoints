@@ -88,19 +88,35 @@ describe("legacy mobile E2E award input guards", () => {
     expect(reopen).toContain('- assertVisible: "Award 7 points"');
   });
 
-  it("selects the whole reason before deleting and replacing it", () => {
+  it("enters the final reason once before exercising the numeric keyboard", () => {
+    expect(flow.match(/- inputText: "Maestro staging award"/g)).toHaveLength(1);
     expect(flow).toContain([
-      "- longPressOn:",
+      "- tapOn:",
       '    id: "mobile.award.reason"',
-      '- tapOn: "(?i)Select all"',
-      "- eraseText: 1",
-      '- assertNotVisible: "Reason first keyboard check"',
       '- inputText: "Maestro staging award"',
+      "- assertVisible:",
+      '    id: "mobile.award.reason"',
+      '    text: "Maestro staging award"',
     ].join("\n"));
+    expect(flow.indexOf('- inputText: "Maestro staging award"')).toBeLessThan(
+      flow.indexOf('- tapOn:\n    id: "mobile.award.points"'),
+    );
+  });
+
+  it("preserves the reason through dismissal and refocusing without selection or re-entry", () => {
+    const refocus = flow.split("- takeScreenshot: award-points-keyboard-reopened")[1]
+      ?.split('- tapOn:\n    id: "mobile.award.submit"')[0];
+    expect(refocus).toBeDefined();
+    expect(refocus).not.toMatch(/- (?:inputText|eraseText|longPressOn)/);
+    expect(refocus).not.toContain("Select all");
+    expect(refocus).toContain('- tapOn:\n    id: "mobile.award.reason"');
+    expect(refocus?.match(
+      /- assertVisible:\n {4}id: "mobile.award.reason"\n {4}text: "Maestro staging award"/g,
+    )).toHaveLength(2);
   });
 
   it("checks the exact reason and amount before submission", () => {
-    const beforeSubmit = flow.split('- inputText: "Maestro staging award"')[1]
+    const beforeSubmit = flow.split("- takeScreenshot: award-points-keyboard-dismissed")[1]
       ?.split('- tapOn:\n    id: "mobile.award.submit"')[0];
     expect(beforeSubmit).toBeDefined();
     expect(beforeSubmit).toContain(

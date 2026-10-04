@@ -59,10 +59,10 @@ tags:
 # Focus reason first, without first opening the numeric keyboard.
 - tapOn:
     id: "mobile.award.reason"
-- inputText: "Reason first keyboard check"
+- inputText: "Maestro staging award"
 - assertVisible:
     id: "mobile.award.reason"
-- assertVisible: "Reason first keyboard check"
+    text: "Maestro staging award"
 - assertVisible:
     id: "mobile.award.submit"
 - takeScreenshot: award-reason-first-keyboard-open
@@ -96,19 +96,13 @@ tags:
 - hideKeyboard
 - assertVisible:
     id: "mobile.award.reason"
+    text: "Maestro staging award"
 - assertVisible:
     id: "mobile.award.submit"
 - takeScreenshot: award-points-keyboard-dismissed
 - tapOn:
     id: "mobile.award.reason"
-# A tap may place the cursor mid-text; backspace alone leaves a suffix.
-- longPressOn:
-    id: "mobile.award.reason"
-- tapOn: "(?i)Select all"
-- eraseText: 1
-- assertNotVisible: "Reason first keyboard check"
-- inputText: "Maestro staging award"
-# Keep the keyboard open: both the reason and submit action must stay reachable.
+# Refocus without rewriting the draft; keep the keyboard open for submission.
 - assertVisible:
     id: "mobile.award.reason"
     text: "Maestro staging award"

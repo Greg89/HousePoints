@@ -141,11 +141,14 @@ failure when they are followed by `All broadcast queues are idle!`.
 
 The legacy award flow submits seven points and exercises reason-first focus,
 numeric validation, and keyboard dismissal/reopening. Reopening the numeric
-keyboard must preserve the amount rather than re-enter it. Before replacing
-the reason, select all text and erase the selection: Maestro's `eraseText`
-simulates backspace at the cursor, so a middle-of-text tap can leave a suffix.
-Keep exact reason and seven-point assertions before submission to catch
-partial replacements or accidentally appended digits.
+keyboard must preserve the amount rather than re-enter it. Enter the final
+reason once, then verify the exact draft after numeric editing, keyboard
+dismissal, and reason refocusing. This smoke tests draft preservation and
+keyboard-open submission, not replacement of existing reason text or the
+native selection toolbar. Maestro's `eraseText` simulates backspace at the
+cursor, and a long press in the blank part of a multiline input may not open
+the selection toolbar. Keep exact reason and seven-point assertions before
+submission without depending on either interaction.
 
 The smoke flow also accepts Chrome's first-run **Use without an account** prompt
 because some Google APIs emulator images ignore Chrome's command-line

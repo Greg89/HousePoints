@@ -305,9 +305,11 @@ clearance includes the measured footer height. Do not layer Android window-heigh
 adjustments or manual focus scrolling on top of these components.
 The Maestro award flow checks reason-first entry, numeric input visibility,
 keyboard reopen/dismiss cycles, and submission with the reason keyboard open.
-It selects all text before replacing the reason and verifies the exact reason
-and seven-point amount before submitting; keyboard reopening does not retype
-the amount.
+It enters the final reason once and verifies that the exact draft survives
+numeric editing, keyboard dismissal, and reason refocusing. The seven-point
+amount is also verified before submitting; keyboard reopening does not retype
+either field. This smoke does not test replacing existing reason text or the
+native text-selection toolbar.
 Screenshots capture these states for checking footer placement.
 On a physical Android device, verify that the footer sits just above the open
 keyboard and returns to the bottom after dismissal, without a large blank gap.
