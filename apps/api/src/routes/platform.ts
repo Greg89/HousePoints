@@ -1,3 +1,4 @@
+import { lockOrganizationScoring } from "../scoring-write.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   platformOverviewRequestSchema,
@@ -74,7 +75,7 @@ export async function registerPlatformRoutes(
     if (!actor) return;
     let evidenceSnapshot: Prisma.InputJsonObject;
     if (parsed.targetType === "POINT_TRANSACTION") {
-      const point = await prisma.pointTransaction.findFirst({ where: { id: parsed.targetId, organizationId: actor.organizationId }, select: { id: true, type: true, delta: true, reason: true, trait: true, createdAt: true, actor: { select: { id: true, displayName: true } }, targetUser: { select: { id: true, displayName: true } }, targetHouse: { select: { id: true, name: true } } } });
+      const point = await prisma.pointTransaction.findFirst({ where: { id: parsed.targetId, organizationId: actor.organizationId }, select: { id: true, type: true, delta: true, reason: true, trait: true, category: { select: { id: true, name: true } }, createdAt: true, actor: { select: { id: true, displayName: true } }, targetUser: { select: { id: true, displayName: true } }, targetHouse: { select: { id: true, name: true } } } });
       if (!point) return reply.status(404).send({ code: "REPORT_TARGET_NOT_FOUND", message: "Report target not found" });
       evidenceSnapshot = { ...point, createdAt: point.createdAt.toISOString() };
     } else {
@@ -504,11 +505,12 @@ export async function registerPlatformRoutes(
     const now = new Date();
     await prisma.$transaction(async (tx) => {
       if (parsed.action === "REDACT_CONTENT") {
-        const point = await tx.pointTransaction.findFirst({ where: { id: report.targetId, organizationId: report.organizationId }, select: { id: true, delta: true, targetUserId: true, targetHouseId: true, reason: true, trait: true, deletedAt: true, targetUser: { select: { displayName: true } }, targetHouse: { select: { name: true } } } });
+        await lockOrganizationScoring(tx, report.organizationId);
+        const point = await tx.pointTransaction.findFirst({ where: { id: report.targetId, organizationId: report.organizationId }, select: { id: true, delta: true, targetUserId: true, targetHouseId: true, reason: true, trait: true, category: { select: { id: true, name: true } }, deletedAt: true, targetUser: { select: { displayName: true } }, targetHouse: { select: { name: true } } } });
         if (!point) throw Object.assign(new Error("Moderation target not found"), { code: "MODERATION_TARGET_NOT_FOUND" });
         if (!point.deletedAt) {
           await tx.pointTransaction.update({ where: { id: point.id }, data: { deletedAt: now, deletedByUserId: null, deletionReason: "Removed following platform moderation review" } });
-          await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "POINT_DELETED", summary: `Reported point activity for ${point.targetUser?.displayName ?? "Unknown member"} was removed after platform review.`, metadata: { moderationReportId: report.id, transactionId: point.id, targetUserId: point.targetUserId, targetHouseId: point.targetHouseId, targetHouseName: point.targetHouse.name, delta: point.delta, trait: point.trait, awardReason: point.reason, deletionReason: "Removed following platform moderation review" } } });
+          await tx.auditEvent.create({ data: { organizationId: report.organizationId, actorUserId: null, eventType: "POINT_DELETED", summary: `Reported point activity for ${point.targetUser?.displayName ?? "Unknown member"} was removed after platform review.`, metadata: { moderationReportId: report.id, transactionId: point.id, targetUserId: point.targetUserId, targetHouseId: point.targetHouseId, targetHouseName: point.targetHouse.name, delta: point.delta, trait: point.trait, categoryId: point.category?.id ?? null, categoryName: point.category?.name ?? null, awardReason: point.reason, deletionReason: "Removed following platform moderation review" } } });
         }
       }
       if (["WARN_MEMBER", "SUSPEND_MEMBER", "RESTORE_MEMBER"].includes(parsed.action)) {

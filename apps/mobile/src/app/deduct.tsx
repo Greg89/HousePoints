@@ -1,7 +1,9 @@
+import { createPointSubmissionKeys } from "@housepoints/contracts";
+import { generateRequestId } from "@/lib/request-id";
 import type { OrgMember } from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, Stack, router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +41,7 @@ export default function DeductPointsScreen() {
   const { activeOrgSlug, activeMembership } = useActiveOrg();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const submissionKeys = useRef(createPointSubmissionKeys(generateRequestId));
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [search, setSearch] = useState("");
@@ -82,12 +85,16 @@ export default function DeductPointsScreen() {
       if (!selectedMemberId) {
         throw new Error("A deduction target is required");
       }
+      const payload = { targetUserId: selectedMemberId, reason: trimmedReason };
+      const idempotencyKey = submissionKeys.current.keyFor([activeOrgSlug, payload]);
       const accessToken = await getAccessToken();
-      return callApi(
+      const transaction = await callApi(
         "/points/deduct",
-        { targetUserId: selectedMemberId, reason: trimmedReason },
+        { ...payload, idempotencyKey },
         { accessToken, organizationSlug: activeOrgSlug },
       );
+      submissionKeys.current.complete(idempotencyKey);
+      return transaction;
     },
     onSuccess: (transaction) => {
       showToast({

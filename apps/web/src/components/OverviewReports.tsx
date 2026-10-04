@@ -6,6 +6,7 @@ import { TRAIT_LABELS } from "@housepoints/contracts";
 
 interface OverviewReportsProps {
   dashboardSummary: DashboardSummary;
+  categoryMode?: boolean;
   selectedHouse?: LeaderboardEntry | null;
   onShowActivity: () => void;
 }
@@ -20,6 +21,7 @@ function formatDate(isoString: string) {
 
 export function OverviewReports({
   dashboardSummary,
+  categoryMode = false,
   selectedHouse,
   onShowActivity,
 }: OverviewReportsProps) {
@@ -29,9 +31,10 @@ export function OverviewReports({
   const standout = selectedHouse
     ? dashboardSummary.seasonStandoutsByHouse.find((entry) => entry.houseId === selectedHouse.id)?.standout ?? null
     : dashboardSummary.seasonStandout;
-  const traitLeaders = selectedHouse
-    ? dashboardSummary.traitLeaders.filter((entry) => entry.houseId === selectedHouse.id)
-    : dashboardSummary.traitLeaders;
+  const leaders = (categoryMode
+    ? dashboardSummary.categoryLeaders.map((entry) => ({ ...entry, name: entry.category?.name ?? null }))
+    : dashboardSummary.traitLeaders.map((entry) => ({ ...entry, name: entry.trait ? TRAIT_LABELS[entry.trait] : null })))
+    .filter((entry) => !selectedHouse || entry.houseId === selectedHouse.id);
   const recentActivity = (
     selectedHouse
       ? dashboardSummary.recentActivity.filter((item) => item.targetHouseName === selectedHouse.name)
@@ -48,6 +51,8 @@ export function OverviewReports({
     ? dashboardSummary.houseMemberRankings.find((entry) => entry.houseId === selectedHouse.id)?.members ?? []
     : [];
   const winnerSummary = !selectedHouse && isHistoricalSeason ? dashboardSummary.seasonWinnerSummary : null;
+  const winningHouses = winnerSummary?.winningHouses ?? (winnerSummary?.winningHouse ? [winnerSummary.winningHouse] : []);
+  const topContributors = winnerSummary?.topContributors ?? (winnerSummary?.topContributor ? [winnerSummary.topContributor] : []);
 
   return (
     <section className="space-y-4" aria-label={`${scopeLabel} reporting widgets`}>
@@ -64,7 +69,7 @@ export function OverviewReports({
             : `A quick read on recognition during ${seasonName}.`}
         </p>
         {isHistoricalSeason ? (
-          <p className="text-xs font-semibold text-amber-700">Historical season view</p>
+          <div><p className="text-xs font-semibold text-amber-700">Historical season view</p><p className="text-xs text-muted-foreground">Historical totals and winners reflect recorded corrections and may change.</p></div>
         ) : null}
       </div>
 
@@ -80,23 +85,22 @@ export function OverviewReports({
                 {formatDate(winnerSummary.startsAt)} to {formatDate(winnerSummary.endsAt)}
               </p>
             </div>
-            {winnerSummary.winningHouse ? (
+            {winningHouses.length > 0 ? (
               <div className="rounded-xl border bg-background/60 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Winning house
+                  {winningHouses.length > 1 ? "Co-winning houses" : "Winning house"}
                 </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: winnerSummary.winningHouse.houseColor }}
-                  />
-                  <span className="font-display text-xl font-semibold">
-                    {winnerSummary.winningHouse.houseName}
-                  </span>
-                </div>
-                <p className="mt-1 font-number text-2xl font-bold" style={{ color: winnerSummary.winningHouse.houseColor }}>
-                  {winnerSummary.winningHouse.points.toLocaleString()} points
-                </p>
+                {winningHouses.map((house) => (
+                  <div key={house.houseId}>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: house.houseColor }} />
+                      <span className="font-display text-xl font-semibold">{house.houseName}</span>
+                    </div>
+                    <p className="mt-1 font-number text-2xl font-bold" style={{ color: house.houseColor }}>
+                      {house.points.toLocaleString()} points
+                    </p>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="rounded-xl border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
@@ -106,13 +110,13 @@ export function OverviewReports({
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border bg-background/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top contributor</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{topContributors.length > 1 ? "Top contributors" : "Top contributor"}</p>
               <p className="mt-2 text-sm font-semibold">
-                {winnerSummary.topContributor?.memberName ?? "No contributor yet"}
+                {topContributors.map((contributor) => contributor.memberName).join(", ") || "No contributor yet"}
               </p>
-              {winnerSummary.topContributor ? (
+              {topContributors.length > 0 ? (
                 <p className="font-number text-lg font-bold">
-                  {winnerSummary.topContributor.points.toLocaleString()} points
+                  {topContributors[0].points.toLocaleString()} points
                 </p>
               ) : null}
             </div>
@@ -169,10 +173,10 @@ export function OverviewReports({
         <article className="rounded-xl border bg-card p-5 lg:col-span-2">
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Trophy size={18} className="text-primary" />
-            Trait leader per house
+            {categoryMode ? "Category" : "Trait"} leader per house
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {traitLeaders.map((leader) => (
+            {leaders.map((leader) => (
               <div key={leader.houseId} className="rounded-lg border bg-background/60 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">{leader.houseName}</span>
@@ -182,9 +186,9 @@ export function OverviewReports({
                   />
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {leader.trait ? TRAIT_LABELS[leader.trait] : "No trait data yet"}
+                  {leader.name ?? (categoryMode ? "No category data yet" : "No trait data yet")}
                 </p>
-                {leader.trait ? (
+                {leader.name ? (
                   <div className="mt-3 h-2 rounded-full bg-muted">
                     <div
                       className="h-2 rounded-full"
@@ -274,9 +278,9 @@ export function OverviewReports({
                   >
                     +{item.delta}
                   </span>
-                  {item.trait ? (
+                  {item.category || item.trait ? (
                     <span className="truncate rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                      {TRAIT_LABELS[item.trait]}
+                      {item.category?.name ?? (item.trait ? TRAIT_LABELS[item.trait] : "")}
                     </span>
                   ) : null}
                 </div>
@@ -297,14 +301,14 @@ export function OverviewReports({
           <div className="divide-y">
             {rankedMembers.length > 0 ? (
               rankedMembers.map((member, index) => (
-                <div key={member.memberId} className="flex items-center justify-between gap-4 p-4">
+                <div key={member.memberId ?? "unattributed"} className="flex items-center justify-between gap-4 p-4">
                   <div className="flex items-center gap-3">
                     <span className="w-7 text-center text-sm font-semibold text-muted-foreground">
-                      {index + 1}
+                      {member.rank ?? index + 1}
                     </span>
                     <div>
                       <p className="text-sm font-semibold">{member.displayName}</p>
-                      <p className="text-xs text-muted-foreground">{member.role}</p>
+                      <p className="text-xs text-muted-foreground">{member.role ?? (member.memberId ? "Former member" : "Identity unavailable")}</p>
                     </div>
                   </div>
                   <span

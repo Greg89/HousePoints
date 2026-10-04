@@ -56,7 +56,7 @@ jobs:
 
       - name: Require two consecutive clean mobile staging runs
         if: ${{ inputs.release_stage == 'public' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const response = await github.rest.actions.listWorkflowRuns({
@@ -102,11 +102,11 @@ jobs:
 
     steps:
       - name: Check out release ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-gate.outputs.release_ref }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -115,7 +115,7 @@ jobs:
         run: npm ci
 
       - name: Configure EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           packager: npm

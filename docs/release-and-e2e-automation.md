@@ -132,6 +132,24 @@ Auth0 Universal Login can open unattended, and executes the pinned free Maestro
 CLI. CI does not build or sign a native binary in this slice, and no Maestro
 Cloud account or subscription is required.
 
+The emulator runner executes each non-comment line of its `script` input in a
+separate `sh -c` process. Keep the award-mode conditional on one line; a
+multiline `if` block fails with `expecting "fi"` before Maestro starts. For
+longer shell logic, invoke a checked-in script instead. Broadcast-idle messages
+such as `Test idle failed ... PERSISTENT` are polling diagnostics, not a test
+failure when they are followed by `All broadcast queues are idle!`.
+
+The legacy award flow submits seven points and exercises reason-first focus,
+numeric validation, and keyboard dismissal/reopening. Reopening the numeric
+keyboard must preserve the amount rather than re-enter it. Enter the final
+reason once, then verify the exact draft after numeric editing, keyboard
+dismissal, and reason refocusing. This smoke tests draft preservation and
+keyboard-open submission, not replacement of existing reason text or the
+native selection toolbar. Maestro's `eraseText` simulates backspace at the
+cursor, and a long press in the blank part of a multiline input may not open
+the selection toolbar. Keep exact reason and seven-point assertions before
+submission without depending on either interaction.
+
 The smoke flow also accepts Chrome's first-run **Use without an account** prompt
 because some Google APIs emulator images ignore Chrome's command-line
 first-run suppression flags.
@@ -147,7 +165,9 @@ The APK must target the staging API and staging Auth0 Native Application. The
 test account must belong to exactly one organization so the smoke reaches the
 dashboard without an organization-picker choice. The target member must be an
 assigned, active member in that organization and must not be the test actor.
-The smoke intentionally creates a five-point Teamwork award on each run.
+The legacy smoke intentionally creates a seven-point award using the first
+available trait. The category flow creates a five-point award using the
+configured category.
 
 The manual `android_app_url` input overrides
 `MOBILE_E2E_ANDROID_APP_URL` for one run. No new Railway variables are required;
@@ -234,6 +254,25 @@ Rollback procedure:
    the app version, build again, and release through the store track.
 
 ## Mobile store release gate
+
+For the recognition-category C5 staging rehearsal, dispatch `Staging E2E` with
+`category_rehearsal=true` after enabling the staging API/web flags. Its opt-in
+test uses the existing staging owner and target-member secrets and leaves
+archived category history as evidence. The normal web award smoke accepts
+either trait or category mode; the optional staging Environment variable
+`E2E_RECOGNITION_CATEGORY_NAME` chooses a particular active category.
+Dispatch `Mobile Staging E2E` with `recognition_mode=categories` and the
+category-enabled APK URL. It additionally needs staging Environment variable
+`MOBILE_E2E_CATEGORY_NAME`. Scheduled mobile runs use
+`MOBILE_E2E_RECOGNITION_MODE` (`legacy` by default); keep it aligned with the
+APK URL secret. The staging Railway API needs
+`RECOGNITION_CATEGORY_MUTATIONS_ENABLED=true` and web needs
+`RECOGNITION_CATEGORIES_WEB_ENABLED=true` only during the rehearsal. Both
+services need the same controlled organization ID in
+`RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS`; the EAS preview Environment
+needs it in `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS`. See the
+[C5 runbook](quarterly-product-design/recognition-categories.md#c5-release-rehearsal--prepared-not-enabled)
+for deployment order and rollback.
 
 The manually dispatched `.github/workflows/mobile-release.yml` workflow is the
 store handoff for task 6.8. Internal releases submit the production binary to

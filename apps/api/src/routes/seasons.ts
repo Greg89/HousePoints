@@ -3,9 +3,11 @@ import {
   actorScopeSchema,
   createSeasonSchema,
   renameSeasonSchema,
+  rankScores,
   seasonCompareRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { activeScoringSeason, scoringWriteTime, withScoringWrite } from "../scoring-write.js";
 import type { ActorRecord } from "../actor.js";
 import { SeasonScopeError, mapSeason } from "../season-scope.js";
 import { parseBody, requireActor, requireOwnerActor } from "../route-helpers.js";
@@ -46,10 +48,11 @@ type HouseMetric = {
   transactions: number;
   averagePointsPerDay: number;
   topContributor: {
-    userId: string;
+    userId: string | null;
     displayName: string;
     points: number;
   } | null;
+  topContributors: Array<{ userId: string | null; displayName: string; points: number }>;
 };
 
 const DAY_MS = 86_400_000;
@@ -71,17 +74,9 @@ function buildRanks(
   houses: HouseRecord[],
   pointsByHouseId: Map<string, number>,
 ): Map<string, number> {
-  const ranked = [...houses].sort((a, b) => {
-    const pointDelta = (pointsByHouseId.get(b.id) ?? 0) - (pointsByHouseId.get(a.id) ?? 0);
-
-    if (pointDelta !== 0) {
-      return pointDelta;
-    }
-
-    return a.name.localeCompare(b.name);
-  });
-
-  return new Map(ranked.map((house, index) => [house.id, index + 1]));
+  return new Map(rankScores(houses.map((house) => ({
+    id: house.id, name: house.name, points: pointsByHouseId.get(house.id) ?? 0,
+  }))).map((house) => [house.id, house.rank]));
 }
 
 export async function loadSeasonsForOrg(organizationId: string) {
@@ -120,7 +115,7 @@ export async function loadSeasonCompareDetails(
     }),
     prisma.pointTransaction.groupBy({
       by: ["seasonId", "targetHouseId", "targetUserId"],
-      where: { organizationId, seasonId: { in: seasonIds }, deletedAt: null, targetUserId: { not: null } },
+      where: { organizationId, seasonId: { in: seasonIds }, deletedAt: null },
       _sum: { delta: true },
     }),
   ]);
@@ -129,41 +124,19 @@ export async function loadSeasonCompareDetails(
 
 export async function loadContributorNames(
   userIds: string[],
-  organizationId: string,
 ) {
   if (!userIds.length) return [];
-  const memberships = await prisma.organizationMembership.findMany({
-    where: {
-      organizationId,
-      isActive: true,
-      archivedAt: null,
-      userId: { in: userIds },
-    },
-    select: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-        },
-      },
-    },
+  // IDs originate from organization-scoped transactions, including former members.
+  return prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, displayName: true },
   });
-
-  return memberships.map((membership) => membership.user);
 }
 
 export async function startSeasonTransaction(actor: ActorRecord, seasonName: string) {
-  return prisma.$transaction(async (tx) => {
-    const currentSeason = await tx.season.findFirst({
-      where: { organizationId: actor.organizationId, isActive: true },
-      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
-    });
-
-    if (!currentSeason) {
-      throw new SeasonScopeError(409, "ACTIVE_SEASON_REQUIRED", "An active season is required");
-    }
-
-    const now = new Date();
+  return withScoringWrite(actor.organizationId, async (tx) => {
+    const currentSeason = await activeScoringSeason(tx, actor.organizationId);
+    const now = await scoringWriteTime(tx);
     const previousSeason = await tx.season.update({
       where: { id: currentSeason.id },
       data: { isActive: false, endsAt: now },
@@ -310,7 +283,7 @@ export async function registerSeasonRoutes(
           .filter((userId): userId is string => Boolean(userId)),
       ),
     ];
-    const users = await loadContributorNames(userIds, actor.organizationId);
+    const users = await loadContributorNames(userIds);
     const userNamesById = new Map(users.map((user) => [user.id, user.displayName]));
 
     const totalsBySeasonHouse = new Map<string, { points: number; transactions: number }>();
@@ -328,34 +301,18 @@ export async function registerSeasonRoutes(
       pointsBySeason.get(row.seasonId)?.set(row.targetHouseId, points);
     }
 
-    const topContributorsBySeasonHouse = new Map<string, HouseMetric["topContributor"]>();
+    const contributorsBySeasonHouse = new Map<string, HouseMetric["topContributors"]>();
 
     for (const row of contributorTotals) {
-      if (!row.targetUserId) {
-        continue;
-      }
-
       const points = row._sum.delta ?? 0;
-      const displayName = userNamesById.get(row.targetUserId);
-
-      if (!displayName) {
-        continue;
-      }
+      const displayName = row.targetUserId
+        ? userNamesById.get(row.targetUserId) ?? "Former member"
+        : "Unattributed";
 
       const key = seasonHouseKey(row.seasonId, row.targetHouseId);
-      const current = topContributorsBySeasonHouse.get(key);
-
-      if (
-        !current ||
-        points > current.points ||
-        (points === current.points && displayName.localeCompare(current.displayName) < 0)
-      ) {
-        topContributorsBySeasonHouse.set(key, {
-          userId: row.targetUserId,
-          displayName,
-          points,
-        });
-      }
+      const contributors = contributorsBySeasonHouse.get(key) ?? [];
+      contributors.push({ userId: row.targetUserId, displayName, points });
+      contributorsBySeasonHouse.set(key, contributors);
     }
 
     const fromRanks = buildRanks(houses, pointsBySeason.get(fromSeason.id) ?? new Map());
@@ -366,13 +323,22 @@ export async function registerSeasonRoutes(
     function metricFor(season: SeasonRecord, house: HouseRecord, ranks: Map<string, number>, days: number): HouseMetric {
       const key = seasonHouseKey(season.id, house.id);
       const totals = totalsBySeasonHouse.get(key) ?? { points: 0, transactions: 0 };
+      const rankedContributors = rankScores((contributorsBySeasonHouse.get(key) ?? []).map((entry) => ({
+        ...entry, id: entry.userId ?? "unattributed", name: entry.displayName,
+      })));
+      const topContributors = rankedContributors
+        .filter((entry) => entry.rank === 1)
+        .map((entry) => ({
+          userId: entry.userId, displayName: entry.displayName, points: entry.points,
+        }));
 
       return {
         rank: ranks.get(house.id) ?? houses.length,
         points: totals.points,
         transactions: totals.transactions,
         averagePointsPerDay: roundMetric(totals.points / days),
-        topContributor: topContributorsBySeasonHouse.get(key) ?? null,
+        topContributor: topContributors[0] ?? null,
+        topContributors,
       };
     }
 

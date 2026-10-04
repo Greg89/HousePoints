@@ -17,6 +17,7 @@ import { useActiveOrg } from "@/context/org-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 import { mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { CATEGORY_READ_CAPABILITY } from "@/lib/recognition-categories";
 
 const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
 
@@ -34,7 +35,7 @@ export default function HomeScreen() {
       const accessToken = await getAccessToken();
       return callApi(
         "/dashboard/summary",
-        {},
+        CATEGORY_READ_CAPABILITY,
         { accessToken, organizationSlug: activeOrgSlug, signal },
       );
     },

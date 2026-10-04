@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createPointSubmissionKeys } from "@housepoints/contracts";
+import { useEffect, useRef, useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Select from "@radix-ui/react-select";
 import { Star, CaretDown, Check, Info, X } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import type { OrgMember, LeaderboardEntry, Trait } from "@housepoints/contracts";
+import type { OrgMember, LeaderboardEntry, RecognitionCategory, Trait } from "@housepoints/contracts";
 import { TRAITS, TRAIT_LABELS } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 import type { AwardPointsResult } from "@/lib/action-results";
@@ -22,7 +23,10 @@ interface AwardPointsDialogProps {
   /** Houses available for display context only */
   houses: LeaderboardEntry[];
   /** Server action to submit the award */
-  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait, idempotencyKey?: string) => Promise<AwardPointsResult>;
+  categories?: RecognitionCategory[];
+  onLoadCategories?: () => Promise<RecognitionCategory[]>;
+  onAwardCategory?: (targetUserId: string, delta: number, reason: string, categoryId: string, idempotencyKey?: string) => Promise<AwardPointsResult>;
 }
 
 const QUICK_AMOUNTS = [5, 10, 25, 50];
@@ -33,12 +37,29 @@ export function AwardPointsDialog({
   members,
   currentUserId,
   onAward,
+  categories,
+  onLoadCategories,
+  onAwardCategory,
 }: AwardPointsDialogProps) {
+  const submissionKeys = useRef(createPointSubmissionKeys(() => crypto.randomUUID()));
   const [targetUserId, setTargetUserId] = useState("");
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
   const [trait, setTrait] = useState<Trait | "">("");
+  const [categoryId, setCategoryId] = useState("");
+  const [currentCategories, setCurrentCategories] = useState(categories ?? []);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const categoryMode = categories !== undefined && !!onAwardCategory;
+  const selectedCategory = currentCategories.find((category) => category.id === categoryId);
+  const categoryUnavailable = Boolean(categoryId) && !selectedCategory || Boolean(selectedCategory?.archivedAt);
+
+  useEffect(() => {
+    if (!open || !categoryMode || !onLoadCategories) return;
+    let live = true;
+    onLoadCategories().then((result) => { if (live) setCurrentCategories(result); }).catch(() => { if (live) setCategoryError("Categories could not refresh. Try again before awarding points."); });
+    return () => { live = false; };
+  }, [open, categoryMode, onLoadCategories]);
 
   const selectedMember = members.find((m) => m.id === targetUserId);
 
@@ -47,6 +68,8 @@ export function AwardPointsDialog({
     setDelta("");
     setReason("");
     setTrait("");
+    setCategoryId("");
+    setCategoryError(null);
   }
 
   function handleClose(value: boolean) {
@@ -65,7 +88,7 @@ export function AwardPointsDialog({
     !!targetUserId &&
     hasValidDelta &&
     hasValidReason &&
-    !!trait;
+    (categoryMode ? !!categoryId && !categoryUnavailable && !categoryError : !!trait);
 
   const pointsError =
     delta === ""
@@ -87,23 +110,31 @@ export function AwardPointsDialog({
   const remainingRequirements = [
     !targetUserId ? "select a recipient" : null,
     !hasValidDelta ? "enter 1–100 whole points" : null,
-    !trait ? "select a trait" : null,
+    categoryMode ? (!categoryId || categoryUnavailable ? "select an available category" : null) : (!trait ? "select a trait" : null),
     !hasValidReason ? "add a note (3–240 characters)" : null,
   ].filter((requirement): requirement is string => requirement !== null);
 
   function handleSubmit() {
     if (!canSubmit) return;
+    const key = submissionKeys.current.keyFor([targetUserId, deltaNum, reason, categoryMode ? categoryId : trait]);
     startTransition(async () => {
       try {
-        const result = await onAward(targetUserId, deltaNum, reason, trait as Trait);
+        const result = categoryMode
+          ? await onAwardCategory!(targetUserId, deltaNum, reason, categoryId, key)
+          : await onAward(targetUserId, deltaNum, reason, trait as Trait, key);
 
         if (!result.ok) {
           toast.error("Failed to award points", {
             description: result.message,
           });
+          if (result.code === "RECOGNITION_CATEGORY_UNAVAILABLE" && onLoadCategories) {
+            setCategoryError("This category is no longer available. Your draft is saved; choose another category.");
+            try { setCurrentCategories(await onLoadCategories()); } catch { /* Keep the draft and the error visible. */ }
+          }
           return;
         }
 
+        submissionKeys.current.complete(key);
         toast.success("Points awarded!", {
           description: `+${deltaNum} pts to ${selectedMember?.displayName}`,
         });
@@ -201,17 +232,17 @@ export function AwardPointsDialog({
             {/* Reason */}
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Trait <span className="text-destructive" aria-hidden="true">*</span>
+                {categoryMode ? "Category" : "Trait"} <span className="text-destructive" aria-hidden="true">*</span>
               </label>
-              <Select.Root value={trait} onValueChange={(v) => setTrait(v as Trait)}>
+              <Select.Root value={categoryMode ? categoryId : trait} onValueChange={(value) => { if (categoryMode) { setCategoryId(value); setCategoryError(null); } else setTrait(value as Trait); }}>
                 <Select.Trigger
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2.5 text-sm",
                     "hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
                   )}
                 >
-                  <Select.Value placeholder="Select a trait…">
-                    {trait ? TRAIT_LABELS[trait as Trait] : null}
+                  <Select.Value placeholder={categoryMode ? "Select a category…" : "Select a trait…"}>
+                    {categoryMode ? selectedCategory?.name ?? null : trait ? TRAIT_LABELS[trait as Trait] : null}
                   </Select.Value>
                   <Select.Icon>
                     <CaretDown size={16} className="text-muted-foreground" />
@@ -224,7 +255,9 @@ export function AwardPointsDialog({
                     sideOffset={4}
                   >
                     <Select.Viewport className="p-1">
-                      {TRAITS.map((t) => (
+                      {categoryMode ? currentCategories.filter((category) => !category.archivedAt).map((category) => (
+                        <Select.Item key={category.id} value={category.id} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-accent/10 focus:bg-accent/10 outline-none select-none"><Select.ItemText>{category.name}</Select.ItemText><Select.ItemIndicator className="ml-auto"><Check size={14} /></Select.ItemIndicator></Select.Item>
+                      )) : TRAITS.map((t) => (
                         <Select.Item
                           key={t}
                           value={t}
@@ -243,6 +276,8 @@ export function AwardPointsDialog({
                   </Select.Content>
                 </Select.Portal>
               </Select.Root>
+              {categoryUnavailable || categoryError ? <p role="alert" className="text-sm text-destructive">{categoryError ?? "This category is no longer available. Choose another category."}</p> : null}
+              {categoryMode && onLoadCategories && (categoryUnavailable || categoryError) ? <button type="button" className="text-sm font-semibold text-primary underline" onClick={async () => { try { setCurrentCategories(await onLoadCategories()); setCategoryError(null); } catch { setCategoryError("Categories could not refresh. Try again before awarding points."); } }}>Refresh categories</button> : null}
             </div>
 
             {/* Note */}

@@ -17,6 +17,7 @@ import { useActiveOrg } from "@/context/org-provider";
 import { ApiResponseError, callApi } from "@/lib/api-client";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 import { mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { CATEGORY_READ_CAPABILITY } from "@/lib/recognition-categories";
 import {
   contributorInitials,
   topContributors,
@@ -37,7 +38,7 @@ export default function LeaderboardScreen() {
       const accessToken = await getAccessToken();
       return callApi(
         "/dashboard/summary",
-        {},
+        CATEGORY_READ_CAPABILITY,
         { accessToken, organizationSlug: activeOrgSlug, signal },
       );
     },

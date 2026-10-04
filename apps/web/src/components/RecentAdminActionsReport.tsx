@@ -46,6 +46,8 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   MODERATION_WARNING_ISSUED: "Moderation warning issued",
   MEMBER_SUSPENDED: "Member suspended",
   MEMBER_RESTORED: "Member restored",
+  RECOGNITION_CATEGORY_CREATED: "Recognition category created",
+  RECOGNITION_CATEGORY_ARCHIVED: "Recognition category archived",
 };
 
 const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
@@ -65,6 +67,8 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   MODERATION_WARNING_ISSUED: ShieldCheck,
   MEMBER_SUSPENDED: UserMinus,
   MEMBER_RESTORED: UserPlus,
+  RECOGNITION_CATEGORY_CREATED: ClipboardText,
+  RECOGNITION_CATEGORY_ARCHIVED: Trash,
 };
 
 const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
@@ -78,6 +82,8 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "MODERATION_WARNING_ISSUED", label: "Moderation warnings" },
   { value: "MEMBER_SUSPENDED", label: "Member suspensions" },
   { value: "MEMBER_RESTORED", label: "Member restorations" },
+  { value: "RECOGNITION_CATEGORY_CREATED", label: "Recognition categories created" },
+  { value: "RECOGNITION_CATEGORY_ARCHIVED", label: "Recognition categories archived" },
   { value: "USER_HOUSE_ASSIGNED", label: "House assignments" },
   { value: "ORG_SETTINGS_UPDATED", label: "Organization updates" },
   { value: "ORG_ARCHIVED", label: "Organization archives" },
@@ -192,13 +198,21 @@ export function RecentAdminActionsReport({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full border bg-background px-2 py-1 text-xs font-medium text-muted-foreground">
-                        {actionLabels[action.type]}
+                        {action.type === "POINT_DELETED" && action.metadata.isClosedSeason === "true" ? "Closed-season correction" : actionLabels[action.type]}
                       </span>
                       {action.actorName ? (
                         <span className="text-xs text-muted-foreground">by {action.actorName}</span>
                       ) : null}
                     </div>
                     <p className="mt-2 text-sm font-semibold">{action.summary}</p>
+                    {action.type === "POINT_DELETED" && action.metadata.deletionReason ? (
+                      <p className="mt-1 text-sm text-muted-foreground">Reason: {action.metadata.deletionReason}</p>
+                    ) : null}
+                    {action.type === "POINT_DELETED" && action.metadata.scoreContributionBefore != null ? (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {action.metadata.seasonName}: score contribution {action.metadata.scoreContributionBefore} → {action.metadata.scoreContributionAfter} points.
+                      </p>
+                    ) : null}
                   </div>
                   <time
                     dateTime={action.occurredAt}

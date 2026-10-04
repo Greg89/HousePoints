@@ -43,6 +43,18 @@ describe("ExpoPushDispatcher", () => {
     expect(fetchImplementation).toHaveBeenCalledTimes(2);
   });
 
+  it("passes cancellation through and stops remaining batches after timeout", async () => {
+    const controller = new AbortController();
+    const fetchImplementation = vi.fn().mockImplementation(async () => {
+      controller.abort(new Error("Deadline"));
+      return new Response(JSON.stringify({ data: [{ status: "ok" }] }));
+    });
+    const dispatcher = new ExpoPushDispatcher(undefined, fetchImplementation);
+    await expect(dispatcher.send(Array.from({ length: 101 }, (_, index) => message(index)), controller.signal)).rejects.toThrow("Deadline");
+    expect(fetchImplementation).toHaveBeenCalledOnce();
+    expect(fetchImplementation.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+
   it("rejects unsuccessful HTTP responses and Expo tickets", async () => {
     const httpFailure = new ExpoPushDispatcher(undefined, vi.fn().mockResolvedValue(
       new Response("", { status: 503 }),

@@ -10,7 +10,7 @@ export type PushDispatchResult = {
 };
 
 export interface PushDispatcher {
-  send(messages: readonly PushMessage[]): Promise<PushDispatchResult>;
+  send(messages: readonly PushMessage[], signal?: AbortSignal): Promise<PushDispatchResult>;
 }
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -27,10 +27,11 @@ export class ExpoPushDispatcher implements PushDispatcher {
     private readonly fetchImplementation: typeof fetch = fetch,
   ) {}
 
-  async send(messages: readonly PushMessage[]): Promise<PushDispatchResult> {
+  async send(messages: readonly PushMessage[], signal?: AbortSignal): Promise<PushDispatchResult> {
     let acceptedCount = 0;
 
     for (let offset = 0; offset < messages.length; offset += EXPO_BATCH_SIZE) {
+      signal?.throwIfAborted();
       const batch = messages.slice(offset, offset + EXPO_BATCH_SIZE);
       const headers: Record<string, string> = {
         accept: "application/json",
@@ -42,6 +43,7 @@ export class ExpoPushDispatcher implements PushDispatcher {
 
       const response = await this.fetchImplementation(EXPO_PUSH_URL, {
         method: "POST",
+        signal,
         headers,
         body: JSON.stringify(batch),
       });
@@ -50,6 +52,7 @@ export class ExpoPushDispatcher implements PushDispatcher {
       }
 
       const payload = await response.json() as { data?: ExpoPushTicket | ExpoPushTicket[] };
+      signal?.throwIfAborted();
       const tickets = Array.isArray(payload.data) ? payload.data : payload.data ? [payload.data] : [];
       const failedTicket = tickets.find((ticket) => ticket.status !== "ok");
       if (failedTicket) {

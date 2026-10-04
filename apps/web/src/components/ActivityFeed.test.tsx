@@ -71,6 +71,15 @@ const seasons = [
 ];
 
 describe("ActivityFeed", () => {
+  it("shows the fixed name of an archived custom category on historical activity", () => {
+    render(<ActivityFeed
+      items={[{ ...baseActivity, trait: null, category: { id: "category-old", name: "Community Impact", legacyTrait: null, archivedAt: "2026-09-21T12:00:00.000Z" } }]}
+      members={members}
+      nextCursor={null}
+      onLoadMore={vi.fn()}
+    />);
+    expect(within(screen.getByTestId("activity-card")).getByText("Community Impact")).toBeInTheDocument();
+  });
   it("presents the recipient as the primary identity and the giver as attribution", () => {
     render(
       <ActivityFeed
@@ -339,7 +348,6 @@ describe("ActivityFeed", () => {
   });
 
   it("lets admins delete an activity item after confirmation", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
     const onDelete = vi.fn(async () => ({ ok: true as const }));
 
@@ -357,12 +365,42 @@ describe("ActivityFeed", () => {
     await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
     await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
 
-    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("activity-1"));
-    expect(confirmSpy).toHaveBeenCalledWith(
-      "Delete this 10-point award to Ben? Scores will be recalculated without it.",
-    );
+    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("activity-1", undefined));
     expect(screen.queryByText("Great collaboration")).not.toBeInTheDocument();
-    confirmSpy.mockRestore();
+  });
+
+  it("requires a trimmed reason for historical corrections and retains it on failure", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValueOnce({ ok: false, code: "RETRY", message: "Try again" }).mockResolvedValue({ ok: true });
+    render(<ActivityFeed items={[{ ...baseActivity, season: { ...baseActivity.season!, isActive: false } }]} members={members} nextCursor={null} onLoadMore={vi.fn()} canDelete onDelete={onDelete} />);
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
+    const confirm = screen.getByRole("button", { name: "Confirm removal" });
+    expect(confirm).toBeDisabled();
+    await user.type(screen.getByLabelText("Reason (required)"), "   ");
+    expect(confirm).toBeDisabled();
+    await user.type(screen.getByLabelText("Reason (required)"), "Duplicate award ");
+    await user.click(confirm);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Try again");
+    expect(screen.getByLabelText("Reason (required)")).toHaveValue("   Duplicate award ");
+    await user.click(confirm);
+    await waitFor(() => expect(onDelete).toHaveBeenLastCalledWith("activity-1", "Duplicate award"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("requests a reason when the season closes after activity loaded", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue({ ok: false, code: "CORRECTION_REASON_REQUIRED", message: "A reason is required" });
+    render(<ActivityFeed items={[baseActivity]} members={members} nextCursor={null} onLoadMore={vi.fn()} canDelete onDelete={onDelete} />);
+    await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
+    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
+    expect(await screen.findByLabelText("Reason (required)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm removal" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onDelete).toHaveBeenCalledOnce();
   });
 
   it("lets a user react to an award and updates the card summary", async () => {
@@ -590,7 +628,6 @@ describe("ActivityFeed", () => {
   });
 
   it("shows a safe error when deletion returns an expected failure", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
     const onDelete = vi.fn(async () => ({
       ok: false as const,
@@ -612,9 +649,9 @@ describe("ActivityFeed", () => {
     await user.click(screen.getByRole("button", { name: /activity actions for ben/i }));
     await user.click(screen.getByRole("menuitem", { name: /delete point transaction/i }));
 
+    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
     expect(await screen.findByText("Point transaction is already deleted")).toBeInTheDocument();
     expect(screen.getByText("Great collaboration")).toBeInTheDocument();
-    confirmSpy.mockRestore();
   });
 
   it("labels deductions with a negative point value", () => {

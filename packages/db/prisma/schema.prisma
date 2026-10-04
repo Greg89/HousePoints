@@ -57,6 +57,8 @@ enum AuditEventType {
   MODERATION_WARNING_ISSUED
   MEMBER_SUSPENDED
   MEMBER_RESTORED
+  RECOGNITION_CATEGORY_CREATED
+  RECOGNITION_CATEGORY_ARCHIVED
 }
 
 enum NotificationType {
@@ -113,6 +115,9 @@ enum ModerationReportStatus {
 }
 
 model Organization {
+  recognitionCategories RecognitionCategory[]
+  pointMutationRequests PointMutationRequest[]
+  reportingRevision BigInt @default(0)
   id             String                   @id @default(cuid())
   name           String
   slug           String                   @unique
@@ -193,6 +198,8 @@ model House {
 }
 
 model User {
+  createdRecognitionCategories RecognitionCategory[] @relation("CategoryCreator")
+  archivedRecognitionCategories RecognitionCategory[] @relation("CategoryArchiver")
   id                       String                   @id @default(cuid())
   auth0Sub                 String                   @unique
   email                    String?                  @unique
@@ -291,11 +298,13 @@ model PointTransaction {
   delta           Int
   reason          String
   trait           Trait?
+  categoryId      String?
   deletedAt       DateTime?
   deletedByUserId String?
   deletionReason  String?
   createdAt       DateTime             @default(now())
 
+  category RecognitionCategory? @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict, onUpdate: Restrict)
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   season       Season          @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   actor        User            @relation("ActorTransactions", fields: [actorUserId], references: [id], onDelete: Restrict)
@@ -305,6 +314,7 @@ model PointTransaction {
   reactions    PointReaction[]
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, categoryId])
   @@index([organizationId, seasonId, createdAt])
   @@index([organizationId, deletedAt])
   @@index([targetHouseId, createdAt])
@@ -503,3 +513,47 @@ model DeviceRegistration {
   @@index([revokedAt])
 }
 
+// Compact committed results; expired keys remain to prevent accidental reuse.
+model PointMutationRequest {
+  id             String @id @default(cuid())
+  organizationId String
+  actorUserId    String
+  operation      String
+  key            String
+  fingerprint    String
+  resultId       String
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, actorUserId, operation, key])
+  @@index([expiresAt])
+}
+
+// Names/descriptions and legacy mappings are immutable; SQL enforces active-name
+// uniqueness and normalization. Nullable legacyTrait identifies custom categories.
+model RecognitionCategory {
+  id             String @id @default(cuid())
+  organizationId String
+  creationKey    String?
+  name           String
+  normalizedName String @default("")
+  description    String?
+  legacyTrait    Trait?
+  createdAt      DateTime @default(now())
+  createdById    String?
+  archivedAt     DateTime?
+  archivedById   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("CategoryCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  archivedBy User? @relation("CategoryArchiver", fields: [archivedById], references: [id], onDelete: SetNull)
+  transactions PointTransaction[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, legacyTrait])
+  @@unique([organizationId, creationKey])
+  @@index([organizationId, archivedAt])
+  @@index([createdById])
+  @@index([archivedById])
+}

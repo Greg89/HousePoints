@@ -36,6 +36,7 @@ import { ReportActivityModal } from "@/components/ReportActivityModal";
 import { activityReportPayload, type ReportCategory } from "@/lib/moderation-report";
 import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
 import { invalidateMobileQueries, mobileMutationInvalidations, mobileQueryKeys } from "@/lib/mobile-query-keys";
+import { CATEGORY_READ_CAPABILITY } from "@/lib/recognition-categories";
 
 const PAGE_LIMIT = 20;
 const FOCUS_QUERY_KEYS = [["activity"]] as const;
@@ -63,7 +64,7 @@ export default function ActivityScreen() {
       const accessToken = await getAccessToken();
       return callApi(
         "/transactions/recent",
-        { cursor: pageParam, limit: PAGE_LIMIT },
+        { ...CATEGORY_READ_CAPABILITY, cursor: pageParam, limit: PAGE_LIMIT },
         { accessToken, organizationSlug: activeOrgSlug, signal },
       );
     },
@@ -356,9 +357,9 @@ function ActivityRow({
       <View style={styles.contentSection}>
         <Text style={styles.reason}>{item.reason}</Text>
         <View style={styles.metaRow}>
-          {presentation.traitLabel ? (
+          {presentation.recognitionLabel ? (
             <View style={styles.traitChip}>
-              <Text style={styles.traitLabel}>{presentation.traitLabel}</Text>
+              <Text style={styles.traitLabel}>{presentation.recognitionLabel}</Text>
             </View>
           ) : null}
           {item.season ? (

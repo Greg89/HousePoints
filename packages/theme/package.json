@@ -20,8 +20,8 @@
     "lint": "eslint --config ../../eslint.config.mjs \"src/**/*.ts\""
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^5.0.2",
     "typescript": "^5",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.2"
   }
 }

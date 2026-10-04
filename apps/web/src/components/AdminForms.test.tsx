@@ -253,8 +253,24 @@ describe("AdminForms", () => {
     window.history.replaceState(null, "", "/");
   });
 
+  it("shows Recognition only when the web category gate supplies category data", async () => {
+    setupAdminForms({
+      actorRole: "ADMIN",
+      recognitionCategories: [{ id: "category-1", name: "Community Impact", description: null, legacyTrait: null, createdAt: "2026-09-20T12:00:00.000Z", archivedAt: null }],
+      onListRecognitionCategories: vi.fn().mockResolvedValue([]),
+      onCreateRecognitionCategory: vi.fn().mockResolvedValue({ ok: true }),
+      onArchiveRecognitionCategory: vi.fn().mockResolvedValue({ ok: true }),
+    });
+    const tab = screen.getByRole("tab", { name: /Recognition/ });
+    fireEvent.click(tab);
+    expect(screen.getByText(/Only organization owners/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add category" })).not.toBeInTheDocument();
+  });
+
   it("defaults to the Manage overview and exposes focused section navigation", () => {
     setupAdminForms();
+
+    expect(screen.queryByRole("tab", { name: /Recognition/ })).not.toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: /Members/ })).toHaveAttribute("aria-selected", "false");
@@ -664,6 +680,17 @@ describe("AdminForms", () => {
     expect(adjustmentActivity.getByText("Ravenclaw")).toBeInTheDocument();
     expect(adjustmentActivity.getByText("1 deduction")).toBeInTheDocument();
     expect(adjustmentActivity.getAllByText("10")).toHaveLength(2);
+  });
+
+  it("labels closed-season corrections and shows their reason and score effect", () => {
+    setupAdminForms({ recentAdminActions: [{ ...recentAdminActions[0], metadata: {
+      ...recentAdminActions[0].metadata, isClosedSeason: "true", seasonName: "Q2 2026",
+      scoreContributionBefore: "12", scoreContributionAfter: "0",
+    } }] });
+    switchToManageSection("Audit");
+    expect(screen.getByText("Closed-season correction")).toBeInTheDocument();
+    expect(screen.getByText("Reason: Entered twice")).toBeInTheDocument();
+    expect(screen.getByText("Q2 2026: score contribution 12 → 0 points.")).toBeInTheDocument();
   });
 
   it("filters audit history by event type", async () => {

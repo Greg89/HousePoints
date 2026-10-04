@@ -30,6 +30,10 @@ import {
   readNotifications,
 } from "./actions/notifications";
 import { awardPoints, deductPoints } from "./actions/points";
+import { awardCategoryPoints } from "./actions/points";
+import { archiveRecognitionCategory, createRecognitionCategory, readRecognitionCategories } from "./actions/recognition";
+import { recognitionCategoriesWebEnabledForOrganization } from "@/lib/recognition-gate";
+import { reportsDrillThroughWebEnabled } from "@/lib/reports-gate";
 import { readSessionSummary } from "./actions/profile";
 import {
   readMemberScores,
@@ -125,7 +129,9 @@ export async function renderDashboardPage(route: string) {
     redirect(rootRedirect);
   }
 
-  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext] = await Promise.all([
+  const recognitionEnabledForOrg = recognitionCategoriesWebEnabledForOrganization(session.organizationId);
+
+  const [leaderboard, members, activityPage, memberScores, dashboardSummary, seasonContext, notifications, adminContext, recognitionCategories] = await Promise.all([
     readLeaderboard(requestId),
     readMembers(requestId),
     readActivityPage({}, requestId),
@@ -134,6 +140,7 @@ export async function renderDashboardPage(route: string) {
     readSeasonContext(requestId),
     readNotificationsForDashboard(requestId, route),
     readAdminContextForDashboard(session.role, requestId, route),
+    recognitionEnabledForOrg ? readRecognitionCategories(requestId) : Promise.resolve(undefined),
   ]);
   const initialSeasonComparison = await readInitialSeasonComparison(seasonContext.seasons, requestId, route);
 
@@ -147,6 +154,10 @@ export async function renderDashboardPage(route: string) {
   const dashboardHref = session.organizationSlug
     ? `/o/${encodeURIComponent(session.organizationSlug)}`
     : "/";
+  const reportsHref =
+    reportsDrillThroughWebEnabled && session.organizationSlug
+      ? `/o/${encodeURIComponent(session.organizationSlug)}/reports`
+      : null;
   const releaseNotesUrl = readReleaseNotesUrl(requestId, route);
 
   const adminSection = adminContext === ADMIN_CONTEXT_FAILED ? (
@@ -182,6 +193,10 @@ export async function renderDashboardPage(route: string) {
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
       onRenameSeason={renameSeason}
+      recognitionCategories={recognitionCategories}
+      onListRecognitionCategories={recognitionEnabledForOrg ? readRecognitionCategories : undefined}
+      onCreateRecognitionCategory={recognitionEnabledForOrg ? createRecognitionCategory : undefined}
+      onArchiveRecognitionCategory={recognitionEnabledForOrg ? archiveRecognitionCategory : undefined}
     />
   ) : undefined;
 
@@ -217,11 +232,15 @@ export async function renderDashboardPage(route: string) {
       onMarkNotificationRead={markNotificationRead}
       onMarkAllNotificationsRead={markAllNotificationsRead}
       onAward={awardPoints}
+      recognitionCategories={recognitionCategories}
+      onLoadRecognitionCategories={recognitionEnabledForOrg ? readRecognitionCategories : undefined}
+      onAwardCategory={recognitionEnabledForOrg ? awardCategoryPoints : undefined}
       onDeduct={pointAdjustmentsEnabled ? deductPoints : undefined}
       onDeletePoint={deletePointTransaction}
       onReactToPoint={reactToPointTransaction}
       onReadPointReactionDetails={readPointReactionDetails}
       dashboardHref={dashboardHref}
+      reportsHref={reportsHref}
       loginUrl="/auth/login"
       logoutUrl="/auth/logout"
       releaseNotesUrl={releaseNotesUrl}

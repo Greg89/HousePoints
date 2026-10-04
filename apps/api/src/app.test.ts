@@ -3,7 +3,7 @@
  * Prisma is mocked per test so we control exactly what the DB "returns".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { READ_ARCHIVED_NOTIFICATION_TYPES } from "@housepoints/contracts";
+import { READ_ARCHIVED_NOTIFICATION_TYPES, TRAIT_LABELS, type Trait } from "@housepoints/contracts";
 
 // Mock @housepoints/db before importing anything that uses it.
 vi.mock("@housepoints/db", () => ({
@@ -13,8 +13,10 @@ vi.mock("@housepoints/db", () => ({
   updateUserDisplayName: vi.fn(),
   prisma: {
     $transaction: vi.fn(),
+    $queryRaw: vi.fn(),
     $executeRawUnsafe: vi.fn(),
     organization: {
+      findUniqueOrThrow: vi.fn(),
       upsert: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -60,6 +62,7 @@ vi.mock("@housepoints/db", () => ({
     house: {
       upsert: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
@@ -97,7 +100,17 @@ vi.mock("@housepoints/db", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    pointMutationRequest: { findUnique: vi.fn(), create: vi.fn() },
+    recognitionCategory: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
+    },
     pointTransaction: {
+      count: vi.fn(),
       create: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -170,6 +183,7 @@ const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn
 const mockHouseUpsert = prisma.house.upsert as ReturnType<typeof vi.fn>;
 const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
+const mockHouseFindFirst = prisma.house.findFirst as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
 const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
 const mockInviteCount = prisma.orgInvite.count as ReturnType<typeof vi.fn>;
@@ -197,11 +211,18 @@ const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
 const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
+const mockTxCount = prisma.pointTransaction.count as ReturnType<typeof vi.fn>;
 const mockTxFindUnique = prisma.pointTransaction.findUnique as ReturnType<typeof vi.fn>;
 const mockTxFindFirst = prisma.pointTransaction.findFirst as ReturnType<typeof vi.fn>;
 const mockTxFindMany = prisma.pointTransaction.findMany as ReturnType<typeof vi.fn>;
 const mockTxGroupBy = prisma.pointTransaction.groupBy as ReturnType<typeof vi.fn>;
 const mockTxUpdate = prisma.pointTransaction.update as ReturnType<typeof vi.fn>;
+const mockCategoryFindUnique = prisma.recognitionCategory.findUnique as ReturnType<typeof vi.fn>;
+const mockCategoryFindFirst = prisma.recognitionCategory.findFirst as ReturnType<typeof vi.fn>;
+const mockCategoryFindMany = prisma.recognitionCategory.findMany as ReturnType<typeof vi.fn>;
+const mockCategoryCreate = prisma.recognitionCategory.create as ReturnType<typeof vi.fn>;
+const mockCategoryUpdate = prisma.recognitionCategory.update as ReturnType<typeof vi.fn>;
+const mockCategoryCount = prisma.recognitionCategory.count as ReturnType<typeof vi.fn>;
 const mockPointReactionCreate = prisma.pointReaction.create as ReturnType<typeof vi.fn>;
 const mockPointReactionFindFirst = prisma.pointReaction.findFirst as ReturnType<typeof vi.fn>;
 const mockPointReactionFindMany = prisma.pointReaction.findMany as ReturnType<typeof vi.fn>;
@@ -335,9 +356,32 @@ const makeActorMembership = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(prisma.organization.findUniqueOrThrow).mockResolvedValue({ reportingRevision: 2n } as never);
+  vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "org-1", now: new Date() }]);
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
   mockTxGroupBy.mockResolvedValue([]);
+  mockTxCount.mockResolvedValue(0);
+  mockCategoryFindUnique.mockResolvedValue(null);
+  mockCategoryFindFirst.mockImplementation(async ({ where }) => {
+    const legacyTrait = where?.legacyTrait as Trait | undefined;
+    if (!legacyTrait) return null;
+    return {
+      id: `category-${legacyTrait.toLowerCase()}`,
+      organizationId: "org-1",
+      creationKey: null,
+      name: TRAIT_LABELS[legacyTrait],
+      normalizedName: TRAIT_LABELS[legacyTrait].toLowerCase(),
+      description: null,
+      legacyTrait,
+      createdAt: new Date("2026-09-26T12:00:00.000Z"),
+      createdById: null,
+      archivedAt: null,
+      archivedById: null,
+    };
+  });
+  mockCategoryFindMany.mockResolvedValue([]);
+  mockCategoryCount.mockResolvedValue(20);
   mockPointReactionCreate.mockResolvedValue({ id: "reaction-1", reactionKey: "clap" });
   mockPointReactionFindFirst.mockResolvedValue(null);
   mockPointReactionFindMany.mockResolvedValue([]);
@@ -420,11 +464,17 @@ async function buildTestApp(
     pushDispatcher?: NonNullable<Parameters<typeof buildApp>[0]>["pushDispatcher"];
     organizationCreationPolicy?: NonNullable<Parameters<typeof buildApp>[0]>["organizationCreationPolicy"];
     platformOwnerAuth0Subjects?: ReadonlySet<string>;
+    recognitionCategoryMutationsEnabled?: boolean;
+    recognitionCategoryRolloutOrganizationIds?: ReadonlySet<string>;
+    reportCursorSecret?: string;
   } = {},
 ) {
   const app = await buildApp({
     corsAllowedOrigins: TEST_CORS_ORIGINS,
     pointAdjustmentsEnabled: true,
+    recognitionCategoryMutationsEnabled: options.recognitionCategoryMutationsEnabled,
+    recognitionCategoryRolloutOrganizationIds: options.recognitionCategoryRolloutOrganizationIds ?? new Set(["org-1"]),
+    reportCursorSecret: options.reportCursorSecret ?? "test-report-cursor-secret-with-more-than-32-characters",
     organizationCreationPolicy: options.organizationCreationPolicy,
     platformOwnerAuth0Subjects: options.platformOwnerAuth0Subjects,
     pushDispatcher: options.pushDispatcher,
@@ -989,6 +1039,145 @@ describe("POST /users/bootstrap", () => {
   });
 });
 
+describe("recognition category routes", () => {
+  const category = {
+    id: "category-1",
+    organizationId: "org-1",
+    creationKey: "29b2f600-1d44-401b-b18a-bf02c6d58d98",
+    name: "Community Impact",
+    normalizedName: "community impact",
+    description: "Recognizes impact beyond the team.",
+    legacyTrait: null,
+    createdAt: new Date("2026-09-26T12:00:00.000Z"),
+    createdById: "user-owner",
+    archivedAt: null,
+    archivedById: null,
+  };
+
+  it("lists active categories for members", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockCategoryFindMany.mockResolvedValue([category]);
+    const app = await buildTestApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/list",
+      payload: { includeArchived: false },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      apiVersion: "categories-v1",
+      categories: [{
+        id: "category-1",
+        name: "Community Impact",
+        description: "Recognizes impact beyond the team.",
+        legacyTrait: null,
+        createdAt: "2026-09-26T12:00:00.000Z",
+        archivedAt: null,
+      }],
+    });
+    expect(mockCategoryFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId: "org-1", archivedAt: null },
+    }));
+    await app.close();
+  });
+
+  it("keeps category mutations disabled by default", async () => {
+    const app = await buildTestApp("auth0|owner");
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/create",
+      payload: { idempotencyKey: category.creationKey, name: category.name },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    await app.close();
+  });
+
+  it("keeps create and archive disabled outside the rollout organization", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    const app = await buildTestApp("auth0|owner", {}, {
+      recognitionCategoryMutationsEnabled: true,
+      recognitionCategoryRolloutOrganizationIds: new Set(["org-2"]),
+    });
+    const create = await app.inject({ method: "POST", url: "/recognition-categories/create", payload: { idempotencyKey: category.creationKey, name: category.name } });
+    const archive = await app.inject({ method: "POST", url: "/recognition-categories/archive", payload: { categoryId: category.id } });
+    expect(create.statusCode).toBe(404);
+    expect(archive.statusCode).toBe(404);
+    expect(create.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(archive.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(mockCategoryCreate).not.toHaveBeenCalled();
+    expect(mockCategoryUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("requires an owner when category mutations are enabled", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/create",
+      payload: { idempotencyKey: category.creationKey, name: category.name },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    await app.close();
+  });
+
+  it("creates a category with one audit and replays its creation key", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockCategoryCreate.mockResolvedValue(category);
+    const app = await buildTestApp("auth0|owner", {}, { recognitionCategoryMutationsEnabled: true });
+    const request = {
+      method: "POST" as const,
+      url: "/recognition-categories/create",
+      payload: {
+        idempotencyKey: category.creationKey,
+        name: "  Community   Impact  ",
+        description: "  Recognizes impact beyond the team.  ",
+      },
+    };
+    const created = await app.inject(request);
+    expect(created.statusCode).toBe(201);
+    expect(created.json().category.id).toBe(category.id);
+    expect(mockCategoryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        creationKey: category.creationKey,
+        name: "Community Impact",
+        description: "Recognizes impact beyond the team.",
+        createdById: "user-owner",
+      }),
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ eventType: "RECOGNITION_CATEGORY_CREATED" }),
+    });
+
+    mockCategoryFindUnique.mockResolvedValue(category);
+    const replay = await app.inject(request);
+    expect(replay.statusCode).toBe(201);
+    expect(replay.json()).toEqual(created.json());
+    expect(mockCategoryCreate).toHaveBeenCalledOnce();
+    expect(mockAuditEventCreate).toHaveBeenCalledOnce();
+    await app.close();
+  });
+
+  it("rejects archiving the final active category", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner());
+    mockCategoryFindFirst.mockResolvedValue(category);
+    mockCategoryCount.mockResolvedValue(1);
+    const app = await buildTestApp("auth0|owner", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/recognition-categories/archive",
+      payload: { categoryId: category.id },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_LAST_ACTIVE");
+    expect(mockCategoryUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 describe("POST /points/adjust", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);
@@ -1163,9 +1352,123 @@ describe("POST /points/adjust", () => {
         entityId: "tx-abc",
         actionHref: "/?tab=activity",
       },
-    }]);
+    }], expect.any(AbortSignal));
     await app.close();
   });
+
+  it("keeps category awards disabled before the release gate", async () => {
+    const app = await buildTestApp("auth0|admin");
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1",
+        delta: 20,
+        reason: "Supported the whole community",
+        categoryApiVersion: "categories-v1",
+        categoryId: "category-custom",
+      },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects category awards outside the rollout organization", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    const app = await buildTestApp("auth0|admin", {}, {
+      recognitionCategoryMutationsEnabled: true,
+      recognitionCategoryRolloutOrganizationIds: new Set(["org-2"]),
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1", delta: 20, reason: "Supported the community",
+        categoryApiVersion: "categories-v1", categoryId: "category-custom",
+      },
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().code).toBe("RECOGNITION_CATEGORY_MUTATIONS_DISABLED");
+    expect(mockTxCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("accepts a category award and uses its fixed name in notifications", async () => {
+    mockFindUnique.mockResolvedValueOnce(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockCategoryFindFirst.mockResolvedValue({
+      id: "category-custom",
+      organizationId: "org-1",
+      name: "Community Impact",
+      legacyTrait: null,
+      archivedAt: null,
+    });
+    mockTxCreate.mockResolvedValue({ id: "tx-category" });
+    const app = await buildTestApp("auth0|admin", {}, { recognitionCategoryMutationsEnabled: true });
+    const res = await app.inject({
+      method: "POST",
+      url: "/points/adjust",
+      payload: {
+        targetUserId: "user-1",
+        delta: 20,
+        reason: "Supported the whole community",
+        categoryApiVersion: "categories-v1",
+        categoryId: "category-custom",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(mockTxCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ trait: null, categoryId: "category-custom" }),
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        body: "Bob awarded you 20 points for Community Impact.",
+      })],
+      skipDuplicates: true,
+    });
+    await app.close();
+  });
+
+  it("confirms after a push timeout and replays a lost keyed response without duplicate effects", async () => {
+    const pushDispatcher = { send: vi.fn().mockReturnValue(new Promise(() => {})) };
+    mockDeviceRegistrationFindMany.mockResolvedValue([{ organizationId: "org-1", userId: "user-1", pushToken: "ExponentPushToken[test]" }]);
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockMembershipFindFirst.mockResolvedValue(makeTargetMembership());
+    mockMembershipFindMany.mockResolvedValue([
+      { userId: "user-2", role: "ADMIN", houseId: "house-2" },
+      { userId: "user-1", role: "MEMBER", houseId: "house-1" },
+    ]);
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxCreate.mockResolvedValue({ id: "tx-retry" });
+    let stored: unknown = null;
+    (prisma.pointMutationRequest.findUnique as ReturnType<typeof vi.fn>).mockImplementation(async () => stored);
+    (prisma.pointMutationRequest.create as ReturnType<typeof vi.fn>).mockImplementation(async ({ data }) => { stored = data; return data; });
+    const app = await buildTestApp("auth0|member", {}, { pushDispatcher });
+    try {
+      const request = { method: "POST" as const, url: "/points/adjust", payload: {
+        targetUserId: "user-1", delta: 15, reason: "Great work", trait: "TECHNICAL_EXCELLENCE",
+        idempotencyKey: "29b2f600-1d44-401b-b18a-bf02c6d58d98",
+      } };
+      const first = await app.inject(request);
+      expect(first.statusCode).toBe(201);
+      const replay = await app.inject(request);
+      expect(replay.statusCode).toBe(201);
+      expect(replay.json()).toEqual(first.json());
+      expect(mockTxCreate).toHaveBeenCalledOnce();
+      expect(prisma.notification.createMany).toHaveBeenCalledOnce();
+      expect(pushDispatcher.send).toHaveBeenCalledOnce();
+      const conflict = await app.inject({ ...request, payload: { ...request.payload, delta: 20 } });
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json().code).toBe("IDEMPOTENCY_KEY_CONFLICT");
+      mockMembershipFindMany.mockResolvedValue([]);
+      const revoked = await app.inject(request);
+      expect(revoked.statusCode).toBe(403);
+      expect(revoked.json().code).toBe("POINT_MUTATION_NOT_AUTHORIZED");
+    } finally { await app.close(); }
+  }, 8_000);
 
   it("rejects self-awards before resolving or creating the transaction", async () => {
     const actor = makeAdmin({ id: "user-2", houseId: "house-1", organizationId: "org-1" });
@@ -1450,7 +1753,7 @@ describe("POST /points/deduct", () => {
         }),
       }),
     );
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockTxCreate).not.toHaveBeenCalled();
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -1488,7 +1791,7 @@ describe("POST /points/deduct", () => {
         }),
       }),
     );
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledOnce();
     expect(mockTxCreate).not.toHaveBeenCalled();
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
     await app.close();
@@ -1520,6 +1823,7 @@ describe("POST /points/deduct", () => {
         actorUserId: "user-2",
         targetUserId: "user-1",
         targetHouseId: "house-2",
+        createdAt: expect.any(Date),
         type: "DEDUCTION",
         delta: -10,
         reason: "Duplicate award correction",
@@ -1625,6 +1929,7 @@ describe("POST /points/delete", () => {
       id: "tx-1",
       organizationId: "org-1",
       deletedAt: null,
+      season: { id: "season-active", name: "Q3 2026", isActive: true, endsAt: null },
     });
     mockTxUpdate.mockResolvedValue(deletedPoint);
     const app = await buildTestApp("auth0|admin");
@@ -1667,20 +1972,55 @@ describe("POST /points/delete", () => {
         organizationId: "org-1",
         actorUserId: "user-2",
         eventType: "POINT_DELETED",
+        createdAt: expect.any(Date),
         summary: "Bob deleted 15 points from Alice.",
         metadata: {
           transactionId: "tx-1",
+          seasonId: "season-active",
+          seasonName: "Q3 2026",
+          isClosedSeason: false,
+          correctedAt: expect.any(String),
+          scoreContributionBefore: 15,
+          scoreContributionAfter: 0,
+          scoreChange: -15,
+          reportingRevision: "2",
           targetUserId: "user-1",
           targetUserName: "Alice",
           targetHouseId: "house-1",
           targetHouseName: "Phoenix",
           delta: 15,
           trait: "TECHNICAL_EXCELLENCE",
+          categoryId: null,
+          categoryName: null,
           awardReason: "Crushed the demo",
           deletionReason: "Duplicate award",
         },
       },
     });
+    await app.close();
+  });
+
+  it.each([undefined, "", "   "])("requires a closed-season correction reason (%s)", async reason => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({ id: "tx-1", organizationId: "org-1", deletedAt: null,
+      season: { id: "closed", name: "Q2", isActive: false, endsAt: new Date() } });
+    const app = await buildTestApp("auth0|admin");
+    const response = await app.inject({ method: "POST", url: "/points/delete", payload: { transactionId: "tx-1", reason } });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().code).toBe("CORRECTION_REASON_REQUIRED");
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+    expect(mockAuditEventCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("keeps active-season deletion compatible without a reason", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({ id: "tx-1", organizationId: "org-1", deletedAt: null,
+      season: { id: "season-active", name: "Q3", isActive: true, endsAt: null } });
+    mockTxUpdate.mockResolvedValue({ ...deletedPoint, deletionReason: null });
+    const app = await buildTestApp("auth0|admin");
+    const response = await app.inject({ method: "POST", url: "/points/delete", payload: { transactionId: "tx-1" } });
+    expect(response.statusCode).toBe(200);
     await app.close();
   });
 
@@ -1690,6 +2030,7 @@ describe("POST /points/delete", () => {
       id: "tx-1",
       organizationId: "org-other",
       deletedAt: null,
+      season: { id: "season-active", name: "Q3 2026", isActive: true, endsAt: null },
     });
     const app = await buildTestApp("auth0|admin");
 
@@ -1876,11 +2217,11 @@ describe("POST /seasons/compare", () => {
           _sum: { delta: -10 },
         },
       ]);
-    mockMembershipFindMany.mockResolvedValue([
-      { user: { id: "user-1", displayName: "Alice" } },
-      { user: { id: "user-2", displayName: "Bob" } },
-      { user: { id: "user-3", displayName: "Cora" } },
-      { user: { id: "user-4", displayName: "Drew" } },
+    mockUserFindMany.mockResolvedValue([
+      { id: "user-1", displayName: "Alice" },
+      { id: "user-2", displayName: "Bob" },
+      { id: "user-3", displayName: "Cora" },
+      { id: "user-4", displayName: "Drew" },
     ]);
     const app = await buildTestApp();
 
@@ -1927,21 +2268,17 @@ describe("POST /seasons/compare", () => {
           organizationId: "org-secure",
           seasonId: { in: ["season-0", "season-active"] },
           deletedAt: null,
-          targetUserId: { not: null },
         },
       }),
     );
-    expect(mockMembershipFindMany).toHaveBeenCalledWith(
+    expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          organizationId: "org-secure",
-          isActive: true,
-          archivedAt: null,
-          userId: { in: ["user-1", "user-2", "user-3", "user-4"] },
+          id: { in: ["user-1", "user-2", "user-3", "user-4"] },
         },
       }),
     );
-    expect(res.json()).toEqual({
+    expect(res.json()).toMatchObject({
       fromSeason: {
         id: "season-0",
         name: "Season 0",
@@ -2128,9 +2465,7 @@ describe("POST /seasons/compare", () => {
     mockTxGroupBy
       .mockResolvedValueOnce(houseTotals)
       .mockResolvedValueOnce(contributorTotals);
-    mockMembershipFindMany.mockResolvedValue(
-      users.map((user) => ({ user })),
-    );
+    mockUserFindMany.mockResolvedValue(users);
     const app = await buildTestApp();
 
     const res = await app.inject({
@@ -2145,14 +2480,11 @@ describe("POST /seasons/compare", () => {
     expect(res.statusCode).toBe(200);
     expect(mockHouseFindMany).toHaveBeenCalledTimes(1);
     expect(mockTxGroupBy).toHaveBeenCalledTimes(2);
-    expect(mockMembershipFindMany).toHaveBeenCalledTimes(1);
-    expect(mockMembershipFindMany).toHaveBeenCalledWith(
+    expect(mockUserFindMany).toHaveBeenCalledTimes(1);
+    expect(mockUserFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          organizationId: "org-secure",
-          isActive: true,
-          archivedAt: null,
-          userId: { in: users.map((user) => user.id) },
+          id: { in: users.map((user) => user.id) },
         },
       }),
     );
@@ -2576,6 +2908,7 @@ describe("POST /houses/leaderboard", () => {
         score: 15,
         transactions: 2,
         memberCount: 1,
+        rank: 1,
       },
       {
         id: "house-1",
@@ -2585,6 +2918,7 @@ describe("POST /houses/leaderboard", () => {
         score: 10,
         transactions: 1,
         memberCount: 2,
+        rank: 2,
       },
     ]);
     await app.close();
@@ -4835,6 +5169,50 @@ describe("POST /transactions/recent", () => {
     await app.close();
   });
 
+  it("requires category capability before returning custom-category activity", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockTxFindMany.mockResolvedValue([{
+      id: "tx-custom",
+      type: "AWARD",
+      delta: 10,
+      reason: "Community contribution",
+      trait: null,
+      category: {
+        id: "category-custom",
+        name: "Community Impact",
+        legacyTrait: null,
+        archivedAt: null,
+      },
+      createdAt: new Date("2026-09-26T12:00:00.000Z"),
+      actor: { displayName: "Bob" },
+      targetUser: { displayName: "Alice" },
+      targetHouse: { name: "Phoenix", color: "#7c3aed" },
+      season: { id: "season-active", name: "Q3 2026", isActive: true },
+      reactions: [],
+    }]);
+    const app = await buildTestApp();
+    const unsupported = await app.inject({ method: "POST", url: "/transactions/recent", payload: {} });
+    expect(unsupported.statusCode).toBe(426);
+    expect(unsupported.json().code).toBe("RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED");
+
+    const supported = await app.inject({
+      method: "POST",
+      url: "/transactions/recent",
+      payload: { categoryApiVersion: "categories-v1" },
+    });
+    expect(supported.statusCode).toBe(200);
+    expect(supported.json().items[0]).toEqual(expect.objectContaining({
+      trait: null,
+      category: {
+        id: "category-custom",
+        name: "Community Impact",
+        legacyTrait: null,
+        archivedAt: null,
+      },
+    }));
+    await app.close();
+  });
+
   it("uses the provided activity cursor for the next page", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
     mockTxFindMany.mockResolvedValue([]);
@@ -5944,6 +6322,177 @@ describe("POST /members", () => {
   });
 });
 
+describe("POST /reports/query", () => {
+  const baseTime = new Date("2026-09-27T12:00:00.000Z");
+  const reportRow = (id: string, minute: number, delta: number, type: "AWARD" | "DEDUCTION") => ({
+    id, type, delta, reason: `Reason for ${id}`, trait: type === "AWARD" ? "COLLABORATION" : null,
+    createdAt: new Date(baseTime.getTime() + minute * 60_000),
+    category: type === "AWARD" ? { id: "cat-1", name: "Teamwork", archivedAt: null } : null,
+    targetHouse: { id: "house-1", name: "Phoenix", color: "#7c3aed" },
+    targetUser: { id: "user-2", displayName: "Bob" },
+    actor: { id: "user-1", displayName: "Alice" },
+  });
+
+  function arrangeAccess() {
+    mockFindUnique.mockResolvedValue(makeMember());
+    mockMembershipFindFirst.mockResolvedValue({ id: "membership-user-1" });
+    mockOrgFindUnique.mockResolvedValue({ reportingRevision: 7n });
+    mockSeasonFindFirst.mockResolvedValue({ id: "season-1" });
+  }
+
+  it("reads a summary and stable pages in a repeatable-read snapshot", async () => {
+    arrangeAccess();
+    const rows = [
+      reportRow("p3", 3, 10, "AWARD"),
+      reportRow("p2", 2, -5, "DEDUCTION"),
+      reportRow("p1", 1, 2, "AWARD"),
+    ];
+    mockTxGroupBy.mockResolvedValue([
+      { type: "AWARD", _sum: { delta: 12 }, _count: { _all: 2 } },
+      { type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } },
+    ]);
+    mockTxFindMany.mockResolvedValueOnce(rows).mockResolvedValueOnce([rows[2]]);
+    const app = await buildTestApp();
+    const first = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 2 } });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({
+      scope: { seasonId: "season-1" }, revision: "7",
+      summary: { netPoints: 7, awardedPoints: 12, deductedPoints: 5, transactionCount: 3, awardCount: 2, deductionCount: 1, deductionsOutsideCategory: null },
+      items: [{ id: "p3" }, { id: "p2" }],
+    });
+    const cursor = first.json().nextCursor as string;
+    expect(cursor).toEqual(expect.any(String));
+    const second = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 2, cursor } });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().items.map((item: { id: string }) => item.id)).toEqual(["p1"]);
+    expect(second.json().nextCursor).toBeNull();
+    expect(mockTxFindMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        organizationId: "org-1", seasonId: "season-1", deletedAt: null,
+        OR: [
+          { createdAt: { lt: rows[1].createdAt } },
+          { createdAt: rows[1].createdAt, id: { lt: "p2" } },
+        ],
+      }),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 3,
+    }));
+    expect(mockTransaction).toHaveBeenCalledWith(expect.any(Function), expect.objectContaining({ isolationLevel: "RepeatableRead" }));
+    await app.close();
+  });
+
+  it("requires refresh after a correction changes the reporting revision", async () => {
+    arrangeAccess();
+    mockTxFindMany.mockResolvedValue([reportRow("p2", 2, 2, "AWARD"), reportRow("p1", 1, 1, "AWARD")]);
+    const app = await buildTestApp();
+    const first = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1 } });
+    const cursor = first.json().nextCursor as string;
+    mockOrgFindUnique.mockResolvedValue({ reportingRevision: 8n });
+    const second = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1, cursor } });
+    expect(second.statusCode).toBe(409);
+    expect(second.json().code).toBe("REPORT_REFRESH_REQUIRED");
+    expect(mockTxFindMany).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
+  it("rejects altered cursors and revoked membership", async () => {
+    arrangeAccess();
+    mockTxFindMany.mockResolvedValue([reportRow("p2", 2, 2, "AWARD"), reportRow("p1", 1, 1, "AWARD")]);
+    const app = await buildTestApp();
+    const first = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1 } });
+    const cursor = first.json().nextCursor as string;
+    const altered = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1, cursor: `${cursor}x` } });
+    expect(altered.statusCode).toBe(400);
+    expect(altered.json().code).toBe("INVALID_REPORT_CURSOR");
+    mockMembershipFindFirst.mockResolvedValue(null);
+    const revoked = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", limit: 1, cursor } });
+    expect(revoked.statusCode).toBe(403);
+    expect(revoked.json().code).toBe("REPORT_ACCESS_REVOKED");
+    await app.close();
+  });
+
+  it("rejects report IDs outside the actor's organization", async () => {
+    arrangeAccess();
+    mockMembershipFindFirst.mockImplementation(async ({ where }) => where?.id ? { id: where.id } : null);
+    const app = await buildTestApp();
+    for (const payload of [
+      { seasonId: "season-1", houseId: "other-house" },
+      { seasonId: "season-1", categoryId: "other-category" },
+      { seasonId: "season-1", memberId: "other-member" },
+      { seasonId: "season-1", giverId: "other-giver" },
+    ]) {
+      const response = await app.inject({ method: "POST", url: "/reports/query", payload });
+      expect(response.statusCode).toBe(404);
+      expect(response.json().code).toBe("REPORT_SCOPE_NOT_FOUND");
+    }
+    expect(mockHouseFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "other-house", organizationId: "org-1" } }));
+    await app.close();
+  });
+
+  it("keeps category awards separate from uncategorized deductions", async () => {
+    arrangeAccess();
+    mockCategoryFindFirst.mockResolvedValue({ id: "cat-1" });
+    mockTxGroupBy.mockImplementation(async ({ where }) => where?.type === "DEDUCTION"
+      ? [{ type: "DEDUCTION", _sum: { delta: -5 }, _count: { _all: 1 } }]
+      : [{ type: "AWARD", _sum: { delta: 10 }, _count: { _all: 1 } }]);
+    mockTxFindMany.mockResolvedValue([reportRow("p3", 3, 10, "AWARD")]);
+    const app = await buildTestApp();
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", categoryId: "cat-1" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().summary).toEqual({
+      netPoints: 10, awardedPoints: 10, deductedPoints: 0, transactionCount: 1,
+      awardCount: 1, deductionCount: 0, deductionsOutsideCategory: { points: 5, count: 1 },
+    });
+    expect(mockTxGroupBy).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: { organizationId: "org-1", seasonId: "season-1", deletedAt: null, type: "DEDUCTION" },
+    }));
+    await app.close();
+  });
+
+  it("filters anonymous recipients and returns a zero summary for empty seasons", async () => {
+    arrangeAccess();
+    const app = await buildTestApp();
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1", memberId: null, type: "DEDUCTION" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().summary).toEqual({
+      netPoints: 0, awardedPoints: 0, deductedPoints: 0, transactionCount: 0,
+      awardCount: 0, deductionCount: 0, deductionsOutsideCategory: null,
+    });
+    expect(mockTxGroupBy).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId: "org-1", seasonId: "season-1", deletedAt: null, targetUserId: null, type: "DEDUCTION" },
+    }));
+    await app.close();
+  });
+
+  it("combines house, recipient, category, giver, and type without widening scope", async () => {
+    arrangeAccess();
+    mockHouseFindFirst.mockResolvedValue({ id: "house-1" });
+    mockCategoryFindFirst.mockResolvedValue({ id: "cat-1" });
+    mockTxGroupBy.mockResolvedValue([]);
+    const app = await buildTestApp();
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: {
+      seasonId: "season-1", houseId: "house-1", memberId: "user-2",
+      categoryId: "cat-1", giverId: "user-1", type: "AWARD",
+    } });
+    expect(response.statusCode).toBe(200);
+    expect(mockTxFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      organizationId: "org-1", seasonId: "season-1", deletedAt: null,
+      targetHouseId: "house-1", targetUserId: "user-2", categoryId: "cat-1",
+      actorUserId: "user-1", type: "AWARD",
+    } }));
+    await app.close();
+  });
+
+  it("returns a typed unavailable response until cursor signing is configured", async () => {
+    arrangeAccess();
+    const app = await buildTestApp("auth0|member", {}, { reportCursorSecret: "" });
+    const response = await app.inject({ method: "POST", url: "/reports/query", payload: { seasonId: "season-1" } });
+    expect(response.statusCode).toBe(503);
+    expect(response.json().code).toBe("REPORTS_NOT_CONFIGURED");
+    await app.close();
+  });
+});
+
 describe("POST /dashboard/summary", () => {
   it("returns 403 ACTOR_NOT_MAPPED when actor is not found", async () => {
     mockFindUnique.mockResolvedValue(null);
@@ -5957,6 +6506,27 @@ describe("POST /dashboard/summary", () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe("ACTOR_NOT_MAPPED");
+    await app.close();
+  });
+
+  it("requires category capability when the season contains custom awards", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockTxGroupBy.mockImplementation(async ({ by }) => (
+      by.includes("categoryId")
+        ? [{ targetHouseId: "house-1", categoryId: "category-custom", _count: { categoryId: 1 } }]
+        : []
+    ));
+    mockCategoryFindMany.mockResolvedValue([{
+      id: "category-custom",
+      name: "Community Impact",
+      legacyTrait: null,
+      archivedAt: null,
+    }]);
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/dashboard/summary", payload: {} });
+    expect(res.statusCode).toBe(426);
+    expect(res.json().code).toBe("RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED");
     await app.close();
   });
 
@@ -5978,12 +6548,6 @@ describe("POST /dashboard/summary", () => {
         { targetHouseId: "house-1", trait: "COLLABORATION", _count: { trait: 2 } },
         { targetHouseId: "house-1", trait: "LEADERSHIP", _count: { trait: 1 } },
         { targetHouseId: "house-2", trait: "INNOVATION", _count: { trait: 1 } },
-      ])
-      .mockResolvedValueOnce([
-        { targetUserId: "user-removed", _sum: { delta: 100 } },
-        { targetUserId: "user-1", _sum: { delta: 55 } },
-        { targetUserId: "user-2", _sum: { delta: 5 } },
-        { targetUserId: "user-3", _sum: { delta: 10 } },
       ])
       .mockResolvedValueOnce([
         { targetHouseId: "house-1", _sum: { delta: 55 }, _count: { _all: 3 } },
@@ -6059,31 +6623,31 @@ describe("POST /dashboard/summary", () => {
     expect(body.seasonWinnerSummary).toBeNull();
     expect(body.monthStartsAt).toBe("2026-07-01T00:00:00.000Z");
     expect(body.seasonStandout).toEqual({
-      memberId: "user-1",
-      memberName: "Alice",
+      memberId: "user-removed",
+      memberName: "Former member",
       houseId: "house-1",
       houseName: "Phoenix",
       houseColor: "#7c3aed",
-      points: 30,
+      points: 100,
     });
     expect(body.monthlyStandout).toEqual({
-      memberId: "user-1",
-      memberName: "Alice",
+      memberId: "user-removed",
+      memberName: "Former member",
       houseId: "house-1",
       houseName: "Phoenix",
       houseColor: "#7c3aed",
-      points: 30,
+      points: 100,
     });
     expect(body.monthlyStandoutsByHouse).toEqual([
       {
         houseId: "house-1",
         standout: {
-          memberId: "user-1",
-          memberName: "Alice",
+          memberId: "user-removed",
+          memberName: "Former member",
           houseId: "house-1",
           houseName: "Phoenix",
           houseColor: "#7c3aed",
-          points: 30,
+          points: 100,
         },
       },
       {
@@ -6140,14 +6704,14 @@ describe("POST /dashboard/summary", () => {
       {
         houseId: "house-1",
         members: [
-          { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 55 },
-          { memberId: "user-2", displayName: "Bob", role: "ADMIN", points: 5 },
+          { memberId: "user-removed", displayName: "Former member", role: null, points: 100, rank: 1, isCurrentMember: false, currentHouseId: null },
+          { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 30, rank: 2, isCurrentMember: true, currentHouseId: "house-1" },
         ],
       },
       {
         houseId: "house-2",
         members: [
-          { memberId: "user-3", displayName: "Cora", role: "MEMBER", points: 10 },
+          { memberId: "user-3", displayName: "Cora", role: "MEMBER", points: 10, rank: 1, isCurrentMember: true, currentHouseId: "house-2" },
         ],
       },
     ]);
@@ -6208,9 +6772,6 @@ describe("POST /dashboard/summary", () => {
       ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { targetUserId: "user-3", _sum: { delta: 30 } },
-      ])
-      .mockResolvedValueOnce([
         { targetHouseId: "house-1", _sum: { delta: 10 }, _count: { _all: 1 } },
         { targetHouseId: "house-2", _sum: { delta: 30 }, _count: { _all: 3 } },
       ])
@@ -6258,6 +6819,9 @@ describe("POST /dashboard/summary", () => {
         houseColor: "#ef4444",
         points: 30,
       },
+      winningHouses: [{
+        houseId: "house-2", houseName: "Ember", houseColor: "#ef4444", points: 30,
+      }],
       topContributor: {
         memberId: "user-3",
         memberName: "Cora",
@@ -6266,6 +6830,9 @@ describe("POST /dashboard/summary", () => {
         houseColor: "#ef4444",
         points: 30,
       },
+      topContributors: [{
+        memberId: "user-3", memberName: "Cora", houseId: "house-2", houseName: "Ember", houseColor: "#ef4444", points: 30,
+      }],
       totalTransactions: 4,
       awardCount: 3,
       deductionCount: 1,
@@ -6286,6 +6853,55 @@ describe("POST /dashboard/summary", () => {
         }),
       );
     }
+    await app.close();
+  });
+
+  it("reconciles moved and unattributed recipients with tied net house totals", async () => {
+    mockFindUnique.mockResolvedValue(makeMember({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(SEASON_ZERO);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix", color: "#7c3aed" },
+      { id: "house-2", name: "Ember", color: "#ef4444" },
+    ]);
+    mockTxGroupBy
+      .mockResolvedValueOnce([
+        { targetUserId: "user-1", targetHouseId: "house-1", _sum: { delta: 10 } },
+        { targetUserId: null, targetHouseId: "house-1", _sum: { delta: -5 } },
+        { targetUserId: "user-1", targetHouseId: "house-2", _sum: { delta: -5 } },
+        { targetUserId: null, targetHouseId: "house-2", _sum: { delta: 10 } },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { targetHouseId: "house-1", _sum: { delta: 5 }, _count: { _all: 2 } },
+        { targetHouseId: "house-2", _sum: { delta: 5 }, _count: { _all: 2 } },
+      ])
+      .mockResolvedValueOnce([
+        { type: "AWARD", _sum: { delta: 20 }, _count: { _all: 2 } },
+        { type: "DEDUCTION", _sum: { delta: -10 }, _count: { _all: 2 } },
+      ])
+      .mockResolvedValueOnce([]);
+    mockTxFindMany.mockResolvedValue([]);
+    mockMembershipFindMany.mockResolvedValue([{ role: "MEMBER", houseId: "house-2", user: { id: "user-1", displayName: "Alice" } }]);
+    mockUserFindMany.mockResolvedValue([{ id: "user-1", displayName: "Alice" }]);
+    const app = await buildTestApp();
+    const res = await app.inject({ method: "POST", url: "/dashboard/summary", payload: { seasonId: "season-0" } });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.seasonWinnerSummary.winningHouses.map((house: { houseId: string }) => house.houseId)).toEqual(["house-2", "house-1"]);
+    expect(body.seasonWinnerSummary.topContributors).toEqual([expect.objectContaining({ memberId: "user-1", points: 5 })]);
+    expect(body.seasonWinnerSummary.awardedPoints - body.seasonWinnerSummary.deductedPoints).toBe(10);
+    expect(body.houseMemberRankings).toEqual([
+      { houseId: "house-1", members: [
+        { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: 10, rank: 1, isCurrentMember: true, currentHouseId: "house-2" },
+        { memberId: null, displayName: "Unattributed", role: null, points: -5, rank: 2, isCurrentMember: false, currentHouseId: null },
+      ] },
+      { houseId: "house-2", members: [
+        { memberId: null, displayName: "Unattributed", role: null, points: 10, rank: 1, isCurrentMember: false, currentHouseId: null },
+        { memberId: "user-1", displayName: "Alice", role: "MEMBER", points: -5, rank: 2, isCurrentMember: true, currentHouseId: "house-2" },
+      ] },
+    ]);
+    expect(body.houseMemberRankings.map((house: { members: { points: number }[] }) => house.members.reduce((sum, member) => sum + member.points, 0))).toEqual([5, 5]);
     await app.close();
   });
 });
@@ -6561,7 +7177,7 @@ describe("POST /orgs/create", () => {
 describe("platform support routes", () => {
   it("submits an organization-scoped point report with an immutable evidence snapshot", async () => {
     mockFindUnique.mockResolvedValue(makeMember());
-    mockTxFindFirst.mockResolvedValue({ id: "tx-1", type: "AWARD", delta: 10, reason: "Great work", trait: "LEADERSHIP", createdAt: new Date("2026-09-20T12:00:00.000Z"), actor: { id: "user-2", displayName: "Sam" }, targetUser: { id: "user-3", displayName: "Alex" }, targetHouse: { id: "house-1", name: "Phoenix" } });
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", type: "AWARD", delta: 10, reason: "Great work", trait: null, category: { id: "custom-1", name: "Community Impact" }, createdAt: new Date("2026-09-20T12:00:00.000Z"), actor: { id: "user-2", displayName: "Sam" }, targetUser: { id: "user-3", displayName: "Alex" }, targetHouse: { id: "house-1", name: "Phoenix" } });
     mockModerationReportCreate.mockResolvedValue({ id: "report-1" });
     const app = await buildTestApp();
     const res = await app.inject({ method: "POST", url: "/moderation/reports/submit", payload: { targetType: "POINT_TRANSACTION", targetId: "tx-1", category: "INAPPROPRIATE_CONTENT", details: "The award message needs review." } });
@@ -6573,6 +7189,7 @@ describe("platform support routes", () => {
         targetId: "tx-1",
         evidenceSnapshot: expect.objectContaining({
           reason: "Great work",
+          category: { id: "custom-1", name: "Community Impact" },
           actor: { id: "user-2", displayName: "Sam" },
         }),
       }),
@@ -6583,13 +7200,13 @@ describe("platform support routes", () => {
 
   it("redacts reported point activity with organization and platform audit evidence", async () => {
     mockModerationReportFindUnique.mockResolvedValue({ id: "report-1", status: "OPEN", organizationId: "org-1", targetType: "POINT_TRANSACTION", targetId: "tx-1" });
-    mockTxFindFirst.mockResolvedValue({ id: "tx-1", delta: 10, targetUserId: "user-3", targetHouseId: "house-1", reason: "Bad message", trait: "LEADERSHIP", deletedAt: null, targetUser: { displayName: "Alex" }, targetHouse: { name: "Phoenix" } });
+    mockTxFindFirst.mockResolvedValue({ id: "tx-1", delta: 10, targetUserId: "user-3", targetHouseId: "house-1", reason: "Bad message", trait: null, category: { id: "custom-1", name: "Community Impact" }, deletedAt: null, targetUser: { displayName: "Alex" }, targetHouse: { name: "Phoenix" } });
     mockModerationReportUpdate.mockResolvedValue({});
     const app = await buildTestApp("auth0|platform-owner", {}, { platformOwnerAuth0Subjects: new Set(["auth0|platform-owner"]) });
     const res = await app.inject({ method: "POST", url: "/platform/moderation/reports/resolve", payload: { reportId: "report-1", action: "REDACT_CONTENT", operatorNote: "Message violates the content policy." } });
     expect(res.statusCode).toBe(200);
     expect(mockTxUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "tx-1" }, data: expect.objectContaining({ deletedAt: expect.any(Date), deletedByUserId: null }) }));
-    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ organizationId: "org-1", eventType: "POINT_DELETED", metadata: expect.objectContaining({ moderationReportId: "report-1" }) }) });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ organizationId: "org-1", eventType: "POINT_DELETED", metadata: expect.objectContaining({ moderationReportId: "report-1", categoryId: "custom-1", categoryName: "Community Impact" }) }) });
     expect(mockPlatformAuditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "MODERATION_REPORT_UPDATED", metadata: expect.objectContaining({ action: "REDACT_CONTENT" }) }) });
     expect(mockModerationReportUpdate).toHaveBeenCalledWith({ where: { id: "report-1" }, data: expect.objectContaining({ status: "RESOLVED", operatorNote: "Message violates the content policy.", resolvedByAuth0Sub: "auth0|platform-owner" }) });
     await app.close();

@@ -278,7 +278,7 @@ export function SeasonComparisonReport({
                   <div className="text-sm">
                     {house.to.topContributor ? (
                       <>
-                        <p className="font-semibold">{house.to.topContributor.displayName}</p>
+                        <p className="font-semibold">{(house.to.topContributors ?? [house.to.topContributor]).map((contributor) => contributor.displayName).join(", ")}</p>
                         <p className="text-xs text-muted-foreground">
                           {house.to.topContributor.points.toLocaleString()} points
                         </p>

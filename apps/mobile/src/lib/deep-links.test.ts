@@ -44,32 +44,46 @@ describe("parseHousePointsUrl", () => {
   });
 });
 
+const memberships = [
+  { organizationId: "org-1", organizationSlug: "acme" },
+  { organizationId: "org-2", organizationSlug: "other" },
+];
+
 describe("deepLinkFromNotificationData", () => {
-  it("prefers a canonical URL supplied by the notification", () => {
-    expect(deepLinkFromNotificationData({
-      url: "housepoints://invite/token-1",
-    }, "acme")).toEqual({ kind: "invite", token: "token-1" });
+  it("supports explicit legacy invite URLs", () => {
+    expect(deepLinkFromNotificationData({ url: "housepoints://invite/token-1" }, []))
+      .toEqual({ kind: "invite", token: "token-1" });
   });
-
-  it("routes point notifications to activity in the registered organization", () => {
-    expect(deepLinkFromNotificationData({
-      type: "POINT_AWARD_RECEIVED",
-      entityId: "point-1",
-    }, "acme")).toEqual({
-      kind: "activity",
-      organizationSlug: "acme",
-      pointId: "point-1",
-    });
+  it.each(["POINT_AWARD_RECEIVED", "POINT_DEDUCTION_RECEIVED"])("resolves %s using the server organization ID", type => {
+    // Same shape emitted by dispatchPushForNotifications; no slug or URL supplied.
+    expect(deepLinkFromNotificationData({ organizationId: "org-2", type, entityId: "point-1", actionHref: "/?tab=activity" }, memberships))
+      .toEqual({ kind: "activity", organizationSlug: "other", pointId: "point-1" });
   });
-
-  it("routes other notifications to the organization dashboard", () => {
-    expect(deepLinkFromNotificationData({
-      type: "SEASON_STARTED",
-      entityId: "season-1",
-    }, "acme")).toEqual({ kind: "dashboard", organizationSlug: "acme" });
+  it("uses the current slug after an organization rename", () => {
+    expect(deepLinkFromNotificationData({ organizationId: "org-1", type: "SEASON_STARTED", entityId: "season-1" }, [{ organizationId: "org-1", organizationSlug: "renamed" }]))
+      .toEqual({ kind: "dashboard", organizationSlug: "renamed" });
   });
-
-  it("waits for active organization hydration when no URL is supplied", () => {
-    expect(deepLinkFromNotificationData({ type: "SEASON_STARTED" }, null)).toBeNull();
+  it("does not interpret a reaction ID as a point ID", () => {
+    expect(deepLinkFromNotificationData({ organizationId: "org-1", type: "POINT_REACTION_RECEIVED", entityId: "reaction-1", actionHref: "/?tab=activity" }, memberships))
+      .toEqual({ kind: "dashboard", organizationSlug: "acme" });
+  });
+  it.each([
+    { type: "SEASON_STARTED" },
+    { organizationId: "revoked", type: "SEASON_STARTED" },
+    { organizationId: 123 },
+    { organizationId: "org-1", type: "POINT_AWARD_RECEIVED", entityId: "" },
+    { organizationId: "org-1", type: "POINT_DEDUCTION_RECEIVED" },
+    { organizationId: "org-1", url: "housepoints://o/other/dashboard" },
+    { organizationId: "org-1", url: "housepoints://invite/token" },
+    { url: "https://untrusted.test/" },
+    { url: "housepoints://o/revoked/dashboard" },
+  ])("does not guess a destination for %j", data => {
+    expect(deepLinkFromNotificationData(data, memberships)).toBeNull();
+  });
+  it("validates explicit organization URLs against membership", () => {
+    expect(deepLinkFromNotificationData({ url: "housepoints://o/acme/dashboard" }, memberships))
+      .toEqual({ kind: "dashboard", organizationSlug: "acme" });
+    expect(deepLinkFromNotificationData({ organizationId: "org-1", url: "housepoints://o/acme/activity/point-1" }, memberships))
+      .toEqual({ kind: "activity", organizationSlug: "acme", pointId: "point-1" });
   });
 });

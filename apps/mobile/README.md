@@ -55,6 +55,14 @@ Fill in:
 - `EXPO_PUBLIC_WEB_BASE_URL` — deployed web origin used for admin handoffs.
 - `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED` — set to `true` to expose the role-gated
   mobile Manage tab during the Phase 3 rollout.
+- `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` — defaults to `false`. Keep it
+  false in EAS environments until the C5 category rollout; a preview build with
+  it enabled can select and award active custom categories after the API
+  mutation gate is enabled. Category-aware dashboard and activity reads remain
+  active in upgraded binaries regardless of this flag.
+- `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS` — comma-separated
+  organization IDs allowed to use category awards when the flag is enabled.
+  Empty means no organizations; match the API and web cohort lists.
 
 Android push builds also require `apps/mobile/google-services.json` for the
 Firebase project registered to `com.housepoints.app`. This file contains the
@@ -77,6 +85,39 @@ npx.cmd eas-cli@latest env:pull --environment preview --path .env
 The resulting `.env` is ignored by Git. Do not commit it or paste its contents
 into issues, logs, or documentation. Confirm that preview points to the beta web
 and API services before creating test data.
+
+## macOS Android preview builds with EAS
+
+Cloud builds need Node.js, npm, Git, and an Expo login. Android Studio, Java,
+and Xcode are only needed for local native builds or simulators, not for an
+Android EAS cloud build. Use `npm` and `npx` on macOS instead of `npm.cmd` and
+`npx.cmd`.
+
+Run the repository checks, then from `apps/mobile`:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest whoami
+npx eas-cli@latest build --profile preview --platform android
+```
+
+This uploads the local project to EAS and uses the EAS `preview` Environment.
+It does not commit or push to GitHub. Commit and push the reviewed candidate
+to `develop` separately so GitHub and the preview artifact represent the same
+change. Open the resulting build link to install its APK on an Android device.
+
+Dispatch `Mobile Staging E2E` on `develop` with that build's APK download URL
+as `android_app_url`. The workflow currently runs manually or on its weekday
+schedule; a push to `develop` runs CI but does not trigger mobile E2E. After
+verification, follow the existing store release workflow below.
+
+For the C5 category rehearsal, build a preview APK with
+`EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED=true` only after staging API and
+web category flags and matching organization-ID allowlists are enabled. Set the staging GitHub Environment variable
+`MOBILE_E2E_CATEGORY_NAME` to an active custom category's exact name and
+dispatch `Mobile Staging E2E` with `recognition_mode=categories`. The scheduled
+workflow uses `MOBILE_E2E_RECOGNITION_MODE` (default `legacy`); align that
+variable with the APK stored in `MOBILE_E2E_ANDROID_APP_URL`.
 
 ## Windows Android local-testing runbook
 
@@ -257,6 +298,33 @@ for the native Auth0 application does not match `AUTH0_AUDIENCE`.
 
 ## Verify (dev laptop, no device)
 
+The award form uses Expo SDK 54's supported `react-native-keyboard-controller`
+version. `KeyboardAwareScrollView` tracks native input and keyboard movement;
+`KeyboardStickyView` keeps the submit footer above the keyboard. The scroll
+clearance includes the measured footer height. Do not layer Android window-height
+adjustments or manual focus scrolling on top of these components.
+The Maestro award flow checks reason-first entry, numeric input visibility,
+keyboard reopen/dismiss cycles, and submission with the reason keyboard open.
+It enters the final reason once and verifies that the exact draft survives
+numeric editing, keyboard dismissal, and reason refocusing. The seven-point
+amount is also verified before submitting; keyboard reopening does not retype
+either field. This smoke does not test replacing existing reason text or the
+native text-selection toolbar.
+Screenshots capture these states for checking footer placement.
+On a physical Android device, verify that the footer sits just above the open
+keyboard and returns to the bottom after dismissal, without a large blank gap.
+Also check a multiline reason on a small physical iOS and Android device before
+release; desktop unit tests cannot verify native keyboard layout.
+
+The keyboard controller adds native code and was introduced in app/runtime
+version `1.0.1`. The current `1.0.2` candidate also updates native Expo
+dependencies and requires a new EAS binary; do not publish it as an OTA update
+for runtimes `1.0.0` or `1.0.1`. Install the rebuilt preview APK before testing.
+
+Tap the point total to enter a whole number from 1 to 100 directly. The plus,
+minus, and quick preset controls remain available. Empty, fractional, or
+out-of-range amounts disable submission and show an inline validation message.
+
 Even without a simulator, these gates must pass before landing changes:
 
 ```powershell
@@ -294,6 +362,13 @@ eas update --channel production --environment production --message "Describe hot
 - Runtime compatibility follows the app `version`. Increment `version` and
   create new native builds whenever native dependencies or configuration
   change.
+
+The current app/store and OTA runtime version is `1.0.2`, manually maintained
+in `app.config.ts`. EAS `autoIncrement` only advances the production native
+build numbers, not this version. The npm package version is separate metadata.
+Keep the same candidate app version when merging from `develop` to `master`.
+Semantic-release automation will be planned after the `1.0.2` Play release;
+it is not enabled for this candidate.
 
 Configure the required `EXPO_PUBLIC_*` values in the matching EAS
 `development`, `preview`, and `production` Environments. Do not promote a
@@ -354,7 +429,7 @@ First release rehearsal:
 
 `apps/mobile/e2e/sign-in-dashboard-award.yaml` covers Auth0 sign-in, dashboard
 readiness, and a point award using stable native test IDs. The
-`Mobile Staging E2E` workflow runs on pushes to `develop` or manually. It
+`Mobile Staging E2E` workflow runs on a weekday schedule or manually. It
 downloads a configured staging APK, starts a GitHub-hosted Android emulator,
 and runs the free Maestro CLI without a Maestro Cloud subscription. Failure
 artifacts are retained for seven days. See

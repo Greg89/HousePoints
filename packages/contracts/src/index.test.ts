@@ -51,6 +51,9 @@ import {
   broadcastReleaseAnnouncementResponseSchema,
   broadcastReleaseAnnouncementSchema,
   createReleaseAnnouncementSchema,
+  createRecognitionCategorySchema,
+  archiveRecognitionCategorySchema,
+  recognitionCategoryListResponseSchema,
   releaseAnnouncementSchema,
   pagedActivityFeedSchema,
   adminAuditActionSchema,
@@ -129,6 +132,9 @@ const webConsumedApiEndpoints = [
   "/platform/settings",
   "/points/deduct",
   "/points/delete",
+  "/recognition-categories/archive",
+  "/recognition-categories/create",
+  "/recognition-categories/list",
   "/seasons/context",
   "/seasons/compare",
   "/seasons/rename",
@@ -226,7 +232,62 @@ describe("adjustPointsSchema", () => {
 
     const result = adjustPointsSchema.safeParse(withoutTrait);
     expect(result.success).toBe(false);
-    expect(result.error?.flatten().fieldErrors.trait).toBeDefined();
+  });
+
+  it("accepts an explicitly versioned category award", () => {
+    expect(adjustPointsSchema.parse({
+      targetUserId: "user_1",
+      delta: 10,
+      reason: "Great category work",
+      categoryApiVersion: "categories-v1",
+      categoryId: "category_1",
+    })).toEqual({
+      targetUserId: "user_1",
+      delta: 10,
+      reason: "Great category work",
+      categoryApiVersion: "categories-v1",
+      categoryId: "category_1",
+    });
+  });
+
+  it("rejects ambiguous or unversioned category awards", () => {
+    expect(adjustPointsSchema.safeParse({ ...valid, categoryApiVersion: "categories-v1", categoryId: "category_1" }).success).toBe(false);
+    expect(adjustPointsSchema.safeParse({ targetUserId: "user_1", delta: 10, reason: "Great category work", categoryId: "category_1" }).success).toBe(false);
+  });
+});
+
+describe("recognition category schemas", () => {
+  it("accepts category list and mutation payloads", () => {
+    expect(createRecognitionCategorySchema.parse({
+      idempotencyKey: "29b2f600-1d44-401b-b18a-bf02c6d58d98",
+      name: "Community Impact",
+      description: null,
+    }).name).toBe("Community Impact");
+    expect(archiveRecognitionCategorySchema.parse({ categoryId: "category-1" })).toEqual({
+      categoryId: "category-1",
+    });
+    expect(recognitionCategoryListResponseSchema.parse({
+      apiVersion: "categories-v1",
+      categories: [{
+        id: "category-1",
+        name: "Community Impact",
+        description: null,
+        legacyTrait: null,
+        createdAt: "2026-09-26T12:00:00.000Z",
+        archivedAt: null,
+      }],
+    }).categories).toHaveLength(1);
+  });
+
+  it("rejects invalid versions, keys, and category names", () => {
+    expect(createRecognitionCategorySchema.safeParse({
+      idempotencyKey: "not-a-uuid",
+      name: "X",
+    }).success).toBe(false);
+    expect(recognitionCategoryListResponseSchema.safeParse({
+      apiVersion: "categories-v2",
+      categories: [],
+    }).success).toBe(false);
   });
 });
 
@@ -1292,6 +1353,7 @@ describe("dashboard response schemas", () => {
           count: 3,
         },
       ],
+      categoryLeaders: [],
       recentActivity: [activityItem],
       pointsVelocity: [
         {

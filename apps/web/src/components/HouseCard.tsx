@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Users } from "@phosphor-icons/react";
+import Link from "next/link";
+import { ArrowRight, Users } from "@phosphor-icons/react";
 import type { LeaderboardEntry } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -10,14 +11,16 @@ interface HouseCardProps {
   rank: number;
   selected?: boolean;
   onSelect?: () => void;
+  reportHref?: string;
 }
 
-export function HouseCard({ house, rank, selected = false, onSelect }: HouseCardProps) {
+export function HouseCard({ house, rank, selected = false, onSelect, reportHref }: HouseCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: rank * 0.05 }}
+      className="relative"
     >
       <button
         type="button"
@@ -76,6 +79,16 @@ export function HouseCard({ house, rank, selected = false, onSelect }: HouseCard
           </p>
         </div>
       </button>
+      {reportHref ? (
+        <Link
+          href={reportHref}
+          aria-label={`Open full report for ${house.name}`}
+          className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full border bg-background/90 px-3 py-1 text-xs font-semibold text-foreground shadow-sm hover:border-primary/40 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          Full report
+          <ArrowRight size={12} aria-hidden="true" />
+        </Link>
+      ) : null}
     </motion.div>
   );
 }

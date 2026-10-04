@@ -17,6 +17,8 @@ import {
   readCorsAllowedOriginsFromEnv,
   readExpoAccessTokenFromEnv,
   readPointAdjustmentsEnabledFromEnv,
+  readRecognitionCategoryMutationsEnabledFromEnv,
+  readRecognitionCategoryRolloutOrganizationIdsFromEnv,
   readPushDispatchEnabledFromEnv,
   readOrganizationCreationPolicyFromEnv,
   readPlatformOwnerAuth0SubjectsFromEnv,
@@ -29,6 +31,8 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerOrgRoutes } from "./routes/orgs.js";
 import { registerPointRoutes } from "./routes/points.js";
+import { registerRecognitionCategoryRoutes } from "./routes/recognition-categories.js";
+import { registerReportRoutes } from "./routes/reports.js";
 import { registerPlatformRoutes } from "./routes/platform.js";
 import { registerReleaseRoutes } from "./routes/releases.js";
 import { registerSeasonRoutes } from "./routes/seasons.js";
@@ -50,9 +54,12 @@ type BuildAppOptions = {
   corsAllowedOrigins?: readonly string[];
   disableRateLimit?: boolean;
   pointAdjustmentsEnabled?: boolean;
+  recognitionCategoryMutationsEnabled?: boolean;
+  recognitionCategoryRolloutOrganizationIds?: ReadonlySet<string>;
   pushDispatcher?: PushDispatcher | null;
   organizationCreationPolicy?: OrganizationCreationPolicy;
   platformOwnerAuth0Subjects?: ReadonlySet<string>;
+  reportCursorSecret?: string;
 };
 
 export async function buildApp(options: BuildAppOptions = {}) {
@@ -65,6 +72,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
     options.corsAllowedOrigins ?? readCorsAllowedOriginsFromEnv();
   const pointAdjustmentsEnabled =
     options.pointAdjustmentsEnabled ?? readPointAdjustmentsEnabledFromEnv();
+  const recognitionCategoryMutationsEnabled =
+    options.recognitionCategoryMutationsEnabled ?? readRecognitionCategoryMutationsEnabledFromEnv();
+  const recognitionCategoryRolloutOrganizationIds =
+    options.recognitionCategoryRolloutOrganizationIds ?? readRecognitionCategoryRolloutOrganizationIdsFromEnv();
   const organizationCreationPolicy =
     options.organizationCreationPolicy ?? readOrganizationCreationPolicyFromEnv();
   const platformOwnerAuth0Subjects =
@@ -130,16 +141,24 @@ export async function buildApp(options: BuildAppOptions = {}) {
   await registerNotificationRoutes(app);
   await registerOrgRoutes(app, { pushDispatcher, organizationCreationPolicy });
   await registerUserRoutes(app, { verifyIdToken });
-  await registerPointRoutes(app, { pointAdjustmentsEnabled, pushDispatcher });
+  await registerPointRoutes(app, {
+    pointAdjustmentsEnabled,
+    recognitionCategoryMutationsEnabled,
+    recognitionCategoryRolloutOrganizationIds,
+    pushDispatcher,
+  });
+  await registerRecognitionCategoryRoutes(app, {
+    mutationsEnabled: recognitionCategoryMutationsEnabled,
+    rolloutOrganizationIds: recognitionCategoryRolloutOrganizationIds,
+  });
   await registerPlatformRoutes(app, {
     hardOrganizationCreationPolicy: organizationCreationPolicy,
     platformOwnerAuth0Subjects,
   });
   await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
+  await registerReportRoutes(app, { cursorSecret: options.reportCursorSecret ?? process.env.REPORT_CURSOR_SECRET });
   await registerTelemetryRoutes(app);
 
   return app;
 }
-
-

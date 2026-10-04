@@ -45,6 +45,7 @@ import type {
   PointReactionResponse,
   AppUserOrganizationContext,
   ActivityFeedRequest,
+  RecognitionCategory,
 } from "@housepoints/contracts";
 import { cn } from "@/lib/cn";
 
@@ -85,9 +86,12 @@ interface DashboardShellProps {
   onRefreshNotifications: () => Promise<PagedNotifications>;
   onMarkNotificationRead: (notificationId: string) => Promise<NotificationMutationResult>;
   onMarkAllNotificationsRead: () => Promise<NotificationMutationResult>;
-  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait) => Promise<AwardPointsResult>;
-  onDeduct?: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
-  onDeletePoint?: (transactionId: string) => Promise<DeletePointResult>;
+  onAward: (targetUserId: string, delta: number, reason: string, trait: Trait, idempotencyKey?: string) => Promise<AwardPointsResult>;
+  recognitionCategories?: RecognitionCategory[];
+  onLoadRecognitionCategories?: () => Promise<RecognitionCategory[]>;
+  onAwardCategory?: (targetUserId: string, delta: number, reason: string, categoryId: string, idempotencyKey?: string) => Promise<AwardPointsResult>;
+  onDeduct?: (targetUserId: string, reason: string, idempotencyKey?: string) => Promise<DeductPointsResult>;
+  onDeletePoint?: (transactionId: string, reason?: string) => Promise<DeletePointResult>;
   onReactToPoint: (
     transactionId: string,
     reactionKey: PointReactionKey | null,
@@ -96,6 +100,7 @@ interface DashboardShellProps {
     transactionId: string,
   ) => Promise<PointReactionDetailsResult<PointReactionDetailsResponse>>;
   dashboardHref: string;
+  reportsHref?: string | null;
   loginUrl: string;
   logoutUrl: string;
   releaseNotesUrl?: string | null;
@@ -169,8 +174,7 @@ function getTabFromSearchParams(searchParams: ReadableSearchParams, canManage: b
   return null;
 }
 
-function syncTabToUrl(tab: TabId, searchParams: ReadableSearchParams) {
-  const nextParams = new URLSearchParams(searchParams.toString());
+function syncTabToUrl(tab: TabId, searchParams: ReadableSearchParams) {  const nextParams = new URLSearchParams(searchParams.toString());
 
   if (tab === "overview") {
     nextParams.delete("tab");
@@ -181,6 +185,20 @@ function syncTabToUrl(tab: TabId, searchParams: ReadableSearchParams) {
   const nextQuery = nextParams.toString();
   const nextUrl = nextQuery ? `?${nextQuery}` : window.location.pathname;
   window.history.pushState(null, "", nextUrl);
+}
+
+function buildReportHref(
+  reportsHref: string,
+  scope: { seasonId: string; activeSeasonId: string; houseId?: string; memberId?: string },
+): string {
+  const params = new URLSearchParams();
+  if (scope.seasonId && scope.seasonId !== scope.activeSeasonId) {
+    params.set("season", scope.seasonId);
+  }
+  if (scope.houseId) params.set("house", scope.houseId);
+  if (scope.memberId) params.set("member", scope.memberId);
+  const query = params.toString();
+  return query ? `${reportsHref}?${query}` : reportsHref;
 }
 
 export function DashboardShell({
@@ -201,11 +219,15 @@ export function DashboardShell({
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   onAward,
+  recognitionCategories,
+  onLoadRecognitionCategories,
+  onAwardCategory,
   onDeduct,
   onDeletePoint,
   onReactToPoint,
   onReadPointReactionDetails,
   dashboardHref,
+  reportsHref,
   logoutUrl,
   releaseNotesUrl,
   showSeasonOverviewCard = false,
@@ -542,9 +564,14 @@ export function DashboardShell({
                 <HouseCard
                   key={house.id}
                   house={house}
-                  rank={index + 1}
+                  rank={house.rank ?? index + 1}
                   selected={house.id === selectedHouseId}
                   onSelect={() => setSelectedHouseId((current) => current === house.id ? null : house.id)}
+                  reportHref={reportsHref ? buildReportHref(reportsHref, {
+                    seasonId: selectedSeasonId,
+                    activeSeasonId: seasonContext.activeSeason.id,
+                    houseId: house.id,
+                  }) : undefined}
                 />
               ))}
             </div>
@@ -575,6 +602,7 @@ export function DashboardShell({
             ) : null}
             <div className="mt-8">
               <OverviewReports
+                categoryMode={recognitionCategories !== undefined || displayedDashboardSummary.categoryLeaders.some((entry) => entry.category?.legacyTrait === null)}
                 dashboardSummary={displayedDashboardSummary}
                 selectedHouse={selectedHouse}
                 onShowActivity={() => {
@@ -661,6 +689,9 @@ export function DashboardShell({
         members={members}
         currentUserId={session.userId}
         onAward={onAward}
+        categories={recognitionCategories}
+        onLoadCategories={onLoadRecognitionCategories}
+        onAwardCategory={onAwardCategory}
       />
       {onDeduct ? (
         <DeductPointsDialog

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Trophy, Crown, Medal } from "@phosphor-icons/react";
-import type { OrgMember } from "@housepoints/contracts";
+import { rankScores, type OrgMember } from "@housepoints/contracts";
 
 interface LeaderboardProps {
   /** Members enriched with house color */
@@ -36,16 +36,11 @@ export function Leaderboard({
 }: LeaderboardProps) {
   const memberMap = new Map(members.map((m) => [m.id, m]));
 
-  const ranked = memberPoints
+  const ranked = rankScores(memberPoints
     .filter((mp) => mp.points > 0)
-    .map((mp) => ({ member: memberMap.get(mp.memberId), points: mp.points }))
-    .filter((entry): entry is { member: OrgMember; points: number } => Boolean(entry.member))
-    .slice(0, 10)
-    .map((entry, index) => ({
-      member: entry.member,
-      points: entry.points,
-      rank: index + 1,
-    }));
+    .map((mp) => ({ id: mp.memberId, name: memberMap.get(mp.memberId)?.displayName ?? "", member: memberMap.get(mp.memberId), points: mp.points }))
+    .filter((entry): entry is typeof entry & { member: OrgMember } => Boolean(entry.member))
+  ).slice(0, 10);
 
   return (
     <div className="rounded-xl border bg-card">

@@ -19,6 +19,8 @@ const PUSH_NOTIFICATION_TYPES = new Set([
 
 type DeviceLookupClient = Pick<PrismaClient, "deviceRegistration">;
 
+export const PUSH_DELIVERY_TIMEOUT_MS = 3_000;
+
 export async function dispatchPushForNotifications(params: {
   rows: readonly NotificationRow[];
   dispatcher?: PushDispatcher;
@@ -30,7 +32,16 @@ export async function dispatchPushForNotifications(params: {
   );
   if (!params.dispatcher || pushableRows.length === 0) return;
 
-  try {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error("Push delivery deadline exceeded");
+      controller.abort(err);
+      reject(err);
+    }, PUSH_DELIVERY_TIMEOUT_MS);
+  });
+  const deliver = async () => {
     const registrations = await params.client.deviceRegistration.findMany({
       where: {
         revokedAt: null,
@@ -46,6 +57,7 @@ export async function dispatchPushForNotifications(params: {
       },
     });
 
+    controller.signal.throwIfAborted();
     const messages: PushMessage[] = [];
     for (const row of pushableRows) {
       for (const registration of registrations) {
@@ -69,16 +81,22 @@ export async function dispatchPushForNotifications(params: {
     }
     if (messages.length === 0) return;
 
-    const result = await params.dispatcher.send(messages);
+    const result = await params.dispatcher!.send(messages, controller.signal);
+    controller.signal.throwIfAborted();
     info(params.logger, "notifications.push_dispatched", {
       notificationCount: pushableRows.length,
       deviceCount: messages.length,
       acceptedCount: result.acceptedCount,
     });
+  };
+  try {
+    await Promise.race([deliver(), deadline]);
   } catch (err) {
     error(params.logger, "notifications.push_failed", {
       notificationCount: pushableRows.length,
     }, err);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -87,7 +105,8 @@ export function buildPointAwardNotificationData(input: {
   recipientUserId: string;
   actorDisplayName: string;
   delta: number;
-  trait: keyof typeof TRAIT_LABELS;
+  trait?: keyof typeof TRAIT_LABELS;
+  categoryName?: string;
   transactionId: string;
 }): NotificationRow {
   return {
@@ -96,7 +115,7 @@ export function buildPointAwardNotificationData(input: {
     type: "POINT_AWARD_RECEIVED",
     severity: "INFO",
     title: "Points awarded",
-    body: `${input.actorDisplayName} awarded you ${input.delta} points for ${TRAIT_LABELS[input.trait]}.`,
+    body: `${input.actorDisplayName} awarded you ${input.delta} points for ${input.categoryName ?? (input.trait ? TRAIT_LABELS[input.trait] : "recognition")}.`,
     actionLabel: "View activity",
     actionHref: "/?tab=activity",
     entityType: "PointTransaction",

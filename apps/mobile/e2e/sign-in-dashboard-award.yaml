@@ -56,14 +56,65 @@ tags:
 - tapOn:
     id: "mobile.award.trait.*"
     index: 0
+# Focus reason first, without first opening the numeric keyboard.
 - tapOn:
     id: "mobile.award.reason"
 - inputText: "Maestro staging award"
+- assertVisible:
+    id: "mobile.award.reason"
+    text: "Maestro staging award"
+- assertVisible:
+    id: "mobile.award.submit"
+- takeScreenshot: award-reason-first-keyboard-open
 - hideKeyboard
+- tapOn:
+    id: "mobile.award.points"
+- eraseText
+- inputText: "101"
+- assertVisible: "Enter a whole number from 1 to 100."
+- eraseText
+- inputText: "100"
+- assertVisible:
+    id: "mobile.award.points"
+- assertVisible: "Award 100 points"
+# Exercise a custom amount while keeping staging awards small.
+- eraseText
+- inputText: "7"
+- assertVisible:
+    id: "mobile.award.points"
+- assertVisible: "Award 7 points"
+- takeScreenshot: award-points-keyboard-open
+- hideKeyboard
+# Reopen the numeric keyboard to catch stale layout after dismissal.
+- tapOn:
+    id: "mobile.award.points"
+- assertVisible:
+    id: "mobile.award.points"
+    text: "7"
+- assertVisible: "Award 7 points"
+- takeScreenshot: award-points-keyboard-reopened
+- hideKeyboard
+- assertVisible:
+    id: "mobile.award.reason"
+    text: "Maestro staging award"
+- assertVisible:
+    id: "mobile.award.submit"
+- takeScreenshot: award-points-keyboard-dismissed
+- tapOn:
+    id: "mobile.award.reason"
+# Refocus without rewriting the draft; keep the keyboard open for submission.
+- assertVisible:
+    id: "mobile.award.reason"
+    text: "Maestro staging award"
+- takeScreenshot: award-reason-keyboard-open
 - extendedWaitUntil:
     visible:
       id: "mobile.award.submit"
     timeout: 10000
+- assertVisible:
+    id: "mobile.award.points"
+    text: "7"
+- assertVisible: "Award 7 points"
 - tapOn:
     id: "mobile.award.submit"
 

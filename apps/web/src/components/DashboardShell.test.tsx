@@ -378,6 +378,7 @@ const baseProps = {
         count: 1,
       },
     ],
+    categoryLeaders: [],
     recentActivity: [
       {
         id: "activity-1",
@@ -556,6 +557,7 @@ const baseProps = {
           count: 1,
         },
       ],
+      categoryLeaders: [],
       recentActivity: [
         {
           id: "activity-historical",
@@ -616,6 +618,35 @@ describe("DashboardShell", () => {
     vi.useRealTimers();
     searchParamsState.value = "";
     window.history.replaceState(null, "", "/");
+  });
+
+  it("shows category identity in overview reports when category capability is enabled", () => {
+    const category = { id: "category-old", name: "Community Impact", legacyTrait: null, archivedAt: "2026-09-21T12:00:00.000Z" };
+    render(<DashboardShell
+      {...baseProps}
+      recognitionCategories={[{ ...category, description: null, createdAt: "2026-09-20T12:00:00.000Z" }]}
+      onAwardCategory={async () => ({ ok: true })}
+      dashboardSummary={{
+        ...baseProps.dashboardSummary,
+        categoryLeaders: [{ houseId: "house-1", houseName: "Slytherin", houseColor: "#22c55e", category, count: 1 }],
+      }}
+    />);
+    expect(screen.getByText("Category leader per house")).toBeInTheDocument();
+    expect(screen.getByText("Community Impact")).toBeInTheDocument();
+  });
+
+  it("keeps custom-category report labels when category management is rolled back", () => {
+    const category = { id: "category-old", name: "Community Impact", legacyTrait: null, archivedAt: "2026-09-21T12:00:00.000Z" };
+    render(<DashboardShell
+      {...baseProps}
+      dashboardSummary={{
+        ...baseProps.dashboardSummary,
+        categoryLeaders: [{ houseId: "house-1", houseName: "Slytherin", houseColor: "#22c55e", category, count: 1 }],
+      }}
+    />);
+
+    expect(screen.getByText("Category leader per house")).toBeInTheDocument();
+    expect(screen.getByText("Community Impact")).toBeInTheDocument();
   });
 
   it("keeps the dashboard tabs focused for members", () => {
@@ -843,6 +874,7 @@ describe("DashboardShell", () => {
     expect(onSeasonChange).toHaveBeenCalledWith("season-0");
     expect(await screen.findByText("Historical view")).toBeInTheDocument();
     expect(screen.getByText("Historical season view")).toBeInTheDocument();
+    expect(screen.getByText("Historical totals and winners reflect recorded corrections and may change.")).toBeInTheDocument();
     expect(screen.getByLabelText("Season recap")).toHaveTextContent("Winning house");
     expect(screen.getByLabelText("Season recap")).toHaveTextContent("Ravenclaw");
     expect(screen.getByLabelText("Season recap")).toHaveTextContent("10 points");

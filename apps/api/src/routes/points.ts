@@ -16,6 +16,8 @@ import {
   type Trait,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
+import { idempotentPointMutation } from "../point-idempotency.js";
+import { activeScoringSeason, scoringWriteTime, ScoringWriteError, withScoringWrite } from "../scoring-write.js";
 import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
 import {
@@ -28,6 +30,7 @@ import type { PushDispatcher } from "../push-dispatcher.js";
 
 export const ACTIVITY_ITEM_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+  category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
   actor: { select: { displayName: true } },
   targetUser: { select: { displayName: true } },
   targetHouse: { select: { name: true, color: true } },
@@ -89,6 +92,14 @@ export function mapActivityItem(
     delta: tx.delta,
     reason: tx.reason,
     trait: tx.trait ?? null,
+    ...(tx.category
+      ? { category: {
+          id: tx.category.id,
+          name: tx.category.name,
+          legacyTrait: tx.category.legacyTrait,
+          archivedAt: tx.category.archivedAt?.toISOString() ?? null,
+        } }
+      : {}),
     createdAt: tx.createdAt.toISOString(),
     season: tx.season
       ? {
@@ -108,6 +119,7 @@ export function mapActivityItem(
 
 export const DELETED_POINT_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true,
+  category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
   createdAt: true, deletedAt: true, deletionReason: true,
   actor: { select: { displayName: true } },
   targetUser: { select: { displayName: true } },
@@ -129,6 +141,7 @@ export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: 
     delta: activityItem.delta,
     reason: activityItem.reason,
     trait: activityItem.trait,
+    ...(activityItem.category ? { category: activityItem.category } : {}),
     createdAt: activityItem.createdAt,
     season: activityItem.season,
     deletedAt: (tx.deletedAt ?? tx.createdAt).toISOString(),
@@ -139,6 +152,8 @@ export function mapDeletedPoint(tx: Prisma.PointTransactionGetPayload<{ select: 
 
 type PointRouteOptions = {
   pointAdjustmentsEnabled: boolean;
+  recognitionCategoryMutationsEnabled: boolean;
+  recognitionCategoryRolloutOrganizationIds: ReadonlySet<string>;
   pushDispatcher?: PushDispatcher;
 };
 
@@ -171,8 +186,8 @@ export async function findTargetMembership(organizationId: string, targetUserId:
 }
 
 export async function createPointAward(params: {
+  idempotencyKey?: string;
   organizationId: string;
-  seasonId: string;
   actorId: string;
   actorDisplayName: string;
   targetUserId: string;
@@ -180,50 +195,73 @@ export async function createPointAward(params: {
   targetHouseId: string;
   delta: number;
   reason: string;
-  trait: Trait;
+  trait?: Trait;
+  categoryId?: string;
 }) {
-  return prisma.$transaction(async (tx) => {
-    const award = await tx.pointTransaction.create({
-      data: {
-        organizationId: params.organizationId,
-        seasonId: params.seasonId,
-        actorUserId: params.actorId,
-        targetUserId: params.targetUserId,
-        targetHouseId: params.targetHouseId,
-        type: "AWARD",
-        delta: params.delta,
-        reason: params.reason,
-        trait: params.trait,
-      },
-    });
-
-    if (params.targetUserId !== params.actorId) {
-      await tx.notification.createMany({
-        data: [buildPointAwardNotificationData({
+  return withScoringWrite(params.organizationId, async (tx) => {
+    let categoryName: string | undefined;
+    const result = await idempotentPointMutation(tx, params, "AWARD", async () => {
+      const category = params.categoryId
+        ? await tx.recognitionCategory.findFirst({
+            where: { id: params.categoryId, organizationId: params.organizationId, archivedAt: null },
+          })
+        : await tx.recognitionCategory.findFirst({
+            where: { organizationId: params.organizationId, legacyTrait: params.trait, archivedAt: null },
+          });
+      if (!category) {
+        throw new ScoringWriteError(409, "RECOGNITION_CATEGORY_UNAVAILABLE", "The selected recognition category is unavailable. Refresh and choose another category.");
+      }
+      categoryName = category.name;
+      const season = await activeScoringSeason(tx, params.organizationId);
+      const now = await scoringWriteTime(tx);
+      const award = await tx.pointTransaction.create({
+        data: {
           organizationId: params.organizationId,
-          recipientUserId: params.targetUserId,
-          actorDisplayName: params.actorDisplayName,
+          seasonId: season.id,
+          createdAt: now,
+          actorUserId: params.actorId,
+          targetUserId: params.targetUserId,
+          targetHouseId: params.targetHouseId,
+          type: "AWARD",
           delta: params.delta,
-          trait: params.trait,
-          transactionId: award.id,
-        })],
-        skipDuplicates: true,
+          reason: params.reason,
+          trait: params.trait ?? null,
+          categoryId: category.id,
+        },
       });
-    }
 
-    return award;
+      if (params.targetUserId !== params.actorId) {
+        await tx.notification.createMany({
+          data: [buildPointAwardNotificationData({
+            organizationId: params.organizationId,
+            recipientUserId: params.targetUserId,
+            actorDisplayName: params.actorDisplayName,
+            delta: params.delta,
+            trait: params.trait,
+            categoryName: category.name,
+            transactionId: award.id,
+          })],
+          skipDuplicates: true,
+        });
+      }
+
+      return award;
+    });
+    const response: typeof result & { categoryName?: string } = result;
+    if (categoryName) response.categoryName = categoryName;
+    return response;
   });
 }
 
-export async function checkDeductionCooldowns(params: {
+async function checkDeductionCooldowns(tx: Prisma.TransactionClient, now: Date, params: {
   organizationId: string;
   seasonId: string;
   actorHouseId: string;
   targetUserId: string;
 }) {
-  const cooldownWindowStartsAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const cooldownWindowStartsAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const actorHouseMemberships = await prisma.organizationMembership.findMany({
+  const actorHouseMemberships = await tx.organizationMembership.findMany({
     where: {
       organizationId: params.organizationId,
       houseId: params.actorHouseId,
@@ -234,8 +272,8 @@ export async function checkDeductionCooldowns(params: {
   });
   const actorHouseUserIds = actorHouseMemberships.map((membership) => membership.userId);
 
-  return Promise.all([
-    prisma.pointTransaction.findFirst({
+  return [
+    await tx.pointTransaction.findFirst({
       where: {
         organizationId: params.organizationId,
         seasonId: params.seasonId,
@@ -246,7 +284,7 @@ export async function checkDeductionCooldowns(params: {
       select: { id: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.pointTransaction.findFirst({
+    await tx.pointTransaction.findFirst({
       where: {
         organizationId: params.organizationId,
         seasonId: params.seasonId,
@@ -257,13 +295,13 @@ export async function checkDeductionCooldowns(params: {
       select: { id: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
-  ]);
+  ] as const;
 }
 
 export async function createPointDeduction(params: {
+  idempotencyKey?: string;
   organizationId: string;
-  seasonId: string;
-  seasonName: string;
+  actorHouseId: string;
   actorId: string;
   actorDisplayName: string;
   targetUserId: string;
@@ -271,14 +309,25 @@ export async function createPointDeduction(params: {
   targetHouseId: string;
   reason: string;
 }) {
-  return prisma.$transaction(async (tx) => {
+  return withScoringWrite(params.organizationId, (tx) => idempotentPointMutation(tx, params, "DEDUCTION", async () => {
+    const season = await activeScoringSeason(tx, params.organizationId);
+    const now = await scoringWriteTime(tx);
+    const [houseDeduction, targetDeduction] = await checkDeductionCooldowns(tx, now, {
+      organizationId: params.organizationId,
+      seasonId: season.id,
+      actorHouseId: params.actorHouseId,
+      targetUserId: params.targetUserId,
+    });
+    if (houseDeduction) throw new ScoringWriteError(409, "DEDUCTION_COOLDOWN_ACTIVE", "This house has already deducted points in the last 24 hours");
+    if (targetDeduction) throw new ScoringWriteError(409, "TARGET_DEDUCTION_LIMIT_ACTIVE", "This member has already received a deduction in the last 24 hours");
     const deduction = await tx.pointTransaction.create({
       data: {
         organizationId: params.organizationId,
-        seasonId: params.seasonId,
+        seasonId: season.id,
         actorUserId: params.actorId,
         targetUserId: params.targetUserId,
         targetHouseId: params.targetHouseId,
+        createdAt: now,
         type: "DEDUCTION",
         delta: -10,
         reason: params.reason,
@@ -298,8 +347,8 @@ export async function createPointDeduction(params: {
           targetUserId: params.targetUserId,
           targetUserName: params.targetUserDisplayName,
           targetHouseId: params.targetHouseId,
-          seasonId: params.seasonId,
-          seasonName: params.seasonName,
+          seasonId: season.id,
+          seasonName: season.name,
           delta: -10,
           reason: params.reason,
         },
@@ -318,7 +367,7 @@ export async function createPointDeduction(params: {
     });
 
     return deduction;
-  });
+  }));
 }
 
 export async function getUserScoresByMember(organizationId: string, seasonId: string) {
@@ -705,16 +754,29 @@ export async function softDeleteTransaction(params: {
   organizationId: string;
   deletionReason: string | null;
 }) {
-  return prisma.$transaction(async (tx) => {
+  return withScoringWrite(params.organizationId, async (tx) => {
+    const existing = await tx.pointTransaction.findUnique({
+      where: { id: params.transactionId },
+      select: { organizationId: true, deletedAt: true, season: { select: { id: true, name: true, isActive: true, endsAt: true } } },
+    });
+    if (!existing || existing.organizationId !== params.organizationId) throw new ScoringWriteError(404, "POINT_TRANSACTION_NOT_FOUND", "Point transaction not found");
+    if (existing.deletedAt) throw new ScoringWriteError(409, "POINT_TRANSACTION_ALREADY_DELETED", "Point transaction is already deleted");
+    const isClosedSeason = !existing.season.isActive || existing.season.endsAt !== null;
+    const deletionReason = params.deletionReason?.trim() || null;
+    if (isClosedSeason && !deletionReason) {
+      throw new ScoringWriteError(422, "CORRECTION_REASON_REQUIRED", "A reason is required to correct points in a closed season.");
+    }
+    const correctedAt = await scoringWriteTime(tx);
     const point = await tx.pointTransaction.update({
       where: { id: params.transactionId },
       data: {
-        deletedAt: new Date(),
+        deletedAt: correctedAt,
         deletedByUserId: params.actorId,
-        deletionReason: params.deletionReason,
+        deletionReason,
       },
       select: {
         id: true, type: true, delta: true, reason: true, trait: true,
+        category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
         targetUserId: true, targetHouseId: true, createdAt: true,
         deletedAt: true, deletionReason: true,
         actor: { select: { displayName: true } },
@@ -725,22 +787,39 @@ export async function softDeleteTransaction(params: {
       },
     });
 
+    const { reportingRevision } = await tx.organization.findUniqueOrThrow({
+      where: { id: params.organizationId },
+      select: { reportingRevision: true },
+    });
     await tx.auditEvent.create({
       data: {
         organizationId: params.organizationId,
         actorUserId: params.actorId,
         eventType: "POINT_DELETED",
-        summary: `${params.actorDisplayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
+        createdAt: correctedAt,
+        summary: isClosedSeason
+          ? `${params.actorDisplayName} corrected ${existing.season.name} by removing a ${point.delta}-point transaction for ${point.targetUser?.displayName ?? "Unknown member"}.`
+          : `${params.actorDisplayName} deleted ${point.delta} points from ${point.targetUser?.displayName ?? "Unknown member"}.`,
         metadata: {
           transactionId: point.id,
+          seasonId: existing.season.id,
+          seasonName: existing.season.name,
+          isClosedSeason,
+          correctedAt: correctedAt.toISOString(),
+          scoreContributionBefore: point.delta,
+          scoreContributionAfter: 0,
+          scoreChange: -point.delta,
+          reportingRevision: reportingRevision.toString(),
           targetUserId: point.targetUserId,
           targetUserName: point.targetUser?.displayName ?? null,
           targetHouseId: point.targetHouseId,
           targetHouseName: point.targetHouse.name,
           delta: point.delta,
           trait: point.trait,
+          categoryId: point.category?.id ?? null,
+          categoryName: point.category?.name ?? null,
           awardReason: point.reason,
-          deletionReason: params.deletionReason,
+          deletionReason,
         },
       },
     });
@@ -757,8 +836,22 @@ export async function registerPointRoutes(
     const parsed = await parseBody(adjustPointsSchema, request, reply);
     if (!parsed) return;
 
+    if ("categoryId" in parsed && !options.recognitionCategoryMutationsEnabled) {
+      return reply.status(404).send({
+        code: "RECOGNITION_CATEGORY_MUTATIONS_DISABLED",
+        message: "Recognition categories are not enabled.",
+      });
+    }
+
     const actor = await requireActor(request, reply);
     if (!actor) return;
+
+    if ("categoryId" in parsed && !options.recognitionCategoryRolloutOrganizationIds.has(actor.organizationId)) {
+      return reply.status(404).send({
+        code: "RECOGNITION_CATEGORY_MUTATIONS_DISABLED",
+        message: "Recognition categories are not enabled.",
+      });
+    }
 
     if (!actor.houseId) {
       warn(request.log, "points.actor_house_unassigned", {
@@ -813,12 +906,12 @@ export async function registerPointRoutes(
 
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
-    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
-    if (!activeSeason) return;
 
-    const transaction = await createPointAward({
+    const trait = "trait" in parsed ? parsed.trait : undefined;
+    const categoryId = "categoryId" in parsed ? parsed.categoryId : undefined;
+    const { transaction, replayed, categoryName } = await createPointAward({
+      idempotencyKey: parsed.idempotencyKey,
       organizationId: actor.organizationId,
-      seasonId: activeSeason.id,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
       targetUserId: targetUser.id,
@@ -826,9 +919,10 @@ export async function registerPointRoutes(
       targetHouseId,
       delta: parsed.delta,
       reason: parsed.reason,
-      trait: parsed.trait,
+      trait,
+      categoryId,
     });
-    if (targetUser.id !== actor.id) {
+    if (!replayed && targetUser.id !== actor.id) {
       await dispatchPushForNotifications({
         client: prisma,
         dispatcher: options.pushDispatcher,
@@ -838,7 +932,8 @@ export async function registerPointRoutes(
           recipientUserId: targetUser.id,
           actorDisplayName: actor.displayName,
           delta: parsed.delta,
-          trait: parsed.trait,
+          trait,
+          categoryName,
           transactionId: transaction.id,
         })],
       });
@@ -851,7 +946,8 @@ export async function registerPointRoutes(
       organizationId: actor.organizationId,
       targetUserId: targetUser.id,
       targetHouseId,
-      delta: transaction.delta,
+      delta: parsed.delta,
+      replayed,
     });
 
     return reply.status(201).send(transaction);
@@ -938,50 +1034,11 @@ export async function registerPointRoutes(
 
     const targetUser = targetMembership.user;
     const targetHouseId = targetMembership.houseId;
-    const activeSeason = await resolveSeasonOrReject(actor, undefined, request, reply);
-    if (!activeSeason) return;
 
-    const [recentHouseDeduction, recentTargetDeduction] = await checkDeductionCooldowns({
+    const { transaction, replayed } = await createPointDeduction({
+      idempotencyKey: parsed.idempotencyKey,
       organizationId: actor.organizationId,
-      seasonId: activeSeason.id,
       actorHouseId: actor.houseId,
-      targetUserId: targetUser.id,
-    });
-
-    if (recentHouseDeduction) {
-      warn(request.log, "points.deduct.cooldown_active", {
-        actorUserId: actor.id,
-        actorHouseId: actor.houseId,
-        organizationId: actor.organizationId,
-        seasonId: activeSeason.id,
-        previousTransactionId: recentHouseDeduction.id,
-        previousCreatedAt: recentHouseDeduction.createdAt.toISOString(),
-      });
-      return reply.status(409).send({
-        message: "This house has already deducted points in the last 24 hours",
-        code: "DEDUCTION_COOLDOWN_ACTIVE",
-      });
-    }
-
-    if (recentTargetDeduction) {
-      warn(request.log, "points.deduct.target_limit_active", {
-        actorUserId: actor.id,
-        targetUserId: targetUser.id,
-        organizationId: actor.organizationId,
-        seasonId: activeSeason.id,
-        previousTransactionId: recentTargetDeduction.id,
-        previousCreatedAt: recentTargetDeduction.createdAt.toISOString(),
-      });
-      return reply.status(409).send({
-        message: "This member has already received a deduction in the last 24 hours",
-        code: "TARGET_DEDUCTION_LIMIT_ACTIVE",
-      });
-    }
-
-    const transaction = await createPointDeduction({
-      organizationId: actor.organizationId,
-      seasonId: activeSeason.id,
-      seasonName: activeSeason.name,
       actorId: actor.id,
       actorDisplayName: actor.displayName,
       targetUserId: targetUser.id,
@@ -989,7 +1046,7 @@ export async function registerPointRoutes(
       targetHouseId,
       reason: parsed.reason,
     });
-    await dispatchPushForNotifications({
+    if (!replayed) await dispatchPushForNotifications({
       client: prisma,
       dispatcher: options.pushDispatcher,
       logger: request.log,
@@ -1010,6 +1067,7 @@ export async function registerPointRoutes(
       targetUserId: targetUser.id,
       targetHouseId,
       delta: -10,
+      replayed,
     });
 
     return reply.status(201).send(transaction);
@@ -1050,6 +1108,16 @@ export async function registerPointRoutes(
       seasonId: parsed.seasonId,
     });
     const nextCursor = hasNextPage ? items.at(-1)?.id ?? null : null;
+
+    if (
+      parsed.categoryApiVersion !== "categories-v1" &&
+      items.some((item) => item.category?.legacyTrait === null)
+    ) {
+      return reply.status(426).send({
+        code: "RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED",
+        message: "Update HousePoints to view custom recognition activity.",
+      });
+    }
 
     return {
       items: items.map((item) => mapActivityItem(item, actor.id)),

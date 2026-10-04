@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
 import { useMemo } from "react";
 import { Auth0Provider } from "react-native-auth0";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider } from "@/context/auth-provider";
@@ -39,7 +40,9 @@ export default function RootLayout() {
               <NotificationResponseManager />
               <ToastProvider>
                 <StatusBar style="dark" />
-                <Stack screenOptions={{ headerShown: false }} />
+                <KeyboardProvider>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </KeyboardProvider>
               </ToastProvider>
             </OrgProvider>
           </AuthProvider>

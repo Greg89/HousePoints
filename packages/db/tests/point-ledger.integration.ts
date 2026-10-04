@@ -132,6 +132,51 @@ async function run() {
 
   const { organization, house, actor, target, season } = await createLedgerFixture();
 
+  const rolledBackOrganizationId = `${runId}-rolled-back`;
+  await assert.rejects(
+    () => prisma.$transaction(async (tx) => {
+      await tx.organization.create({
+        data: {
+          id: rolledBackOrganizationId,
+          name: `Rolled Back Org ${runId}`,
+          slug: `rolled-back-${runId}`,
+        },
+      });
+      assert.equal(
+        await tx.recognitionCategory.count({ where: { organizationId: rolledBackOrganizationId } }),
+        20,
+      );
+      throw new Error("rollback category seed");
+    }),
+    /rollback category seed/,
+  );
+  assert.equal(await prisma.organization.count({ where: { id: rolledBackOrganizationId } }), 0);
+  assert.equal(
+    await prisma.recognitionCategory.count({ where: { organizationId: rolledBackOrganizationId } }),
+    0,
+  );
+
+  const defaultCategories = await prisma.recognitionCategory.findMany({
+    where: { organizationId: organization.id },
+    orderBy: { legacyTrait: "asc" },
+  });
+  assert.equal(defaultCategories.length, 20);
+  assert.equal(defaultCategories.every((category) => category.legacyTrait !== null), true);
+  assert.equal(defaultCategories.every((category) => category.archivedAt === null), true);
+  assert.equal(defaultCategories.find((category) => category.legacyTrait === "ABOVE_AND_BEYOND")?.name, "Above & Beyond");
+
+  const otherOrganization = await prisma.organization.create({
+    data: {
+      name: `Other Integration Org ${runId}`,
+      slug: `other-integration-${runId}`,
+    },
+  });
+  created.organizationIds.push(otherOrganization.id);
+  assert.equal(
+    await prisma.recognitionCategory.count({ where: { organizationId: otherOrganization.id } }),
+    20,
+  );
+
   const actorMembership = await prisma.organizationMembership.findUniqueOrThrow({
     where: {
       organizationId_userId: {
@@ -286,6 +331,90 @@ async function run() {
   assert.equal(transaction.delta, 10);
   assert.equal(transaction.trait, "TEAM_SUPPORT");
 
+  const otherCategory = await prisma.recognitionCategory.findFirstOrThrow({
+    where: { organizationId: otherOrganization.id, legacyTrait: "TEAM_SUPPORT" },
+  });
+  await assert.rejects(
+    () => prisma.pointTransaction.update({ where: { id: transaction.id }, data: { categoryId: otherCategory.id } }),
+    (error) => {
+      assertPrismaErrorCode(error, "P2003");
+      return true;
+    },
+  );
+
+  const totalsBeforeBackfill = await prisma.pointTransaction.aggregate({
+    where: { organizationId: organization.id },
+    _count: true,
+    _sum: { delta: true },
+  });
+  const [firstBackfill] = await prisma.$queryRaw<Array<{ backfill_recognition_categories: bigint }>>`
+    SELECT backfill_recognition_categories()
+  `;
+  assert.equal(firstBackfill?.backfill_recognition_categories, 1n);
+
+  const backfilledTransaction = await prisma.pointTransaction.findUniqueOrThrow({
+    where: { id: transaction.id },
+    include: { category: true },
+  });
+  assert.equal(backfilledTransaction.category?.organizationId, organization.id);
+  assert.equal(backfilledTransaction.category?.legacyTrait, transaction.trait);
+  assert.equal(backfilledTransaction.category?.name, "Team Support");
+  assert.deepEqual(
+    await prisma.pointTransaction.aggregate({
+      where: { organizationId: organization.id },
+      _count: true,
+      _sum: { delta: true },
+    }),
+    totalsBeforeBackfill,
+  );
+
+  const [secondBackfill] = await prisma.$queryRaw<Array<{ backfill_recognition_categories: bigint }>>`
+    SELECT backfill_recognition_categories()
+  `;
+  assert.equal(secondBackfill?.backfill_recognition_categories, 0n);
+
+  const customCategory = await prisma.recognitionCategory.create({
+    data: {
+      organizationId: organization.id,
+      name: "  Team   Spirit  ",
+      description: "Recognizes exceptional teamwork.",
+      createdById: actor.id,
+    },
+  });
+  assert.equal(customCategory.name, "Team Spirit");
+  assert.equal(customCategory.normalizedName, "team spirit");
+
+  await assert.rejects(
+    () => prisma.recognitionCategory.create({
+      data: { organizationId: organization.id, name: "TEAM SPIRIT" },
+    }),
+    (error) => {
+      assertPrismaErrorCode(error, "P2002");
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => prisma.recognitionCategory.update({
+      where: { id: customCategory.id },
+      data: { name: "Renamed category" },
+    }),
+    (error) => {
+      assert(error instanceof Error);
+      assert.match(error.message, /immutable/i);
+      return true;
+    },
+  );
+
+  await prisma.recognitionCategory.update({
+    where: { id: customCategory.id },
+    data: { archivedAt: new Date(), archivedById: actor.id },
+  });
+  const replacementCategory = await prisma.recognitionCategory.create({
+    data: { organizationId: organization.id, name: "team spirit", createdById: actor.id },
+  });
+  assert.notEqual(replacementCategory.id, customCategory.id);
+
   const deduction = await prisma.pointTransaction.create({
     data: {
       organizationId: organization.id,
@@ -303,6 +432,7 @@ async function run() {
   assert.equal(deduction.type, "DEDUCTION");
   assert.equal(deduction.delta, -10);
   assert.equal(deduction.trait, null);
+  assert.equal(deduction.categoryId, null);
 
   const auditEvent = await prisma.auditEvent.create({
     data: {

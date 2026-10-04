@@ -1,3 +1,4 @@
+import { ScoringWriteError, SeasonScopeError } from "./scoring-errors.js";
 import type { FastifyInstance } from "fastify";
 import {
   readBearerToken,
@@ -87,6 +88,10 @@ export function registerRequestLifecycleHooks(app: FastifyInstance): void {
   });
 
   app.setErrorHandler(async (err, request, reply) => {
+    if (err instanceof ScoringWriteError || err instanceof SeasonScopeError) {
+      request.log.warn({ event: "scoring.write.rejected", code: err.code, statusCode: err.statusCode }, err.message);
+      return reply.status(err.statusCode).send({ code: err.code, message: err.message });
+    }
     if (isRateLimitError(err)) {
       return reply.status(429).send({
         code: "RATE_LIMITED",

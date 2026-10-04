@@ -1,10 +1,8 @@
 import type { CSSProperties } from "react";
+import { resolveHouseThemeStyle as resolveBaseHouseThemeStyle } from "@housepoints/theme";
 import type { HouseThemeVars } from "@housepoints/theme";
 
-export {
-  assessHouseThemeColor,
-  resolveHouseThemeStyle,
-} from "@housepoints/theme";
+export { assessHouseThemeColor } from "@housepoints/theme";
 export type {
   HouseThemeColorAssessment,
   HouseThemeToken,
@@ -18,3 +16,11 @@ export type {
  * same math without a React dependency.
  */
 export type HouseThemeStyle = CSSProperties & HouseThemeVars;
+
+// React 19.3's CSSProperties no longer accepts a bare `Record<'--foo', string>`;
+// cast at the boundary so callers get a React-friendly style object.
+export function resolveHouseThemeStyle(
+  input: Parameters<typeof resolveBaseHouseThemeStyle>[0],
+): HouseThemeStyle | undefined {
+  return resolveBaseHouseThemeStyle(input) as HouseThemeStyle | undefined;
+}

@@ -7,6 +7,7 @@ import {
   leaderboardSchema,
   orgMembersSchema,
   pagedActivityFeedSchema,
+  RECOGNITION_CATEGORY_API_VERSION,
   pointReactionDetailsRequestSchema,
   pointReactionDetailsResponseSchema,
   pointReactionResponseSchema,
@@ -86,7 +87,7 @@ export async function readActivityPage(
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/transactions/recent", requestId, {
     method: "POST",
-    body: JSON.stringify(request),
+    body: JSON.stringify({ ...request, categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION }),
   });
   return parseApiResponse(
     response,
@@ -208,7 +209,7 @@ export async function readDashboardSummary(
   await getCurrentUserForRequest(requestId);
   const response = await apiFetch("/dashboard/summary", requestId, {
     method: "POST",
-    body: JSON.stringify(seasonId ? { seasonId } : {}),
+    body: JSON.stringify({ ...(seasonId ? { seasonId } : {}), categoryApiVersion: RECOGNITION_CATEGORY_API_VERSION }),
   });
   return parseApiResponse(
     response,

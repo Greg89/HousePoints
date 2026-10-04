@@ -24,6 +24,7 @@ import {
   restoreOrgSchema,
 } from "./admin-schemas.js";
 import {
+  dashboardSummaryRequestSchema,
   dashboardSummarySchema,
   leaderboardSchema,
 } from "./dashboard-schemas.js";
@@ -92,6 +93,13 @@ import {
   unregisterDeviceResponseSchema,
 } from "./device-schemas.js";
 import { reportClientErrorSchema, reportClientErrorResponseSchema } from "./telemetry-schemas.js";
+import {
+  archiveRecognitionCategorySchema,
+  createRecognitionCategorySchema,
+  listRecognitionCategoriesSchema,
+  recognitionCategoryListResponseSchema,
+  recognitionCategoryMutationResponseSchema,
+} from "./recognition-category-schemas.js";
 import {
   platformOverviewRequestSchema,
   platformOverviewSchema,
@@ -171,7 +179,7 @@ export const apiContracts = {
   "/admin/users/display-name": defineContract(updateMemberDisplayNameSchema, adminUserSchema),
   "/admin/users/role": defineContract(promoteUserSchema, adminUserSchema),
   "/dashboard/summary": defineContract(
-    seasonScopedRequestSchema,
+    dashboardSummaryRequestSchema,
     dashboardSummarySchema,
   ),
   "/devices/register": defineContract(registerDeviceRequestSchema, registerDeviceResponseSchema),
@@ -225,6 +233,18 @@ export const apiContracts = {
   "/points/delete": defineContract(
     deletePointTransactionSchema,
     deletedPointSchema,
+  ),
+  "/recognition-categories/list": defineContract(
+    listRecognitionCategoriesSchema,
+    recognitionCategoryListResponseSchema,
+  ),
+  "/recognition-categories/create": defineContract(
+    createRecognitionCategorySchema,
+    recognitionCategoryMutationResponseSchema,
+  ),
+  "/recognition-categories/archive": defineContract(
+    archiveRecognitionCategorySchema,
+    recognitionCategoryMutationResponseSchema,
   ),
   "/seasons/context": defineContract(actorScopeSchema, seasonContextSchema),
   "/seasons/compare": defineContract(

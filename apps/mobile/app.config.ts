@@ -9,11 +9,10 @@ const config: ExpoConfig = {
   owner: "dodson-llc",
   slug: "housepoints",
   scheme: "housepoints",
-  version: "1.0.0",
+  version: "1.0.2",
   icon: "./assets/icon.png",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
   runtimeVersion: {
     policy: "appVersion",
   },

@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import {
+  dashboardSummaryRequestSchema,
+  rankScores,
+  scoreWinners,
   seasonScopedRequestSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
@@ -61,20 +64,23 @@ export async function loadLeaderboard(organizationId: string, seasonId: string) 
     );
   }
 
-  return houses
-    .map((house) => {
-      const totals = totalsByHouseId.get(house.id);
-      return {
-        id: house.id,
-        name: house.name,
-        color: house.color,
-        description: house.description,
-        score: totals?.score ?? 0,
-        transactions: totals?.transactions ?? 0,
-        memberCount: memberCountsByHouseId.get(house.id) ?? 0,
-      };
-    })
-    .sort((a, b) => b.score - a.score);
+  return rankScores(houses.map((house) => {
+    const totals = totalsByHouseId.get(house.id);
+    return {
+      id: house.id,
+      name: house.name,
+      color: house.color,
+      description: house.description,
+      score: totals?.score ?? 0,
+      transactions: totals?.transactions ?? 0,
+      memberCount: memberCountsByHouseId.get(house.id) ?? 0,
+      points: totals?.score ?? 0,
+    };
+  })).map((house) => ({
+    id: house.id, name: house.name, color: house.color,
+    description: house.description, score: house.score,
+    transactions: house.transactions, memberCount: house.memberCount, rank: house.rank,
+  }));
 }
 
 export async function loadDashboardSummaryData(
@@ -88,10 +94,11 @@ export async function loadDashboardSummaryData(
     monthlyTraitTotals,
     recentTransactions,
     velocityTransactions,
-    memberTotals,
     houseTotals,
     transactionTypeTotals,
     memberships,
+    categoryTotals,
+    categories,
   ] = await Promise.all([
     prisma.house.findMany({
       where: { organizationId },
@@ -100,7 +107,7 @@ export async function loadDashboardSummaryData(
     }),
     prisma.pointTransaction.groupBy({
       by: ["targetUserId", "targetHouseId"],
-      where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
+      where: { organizationId, seasonId, deletedAt: null },
       _sum: { delta: true },
     }),
     prisma.pointTransaction.groupBy({
@@ -114,6 +121,7 @@ export async function loadDashboardSummaryData(
       take: 10,
       select: {
         id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
+        category: { select: { id: true, name: true, legacyTrait: true, archivedAt: true } },
         actor: { select: { displayName: true } },
         targetUser: { select: { displayName: true } },
         targetHouse: { select: { name: true, color: true } },
@@ -123,11 +131,6 @@ export async function loadDashboardSummaryData(
     prisma.pointTransaction.findMany({
       where: { organizationId, seasonId, deletedAt: null, createdAt: { gte: velocityStartsAt } },
       select: { targetHouseId: true, delta: true, createdAt: true },
-    }),
-    prisma.pointTransaction.groupBy({
-      by: ["targetUserId"],
-      where: { organizationId, seasonId, deletedAt: null, targetUserId: { not: null } },
-      _sum: { delta: true },
     }),
     prisma.pointTransaction.groupBy({
       by: ["targetHouseId"],
@@ -155,6 +158,21 @@ export async function loadDashboardSummaryData(
         },
       },
     }),
+    prisma.pointTransaction.groupBy({
+      by: ["targetHouseId", "categoryId"],
+      where: {
+        organizationId,
+        seasonId,
+        deletedAt: null,
+        type: "AWARD",
+        categoryId: { not: null },
+      },
+      _count: { categoryId: true },
+    }),
+    prisma.recognitionCategory.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, legacyTrait: true, archivedAt: true },
+    }),
   ]);
   const members = memberships.map((membership) => ({
     id: membership.user.id,
@@ -162,7 +180,16 @@ export async function loadDashboardSummaryData(
     role: membership.role,
     houseId: membership.houseId,
   }));
-  return { houses, monthlyMemberTotals, monthlyTraitTotals, recentTransactions, velocityTransactions, memberTotals, houseTotals, transactionTypeTotals, members };
+  const recipientIds = [...new Set(monthlyMemberTotals
+    .map((row) => row.targetUserId)
+    .filter((id): id is string => id !== null))];
+  const recipients = recipientIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: recipientIds } },
+        select: { id: true, displayName: true },
+      })
+    : [];
+  return { houses, monthlyMemberTotals, monthlyTraitTotals, recentTransactions, velocityTransactions, houseTotals, transactionTypeTotals, members, recipients, categoryTotals, categories };
 }
 
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
@@ -188,7 +215,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post("/dashboard/summary", async (request, reply) => {
-    const parsed = await parseBody(seasonScopedRequestSchema, request, reply);
+    const parsed = await parseBody(dashboardSummaryRequestSchema, request, reply);
     if (!parsed) return;
 
     const actor = await requireActor(request, reply);
@@ -207,30 +234,43 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       monthlyTraitTotals,
       recentTransactions,
       velocityTransactions,
-      memberTotals,
       houseTotals,
       transactionTypeTotals,
       members,
+      recipients,
+      categoryTotals,
+      categories,
     } = await loadDashboardSummaryData(actor.organizationId, season.id, velocityStartsAt);
+
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    const hasCustomCategoryAwards = categoryTotals.some((total) => {
+      const category = total.categoryId ? categoryById.get(total.categoryId) : null;
+      return category?.legacyTrait === null;
+    });
+
+    if (
+      parsed.categoryApiVersion !== "categories-v1" &&
+      hasCustomCategoryAwards
+    ) {
+      return reply.status(426).send({
+        code: "RECOGNITION_CATEGORY_CLIENT_UPGRADE_REQUIRED",
+        message: "Update HousePoints to view custom recognition activity.",
+      });
+    }
 
     const houseById = new Map(houses.map((house) => [house.id, house]));
     const memberById = new Map(members.map((member) => [member.id, member]));
-    const activeMemberIds = new Set(memberById.keys());
-    const memberPoints = new Map(
-      memberTotals
-        .filter((row) => row.targetUserId && activeMemberIds.has(row.targetUserId))
-        .map((row) => [row.targetUserId as string, row._sum.delta ?? 0]),
-    );
+    const recipientNameById = new Map(recipients.map((user) => [user.id, user.displayName]));
 
     function toStandout(row: (typeof monthlyMemberTotals)[number] | undefined) {
       if (!row?.targetUserId) return null;
       const member = memberById.get(row.targetUserId);
       const house = houseById.get(row.targetHouseId);
-      if (!member || !house) return null;
+      if (!house) return null;
 
       return {
-        memberId: member.id,
-        memberName: member.displayName,
+        memberId: row.targetUserId,
+        memberName: recipientNameById.get(row.targetUserId) ?? member?.displayName ?? "Former member",
         houseId: house.id,
         houseName: house.name,
         houseColor: house.color,
@@ -239,9 +279,9 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     }
 
     const monthlyMemberTotalsByMember = new Map<string, (typeof monthlyMemberTotals)[number]>();
-    for (const row of monthlyMemberTotals.filter(
-      (entry) => entry.targetUserId && activeMemberIds.has(entry.targetUserId),
-    )) {
+    for (const row of [...monthlyMemberTotals]
+      .filter((entry) => entry.targetUserId)
+      .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0) || a.targetHouseId.localeCompare(b.targetHouseId))) {
       const existing = monthlyMemberTotalsByMember.get(row.targetUserId as string);
       if (!existing) {
         monthlyMemberTotalsByMember.set(row.targetUserId as string, row);
@@ -254,8 +294,14 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       });
     }
 
-    const monthlyStandoutRow = Array.from(monthlyMemberTotalsByMember.values())
-      .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0];
+    const monthlyStandoutRows = Array.from(monthlyMemberTotalsByMember.values());
+    const rankedPersonal = rankScores(monthlyStandoutRows.map((row) => ({
+      id: row.targetUserId as string,
+      name: recipientNameById.get(row.targetUserId as string) ?? memberById.get(row.targetUserId as string)?.displayName ?? "Former member",
+      points: row._sum.delta ?? 0,
+      row,
+    })));
+    const monthlyStandoutRow = rankedPersonal[0]?.row;
 
     const traitLeaders = houses.map((house) => {
       const topTrait = monthlyTraitTotals
@@ -268,6 +314,26 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         houseColor: house.color,
         trait: topTrait?.trait ?? null,
         count: topTrait?._count.trait ?? 0,
+      };
+    });
+    const categoryLeaders = houses.map((house) => {
+      const topCategory = categoryTotals
+        .filter((row) => row.targetHouseId === house.id && row.categoryId)
+        .sort((a, b) => b._count.categoryId - a._count.categoryId)[0];
+      const category = topCategory?.categoryId ? categoryById.get(topCategory.categoryId) : null;
+      return {
+        houseId: house.id,
+        houseName: house.name,
+        houseColor: house.color,
+        category: category
+          ? {
+              id: category.id,
+              name: category.name,
+              legacyTrait: category.legacyTrait,
+              archivedAt: category.archivedAt?.toISOString() ?? null,
+            }
+          : null,
+        count: topCategory?._count.categoryId ?? 0,
       };
     });
 
@@ -285,31 +351,44 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const houseMemberRankings = houses.map((house) => ({
       houseId: house.id,
-      members: members
-        .filter((member) => member.houseId === house.id)
-        .map((member) => ({
-          memberId: member.id,
-          displayName: member.displayName,
-          role: member.role,
-          points: memberPoints.get(member.id) ?? 0,
+      members: rankScores(monthlyMemberTotals
+        .filter((row) => row.targetHouseId === house.id)
+        .map((row) => {
+          const member = row.targetUserId ? memberById.get(row.targetUserId) : null;
+          return {
+            id: row.targetUserId ?? "unattributed",
+            name: row.targetUserId
+              ? recipientNameById.get(row.targetUserId) ?? member?.displayName ?? "Former member"
+              : "Unattributed",
+            memberId: row.targetUserId,
+            displayName: row.targetUserId
+              ? recipientNameById.get(row.targetUserId) ?? member?.displayName ?? "Former member"
+              : "Unattributed",
+            role: member?.role ?? null,
+            points: row._sum.delta ?? 0,
+            isCurrentMember: Boolean(member),
+            currentHouseId: member?.houseId ?? null,
+          };
         }))
-        .sort((a, b) => b.points - a.points || a.displayName.localeCompare(b.displayName)),
+        .map((entry) => ({
+          memberId: entry.memberId, displayName: entry.displayName, role: entry.role,
+          points: entry.points, rank: entry.rank, isCurrentMember: entry.isCurrentMember,
+          currentHouseId: entry.currentHouseId,
+        })),
     }));
     const transactionTotalsByType = new Map(transactionTypeTotals.map((row) => [row.type, row]));
     const awardTotals = transactionTotalsByType.get("AWARD");
     const deductionTotals = transactionTotalsByType.get("DEDUCTION");
     const totalTransactions = transactionTypeTotals.reduce((total, row) => total + row._count._all, 0);
     const housePoints = new Map(houseTotals.map((row) => [row.targetHouseId, row._sum.delta ?? 0]));
-    const winningHouse = totalTransactions === 0
-      ? null
-      : houses
-          .map((house) => ({
-            houseId: house.id,
-            houseName: house.name,
-            houseColor: house.color,
-            points: housePoints.get(house.id) ?? 0,
-          }))
-          .sort((a, b) => b.points - a.points || a.houseName.localeCompare(b.houseName))[0] ?? null;
+    const winningHouses = scoreWinners(houses.map((house) => ({
+      id: house.id, name: house.name, points: housePoints.get(house.id) ?? 0,
+      houseId: house.id, houseName: house.name, houseColor: house.color,
+    })), totalTransactions).map((house) => ({
+      houseId: house.houseId, houseName: house.houseName,
+      houseColor: house.houseColor, points: house.points,
+    }));
+    const winningHouse = winningHouses[0] ?? null;
 
     info(request.log, "dashboard.summary.loaded", {
       organizationId: actor.organizationId,
@@ -326,7 +405,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           .filter((row) =>
             row.targetHouseId === house.id &&
             row.targetUserId &&
-            activeMemberIds.has(row.targetUserId)
+            houseById.has(row.targetHouseId)
           )
           .sort((a, b) => (b._sum.delta ?? 0) - (a._sum.delta ?? 0))[0],
       ),
@@ -339,7 +418,12 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           startsAt: season.startsAt.toISOString(),
           endsAt: season.endsAt.toISOString(),
           winningHouse,
+          winningHouses,
           topContributor: seasonStandout,
+          topContributors: totalTransactions === 0 ? [] : rankedPersonal
+            .filter((entry) => entry.rank === 1)
+            .map((entry) => toStandout(entry.row))
+            .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
           totalTransactions,
           awardCount: awardTotals?._count._all ?? 0,
           deductionCount: deductionTotals?._count._all ?? 0,
@@ -358,6 +442,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       monthlyStandout: seasonStandout,
       monthlyStandoutsByHouse: seasonStandoutsByHouse,
       traitLeaders,
+      categoryLeaders,
       recentActivity: recentTransactions.map((transaction) => mapActivityItem(transaction)),
       pointsVelocity: houses.map((house) => ({
         houseId: house.id,

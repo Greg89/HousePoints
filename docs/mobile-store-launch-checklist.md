@@ -7,7 +7,7 @@ tokens, passwords, service-account JSON, signing keys, or other credentials.
 ## Progress record
 
 - Release owner: Gregory Dodson
-- Target version: `1.0.0`
+- Target app/runtime version: `1.0.2`
 - Candidate commit:
 - Target internal-release date:
 - Target public-release date:
@@ -35,7 +35,7 @@ The identifiers already committed to the application are:
 
 Before the first store build:
 
-- [x] Use `1.0.0` as the first public version in
+- [x] Set the release candidate app/runtime version to `1.0.2` in
   `apps/mobile/app.config.ts`.
 - [x] Add a final application icon.
 - [x] Add an Android adaptive icon.
@@ -87,6 +87,45 @@ Useful references:
 - [EAS Build introduction](https://docs.expo.dev/build/introduction/)
 - [EAS Submit overview](https://docs.expo.dev/deploy/submit-to-app-stores/)
 
+### Expo dependency validation
+
+CI runs `npx expo install --check` from `apps/mobile`. This check can start
+failing when Expo publishes newer recommended SDK patch versions, even when
+the application code has not changed: `npm ci` installs the versions recorded
+in the root lockfile rather than updating them.
+
+When the check reports outdated dependencies, run `npx expo install --fix`
+from `apps/mobile`, review the dependency changes, and commit both
+`apps/mobile/package.json` and the root `package-lock.json`. Run
+`npx expo install --check` again before merging `develop` into `master`.
+Keep compatibility validation enabled; the existing TypeScript exclusion is
+intentional and is not the cause of an Expo package-version failure.
+
+### App versions and native builds
+
+The current release candidate is `1.0.2`, including the Expo SDK 57 patch
+updates. Build a new preview APK for staging verification and a production
+AAB for Google Play; do not deliver these native dependency changes as an
+OTA update to `1.0.0` or `1.0.1` binaries.
+
+The app/store version is manually maintained in `apps/mobile/app.config.ts`.
+The `appVersion` runtime policy uses that same version for OTA compatibility.
+Keep the candidate version unchanged between staging verification and the
+approved merge to `master`.
+
+EAS manages Android version codes and iOS build numbers remotely.
+The production profile in `apps/mobile/eas.json` automatically increments
+those build numbers for both internal and public store-release workflows;
+it does not bump the app/store version. The mobile npm package version is
+separate metadata and does not control the app version.
+
+After `1.0.2` is live on Google Play, plan semantic-release automation as a
+separate unit of work. Decide version ownership, commit conventions,
+mobile-specific release detection in this monorepo, native/OTA compatibility,
+and how candidate versions flow from `develop` to `master` before enabling
+automated publishing. The current release remains manually versioned and
+approval-gated.
+
 ## 3. Configure EAS Environments
 
 Create EAS Environments named `development`, `preview`, and `production`.
@@ -101,6 +140,10 @@ Define every variable from `apps/mobile/.env.example` in each Environment:
 - [x] Leave optional `EXPO_PUBLIC_DEFAULT_ORG_SLUG` unset.
 - [x] `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED`
 - [x] `EXPO_PUBLIC_MOBILE_ADMIN_ENABLED`
+- [ ] `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` — keep `false` until the C5
+  staging rehearsal; record the preview and production values separately.
+- [ ] `EXPO_PUBLIC_RECOGNITION_CATEGORY_ROLLOUT_ORGANIZATION_IDS` — keep empty
+  until the C5 controlled-organization rehearsal, then match API/web IDs.
 
 Environment mapping:
 
@@ -302,4 +345,3 @@ Fill these in as work completes:
 - Google Play production submission:
 - Live App Store listing:
 - Live Google Play listing:
-

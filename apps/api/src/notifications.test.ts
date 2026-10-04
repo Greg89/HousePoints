@@ -1,3 +1,4 @@
+import { ExpoPushDispatcher } from "./push-dispatcher.js";
 import type { FastifyBaseLogger } from "fastify";
 import { describe, it, expect, vi } from "vitest";
 import {
@@ -9,6 +10,7 @@ import {
   buildMemberNeedsAssignmentNotificationData,
   buildReleaseAnnouncementNotificationData,
   dispatchPushForNotifications,
+  PUSH_DELIVERY_TIMEOUT_MS,
 } from "./notifications.js";
 
 describe("dispatchPushForNotifications", () => {
@@ -44,11 +46,39 @@ describe("dispatchPushForNotifications", () => {
         organizationId: "org-1",
         type: "POINT_AWARD_RECEIVED",
       }),
-    })]);
+    })], expect.any(AbortSignal));
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({ event: "notifications.push_dispatched", deviceCount: 1 }),
       "notifications.push_dispatched",
     );
+  });
+
+  it.each(["lookup", "dispatcher", "fetch", "body"])("bounds a stalled %s without late success or delivery", async (stage) => {
+    vi.useFakeTimers();
+    try {
+      let release!: (value: never) => void;
+      const stalled = new Promise<never>(resolve => { release = resolve; });
+      const registrations = [{ organizationId: "org-1", userId: "user-2", pushToken: "ExponentPushToken[test]" }];
+      const client = { deviceRegistration: { findMany: vi.fn().mockImplementation(() => stage === "lookup" ? stalled : Promise.resolve(registrations)) } };
+      const fetcher = vi.fn().mockImplementation(() => stage === "fetch" ? stalled : Promise.resolve({ ok: true, json: () => stalled }));
+      const custom = { send: vi.fn().mockReturnValue(stalled) };
+      const dispatcher = stage === "fetch" || stage === "body" ? new ExpoPushDispatcher(undefined, fetcher) : custom;
+      const logger = { info: vi.fn(), error: vi.fn() } as unknown as FastifyBaseLogger;
+      const rows = [buildPointAwardNotificationData({ organizationId: "org-1", recipientUserId: "user-2", actorDisplayName: "Alice", delta: 5, trait: "LEADERSHIP", transactionId: "txn-1" })];
+      const pending = dispatchPushForNotifications({ rows, client, dispatcher, logger });
+      await vi.advanceTimersByTimeAsync(PUSH_DELIVERY_TIMEOUT_MS);
+      await expect(pending).resolves.toBeUndefined();
+      expect(logger.error).toHaveBeenCalledOnce();
+      if (stage !== "lookup") {
+        const signal = stage === "dispatcher" ? custom.send.mock.calls[0][1] : fetcher.mock.calls[0][1].signal;
+        expect(signal.aborted).toBe(true);
+      }
+      release((stage === "lookup" ? registrations : stage === "body" ? { data: [{ status: "ok" }] } : { acceptedCount: 1 }) as never);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(logger.info).not.toHaveBeenCalled();
+      if (stage === "lookup") expect(custom.send).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
   });
 
   it("logs provider failures without rejecting the notification operation", async () => {

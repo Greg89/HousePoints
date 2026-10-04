@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { createPointSubmissionKeys } from "@housepoints/contracts";
+import { useMemo, useRef, useState, useTransition } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { MinusCircle, X } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
@@ -15,7 +16,7 @@ interface DeductPointsDialogProps {
   onOpenChange: (open: boolean) => void;
   members: OrgMember[];
   actorHouseId: string | null;
-  onDeduct: (targetUserId: string, reason: string) => Promise<DeductPointsResult>;
+  onDeduct: (targetUserId: string, reason: string, idempotencyKey?: string) => Promise<DeductPointsResult>;
 }
 
 const DEDUCTION_AMOUNT = 10;
@@ -27,6 +28,7 @@ export function DeductPointsDialog({
   actorHouseId,
   onDeduct,
 }: DeductPointsDialogProps) {
+  const submissionKeys = useRef(createPointSubmissionKeys(() => crypto.randomUUID()));
   const [targetUserId, setTargetUserId] = useState("");
   const [reason, setReason] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
@@ -57,9 +59,10 @@ export function DeductPointsDialog({
       return;
     }
 
+    const key = submissionKeys.current.keyFor([targetUserId, reason.trim()]);
     startTransition(async () => {
       try {
-        const result = await onDeduct(targetUserId, reason.trim());
+        const result = await onDeduct(targetUserId, reason.trim(), key);
 
         if (!result.ok) {
           toast.error("Failed to deduct points", {
@@ -68,6 +71,7 @@ export function DeductPointsDialog({
           return;
         }
 
+        submissionKeys.current.complete(key);
         toast.success("Points deducted", {
           description: `-${DEDUCTION_AMOUNT} pts from ${selectedMember?.displayName}`,
         });

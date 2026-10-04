@@ -22,6 +22,8 @@ export type WebLogEvent =
   | "web.dashboard.render_started"
   | "web.dashboard.render_completed"
   | "web.dashboard.render_failed"
+  | "web.reports.render_started"
+  | "web.reports.render_completed"
   | "web.client.error_reported"
   | "web.client.error_report_rejected"
   | "web.client.error_persistence_failed"
