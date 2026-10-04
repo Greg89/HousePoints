@@ -316,9 +316,10 @@ keyboard and returns to the bottom after dismissal, without a large blank gap.
 Also check a multiline reason on a small physical iOS and Android device before
 release; desktop unit tests cannot verify native keyboard layout.
 
-The keyboard controller adds native code. App/runtime version `1.0.1` requires
-a new EAS binary; do not publish this change as an OTA update for runtime
-`1.0.0`. Install the rebuilt preview APK before testing this fix.
+The keyboard controller adds native code and was introduced in app/runtime
+version `1.0.1`. The current `1.0.2` candidate also updates native Expo
+dependencies and requires a new EAS binary; do not publish it as an OTA update
+for runtimes `1.0.0` or `1.0.1`. Install the rebuilt preview APK before testing.
 
 Tap the point total to enter a whole number from 1 to 100 directly. The plus,
 minus, and quick preset controls remain available. Empty, fractional, or
@@ -361,6 +362,13 @@ eas update --channel production --environment production --message "Describe hot
 - Runtime compatibility follows the app `version`. Increment `version` and
   create new native builds whenever native dependencies or configuration
   change.
+
+The current app/store and OTA runtime version is `1.0.2`, manually maintained
+in `app.config.ts`. EAS `autoIncrement` only advances the production native
+build numbers, not this version. The npm package version is separate metadata.
+Keep the same candidate app version when merging from `develop` to `master`.
+Semantic-release automation will be planned after the `1.0.2` Play release;
+it is not enabled for this candidate.
 
 Configure the required `EXPO_PUBLIC_*` values in the matching EAS
 `development`, `preview`, and `production` Environments. Do not promote a
