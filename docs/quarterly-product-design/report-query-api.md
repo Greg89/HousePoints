@@ -17,3 +17,5 @@ The integration command is `npm run test:reporting-integration -w @housepoints/a
 | Larger | 8 | 200 | 1,000 | 20 | 10 | 22,901 | 4.7 / 5.1 ms | Existing `PointTransaction_organizationId_deletedAt_idx` / 0.21 ms |
 
 The statement count includes transaction control and Prisma-generated reads. These are local baselines, not production capacity guarantees. The current indexes support these fixtures; no new index is justified by this evidence. R3 adds the authenticated web route and navigation; R4 adds category/giver presentation and combinations on that UI.
+
+The web drill-through resets its ledger, summary, cursor, revision, and error state when the organization, season, house, member, category, giver, or transaction-type scope changes. A filter with no matching transactions shows an empty ledger and zero filtered totals rather than retaining the previous scope's results. Pagination remains intact while viewing the same scope.

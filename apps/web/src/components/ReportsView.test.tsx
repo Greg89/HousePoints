@@ -10,7 +10,7 @@ import type {
   ReportPageResponse,
   SeasonContext,
 } from "@housepoints/contracts";
-import { ReportsView } from "./ReportsView";
+import { ReportsView, type ReportsViewProps } from "./ReportsView";
 import type { ReadReportPageResult } from "@/app/actions/reports";
 
 const searchParamsState = { value: "" };
@@ -315,6 +315,167 @@ describe("ReportsView", () => {
       limit: 25,
     });
     expect(await screen.findByText(/reason tx-3/i)).toBeInTheDocument();
+  });
+
+  it("replaces a paginated house report with an empty deductions report and restores All", async () => {
+    const user = userEvent.setup();
+    const allResult = makeSuccess([makeItem("tx-1")], "cursor-1");
+    const onLoadReport = vi.fn().mockResolvedValue(
+      makeSuccess([makeItem("tx-2")], "cursor-2"),
+    );
+    const props = { ...baseProps, houseId: "house-1", onLoadReport };
+    const { rerender } = render(
+      <ReportsView {...props} initialResult={allResult} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Load more/i }));
+    expect(await screen.findByText("reason tx-2")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Deductions only" })).toHaveAttribute(
+      "href",
+      "/o/acme/reports?house=house-1&type=DEDUCTION",
+    );
+
+    const deductionsResult: ReadReportPageResult = {
+      ok: true,
+      page: {
+        scope: { seasonId: "season-1", houseId: "house-1", type: "DEDUCTION" },
+        revision: "43",
+        summary: {
+          netPoints: 0,
+          awardedPoints: 0,
+          deductedPoints: 0,
+          transactionCount: 0,
+          awardCount: 0,
+          deductionCount: 0,
+          deductionsOutsideCategory: null,
+        },
+        items: [],
+        nextCursor: null,
+      },
+    };
+    rerender(
+      <ReportsView
+        {...props}
+        type="DEDUCTION"
+        baselineSummary={allResult.ok ? allResult.page.summary : null}
+        initialResult={deductionsResult}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Deductions only" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.queryByText("reason tx-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("reason tx-2")).not.toBeInTheDocument();
+    expect(screen.getByText(/No transactions match this view yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Load more/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Report revision 43")).toBeInTheDocument();
+    const summary = screen.getByRole("region", { name: /Report summary/i });
+    expect(within(summary).getByText("0 awards")).toBeInTheDocument();
+    expect(within(summary).getByText("0 of 1 of full-season transactions")).toBeInTheDocument();
+    expect(onLoadReport).toHaveBeenCalledTimes(1);
+
+    rerender(<ReportsView {...props} initialResult={allResult} />);
+    expect(screen.getByText("reason tx-1")).toBeInTheDocument();
+    expect(screen.queryByText("reason tx-2")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Load more/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it.each<{ name: string; changes: Partial<ReportsViewProps> }>([
+    { name: "organization", changes: { organizationSlug: "other-org" } },
+    { name: "season", changes: { seasonId: "season-0" } },
+    { name: "house", changes: { houseId: "house-1" } },
+    { name: "member", changes: { memberId: "member-1" } },
+    { name: "category", changes: { categoryId: "cat-1" } },
+    { name: "giver", changes: { giverId: "member-2" } },
+    { name: "transaction type", changes: { type: "AWARD" } },
+  ])("resets ledger state when the $name scope changes", ({ changes }) => {
+    const props = { ...baseProps, onLoadReport: vi.fn() };
+    const { rerender } = render(
+      <ReportsView
+        {...props}
+        initialResult={makeSuccess([makeItem("tx-old")], "old-cursor")}
+      />,
+    );
+
+    rerender(
+      <ReportsView
+        {...props}
+        {...changes}
+        initialResult={makeSuccess([makeItem("tx-new")], null)}
+      />,
+    );
+
+    expect(screen.queryByText("reason tx-old")).not.toBeInTheDocument();
+    expect(screen.getByText("reason tx-new")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Load more/i })).not.toBeInTheDocument();
+  });
+
+  it("preserves loaded pages when the same scope rerenders", async () => {
+    const user = userEvent.setup();
+    const onLoadReport = vi.fn().mockResolvedValue(makeSuccess([makeItem("tx-2")], null));
+    const props = { ...baseProps, onLoadReport };
+    const { rerender } = render(
+      <ReportsView
+        {...props}
+        initialResult={makeSuccess([makeItem("tx-1")], "cursor-1")}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Load more/i }));
+    expect(await screen.findByText("reason tx-2")).toBeInTheDocument();
+
+    rerender(
+      <ReportsView
+        {...props}
+        initialResult={makeSuccess([makeItem("tx-1")], "cursor-1")}
+      />,
+    );
+    expect(screen.getByText("reason tx-1")).toBeInTheDocument();
+    expect(screen.getByText("reason tx-2")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Load more/i })).not.toBeInTheDocument();
+  });
+
+  it("clears an old error and displays errors from the newly selected scope", () => {
+    const props = { ...baseProps, onLoadReport: vi.fn() };
+    const { rerender } = render(
+      <ReportsView
+        {...props}
+        initialResult={{
+          ok: false,
+          code: "REPORT_REFRESH_REQUIRED",
+          message: "Scores changed while loading.",
+        }}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Scores changed");
+
+    rerender(
+      <ReportsView
+        {...props}
+        type="AWARD"
+        initialResult={makeSuccess([makeItem("tx-new")], null)}
+      />,
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("reason tx-new")).toBeInTheDocument();
+
+    rerender(
+      <ReportsView
+        {...props}
+        type="DEDUCTION"
+        initialResult={{
+          ok: false,
+          code: "REPORT_ACCESS_REVOKED",
+          message: "You no longer have access to this report.",
+        }}
+      />,
+    );
+    expect(screen.queryByText("reason tx-new")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /Report summary/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("no longer have access");
   });
 
   it("navigates to the new season when the season selector changes", async () => {
