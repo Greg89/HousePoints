@@ -167,6 +167,30 @@ Recommended multi-org beta sequence:
 4. Set `broadcast_release=true`.
 5. Verify the workflow response and the `releases.broadcasted` log event.
 
+## October 4, 2026 Announcement
+
+The public page is [Recognition Categories, Detailed Reports, and Mobile Progress](../site/releases/2026-10-04-categories-reports-mobile.html).
+It covers recognition categories, web reports and the beta-verified filter fix,
+plus recent committed mobile work without claiming public store availability.
+
+After production promotion, confirm category and report configuration and smoke
+test both flows. Use these inputs for `Publish Release Notes` from `master` once
+that branch contains the release page:
+
+| Input | Value |
+|---|---|
+| `release_version` | `2026.10.04` |
+| `release_title` | `Recognition Categories, Detailed Reports, and Mobile Progress` |
+| `release_summary` | `Customize recognition with organization-owned categories, explore the transactions behind house scores, and catch up on recent mobile improvements.` |
+| `release_notes_path` | `releases/2026-10-04-categories-reports-mobile.html` |
+| `released_at` | Leave empty to use workflow run time. |
+| `record_release` | `true` |
+| `broadcast_release` | `false` until production health is confirmed; `true` when ready to notify active users. |
+
+Keep the same version for retries or a later broadcast. Existing repository
+configuration (`RELEASE_RECORD_API_BASE_URL` and `RELEASE_AUTOMATION_SECRET`)
+is reused; this announcement adds no secrets or workflow requirements.
+
 ## Future Semantic Release Shape
 
 The likely automated release pipeline is:

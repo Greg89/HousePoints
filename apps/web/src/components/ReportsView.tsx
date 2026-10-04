@@ -57,7 +57,21 @@ type BuildHrefParams = {
 
 const PAGE_SIZE = 25;
 
-export function ReportsView({
+export function ReportsView(props: ReportsViewProps) {
+  const scopeKey = JSON.stringify([
+    props.organizationSlug,
+    props.seasonId,
+    props.houseId,
+    props.memberId,
+    props.categoryId,
+    props.giverId,
+    props.type,
+  ]);
+
+  return <ScopedReportsView key={scopeKey} {...props} />;
+}
+
+function ScopedReportsView({
   organizationSlug,
   seasonContext,
   leaderboard,
