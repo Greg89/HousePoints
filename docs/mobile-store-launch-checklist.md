@@ -87,6 +87,20 @@ Useful references:
 - [EAS Build introduction](https://docs.expo.dev/build/introduction/)
 - [EAS Submit overview](https://docs.expo.dev/deploy/submit-to-app-stores/)
 
+### Expo dependency validation
+
+CI runs `npx expo install --check` from `apps/mobile`. This check can start
+failing when Expo publishes newer recommended SDK patch versions, even when
+the application code has not changed: `npm ci` installs the versions recorded
+in the root lockfile rather than updating them.
+
+When the check reports outdated dependencies, run `npx expo install --fix`
+from `apps/mobile`, review the dependency changes, and commit both
+`apps/mobile/package.json` and the root `package-lock.json`. Run
+`npx expo install --check` again before merging `develop` into `master`.
+Keep compatibility validation enabled; the existing TypeScript exclusion is
+intentional and is not the cause of an Expo package-version failure.
+
 ## 3. Configure EAS Environments
 
 Create EAS Environments named `development`, `preview`, and `production`.
