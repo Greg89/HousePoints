@@ -47,6 +47,12 @@ Implemented and locally verified September 27, 2026. `RECOGNITION_CATEGORIES_WEB
 
 If a category is archived while an award form is open, the API rejects the award, the web app refreshes categories, and the recipient, points, and reason remain in the draft until another active category is chosen. Activity and overview reports display the category's fixed name, including archived names. Create retries reuse their idempotency key. Web and API mutation flags both remain off until the C5 staging rehearsal. On web rollback after custom awards exist, keep category-aware read capability and the C2 API/schema in place; returning to enum-only readers is unsafe.
 
+The web award dialog refreshes categories once per opening, not on recipient
+selection or changes to the server-action callback reference. Category reads use
+the authenticated, organization-scoped list endpoint without repeating user
+bootstrap. Refresh failures remain inline with an explicit retry and preserve
+the award draft; the server logs failures with the request ID.
+
 ## C4 mobile compatibility
 
 Implemented and locally verified September 27, 2026; Android device and currently supported old-binary checks remain pending. The upgraded app declares `categories-v1` on dashboard and activity reads even while category awards are disabled. Activity uses the category's fixed name, including archived custom categories, and dashboard summary parsing accepts category leaders and custom recent activity. Notification bodies already come from the C2 API's category name and need no native management screen or enum substitution.
