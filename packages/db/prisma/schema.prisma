@@ -48,6 +48,10 @@ enum AuditEventType {
   POINT_DELETED
   POINTS_DEDUCTED
   SEASON_STARTED
+  SEASON_PLAN_CREATED
+  SEASON_PLAN_UPDATED
+  SEASON_PLAN_DISCARDED
+  SEASON_PLANNED_END_UPDATED
   HOUSE_SETTINGS_UPDATED
   ORG_SETTINGS_UPDATED
   USER_DISPLAY_NAME_CHANGED
@@ -131,6 +135,7 @@ model Organization {
   transactions   PointTransaction[]
   invites        OrgInvite[]
   seasons        Season[]
+  seasonPlan     SeasonPlan?
   auditEvents    AuditEvent[]
   slugAliases    OrganizationSlugAlias[]
   notifications  Notification[]
@@ -217,6 +222,8 @@ model User {
   usedInvite               OrgInvite[]              @relation("UsedInvites")
   archivedOrganizations    Organization[]           @relation("ArchivedOrganizations")
   createdSeasons           Season[]                 @relation("CreatedSeasons")
+  createdSeasonPlans SeasonPlan[] @relation("CreatedSeasonPlans")
+  updatedSeasonPlans SeasonPlan[] @relation("UpdatedSeasonPlans")
   auditEvents              AuditEvent[]             @relation("AuditEventActor")
   authIdentities           AuthIdentity[]
   memberships              OrganizationMembership[]
@@ -273,6 +280,8 @@ model Season {
   name           String
   startsAt       DateTime
   endsAt         DateTime?
+  plannedEndsAt  DateTime?
+  timezone       String?
   isActive       Boolean            @default(false)
   createdById    String?
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -285,6 +294,27 @@ model Season {
   @@index([organizationId, isActive])
   @@index([organizationId, startsAt])
   @@index([createdById])
+}
+
+model SeasonPlan {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  name           String
+  kickoffMessage String?
+  plannedStartsAt DateTime?
+  plannedEndsAt  DateTime?
+  timezone       String
+  version        Int          @default(1)
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?        @relation("CreatedSeasonPlans", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?        @relation("UpdatedSeasonPlans", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@index([updatedById])
 }
 
 model PointTransaction {

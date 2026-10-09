@@ -1,6 +1,8 @@
 # Season kickoff and reporting
 
-Status: proposed. Extends [implemented seasons](../seasons-design.md), [winner summary](../season-winner-summary.md), and [comparison](../season-comparison-report.md). D2 (closed-season corrections with required reason and audit trail), D3 (transaction-time house attribution), and D4 (shared ranks and co-winners for this release) are approved September 20, 2026; D5 (manual rollover with informational planned dates and no background season-transition service) is also approved September 20, 2026. Other implementation details remain proposed.
+Status: S1 is implemented and locally verified; database integration validation and deployment remain pending. S2 kickoff and S3 recap/correction integration remain proposed. Extends [implemented seasons](../seasons-design.md), [winner summary](../season-winner-summary.md), and [comparison](../season-comparison-report.md). D2 (closed-season corrections with required reason and audit trail), D3 (transaction-time house attribution), and D4 (shared ranks and co-winners for this release) are approved September 20, 2026; D5 (manual rollover with informational planned dates and no background season-transition service) is also approved September 20, 2026.
+
+S1 locally adds organization-scoped season planning, owner plan management with audited version checks, DST-aware local date entry, active-season planned-end metadata, and web/mobile planned-end messaging. Workspace tests, typecheck, lint, and the production build pass. Database integration validation remains pending because the configured integration database lacks the existing `Organization.reportingRevision` column and is not clearly a disposable local test database; it was not migrated or modified. The existing immediate-start behavior remains separate; prepared-plan kickoff is S2. No migration has been applied to a shared or production environment.
 
 ## Current foundation and intended change
 
@@ -24,7 +26,7 @@ Admins can inspect plans and reports but cannot edit or start seasons. Members c
 
 ## State and data
 
-Use a separate organization-scoped `SeasonPlan` for the next season rather than forcing drafts into existing `Season` contracts that require `startsAt`. Proposed fields: organization ID (unique), name, kickoff message, planned start/end instants, timezone, version, creator/updater, timestamps. Discarding a draft is an audited configuration operation; it does not delete a real season or ledger history.
+Use a separate organization-scoped `SeasonPlan` for the next season rather than forcing drafts into existing `Season` contracts that require `startsAt`. S1 persists organization ID (unique), name, kickoff message, planned start/end instants, timezone, version, creator/updater, and timestamps. Discarding a draft is an audited configuration operation; it does not delete a real season or ledger history.
 
 Add planned end and timezone metadata to actual seasons as needed. Keep existing `startsAt` and `endsAt` as actual boundaries. A missed planned end displays "Past planned end; awaiting next kickoff" and continues accepting awards. It must not silently close or pretend the actual end occurred.
 

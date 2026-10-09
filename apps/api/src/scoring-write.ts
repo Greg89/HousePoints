@@ -22,7 +22,15 @@ export function withScoringWrite<T>(organizationId: string, write: (tx: Prisma.T
 export async function activeScoringSeason(tx: Prisma.TransactionClient, organizationId: string) {
   const season = await tx.season.findFirst({
     where: { organizationId, isActive: true },
-    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      plannedEndsAt: true,
+      timezone: true,
+      isActive: true,
+    },
   });
   if (!season) throw new SeasonScopeError(409, "ACTIVE_SEASON_REQUIRED", "An active season is required");
   return season;

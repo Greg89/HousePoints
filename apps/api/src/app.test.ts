@@ -65,6 +65,7 @@ vi.mock("@housepoints/db", () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      count: vi.fn(),
     },
     orgInvite: {
       create: vi.fn(),
@@ -99,6 +100,12 @@ vi.mock("@housepoints/db", () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+    },
+    seasonPlan: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
     pointMutationRequest: { findUnique: vi.fn(), create: vi.fn() },
     recognitionCategory: {
@@ -185,6 +192,7 @@ const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindFirst = prisma.house.findFirst as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
+const mockHouseCount = prisma.house.count as ReturnType<typeof vi.fn>;
 const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
 const mockInviteCount = prisma.orgInvite.count as ReturnType<typeof vi.fn>;
 const mockInviteFindMany = prisma.orgInvite.findMany as ReturnType<typeof vi.fn>;
@@ -210,6 +218,10 @@ const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
 const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
+const mockSeasonPlanFindUnique = prisma.seasonPlan.findUnique as ReturnType<typeof vi.fn>;
+const mockSeasonPlanCreate = prisma.seasonPlan.create as ReturnType<typeof vi.fn>;
+const mockSeasonPlanUpdate = prisma.seasonPlan.update as ReturnType<typeof vi.fn>;
+const mockSeasonPlanDelete = prisma.seasonPlan.delete as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxCount = prisma.pointTransaction.count as ReturnType<typeof vi.fn>;
 const mockTxFindUnique = prisma.pointTransaction.findUnique as ReturnType<typeof vi.fn>;
@@ -424,6 +436,11 @@ beforeEach(() => {
     }),
   );
   mockSeasonFindMany.mockResolvedValue([]);
+  mockSeasonPlanFindUnique.mockResolvedValue(null);
+  mockSeasonPlanCreate.mockResolvedValue({});
+  mockSeasonPlanUpdate.mockResolvedValue({});
+  mockSeasonPlanDelete.mockResolvedValue({});
+  mockHouseCount.mockResolvedValue(0);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
   mockNotificationCount.mockResolvedValue(0);
@@ -2773,6 +2790,246 @@ describe("POST /seasons/start", () => {
       select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("Season planning", () => {
+  const plan = {
+    id: "plan-1",
+    organizationId: "org-secure",
+    name: "Winter 2027",
+    kickoffMessage: "Welcome to the next season.",
+    plannedStartsAt: new Date("2027-01-01T14:00:00.000Z"),
+    plannedEndsAt: new Date("2027-03-31T13:00:00.000Z"),
+    timezone: "America/New_York",
+    version: 2,
+    createdById: "user-owner",
+    updatedById: "user-owner",
+    createdAt: new Date("2026-10-01T12:00:00.000Z"),
+    updatedAt: new Date("2026-10-02T12:00:00.000Z"),
+  };
+
+  it("returns an organization-scoped plan and readiness to admins", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    mockCategoryCount.mockResolvedValue(4);
+    mockHouseCount.mockResolvedValue(3);
+    mockMembershipCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan-context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      activeSeason: {
+        id: ACTIVE_SEASON.id,
+        name: ACTIVE_SEASON.name,
+        startsAt: ACTIVE_SEASON.startsAt.toISOString(),
+        endsAt: null,
+        isActive: true,
+      },
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        kickoffMessage: plan.kickoffMessage,
+        plannedStartsAt: plan.plannedStartsAt.toISOString(),
+        plannedEndsAt: plan.plannedEndsAt.toISOString(),
+        timezone: plan.timezone,
+        version: plan.version,
+        createdAt: plan.createdAt.toISOString(),
+        updatedAt: plan.updatedAt.toISOString(),
+      },
+      activeCategoryCount: 4,
+      houseCount: 3,
+      unassignedMemberCount: 2,
+    });
+    expect(mockSeasonPlanFindUnique).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure" },
+    });
+    expect(mockMembershipCount).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
+        houseId: null,
+      },
+    });
+    await app.close();
+  });
+
+  it("prevents regular members from inspecting owner/admin season plans", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan-context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockSeasonPlanFindUnique).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("creates an audited plan and increments its version on updates", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonPlanFindUnique.mockResolvedValue(null);
+    mockSeasonFindFirst.mockResolvedValue(null);
+    mockSeasonPlanCreate.mockResolvedValue({ ...plan, version: 1 });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan",
+      payload: {
+        expectedVersion: 0,
+        name: "Winter 2027",
+        kickoffMessage: "Welcome to the next season.",
+        plannedStartsAt: "2027-01-01T14:00:00.000Z",
+        plannedEndsAt: "2027-03-31T13:00:00.000Z",
+        timezone: "America/New_York",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockSeasonPlanCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-secure",
+        name: "Winter 2027",
+        plannedStartsAt: new Date("2027-01-01T14:00:00.000Z"),
+        plannedEndsAt: new Date("2027-03-31T13:00:00.000Z"),
+        timezone: "America/New_York",
+        version: 1,
+        createdById: "user-owner",
+        updatedById: "user-owner",
+      }),
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "SEASON_PLAN_CREATED",
+        metadata: expect.objectContaining({
+          planId: plan.id,
+          previousVersion: null,
+          version: 1,
+        }),
+      }),
+    });
+    await app.close();
+  });
+
+  it("rejects stale plan versions and invalid time zones without writing", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    const app = await buildTestApp("auth0|owner");
+    const payload = {
+      expectedVersion: 1,
+      name: "Winter 2027",
+      kickoffMessage: null,
+      plannedStartsAt: null,
+      plannedEndsAt: null,
+      timezone: "America/New_York",
+    };
+
+    const staleResponse = await app.inject({
+      method: "POST",
+      url: "/seasons/plan",
+      payload,
+    });
+    expect(staleResponse.statusCode).toBe(409);
+    expect(staleResponse.json().code).toBe("SEASON_PLAN_VERSION_CONFLICT");
+    expect(mockSeasonPlanUpdate).not.toHaveBeenCalled();
+
+    const invalidTimezoneResponse = await app.inject({
+      method: "POST",
+      url: "/seasons/plan",
+      payload: { ...payload, expectedVersion: 2, timezone: "Not/AZone" },
+    });
+    expect(invalidTimezoneResponse.statusCode).toBe(400);
+    expect(invalidTimezoneResponse.json().code).toBe("INVALID_TIMEZONE");
+    expect(mockSeasonPlanUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("audits draft discard and never changes the active season", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan/discard",
+      payload: { expectedVersion: plan.version },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ discarded: true });
+    expect(mockSeasonPlanDelete).toHaveBeenCalledWith({ where: { id: plan.id } });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "SEASON_PLAN_DISCARDED",
+        metadata: expect.objectContaining({ planId: plan.id, version: plan.version }),
+      }),
+    });
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("updates and audits only the expected active season planned end", async () => {
+    const plannedEnd = {
+      ...ACTIVE_SEASON,
+      plannedEndsAt: new Date("2026-12-31T15:00:00.000Z"),
+      timezone: "America/New_York",
+    };
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonUpdate.mockResolvedValue(plannedEnd);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/planned-end",
+      payload: {
+        seasonId: ACTIVE_SEASON.id,
+        plannedEndsAt: "2026-12-31T15:00:00.000Z",
+        timezone: "America/New_York",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      id: ACTIVE_SEASON.id,
+      plannedEndsAt: "2026-12-31T15:00:00.000Z",
+      timezone: "America/New_York",
+    });
+    expect(mockSeasonUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: ACTIVE_SEASON.id },
+      data: {
+        plannedEndsAt: new Date("2026-12-31T15:00:00.000Z"),
+        timezone: "America/New_York",
+      },
+    }));
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "SEASON_PLANNED_END_UPDATED",
+        metadata: {
+          seasonId: ACTIVE_SEASON.id,
+          beforePlannedEndsAt: null,
+          beforeTimezone: null,
+          afterPlannedEndsAt: "2026-12-31T15:00:00.000Z",
+          afterTimezone: "America/New_York",
+        },
+      }),
+    });
     await app.close();
   });
 });

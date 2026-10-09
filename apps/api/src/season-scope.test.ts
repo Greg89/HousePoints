@@ -77,6 +77,8 @@ describe("resolveSeasonScope", () => {
         name: true,
         startsAt: true,
         endsAt: true,
+        plannedEndsAt: true,
+        timezone: true,
         isActive: true,
       },
     });
@@ -107,6 +109,8 @@ describe("resolveSeasonScope", () => {
         name: true,
         startsAt: true,
         endsAt: true,
+        plannedEndsAt: true,
+        timezone: true,
         isActive: true,
       },
     });

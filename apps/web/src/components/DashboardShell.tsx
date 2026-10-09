@@ -129,6 +129,27 @@ function formatDate(value: string) {
 }
 
 function getSeasonTiming(season: SeasonContext["activeSeason"], now = new Date()) {
+  if (season.plannedEndsAt) {
+    const plannedEnd = new Date(season.plannedEndsAt);
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: season.timezone ?? undefined,
+      timeZoneName: season.timezone ? "short" : undefined,
+    });
+    if (plannedEnd.getTime() < now.getTime()) {
+      return {
+        label: "Past planned end",
+        detail: `Past planned end (${formatter.format(plannedEnd)}); awaiting next kickoff. Awards continue until an owner starts a new season.`,
+      };
+    }
+    return {
+      label: "Planned end",
+      detail: `Planned end ${formatter.format(plannedEnd)}. Dates are informational; awards continue until an owner starts a new season.`,
+    };
+  }
+
   if (!season.endsAt) {
     return {
       label: "No end date set",

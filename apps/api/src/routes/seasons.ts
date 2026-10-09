@@ -1,16 +1,21 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import {
   actorScopeSchema,
   createSeasonSchema,
+  discardSeasonPlanSchema,
+  isValidIanaTimeZone,
   renameSeasonSchema,
   rankScores,
+  saveSeasonPlanSchema,
   seasonCompareRequestSchema,
+  updateSeasonPlannedEndSchema,
 } from "@housepoints/contracts";
 import { prisma } from "@housepoints/db";
 import { activeScoringSeason, scoringWriteTime, withScoringWrite } from "../scoring-write.js";
 import type { ActorRecord } from "../actor.js";
 import { SeasonScopeError, mapSeason } from "../season-scope.js";
-import { parseBody, requireActor, requireOwnerActor } from "../route-helpers.js";
+import { parseBody, requireActor, requireAdminActor, requireOwnerActor } from "../route-helpers.js";
 import { info, warn } from "../logging.js";
 import {
   buildSeasonStartedNotificationData,
@@ -33,8 +38,24 @@ type SeasonRecord = {
   name: string;
   startsAt: Date;
   endsAt: Date | null;
+  plannedEndsAt?: Date | null;
+  timezone?: string | null;
   isActive: boolean;
 };
+
+class SeasonPlanConflictError extends Error {
+  constructor() {
+    super("The season plan changed. Refresh it before saving.");
+    this.name = "SeasonPlanConflictError";
+  }
+}
+
+class SeasonPlanNameConflictError extends Error {
+  constructor() {
+    super("A season with that name already exists.");
+    this.name = "SeasonPlanNameConflictError";
+  }
+}
 
 type HouseRecord = {
   id: string;
@@ -83,7 +104,15 @@ export async function loadSeasonsForOrg(organizationId: string) {
   return prisma.season.findMany({
     where: { organizationId },
     orderBy: { startsAt: "desc" },
-    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      plannedEndsAt: true,
+      timezone: true,
+      isActive: true,
+    },
   });
 }
 
@@ -93,7 +122,15 @@ export async function loadSeasonCompareData(
 ) {
   return prisma.season.findMany({
     where: { id: { in: seasonIds }, organizationId },
-    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      plannedEndsAt: true,
+      timezone: true,
+      isActive: true,
+    },
   });
 }
 
@@ -140,7 +177,15 @@ export async function startSeasonTransaction(actor: ActorRecord, seasonName: str
     const previousSeason = await tx.season.update({
       where: { id: currentSeason.id },
       data: { isActive: false, endsAt: now },
-      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        plannedEndsAt: true,
+        timezone: true,
+        isActive: true,
+      },
     });
     const activeSeason = await tx.season.create({
       data: {
@@ -150,7 +195,15 @@ export async function startSeasonTransaction(actor: ActorRecord, seasonName: str
         isActive: true,
         createdById: actor.id,
       },
-      select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        plannedEndsAt: true,
+        timezone: true,
+        isActive: true,
+      },
     });
 
     await tx.auditEvent.create({
@@ -207,7 +260,156 @@ export async function renameSeasonInDb(seasonId: string, name: string) {
   return prisma.season.update({
     where: { id: seasonId },
     data: { name },
-    select: { id: true, name: true, startsAt: true, endsAt: true, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      startsAt: true,
+      endsAt: true,
+      plannedEndsAt: true,
+      timezone: true,
+      isActive: true,
+    },
+  });
+}
+
+function mapSeasonPlan(plan: {
+  id: string;
+  name: string;
+  kickoffMessage: string | null;
+  plannedStartsAt: Date | null;
+  plannedEndsAt: Date | null;
+  timezone: string;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: plan.id,
+    name: plan.name,
+    kickoffMessage: plan.kickoffMessage,
+    plannedStartsAt: plan.plannedStartsAt?.toISOString() ?? null,
+    plannedEndsAt: plan.plannedEndsAt?.toISOString() ?? null,
+    timezone: plan.timezone,
+    version: plan.version,
+    createdAt: plan.createdAt.toISOString(),
+    updatedAt: plan.updatedAt.toISOString(),
+  };
+}
+
+function hasValidTimezone(timezone: string): boolean {
+  return isValidIanaTimeZone(timezone);
+}
+
+function seasonPlanAuditData(
+  organizationId: string,
+  actor: ActorRecord,
+  eventType: "SEASON_PLAN_CREATED" | "SEASON_PLAN_UPDATED" | "SEASON_PLAN_DISCARDED",
+  summary: string,
+  metadata: Prisma.InputJsonObject,
+) {
+  return {
+    organizationId,
+    actorUserId: actor.id,
+    eventType,
+    summary,
+    metadata,
+  };
+}
+
+async function saveSeasonPlan(
+  actor: ActorRecord,
+  input: ReturnType<typeof saveSeasonPlanSchema.parse>,
+) {
+  return withScoringWrite(actor.organizationId, async (tx) => {
+    const existing = await tx.seasonPlan.findUnique({
+      where: { organizationId: actor.organizationId },
+    });
+    if ((existing?.version ?? 0) !== input.expectedVersion) {
+      throw new SeasonPlanConflictError();
+    }
+
+    const overlappingSeason = await tx.season.findFirst({
+      where: { organizationId: actor.organizationId, name: input.name },
+      select: { id: true },
+    });
+    if (overlappingSeason) {
+      throw new SeasonPlanNameConflictError();
+    }
+
+    const planData = {
+      name: input.name,
+      kickoffMessage: input.kickoffMessage || null,
+      plannedStartsAt: input.plannedStartsAt ? new Date(input.plannedStartsAt) : null,
+      plannedEndsAt: input.plannedEndsAt ? new Date(input.plannedEndsAt) : null,
+      timezone: input.timezone,
+    };
+    const plan = existing
+      ? await tx.seasonPlan.update({
+          where: { id: existing.id },
+          data: { ...planData, version: { increment: 1 }, updatedById: actor.id },
+        })
+      : await tx.seasonPlan.create({
+          data: {
+            organizationId: actor.organizationId,
+            ...planData,
+            version: 1,
+            createdById: actor.id,
+            updatedById: actor.id,
+          },
+        });
+
+    await tx.auditEvent.create({
+      data: seasonPlanAuditData(
+        actor.organizationId,
+        actor,
+        existing ? "SEASON_PLAN_UPDATED" : "SEASON_PLAN_CREATED",
+        `${actor.displayName} ${existing ? "updated" : "created"} the next-season plan.`,
+        {
+          planId: plan.id,
+          previousVersion: existing?.version ?? null,
+          version: plan.version,
+          beforeName: existing?.name ?? null,
+          beforeKickoffMessage: existing?.kickoffMessage ?? null,
+          beforePlannedStartsAt: existing?.plannedStartsAt?.toISOString() ?? null,
+          beforePlannedEndsAt: existing?.plannedEndsAt?.toISOString() ?? null,
+          beforeTimezone: existing?.timezone ?? null,
+          afterName: plan.name,
+          afterKickoffMessage: plan.kickoffMessage,
+          afterPlannedStartsAt: plan.plannedStartsAt?.toISOString() ?? null,
+          afterPlannedEndsAt: plan.plannedEndsAt?.toISOString() ?? null,
+          afterTimezone: plan.timezone,
+        },
+      ),
+    });
+    return plan;
+  });
+}
+
+async function discardSeasonPlan(actor: ActorRecord, expectedVersion: number) {
+  return withScoringWrite(actor.organizationId, async (tx) => {
+    const plan = await tx.seasonPlan.findUnique({
+      where: { organizationId: actor.organizationId },
+    });
+    if (!plan || plan.version !== expectedVersion) throw new SeasonPlanConflictError();
+
+    await tx.seasonPlan.delete({ where: { id: plan.id } });
+    await tx.auditEvent.create({
+      data: seasonPlanAuditData(
+        actor.organizationId,
+        actor,
+        "SEASON_PLAN_DISCARDED",
+        `${actor.displayName} discarded the next-season plan.`,
+        {
+          planId: plan.id,
+          version: plan.version,
+          name: plan.name,
+          kickoffMessage: plan.kickoffMessage,
+          plannedStartsAt: plan.plannedStartsAt?.toISOString() ?? null,
+          plannedEndsAt: plan.plannedEndsAt?.toISOString() ?? null,
+          timezone: plan.timezone,
+        },
+      ),
+    });
   });
 }
 
@@ -246,6 +448,177 @@ export async function registerSeasonRoutes(
       activeSeason: mapSeason(activeSeason),
       seasons: seasons.map(mapSeason),
     };
+  });
+
+  app.post("/seasons/plan-context", async (request, reply) => {
+    const parsed = await parseBody(actorScopeSchema, request, reply);
+    if (!parsed) return;
+    const actor = await requireAdminActor(request, reply);
+    if (!actor) return;
+
+    const [activeSeason, plan, activeCategoryCount, houseCount, unassignedMemberCount] =
+      await Promise.all([
+        prisma.season.findFirst({
+          where: { organizationId: actor.organizationId, isActive: true },
+          select: {
+            id: true,
+            name: true,
+            startsAt: true,
+            endsAt: true,
+            plannedEndsAt: true,
+            timezone: true,
+            isActive: true,
+          },
+        }),
+        prisma.seasonPlan.findUnique({
+          where: { organizationId: actor.organizationId },
+        }),
+        prisma.recognitionCategory.count({
+          where: { organizationId: actor.organizationId, archivedAt: null },
+        }),
+        prisma.house.count({ where: { organizationId: actor.organizationId } }),
+        prisma.organizationMembership.count({
+          where: {
+            organizationId: actor.organizationId,
+            isActive: true,
+            archivedAt: null,
+            houseId: null,
+          },
+        }),
+      ]);
+
+    if (!activeSeason) {
+      return reply.status(409).send({
+        message: "An active season is required",
+        code: "ACTIVE_SEASON_REQUIRED",
+      });
+    }
+
+    return {
+      activeSeason: mapSeason(activeSeason),
+      plan: plan ? mapSeasonPlan(plan) : null,
+      activeCategoryCount,
+      houseCount,
+      unassignedMemberCount,
+    };
+  });
+
+  app.post("/seasons/plan", async (request, reply) => {
+    const parsed = await parseBody(saveSeasonPlanSchema, request, reply);
+    if (!parsed) return;
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    if (!hasValidTimezone(parsed.timezone)) {
+      return reply.status(400).send({
+        message: "Choose a valid IANA time zone.",
+        code: "INVALID_TIMEZONE",
+      });
+    }
+
+    try {
+      const plan = await saveSeasonPlan(actor, parsed);
+      return mapSeasonPlan(plan);
+    } catch (err) {
+      if (err instanceof SeasonPlanConflictError) {
+        return reply.status(409).send({
+          message: err.message,
+          code: "SEASON_PLAN_VERSION_CONFLICT",
+        });
+      }
+      if (err instanceof SeasonPlanNameConflictError) {
+        return reply.status(409).send({
+          message: err.message,
+          code: "SEASON_NAME_TAKEN",
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/seasons/plan/discard", async (request, reply) => {
+    const parsed = await parseBody(discardSeasonPlanSchema, request, reply);
+    if (!parsed) return;
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    try {
+      await discardSeasonPlan(actor, parsed.expectedVersion);
+      return { discarded: true as const };
+    } catch (err) {
+      if (err instanceof SeasonPlanConflictError) {
+        return reply.status(409).send({
+          message: err.message,
+          code: "SEASON_PLAN_VERSION_CONFLICT",
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.post("/seasons/planned-end", async (request, reply) => {
+    const parsed = await parseBody(updateSeasonPlannedEndSchema, request, reply);
+    if (!parsed) return;
+    const actor = await requireOwnerActor(request, reply);
+    if (!actor) return;
+
+    if (!hasValidTimezone(parsed.timezone)) {
+      return reply.status(400).send({
+        message: "Choose a valid IANA time zone.",
+        code: "INVALID_TIMEZONE",
+      });
+    }
+
+    try {
+      const updatedSeason = await withScoringWrite(actor.organizationId, async (tx) => {
+        const activeSeason = await activeScoringSeason(tx, actor.organizationId);
+        if (activeSeason.id !== parsed.seasonId) {
+          throw new SeasonScopeError(
+            409,
+            "ACTIVE_SEASON_CHANGED",
+            "The active season changed. Refresh before updating its planned end.",
+          );
+        }
+        const season = await tx.season.update({
+          where: { id: activeSeason.id },
+          data: {
+            plannedEndsAt: parsed.plannedEndsAt ? new Date(parsed.plannedEndsAt) : null,
+            timezone: parsed.timezone,
+          },
+          select: {
+            id: true,
+            name: true,
+            startsAt: true,
+            endsAt: true,
+            plannedEndsAt: true,
+            timezone: true,
+            isActive: true,
+          },
+        });
+        await tx.auditEvent.create({
+          data: {
+            organizationId: actor.organizationId,
+            actorUserId: actor.id,
+            eventType: "SEASON_PLANNED_END_UPDATED",
+            summary: `${actor.displayName} updated the planned end for ${season.name}.`,
+            metadata: {
+              seasonId: season.id,
+              beforePlannedEndsAt: activeSeason.plannedEndsAt?.toISOString() ?? null,
+              beforeTimezone: activeSeason.timezone ?? null,
+              afterPlannedEndsAt: season.plannedEndsAt?.toISOString() ?? null,
+              afterTimezone: season.timezone,
+            },
+          },
+        });
+        return season;
+      });
+      return mapSeason(updatedSeason);
+    } catch (err) {
+      if (err instanceof SeasonScopeError) {
+        return reply.status(err.statusCode).send({ message: err.message, code: err.code });
+      }
+      throw err;
+    }
   });
 
   app.post("/seasons/compare", async (request, reply) => {

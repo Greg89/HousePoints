@@ -41,6 +41,9 @@ export type RenameSeasonResult<Season> =
 export type StartSeasonResult<SeasonTransition> =
   | { ok: true; transition: SeasonTransition }
   | Extract<MutationResult, { ok: false }>;
+export type SaveSeasonPlanResult<SeasonPlan> =
+  | { ok: true; plan: SeasonPlan }
+  | Extract<MutationResult, { ok: false }>;
 export type CreateInviteResult =
   | { ok: true; token: string; joinPath: string; expiresAt: string }
   | Extract<MutationResult, { ok: false }>;

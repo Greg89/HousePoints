@@ -9,15 +9,24 @@ export function mapSeason(season: {
   name: string;
   startsAt: Date;
   endsAt: Date | null;
+  plannedEndsAt?: Date | null;
+  timezone?: string | null;
   isActive: boolean;
 }) {
-  return {
+  const mapped = {
     id: season.id,
     name: season.name,
     startsAt: season.startsAt.toISOString(),
     endsAt: season.endsAt?.toISOString() ?? null,
     isActive: season.isActive,
   };
+  return season.plannedEndsAt || season.timezone
+    ? {
+        ...mapped,
+        plannedEndsAt: season.plannedEndsAt?.toISOString() ?? null,
+        timezone: season.timezone ?? null,
+      }
+    : mapped;
 }
 
 export async function resolveSeasonScope(
@@ -35,6 +44,8 @@ export async function resolveSeasonScope(
         name: true,
         startsAt: true,
         endsAt: true,
+        plannedEndsAt: true,
+        timezone: true,
         isActive: true,
       },
     });
@@ -56,6 +67,8 @@ export async function resolveSeasonScope(
       name: true,
       startsAt: true,
       endsAt: true,
+      plannedEndsAt: true,
+      timezone: true,
       isActive: true,
     },
   });

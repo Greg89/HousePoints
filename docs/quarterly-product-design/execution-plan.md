@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F4 and C1–C3 implemented and locally verified; C4 code is locally verified with device acceptance pending; C5 cohort gate, rehearsal code, and runbook are prepared locally, with live checks pending. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 and C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner; R1–R4 are implemented locally; S1 is locally verified. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -24,7 +24,7 @@ The [decision register](./README.md#decision-register) is the product authority.
 | Billing decision | B1–B3 | Cost-informed commercial specification and tested sandbox architecture |
 | Conditional paid pilot | P1–P7, after billing decision | Verified owner subscriptions, platform oversight, and recovery workflows |
 
-F1–F4 and C1–C3 are implemented; complete C4 device and old-binary verification before C5. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
+F1–F4 and C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
 
 ## F — Targeted scoring and navigation reliability
 
@@ -92,7 +92,7 @@ Done when archive-vs-award and simultaneous-last-archive races are safe, reused 
 
 ### C3 — Web category management and award selection
 
-Status: **implementation complete, locally verified September 27, 2026**. The web category UI is disabled by default through `RECOGNITION_CATEGORIES_WEB_ENABLED`; API mutations remain disabled until C5. See the [category rollout notes](./recognition-categories.md#c3-web-category-management-and-awards).
+Status: **implementation complete, locally verified September 27, 2026**. The web category UI is disabled by default through `RECOGNITION_CATEGORIES_WEB_ENABLED`; API mutations were gated until C5. See the [category rollout notes](./recognition-categories.md#c3-web-category-management-and-awards).
 
 Dependencies: C2. Surfaces: Manage Recognition, award dialog, activity/report labels.
 
@@ -102,7 +102,7 @@ Done when owner/member permissions, archive/add with the same name, picker exclu
 
 ### C4 — Mobile category compatibility
 
-Status: **implementation complete with local verification September 27, 2026; device and old-binary acceptance pending**. The native award flag remains off by default; see the [mobile compatibility notes](./recognition-categories.md#c4-mobile-compatibility).
+Status: **complete per the release owner**. See the [mobile compatibility notes](./recognition-categories.md#c4-mobile-compatibility).
 
 Dependencies: C2. Surfaces: mobile picker, activity/home/report models, notifications, version handling.
 
@@ -112,7 +112,7 @@ Done when the upgraded app completes an award and renders archived/custom catego
 
 ### C5 — Enable categories with a cross-client release rehearsal
 
-Status: **rehearsal automation, rollback-safe web reads, and staging runbook prepared; rollout changed October 4, 2026 to environment-wide flags, beta before production, without organization-ID allowlists**. Code has been deployed per the release owner; category device, old-binary, and live enablement evidence remains to be recorded. See the [C5 runbook](./recognition-categories.md#c5-release-rehearsal--prepared-not-enabled).
+Status: **complete per the release owner**. The rollout uses environment-wide flags, beta before production, without organization-ID allowlists. See the [C5 release notes](./recognition-categories.md#c5-release-rehearsal).
 
 Dependencies: C3, C4. Surfaces: deployment/release docs, compatibility gate and targeted E2E.
 
@@ -171,6 +171,8 @@ Dependencies: C5. Surfaces: SeasonPlan storage/contracts/API, owner Manage UI.
 One draft per organization: name, optional message/planned dates, timezone, readiness summary, edit/discard with audit and stale-edit conflict handling. Add optional planned-end metadata for active seasons and compatible mobile displays. Dates are informational; passing them never closes a season or stops awards.
 
 Done when owner/admin permissions, timezone edge cases, draft conflicts, and past-planned-end messaging are tested. Existing start remains available until S2 connects the draft flow.
+
+Status: **implementation complete and locally verified October 9, 2026**. Workspace tests, typecheck, lint, and production build pass. Database integration validation is still pending: the configured integration database is missing the existing `Organization.reportingRevision` column and is not clearly a disposable local test database, so it was not migrated or modified. No shared or production migration was applied.
 
 ### S2 — Start the prepared season atomically
 
@@ -238,6 +240,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4–C5: **complete per the release owner**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. S1: **implementation complete with local verification; database integration validation and deployment pending**. Remaining S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Recommended next checkpoint: **C4 Android device and old-binary verification, then the C5 staging rehearsal**. Keep category mutation disabled until the controlled staging run and preserve the legacy enum boundary for unsupported clients.
+Recommended next checkpoint after S1 verification: **S2 — start the prepared season atomically**. Preserve the legacy immediate-start API behavior until S2 connects it to the prepared-plan flow.

@@ -5,6 +5,8 @@ export const seasonSchema = z.object({
   name: z.string().min(1),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime().nullable(),
+  plannedEndsAt: z.string().datetime().nullable().optional(),
+  timezone: z.string().nullable().optional(),
   isActive: z.boolean(),
 });
 
@@ -18,6 +20,60 @@ export const seasonContextSchema = z.object({
 });
 
 export type SeasonContext = z.infer<typeof seasonContextSchema>;
+
+export const seasonPlanSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(2).max(80),
+  kickoffMessage: z.string().max(500).nullable(),
+  plannedStartsAt: z.string().datetime().nullable(),
+  plannedEndsAt: z.string().datetime().nullable(),
+  timezone: z.string().min(1),
+  version: z.number().int().positive(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type SeasonPlan = z.infer<typeof seasonPlanSchema>;
+
+export const seasonPlanContextSchema = z.object({
+  activeSeason: seasonSchema,
+  plan: seasonPlanSchema.nullable(),
+  activeCategoryCount: z.number().int().nonnegative(),
+  houseCount: z.number().int().nonnegative(),
+  unassignedMemberCount: z.number().int().nonnegative(),
+});
+
+export type SeasonPlanContext = z.infer<typeof seasonPlanContextSchema>;
+
+export const saveSeasonPlanSchema = z.object({
+  expectedVersion: z.number().int().nonnegative(),
+  name: z.string().trim().min(2).max(80),
+  kickoffMessage: z.string().trim().max(500).nullable(),
+  plannedStartsAt: z.string().datetime().nullable(),
+  plannedEndsAt: z.string().datetime().nullable(),
+  timezone: z.string().trim().min(1).max(100),
+}).strict().refine(
+  (input) =>
+    input.plannedStartsAt === null ||
+    input.plannedEndsAt === null ||
+    new Date(input.plannedEndsAt).getTime() > new Date(input.plannedStartsAt).getTime(),
+  {
+    message: "The planned end must be later than the planned start.",
+    path: ["plannedEndsAt"],
+  },
+);
+
+export type SaveSeasonPlanInput = z.infer<typeof saveSeasonPlanSchema>;
+
+export const discardSeasonPlanSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+}).strict();
+
+export const updateSeasonPlannedEndSchema = z.object({
+  seasonId: z.string().min(1),
+  plannedEndsAt: z.string().datetime().nullable(),
+  timezone: z.string().trim().min(1).max(100),
+}).strict();
 
 export const seasonScopedRequestSchema = z.object({
   seasonId: z.string().min(1).optional(),

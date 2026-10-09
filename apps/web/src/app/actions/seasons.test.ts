@@ -4,7 +4,15 @@ import { ApiResponseError, apiFetch, parseApiResponse } from "@/lib/api-client";
 import { logServerActionFailed, runServerAction } from "@/lib/action-context";
 import { getCurrentUserForRequest } from "@/lib/current-user";
 import { getActorMappingForAdmin } from "./admin-auth";
-import { readSeasonComparison, renameSeason, startSeason } from "./seasons";
+import {
+  discardSeasonPlan,
+  readSeasonComparison,
+  readSeasonPlanContext,
+  renameSeason,
+  saveSeasonPlan,
+  startSeason,
+  updateSeasonPlannedEnd,
+} from "./seasons";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -208,6 +216,111 @@ describe("readSeasonComparison", () => {
     await expect(
       readSeasonComparison("season-current", "season-next", "request-2"),
     ).rejects.toThrow("comparison failed");
+  });
+});
+
+describe("season planning actions", () => {
+  const plan = {
+    id: "plan-1",
+    name: "Winter 2027",
+    kickoffMessage: "Welcome.",
+    plannedStartsAt: "2027-01-01T14:00:00.000Z",
+    plannedEndsAt: "2027-03-31T13:00:00.000Z",
+    timezone: "America/New_York",
+    version: 1,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  };
+
+  it("loads the plan and readiness through the authenticated API", async () => {
+    const context = {
+      activeSeason,
+      plan,
+      activeCategoryCount: 20,
+      houseCount: 4,
+      unassignedMemberCount: 1,
+    };
+    parseApiResponseMock.mockResolvedValue(context);
+
+    await expect(readSeasonPlanContext("request-plan")).resolves.toEqual(context);
+    expect(getCurrentUserForRequestMock).toHaveBeenCalledWith("request-plan");
+    expect(apiFetchMock).toHaveBeenCalledWith("/seasons/plan-context", "request-plan", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  });
+
+  it("validates plan input and persists it through the owner action", async () => {
+    parseApiResponseMock.mockResolvedValue(plan);
+    const formData = new FormData();
+    formData.set("expectedVersion", "0");
+    formData.set("name", " Winter 2027 ");
+    formData.set("kickoffMessage", " Welcome. ");
+    formData.set("plannedStartsAt", plan.plannedStartsAt);
+    formData.set("plannedEndsAt", plan.plannedEndsAt);
+    formData.set("timezone", "America/New_York");
+
+    await expect(saveSeasonPlan(formData)).resolves.toEqual({ ok: true, plan });
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("saveSeasonPlan", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/seasons/plan", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        expectedVersion: 0,
+        name: "Winter 2027",
+        kickoffMessage: "Welcome.",
+        plannedStartsAt: plan.plannedStartsAt,
+        plannedEndsAt: plan.plannedEndsAt,
+        timezone: "America/New_York",
+      }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("does not call the API for invalid plan input", async () => {
+    const formData = new FormData();
+    formData.set("expectedVersion", "0");
+    formData.set("name", "x");
+    formData.set("timezone", "UTC");
+
+    await expect(saveSeasonPlan(formData)).resolves.toMatchObject({
+      ok: false,
+      code: "SEASON_PLAN_INVALID",
+    });
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("discards plans using the expected version", async () => {
+    parseApiResponseMock.mockResolvedValue({ discarded: true });
+    const formData = new FormData();
+    formData.set("expectedVersion", "3");
+
+    await expect(discardSeasonPlan(formData)).resolves.toEqual({ ok: true });
+    expect(apiFetchMock).toHaveBeenCalledWith("/seasons/plan/discard", "request-1", {
+      method: "POST",
+      body: JSON.stringify({ expectedVersion: 3 }),
+    });
+  });
+
+  it("saves a planned end against the active season ID", async () => {
+    parseApiResponseMock.mockResolvedValue({
+      ...activeSeason,
+      plannedEndsAt: "2026-12-31T15:00:00.000Z",
+      timezone: "America/New_York",
+    });
+    const formData = new FormData();
+    formData.set("seasonId", activeSeason.id);
+    formData.set("plannedEndsAt", "2026-12-31T15:00:00.000Z");
+    formData.set("timezone", "America/New_York");
+
+    await expect(updateSeasonPlannedEnd(formData)).resolves.toMatchObject({ ok: true });
+    expect(apiFetchMock).toHaveBeenCalledWith("/seasons/planned-end", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        seasonId: activeSeason.id,
+        plannedEndsAt: "2026-12-31T15:00:00.000Z",
+        timezone: "America/New_York",
+      }),
+    });
   });
 });
 

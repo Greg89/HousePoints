@@ -233,6 +233,32 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
         name: "Summer Sprint",
       },
     }),
+    onReadSeasonPlanContext: vi.fn().mockResolvedValue({
+      activeSeason,
+      plan: null,
+      activeCategoryCount: 20,
+      houseCount: 2,
+      unassignedMemberCount: 1,
+    }),
+    onSaveSeasonPlan: vi.fn().mockResolvedValue({
+      ok: true,
+      plan: {
+        id: "plan-1",
+        name: "Winter 2027",
+        kickoffMessage: null,
+        plannedStartsAt: null,
+        plannedEndsAt: null,
+        timezone: "UTC",
+        version: 1,
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      },
+    }),
+    onDiscardSeasonPlan: vi.fn().mockResolvedValue({ ok: true }),
+    onUpdateSeasonPlannedEnd: vi.fn().mockResolvedValue({
+      ok: true,
+      season: { ...activeSeason, plannedEndsAt: "2026-12-01T00:00:00.000Z", timezone: "UTC" },
+    }),
     ...overrides,
   };
 
@@ -746,14 +772,14 @@ describe("AdminForms", () => {
 
     expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
     expect(screen.getByRole("region", { name: "Season history" })).toHaveTextContent("Season 0");
-    expect(screen.getByRole("button", { name: "Start next season" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start immediately" })).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
   });
 
   it("confirms and starts a new season for owners", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");
-    await user.click(screen.getByRole("button", { name: "Start next season" }));
+    await user.click(screen.getByRole("button", { name: "Start immediately" }));
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");
@@ -769,6 +795,36 @@ describe("AdminForms", () => {
     expect(screen.getByLabelText("Current season")).toHaveTextContent("Q4 2026");
   });
 
+  it("prepares a season plan without starting or changing the active season", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Seasons");
+    await user.click(screen.getByRole("button", { name: "Prepare next season" }));
+    const planForm = within(await screen.findByRole("form", { name: "Prepare next season" }));
+    await user.type(planForm.getByLabelText("Season name"), "Winter 2027");
+    await user.clear(planForm.getByLabelText(/IANA time zone/));
+    await user.type(planForm.getByLabelText(/IANA time zone/), "UTC");
+    fireEvent.change(planForm.getByLabelText("Intended start (optional)"), {
+      target: { value: "2027-01-01T12:00" },
+    });
+    fireEvent.change(planForm.getByLabelText("Intended end (optional)"), {
+      target: { value: "2027-02-01T12:00" },
+    });
+    await user.click(planForm.getByRole("button", { name: "Save plan" }));
+
+    await waitFor(() => expect(props.onSaveSeasonPlan).toHaveBeenCalledOnce());
+    const savePlan = props.onSaveSeasonPlan as ReturnType<typeof vi.fn>;
+    const formData = savePlan.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toMatchObject({
+      expectedVersion: "0",
+      name: "Winter 2027",
+      timezone: "UTC",
+      plannedStartsAt: "2027-01-01T12:00:00.000Z",
+      plannedEndsAt: "2027-02-01T12:00:00.000Z",
+    });
+    expect(props.onStartSeason).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
+  });
+
   it("shows a safe toast when start-season returns an expected failure", async () => {
     const { user, props } = setupAdminForms({
       onStartSeason: vi.fn().mockResolvedValue({
@@ -778,7 +834,7 @@ describe("AdminForms", () => {
       }),
     });
     switchToManageSection("Seasons");
-    await user.click(screen.getByRole("button", { name: "Start next season" }));
+    await user.click(screen.getByRole("button", { name: "Start immediately" }));
     const startSeasonForm = within(screen.getByRole("form", { name: "Start season" }));
 
     await user.type(startSeasonForm.getByPlaceholderText("New season name"), "Q4 2026");

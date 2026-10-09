@@ -118,6 +118,9 @@ export default function HomeScreen() {
             <SeasonHeader
               seasonName={summary.selectedSeason.name}
               startsAt={summary.selectedSeason.startsAt}
+              isActive={summary.selectedSeason.isActive}
+              plannedEndsAt={summary.selectedSeason.plannedEndsAt ?? null}
+              timezone={summary.selectedSeason.timezone ?? null}
             />
           ) : null}
           {houses ? <HousesSection houses={houses} /> : null}
@@ -155,17 +158,36 @@ function ErrorCard({
 function SeasonHeader({
   seasonName,
   startsAt,
+  isActive,
+  plannedEndsAt,
+  timezone,
 }: {
   seasonName: string;
   startsAt: string;
+  isActive: boolean;
+  plannedEndsAt: string | null;
+  timezone: string | null;
 }) {
   const formatted = formatSeasonStart(startsAt);
+  const plannedEnd = plannedEndsAt
+    ? formatPlannedSeasonEnd(plannedEndsAt, timezone)
+    : null;
+  const plannedEndPassed = plannedEndsAt
+    ? new Date(plannedEndsAt).getTime() < Date.now()
+    : false;
   return (
     <View style={styles.seasonCard}>
       <Text style={styles.eyebrow}>Current season</Text>
       <Text style={styles.seasonName}>{seasonName}</Text>
       {formatted ? (
         <Text style={styles.seasonMeta}>Started {formatted}</Text>
+      ) : null}
+      {isActive && plannedEnd ? (
+        <Text style={styles.seasonMeta}>
+          {plannedEndPassed
+            ? `Past planned end (${plannedEnd}); awaiting next kickoff. Awards continue.`
+            : `Planned end: ${plannedEnd}. Awards continue until kickoff.`}
+        </Text>
       ) : null}
     </View>
   );
@@ -234,6 +256,20 @@ function formatSeasonStart(iso: string): string | null {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatPlannedSeasonEnd(iso: string, timezone: string | null): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.valueOf())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timezone ?? undefined,
+    timeZoneName: timezone ? "short" : undefined,
+  }).format(date);
 }
 
 const styles = StyleSheet.create({
