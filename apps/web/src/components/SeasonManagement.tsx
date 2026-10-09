@@ -29,6 +29,7 @@ interface SeasonManagementProps {
   activeSeason: Season;
   actorRole: UserRole;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
+  onKickoffSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
   onReadPlanContext: () => Promise<SeasonPlanContext>;
   onSavePlan: (formData: FormData) => Promise<SaveSeasonPlanResult<SeasonPlan>>;
@@ -154,6 +155,7 @@ export function SeasonManagement({
   activeSeason,
   actorRole,
   onStartSeason,
+  onKickoffSeason,
   onRenameSeason,
   onReadPlanContext,
   onSavePlan,
@@ -162,6 +164,7 @@ export function SeasonManagement({
 }: SeasonManagementProps) {
   const [editorMode, setEditorMode] = useState<EditorMode>(null);
   const [startSeasonPending, startStartSeason] = useTransition();
+  const [kickoffPlanPending, startKickoffPlan] = useTransition();
   const [renameSeasonPending, startRenameSeason] = useTransition();
   const [savePlanPending, startSavePlan] = useTransition();
   const [discardPlanPending, startDiscardPlan] = useTransition();
@@ -174,12 +177,14 @@ export function SeasonManagement({
   const [planContextError, setPlanContextError] = useState<string | null>(null);
   const [planContextLoading, setPlanContextLoading] = useState(true);
   const [pendingPlanDiscard, setPendingPlanDiscard] = useState(false);
+  const [pendingPlanKickoff, setPendingPlanKickoff] = useState(false);
   const [planTimezone, setPlanTimezone] = useState(defaultTimezone);
   const [plannedEndTimezone, setPlannedEndTimezone] = useState(
     activeSeason.timezone ?? defaultTimezone(),
   );
   const [now, setNow] = useState<number | null>(null);
   const startFormRef = useRef<HTMLFormElement>(null);
+  const kickoffIdempotencyKey = useRef<string | null>(null);
   const canManageSeasons = actorRole === "OWNER";
   const renameSeason = seasonList.find((season) => season.id === renameSeasonId) ?? currentSeason;
 
@@ -301,6 +306,7 @@ export function SeasonManagement({
           return;
         }
         toast.success("Next-season plan saved", { description: result.plan.name });
+        kickoffIdempotencyKey.current = null;
         setEditorMode(null);
         await refreshPlanContext();
       } catch (error) {
@@ -326,6 +332,7 @@ export function SeasonManagement({
           return;
         }
         toast.success("Next-season plan discarded");
+        kickoffIdempotencyKey.current = null;
         setPendingPlanDiscard(false);
         await refreshPlanContext();
       } catch (error) {
@@ -382,6 +389,57 @@ export function SeasonManagement({
     if (!canManageSeasons) return;
     const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
     if (name) setPendingStartName(name);
+  }
+
+  function confirmPlanKickoff() {
+    const context = planContext;
+    if (!canManageSeasons || !context?.plan || context.activeCategoryCount === 0) return;
+    const idempotencyKey = kickoffIdempotencyKey.current ?? window.crypto.randomUUID();
+    kickoffIdempotencyKey.current = idempotencyKey;
+    const formData = new FormData();
+    formData.set("expectedActiveSeasonId", context.activeSeason.id);
+    formData.set("expectedPlanVersion", String(context.plan.version));
+    formData.set("idempotencyKey", idempotencyKey);
+
+    startKickoffPlan(async () => {
+      try {
+        const result = await onKickoffSeason(formData);
+        if (!result.ok) {
+          kickoffIdempotencyKey.current = null;
+          toast.error("Prepared season not started", { description: result.message });
+          if (
+            result.code === "SEASON_PLAN_VERSION_CONFLICT" ||
+            result.code === "ACTIVE_SEASON_CHANGED" ||
+            result.code === "ACTIVE_CATEGORY_REQUIRED"
+          ) {
+            await refreshPlanContext();
+          }
+          setPendingPlanKickoff(false);
+          return;
+        }
+
+        kickoffIdempotencyKey.current = null;
+        const { transition } = result;
+        setCurrentSeason(transition.activeSeason);
+        setRenameSeasonId(transition.activeSeason.id);
+        setSeasonList((existing) => [
+          transition.activeSeason,
+          transition.previousSeason,
+          ...existing.filter(
+            (season) =>
+              season.id !== transition.activeSeason.id &&
+              season.id !== transition.previousSeason.id,
+          ),
+        ]);
+        setPendingPlanKickoff(false);
+        toast.success("Prepared season started", { description: transition.activeSeason.name });
+        await refreshPlanContext();
+      } catch (error) {
+        toast.error("Prepared season not started", {
+          description: error instanceof Error ? error.message : "Something went wrong.",
+        });
+      }
+    });
   }
 
   function confirmStartSeason() {
@@ -586,6 +644,46 @@ export function SeasonManagement({
             <li>Current season to close: {planContext.activeSeason.name}</li>
           </ul>
         ) : null}
+        {planContext?.plan && canManageSeasons ? (
+          <div className="mt-4 border-t pt-4">
+            <button
+              type="button"
+              onClick={() => setPendingPlanKickoff(true)}
+              disabled={kickoffPlanPending || planContext.activeCategoryCount === 0}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Kick off prepared season
+            </button>
+            {planContext.activeCategoryCount === 0 ? (
+              <p className="mt-2 text-xs text-destructive">
+                Add an active recognition category before kickoff.
+              </p>
+            ) : null}
+            {pendingPlanKickoff ? (
+              <div className="mt-3">
+                <ManageConfirmationPanel
+                  title={<>Start &ldquo;{planContext.plan.name}&rdquo; now?</>}
+                  description={(
+                    <>
+                      This closes {planContext.activeSeason.name} now. Its points stay with that season;
+                      new awards start at zero in {planContext.plan.name}. Planned dates are expectations
+                      only. The season announcement will include:{" "}
+                      <strong>{planContext.plan.kickoffMessage || "No custom message"}</strong>
+                      {planContext.unassignedMemberCount > 0
+                        ? ` There are ${planContext.unassignedMemberCount} active members without a house.`
+                        : ""}
+                    </>
+                  )}
+                  onConfirm={confirmPlanKickoff}
+                  onCancel={() => setPendingPlanKickoff(false)}
+                  confirmLabel="Kick off season"
+                  pendingLabel="Starting..."
+                  pending={kickoffPlanPending}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {pendingPlanDiscard && planContext?.plan ? (
           <div className="mt-4">
             <ManageConfirmationPanel
@@ -743,7 +841,7 @@ export function SeasonManagement({
                   maxLength={500}
                   disabled={savePlanPending}
                 />
-                <span className="font-normal">Up to 500 characters. This is saved for later; it is not sent now.</span>
+                <span className="font-normal">Up to 500 characters. It will be included in the announcement if you kick off this plan.</span>
               </label>
               <label className="grid gap-1.5 text-xs font-semibold text-muted-foreground">
                 IANA time zone

@@ -6,6 +6,7 @@ import { getCurrentUserForRequest } from "@/lib/current-user";
 import { getActorMappingForAdmin } from "./admin-auth";
 import {
   discardSeasonPlan,
+  kickoffSeason,
   readSeasonComparison,
   readSeasonPlanContext,
   renameSeason,
@@ -175,6 +176,52 @@ describe("startSeason", () => {
     await expect(startSeason(formData)).rejects.toThrow("database vanished");
 
     expect(logServerActionFailedMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("kickoffSeason", () => {
+  beforeEach(() => {
+    parseApiResponseMock.mockResolvedValue({
+      previousSeason,
+      activeSeason,
+    });
+  });
+
+  it("validates, starts the prepared season, and revalidates the dashboard", async () => {
+    const formData = new FormData();
+    formData.set("expectedActiveSeasonId", "season-active");
+    formData.set("expectedPlanVersion", "2");
+    formData.set("idempotencyKey", "d9428888-122b-4b6f-a53d-9b7f3b234540");
+
+    await expect(kickoffSeason(formData)).resolves.toEqual({
+      ok: true,
+      transition: { previousSeason, activeSeason },
+    });
+
+    expect(getActorMappingForAdminMock).toHaveBeenCalledWith("kickoffSeason", "request-1");
+    expect(apiFetchMock).toHaveBeenCalledWith("/seasons/kickoff", "request-1", {
+      method: "POST",
+      body: JSON.stringify({
+        expectedActiveSeasonId: "season-active",
+        expectedPlanVersion: 2,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/");
+  });
+
+  it("returns invalid kickoff metadata without calling the API", async () => {
+    const formData = new FormData();
+    formData.set("expectedActiveSeasonId", "season-active");
+    formData.set("expectedPlanVersion", "2");
+    formData.set("idempotencyKey", "invalid");
+
+    await expect(kickoffSeason(formData)).resolves.toMatchObject({
+      ok: false,
+      code: "SEASON_KICKOFF_INVALID",
+    });
+    expect(apiFetchMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

@@ -136,6 +136,7 @@ model Organization {
   invites        OrgInvite[]
   seasons        Season[]
   seasonPlan     SeasonPlan?
+  seasonTransitions SeasonTransition[]
   auditEvents    AuditEvent[]
   slugAliases    OrganizationSlugAlias[]
   notifications  Notification[]
@@ -287,13 +288,33 @@ model Season {
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy      User?              @relation("CreatedSeasons", fields: [createdById], references: [id], onDelete: SetNull)
   transactions   PointTransaction[]
+  previousSeasonTransitions SeasonTransition[] @relation("SeasonTransitionPrevious")
+  startedSeasonTransitions  SeasonTransition[] @relation("SeasonTransitionActive")
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
   @@unique([organizationId, name])
+  @@unique([organizationId, id])
   @@index([organizationId, isActive])
   @@index([organizationId, startsAt])
   @@index([createdById])
+}
+
+model SeasonTransition {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  idempotencyKey     String
+  planVersion        Int
+  previousSeasonId   String
+  activeSeasonId     String       @unique
+  createdAt          DateTime     @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  previousSeason     Season       @relation("SeasonTransitionPrevious", fields: [organizationId, previousSeasonId], references: [organizationId, id], onDelete: Restrict)
+  activeSeason       Season       @relation("SeasonTransitionActive", fields: [organizationId, activeSeasonId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, previousSeasonId])
 }
 
 model SeasonPlan {

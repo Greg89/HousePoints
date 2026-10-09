@@ -69,6 +69,12 @@ export const discardSeasonPlanSchema = z.object({
   expectedVersion: z.number().int().positive(),
 }).strict();
 
+export const kickoffSeasonSchema = z.object({
+  expectedActiveSeasonId: z.string().min(1),
+  expectedPlanVersion: z.number().int().positive(),
+  idempotencyKey: z.string().uuid(),
+}).strict();
+
 export const updateSeasonPlannedEndSchema = z.object({
   seasonId: z.string().min(1),
   plannedEndsAt: z.string().datetime().nullable(),

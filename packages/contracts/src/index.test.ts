@@ -38,6 +38,7 @@ import {
   seasonPlanContextSchema,
   saveSeasonPlanSchema,
   discardSeasonPlanSchema,
+  kickoffSeasonSchema,
   updateSeasonPlannedEndSchema,
   memberScoreSchema,
   memberScoresSchema,
@@ -145,6 +146,7 @@ const webConsumedApiEndpoints = [
   "/seasons/plan-context",
   "/seasons/plan",
   "/seasons/plan/discard",
+  "/seasons/kickoff",
   "/seasons/planned-end",
   "/seasons/rename",
   "/seasons/start",
@@ -1147,6 +1149,23 @@ describe("season schemas", () => {
       previousSeason,
       activeSeason,
     });
+  });
+
+  it("validates prepared season kickoff requests", () => {
+    expect(kickoffSeasonSchema.parse({
+      expectedActiveSeasonId: "season-active",
+      expectedPlanVersion: 2,
+      idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+    })).toEqual({
+      expectedActiveSeasonId: "season-active",
+      expectedPlanVersion: 2,
+      idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+    });
+    expect(kickoffSeasonSchema.safeParse({
+      expectedActiveSeasonId: "season-active",
+      expectedPlanVersion: 0,
+      idempotencyKey: "not-a-uuid",
+    }).success).toBe(false);
   });
 
   it("accepts a comparison request for two distinct seasons", () => {

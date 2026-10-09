@@ -63,6 +63,7 @@ interface AdminFormsProps {
   onLoadPointAdjustmentStats: (seasonId?: string) => Promise<PointAdjustmentStats>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
+  onKickoffSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
   onReadSeasonPlanContext: () => Promise<SeasonPlanContext>;
   onSaveSeasonPlan: (formData: FormData) => Promise<SaveSeasonPlanResult<SeasonPlan>>;
@@ -193,6 +194,7 @@ export function AdminForms({
   onLoadPointAdjustmentStats,
   onCreateInvite,
   onStartSeason,
+  onKickoffSeason,
   onRenameSeason,
   onReadSeasonPlanContext,
   onSaveSeasonPlan,
@@ -360,6 +362,7 @@ export function AdminForms({
               activeSeason={activeSeason}
               actorRole={actorRole}
               onStartSeason={onStartSeason}
+              onKickoffSeason={onKickoffSeason}
               onRenameSeason={onRenameSeason}
               onReadPlanContext={onReadSeasonPlanContext}
               onSavePlan={onSaveSeasonPlan}

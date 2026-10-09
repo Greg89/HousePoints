@@ -77,6 +77,7 @@ import {
   seasonPlanSchema,
   saveSeasonPlanSchema,
   discardSeasonPlanSchema,
+  kickoffSeasonSchema,
   updateSeasonPlannedEndSchema,
   createSeasonSchema,
   seasonTransitionSchema,
@@ -255,6 +256,7 @@ export const apiContracts = {
   "/seasons/plan-context": defineContract(actorScopeSchema, seasonPlanContextSchema),
   "/seasons/plan": defineContract(saveSeasonPlanSchema, seasonPlanSchema),
   "/seasons/plan/discard": defineContract(discardSeasonPlanSchema, z.object({ discarded: z.literal(true) })),
+  "/seasons/kickoff": defineContract(kickoffSeasonSchema, seasonTransitionSchema),
   "/seasons/planned-end": defineContract(updateSeasonPlannedEndSchema, seasonSchema),
   "/seasons/compare": defineContract(
     seasonCompareRequestSchema,

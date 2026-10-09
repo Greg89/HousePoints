@@ -182,6 +182,8 @@ Add expected-active-season/plan-version checks and idempotent kickoff. Close the
 
 Done when double-click/retry produces one transition, simultaneous award/start is correct, stale plans conflict, and rollback preserves the original active season and draft. No scheduler or standalone close.
 
+Status: **implementation complete and locally verified October 9, 2026**. Full workspace tests, typecheck, lint, and production build pass. Real-database integration tests are implemented and typechecked but have not been executed: the configured integration database is missing the existing `Organization.reportingRevision` column and is not clearly disposable, so it was not migrated or modified. No shared or production migration was applied.
+
 ### S3 — Connect season recap, comparison, and correction notices
 
 Dependencies: S2, R4, F3. Surfaces: Overview/season reports, recap notification links.
@@ -242,4 +244,4 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4–C5: **complete per the release owner**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. S1: **implementation complete with local verification; database integration validation and deployment pending**. Remaining S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Recommended next checkpoint after S1 verification: **S2 — start the prepared season atomically**. Preserve the legacy immediate-start API behavior until S2 connects it to the prepared-plan flow.
+Recommended next checkpoint after S2 verification: **S3 — connect season recap, comparison, and correction notices**. S2 preserves the legacy immediate-start API behavior through the shared transition service.

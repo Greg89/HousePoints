@@ -44,6 +44,7 @@ import {
   renameSeason,
   saveSeasonPlan,
   discardSeasonPlan,
+  kickoffSeason,
   startSeason,
   updateSeasonPlannedEnd,
 } from "./actions/seasons";
@@ -194,6 +195,7 @@ export async function renderDashboardPage(route: string) {
       onLoadPointAdjustmentStats={readPointAdjustmentStats}
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
+      onKickoffSeason={kickoffSeason}
       onRenameSeason={renameSeason}
       onReadSeasonPlanContext={readSeasonPlanContext}
       onSaveSeasonPlan={saveSeasonPlan}

@@ -30,6 +30,7 @@ const MUTATION_RATE_LIMITS = new Map<string, number>([
   ["/seasons/plan/discard", 10],
   ["/seasons/planned-end", 20],
   ["/seasons/start", 5],
+  ["/seasons/kickoff", 5],
   ["/system/releases/broadcast", 10],
   ["/system/releases/record", 10],
   ["/transactions/react", 60],

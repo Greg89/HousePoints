@@ -14,6 +14,7 @@ import {
   saveSeasonPlanSchema,
   updateSeasonPlannedEndSchema,
   discardSeasonPlanSchema,
+  kickoffSeasonSchema,
   type DashboardSummary,
   type LeaderboardEntry,
   type MemberScore,
@@ -170,6 +171,56 @@ export async function startSeason(formData: FormData): Promise<StartSeasonResult
       ok: true,
       transition,
     };
+  });
+}
+
+export async function kickoffSeason(formData: FormData): Promise<StartSeasonResult<SeasonTransition>> {
+  return runServerAction("kickoffSeason", async (context) => {
+    const { requestId } = context;
+    const actor = await getActorMappingForAdmin("kickoffSeason", requestId);
+    const parsed = kickoffSeasonSchema.safeParse({
+      expectedActiveSeasonId: String(formData.get("expectedActiveSeasonId") ?? ""),
+      expectedPlanVersion: Number(formData.get("expectedPlanVersion")),
+      idempotencyKey: String(formData.get("idempotencyKey") ?? ""),
+    });
+    if (!parsed.success) {
+      return {
+        ok: false,
+        code: "SEASON_KICKOFF_INVALID",
+        message: "Refresh the season plan before kicking it off.",
+      };
+    }
+
+    const response = await apiFetch("/seasons/kickoff", requestId, {
+      method: "POST",
+      body: JSON.stringify(parsed.data),
+    });
+    let transition: SeasonTransition;
+    try {
+      transition = await parseApiResponse(
+        response,
+        seasonTransitionSchema,
+        "The prepared season could not be started. Please try again.",
+      );
+    } catch (error) {
+      if (!isExpectedSeasonMutationFailure(error)) throw error;
+      logServerActionFailed(context, error, {
+        actorUserId: actor.id,
+        organizationId: actor.organizationId,
+        expectedActiveSeasonId: parsed.data.expectedActiveSeasonId,
+        expectedPlanVersion: parsed.data.expectedPlanVersion,
+      });
+      return { ok: false, code: error.code, message: error.message };
+    }
+
+    logInfo("web.seasons.started", {
+      requestId,
+      actorUserId: actor.id,
+      organizationId: actor.organizationId,
+      seasonId: transition.activeSeason.id,
+    });
+    revalidatePath("/");
+    return { ok: true, transition };
   });
 }
 

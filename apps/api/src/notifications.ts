@@ -176,6 +176,7 @@ export function buildSeasonStartedNotificationData(input: {
   actorDisplayName: string;
   seasonName: string;
   seasonId: string;
+  kickoffMessage?: string | null;
 }): NotificationRow {
   return {
     organizationId: input.organizationId,
@@ -183,7 +184,10 @@ export function buildSeasonStartedNotificationData(input: {
     type: "SEASON_STARTED",
     severity: "INFO",
     title: "Season started",
-    body: `${input.actorDisplayName} started ${input.seasonName}. House standings and leaderboards now use the new season.`,
+    body: [
+      `${input.actorDisplayName} started ${input.seasonName}. House standings and leaderboards now use the new season.`,
+      input.kickoffMessage,
+    ].filter(Boolean).join("\n\n"),
     actionLabel: "View overview",
     actionHref: "/",
     entityType: "Season",

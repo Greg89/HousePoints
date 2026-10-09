@@ -226,6 +226,21 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
         },
       },
     }),
+    onKickoffSeason: vi.fn().mockResolvedValue({
+      ok: true,
+      transition: {
+        previousSeason: { ...activeSeason, endsAt: "2026-08-01T00:00:00.000Z", isActive: false },
+        activeSeason: {
+          id: "season-next",
+          name: "Winter 2027",
+          startsAt: "2026-08-01T00:00:00.000Z",
+          endsAt: null,
+          isActive: true,
+          plannedEndsAt: "2027-03-31T13:00:00.000Z",
+          timezone: "America/New_York",
+        },
+      },
+    }),
     onRenameSeason: vi.fn().mockResolvedValue({
       ok: true,
       season: {
@@ -823,6 +838,74 @@ describe("AdminForms", () => {
     });
     expect(props.onStartSeason).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
+  });
+
+  it("confirms and kicks off the prepared plan with an idempotency key", async () => {
+    const { user, props } = setupAdminForms({
+      onReadSeasonPlanContext: vi.fn().mockResolvedValue({
+        activeSeason,
+        plan: {
+          id: "plan-1",
+          name: "Winter 2027",
+          kickoffMessage: "Welcome to the next season.",
+          plannedStartsAt: "2027-01-01T14:00:00.000Z",
+          plannedEndsAt: "2027-03-31T13:00:00.000Z",
+          timezone: "America/New_York",
+          version: 3,
+          createdAt: "2026-10-01T00:00:00.000Z",
+          updatedAt: "2026-10-02T00:00:00.000Z",
+        },
+        activeCategoryCount: 20,
+        houseCount: 2,
+        unassignedMemberCount: 1,
+      }),
+    });
+    switchToManageSection("Seasons");
+
+    await user.click(await screen.findByRole("button", { name: "Kick off prepared season" }));
+    expect(screen.getByText(/new awards start at zero in Winter 2027/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome to the next season\./)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Kick off season" }));
+
+    await waitFor(() => expect(props.onKickoffSeason).toHaveBeenCalledOnce());
+    const kickoff = props.onKickoffSeason as ReturnType<typeof vi.fn>;
+    const formData = kickoff.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries(formData.entries())).toMatchObject({
+      expectedActiveSeasonId: activeSeason.id,
+      expectedPlanVersion: "3",
+    });
+    expect(String(formData.get("idempotencyKey"))).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it("blocks prepared kickoff when there are no active recognition categories", async () => {
+    const { user } = setupAdminForms({
+      onReadSeasonPlanContext: vi.fn().mockResolvedValue({
+        activeSeason,
+        plan: {
+          id: "plan-1",
+          name: "Winter 2027",
+          kickoffMessage: null,
+          plannedStartsAt: null,
+          plannedEndsAt: null,
+          timezone: "UTC",
+          version: 1,
+          createdAt: "2026-10-01T00:00:00.000Z",
+          updatedAt: "2026-10-02T00:00:00.000Z",
+        },
+        activeCategoryCount: 0,
+        houseCount: 2,
+        unassignedMemberCount: 0,
+      }),
+    });
+    switchToManageSection("Seasons");
+
+    const kickoffButton = await screen.findByRole("button", { name: "Kick off prepared season" });
+    expect(kickoffButton).toBeDisabled();
+    expect(screen.getByText("Add an active recognition category before kickoff.")).toBeInTheDocument();
+    await user.click(kickoffButton);
+    expect(screen.queryByRole("button", { name: "Kick off season" })).not.toBeInTheDocument();
   });
 
   it("shows a safe toast when start-season returns an expected failure", async () => {

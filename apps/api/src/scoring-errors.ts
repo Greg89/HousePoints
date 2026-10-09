@@ -8,7 +8,11 @@ export class ScoringWriteError extends Error {
 export class SeasonScopeError extends Error {
   constructor(
     readonly statusCode: number,
-    readonly code: "SEASON_NOT_FOUND" | "ACTIVE_SEASON_REQUIRED" | "ACTIVE_SEASON_CHANGED",
+    readonly code:
+      | "SEASON_NOT_FOUND"
+      | "ACTIVE_SEASON_REQUIRED"
+      | "ACTIVE_SEASON_CHANGED"
+      | "OWNER_REQUIRED",
     message: string,
   ) {
     super(message);
