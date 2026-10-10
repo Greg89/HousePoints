@@ -255,16 +255,20 @@ Member performance details are implemented for long presses on the Home season
 standout and Leaderboard contributor rows. See [member-performance.md](./member-performance.md)
 for the shared web/native API, ranking resources, data semantics, and API-first rollout.
 
-**Phase 3 — Admin subset**
+**Phase 3 — Native Manage workspace**
 
-- Manage members: house assignment, role changes, remove member (implemented
+- Manage overview with attention items and focused screens. Search/filter members,
+  edit display names, assign houses, change roles, and remove members (implemented
   with `/admin/context` and the existing mutation routes under `/admin/*`).
 - Invite generation + platform-native share sheet (implemented with
   `/orgs/invite` and React Native's link-capable `Share` API).
 - Point deduction (implemented with `/points/deduct`; the mobile action requires
   `EXPO_PUBLIC_POINT_ADJUSTMENTS_ENABLED=true` and the API separately requires
   `POINT_ADJUSTMENTS_ENABLED=true`).
-- Recent admin actions read view.
+- Owner-only house creation and house/member browsing.
+- Recognition-category browsing, owner-only creation/archive, and last-active-category protection.
+- Paginated recent admin actions read view.
+- See [Mobile Manage workspace](./mobile-manage.md) for the implemented scope and preview checks.
 
 Deferred (web-only for now): season creation/transition, org archive, release announcements, house theme QA, season comparison report.
 
@@ -377,7 +381,7 @@ fixes can ship within their existing channel. Roll back interactively with
 2. **Spike (1 short iteration)**: bare Expo app + Auth0 sign-in + one authenticated API call (`GET /me`). Confirms Auth0 tenant + PKCE config end-to-end. Locks in bundle id `com.housepoints.app` and scheme `housepoints://`.
 3. **MVP Phase 1** feature set behind a staging Auth0 connection. TestFlight + Play internal testing tracks. Expo Updates (`preview` channel) enabled here.
 4. **Phase 2** push + reactions. Enables device registration and push endpoints in staging first. Expo Push API used as the dispatcher.
-5. **Phase 3** admin subset (member mgmt, invites, point deduction). Gated by feature flag `MOBILE_ADMIN_ENABLED` in the mobile app for a soak period. Deeper Manage flows deep-link to the web dashboard.
+5. **Phase 3** Manage workspace (members, invites, houses, categories, admin history, point deduction). Gated by feature flag `MOBILE_ADMIN_ENABLED` in the mobile app for a soak period. Deeper Manage flows deep-link to the web dashboard.
 
 **Phase 3 gate status:** Implemented. Because Expo only exposes public runtime
 configuration to the client, the concrete variable is
@@ -397,7 +401,7 @@ Triaged 2026-07-29. These replace the previous open-questions list.
 | 17.1 | Push provider | **Expo Push API for MVP.** | Single HTTP call, APNs + FCM handled. Kept behind a `PushDispatcher` interface so a swap to native providers stays cheap if we later need rich pushes (images, action buttons, silent/data). |
 | 17.2 | `GET /me/bootstrap` endpoint | **Not added for MVP.** Reuse existing per-resource calls. | Revisit only if launch profiling shows cold-start latency is user-visible on cell networks. |
 | 17.3 | Design tokens | **Extract `packages/theme` immediately** and refactor web to consume it. | Firm prerequisite for the mobile spike. Web refactor is small and unblocks a single source of truth for house colors. Roadmap gains task 6.0a for the extraction. |
-| 17.4 | Admin scope on mobile | **Match the design doc**: member house assignment, role changes, invite generation/share, point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`). Everything else deep-links to web. | Deferred to web-only: season creation/transition, org archive, release announcements, house theme QA, season comparison report. |
+| 17.4 | Admin scope on mobile | **Native Manage workspace**: member directory/details, name and house editing, role/removal controls, invites, house creation, recognition categories, admin history, and feature-gated point deduction. Advanced tools link to web. | Deferred to web-only: season creation/transition, org archive, release announcements, house theme QA, season comparison report. |
 | 17.5 | App identity | **Name: HousePoints. Bundle id: `com.housepoints.app`. Scheme: `housepoints://`.** | Locked before Auth0 Native Application registration and store identifier reservation. Callback + logout URLs recorded in §12. |
 | 17.6 | Expo Updates (OTA) | **Enabled from day one** on `preview` and `production` channels. | JS-only hotfixes ship without store review. Native code changes still require an EAS Build + store submission. Rollback via `eas update --republish` to the previous runtime version. |
 
@@ -406,3 +410,7 @@ Triaged 2026-07-29. These replace the previous open-questions list.
 
 The home screen groups season information and the softly tinted Award points action in one white, bordered card. Planned-end text is muted until overdue. Award points remains available when dashboard data is loading or unavailable. Shared tab headers use a notification bell on a pale circle beside the dark profile circle, with an outlined/read and filled/unread state, a capped unread badge, and accessible notification counts.
 
+
+### Expanded Manage workspace
+
+The native Manage overview now links to focused member, invite, house, recognition-category, and paginated admin-activity screens. Member controls open on tap instead of expanding every member inline. Existing web APIs and schemas remain authoritative; advanced organization tools retain the web handoff. See [Mobile Manage workspace](./mobile-manage.md) for permissions, cache ownership, and preview checks.
