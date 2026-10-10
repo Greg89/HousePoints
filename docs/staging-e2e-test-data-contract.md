@@ -135,6 +135,13 @@ The staging E2E organization should contain:
 - the primary E2E user with permission to award points;
 - the configured target member with a stable display name.
 
+Award smokes support both the legacy trait picker and the recognition-category
+picker. Both the happy-path and reaction-notification smoke select the exact
+active name in the staging GitHub Environment variable
+`E2E_RECOGNITION_CATEGORY_NAME`, defaulting to `Collaboration` when unset. Keep
+that category active, or set the variable to another active category if the
+default has been renamed or archived.
+
 ## Mobile Maestro Actor
 
 The mobile staging smoke uses separate GitHub Environment secrets so native
@@ -165,13 +172,17 @@ when either actor is missing so permission regressions cannot silently pass.
 Dedicated owner/admin/member smoke coverage is intentionally split by actor:
 
 - Primary member actor: dashboard read path and member-level point award access.
-- Admin actor: all six Manage destinations remain visible, with Members and Audit enabled and owner-only destinations focusable but unavailable.
-- Owner actor: all six Manage destinations are enabled.
+- Admin actor: the six core Manage destinations remain visible, with Members and Audit enabled and owner-only destinations focusable but unavailable. When the web recognition rollout is enabled, Recognition is a seventh, accessible read-only destination with no category-creation control.
+- Owner actor: the six core Manage destinations are enabled, plus Recognition with category-management controls when the web recognition rollout is enabled.
 
 The admin and owner credentials remain optional for local development, but both are required in
 the staging GitHub Environment. The Manage workspace suite also verifies deep-link URL state,
 refresh and browser history, member filtering and detail-sheet focus restoration, Audit modes,
 owner tool sheets, and the admin mobile picker without submitting mutations.
+Desktop tabs and the mobile picker assert the complete destination set in both
+rollout modes, rather than requiring six destinations after Recognition ships.
+Local selector regression coverage can run without staging credentials or an app
+server: `npm run test:e2e -w @housepoints/web -- support-contract.spec.ts`.
 
 ## Reversible Team Mutation Coverage
 

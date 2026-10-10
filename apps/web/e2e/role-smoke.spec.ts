@@ -8,6 +8,7 @@ import {
 import { signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
 import { gotoE2EStart } from "./support/navigation";
+import { expectManageWorkspaceContract } from "./support/manage";
 
 const missingEnv = missingRequiredEnv(requiredDashboardSmokeEnv);
 
@@ -39,16 +40,19 @@ test("admin role can reach admin sections but not owner-only tabs", async ({ pag
   await page.getByRole("tab", { name: /manage/i }).click();
   const manageSections = page.getByRole("navigation", { name: /manage sections/i });
   await expect(manageSections).toBeVisible();
+  const recognitionEnabled = await expectManageWorkspaceContract(manageSections);
 
   await expect(manageSections.getByRole("tab", { name: /^overview$/i })).toBeEnabled();
   await expect(manageSections.getByRole("tab", { name: /^members$/i })).toBeEnabled();
   await expect(manageSections.getByRole("tab", { name: /^audit$/i })).toBeEnabled();
+  if (recognitionEnabled) {
+    await expect(manageSections.getByRole("tab", { name: "Recognition", exact: true })).toHaveAttribute("aria-disabled", "false");
+  }
 
   for (const ownerOnlyTab of [/^houses\b/i, /^seasons\b/i, /^organization\b/i]) {
     await expectOwnerOnlyTabBlockedForAdmin(page, manageSections, ownerOnlyTab);
   }
 
-  await expect(manageSections.getByRole("tab")).toHaveCount(6);
   await expect(manageSections.getByRole("tab", { name: /^roles$/i })).toHaveCount(0);
   await expect(manageSections.getByRole("tab", { name: /^settings$/i })).toHaveCount(0);
 });
@@ -65,6 +69,10 @@ test("owner role can reach owner-only manage tabs", async ({ page }) => {
   await page.getByRole("tab", { name: /manage/i }).click();
   const manageSections = page.getByRole("navigation", { name: /manage sections/i });
   await expect(manageSections).toBeVisible();
+  const recognitionEnabled = await expectManageWorkspaceContract(manageSections);
+  if (recognitionEnabled) {
+    await expect(manageSections.getByRole("tab", { name: "Recognition", exact: true })).toHaveAttribute("aria-disabled", "false");
+  }
 
   for (const ownerOnlyTab of [/^houses$/i, /^seasons$/i, /^organization$/i]) {
     const tab = manageSections.getByRole("tab", { name: ownerOnlyTab });
@@ -72,7 +80,6 @@ test("owner role can reach owner-only manage tabs", async ({ page }) => {
     await expect(tab).toHaveAttribute("aria-disabled", "false");
   }
 
-  await expect(manageSections.getByRole("tab")).toHaveCount(6);
 });
 
 async function expectOwnerOnlyTabBlockedForAdmin(page: Page, manageSections: Locator, name: RegExp) {

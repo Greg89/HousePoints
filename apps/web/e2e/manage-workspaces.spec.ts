@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   missingRequiredEnv,
   readE2EAdminCredentials,
@@ -8,7 +8,7 @@ import {
 } from "./support/config";
 import { exactNamePattern, signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
-import { openManage } from "./support/manage";
+import { expectManageWorkspaceContract, openManage } from "./support/manage";
 
 const missingEnv = missingRequiredEnv(requiredManageEnv);
 
@@ -21,8 +21,17 @@ test("admin can use shared workspaces while owner-only destinations stay underst
   await openManage(page, readE2EAdminCredentials()!);
 
   const navigation = page.getByRole("navigation", { name: "Manage sections" });
-  await expectWorkspaceContract(navigation);
+  const recognitionEnabled = await expectManageWorkspaceContract(navigation);
   await expect(page.getByRole("region", { name: "Manage overview" })).toBeVisible();
+
+  if (recognitionEnabled) {
+    const recognition = navigation.getByRole("tab", { name: "Recognition", exact: true });
+    await expect(recognition).toHaveAttribute("aria-disabled", "false");
+    await recognition.click();
+    await expect(page.getByRole("region", { name: "Active categories" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add category", exact: true })).toHaveCount(0);
+    await navigation.getByRole("tab", { name: "Overview", exact: true }).click();
+  }
 
   for (const name of ["Houses", "Seasons", "Organization"]) {
     const destination = navigation.getByRole("tab", { name: workspaceNamePattern(name) });
@@ -65,7 +74,14 @@ test("owner can traverse every workspace, preserve URLs, and open focused tools 
   await openManage(page, ownerCredentials);
 
   const navigation = page.getByRole("navigation", { name: "Manage sections" });
-  await expectWorkspaceContract(navigation);
+  const recognitionEnabled = await expectManageWorkspaceContract(navigation);
+
+  if (recognitionEnabled) {
+    await navigation.getByRole("tab", { name: "Recognition", exact: true }).click();
+    await expect(page).toHaveURL(/[?&]manage=recognition(?:&|$)/);
+    await expect(page.getByRole("region", { name: "Active categories" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add category", exact: true })).toBeVisible();
+  }
 
   await navigation.getByRole("tab", { name: "Members" }).click();
   await expect(page.getByRole("heading", { name: "Members", level: 2 })).toBeVisible();
@@ -117,7 +133,13 @@ test("admin mobile picker keeps owner-only workspaces visible and disabled", asy
 
   const picker = page.getByRole("combobox", { name: "Manage sections" });
   await expect(picker).toBeVisible();
-  await expect(picker.getByRole("option")).toHaveCount(6);
+  const recognitionEnabled = await expectManageWorkspaceContract(picker, "option");
+
+  if (recognitionEnabled) {
+    await expect(picker.getByRole("option", { name: "Recognition", exact: true })).toBeEnabled();
+    await picker.selectOption("recognition");
+    await expect(page.getByRole("region", { name: "Active categories" })).toBeVisible();
+  }
 
   for (const label of ["Houses (Owner only)", "Seasons (Owner only)", "Organization (Owner only)"]) {
     await expect(picker.getByRole("option", { name: label })).toBeDisabled();
@@ -127,15 +149,6 @@ test("admin mobile picker keeps owner-only workspaces visible and disabled", asy
   await expect(page.getByRole("heading", { name: "Members", level: 2 })).toBeVisible();
   await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
 });
-
-async function expectWorkspaceContract(navigation: Locator) {
-  const tabs = navigation.getByRole("tab");
-  await expect(tabs).toHaveCount(6);
-  for (const name of ["Overview", "Members", "Houses", "Seasons", "Organization", "Audit"]) {
-    await expect(navigation.getByRole("tab", { name: workspaceNamePattern(name) })).toBeVisible();
-  }
-  await expect(navigation.getByRole("tab", { name: /^(Roles|Settings)$/i })).toHaveCount(0);
-}
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
