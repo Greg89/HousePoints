@@ -204,7 +204,18 @@ Estimate hosting at realistic member/activity levels; propose Standard price and
 
 Done when each unresolved item has a recommendation, evidence, and owner decision needed before implementation. Time-box discovery to producing this record, not building a generic billing framework.
 
-Draft status: a decision-record skeleton has been drafted at [B1 decision record (draft)](./b1-decision-record.md) that turns every open item from the billing design into a numbered section with a recommendation, an evidence requirement, and a specific owner sign-off. It does not commit to a price, provider, or hosting cost — those require primary-source evidence gathered during the spike. B1 remains "prepared, not decided" until every acceptance-checklist item in that record has a documented owner decision.
+Research status: [B1 decision record](./b1-decision-record.md) contains an
+official-source comparison for Stripe, Paddle, Apple, and Google Play. The
+owner has selected a U.S.-only launch, a U.S. seller entity, USD, a 21–50
+initial Plus band, Stripe as the B2 sandbox candidate, a 30-day price-change
+notice, immediate provider-native proration, the archive/exception policies,
+and the Limited-mode endpoint matrix. iOS may link to web billing; Google
+Play is limited to non-clickable billing information. A staging cost
+measurement plan is documented but has not been run. Representative hosting
+telemetry and prices remain unavailable, and seller-specific provider
+fees/tax obligations still need confirmation. B1 remains "prepared, not
+decided" until every open item in its acceptance checklist is resolved; no
+production billing is authorized.
 
 ### B2 — Prove the lifecycle in an isolated sandbox
 
