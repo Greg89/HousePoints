@@ -19,6 +19,7 @@ import { SeasonScopeError, mapSeason } from "../season-scope.js";
 import { parseBody, requireActor, requireAdminActor, requireOwnerActor } from "../route-helpers.js";
 import { info, warn } from "../logging.js";
 import {
+  buildSeasonRecapNotificationData,
   buildSeasonStartedNotificationData,
   dispatchPushForNotifications,
   type NotificationRow,
@@ -342,8 +343,12 @@ export async function startSeasonTransaction(
       },
       select: { user: { select: { id: true } } },
     });
+    const { slug: organizationSlug } = await tx.organization.findUniqueOrThrow({
+      where: { id: actor.organizationId },
+      select: { slug: true },
+    });
 
-    const notificationRows: NotificationRow[] = notificationRecipients.map((recipient) =>
+    const notificationRows: NotificationRow[] = notificationRecipients.flatMap((recipient) => [
       buildSeasonStartedNotificationData({
         organizationId: actor.organizationId,
         recipientId: recipient.user.id,
@@ -351,7 +356,15 @@ export async function startSeasonTransaction(
         seasonName: activeSeason.name,
         seasonId: activeSeason.id,
         kickoffMessage: plan?.kickoffMessage,
-      }));
+      }),
+      buildSeasonRecapNotificationData({
+        organizationId: actor.organizationId,
+        recipientId: recipient.user.id,
+        organizationSlug,
+        seasonId: previousSeason.id,
+        seasonName: previousSeason.name,
+      }),
+    ]);
     if (notificationRows.length > 0) {
       await tx.notification.createMany({
         data: notificationRows,

@@ -66,10 +66,12 @@ Recommended initial types:
 | `INVITE_ACCEPTED` | Invite creator, admins, owners | `INFO` | Open Manage Team or Invite Activity |
 | `ROLE_CHANGED` | Target user and owners | `INFO` | Open Manage Team |
 | `SEASON_STARTED` | All org members | `INFO` | Open Overview |
+| `SEASON_RECAP` | All org members | `INFO` | Open the completed season report |
+| `SEASON_CORRECTION` | Active owners and admins | `INFO` | Open updated season results |
 | `POINT_AWARD_RECEIVED` | Target user | `INFO` | Open Activity |
 | `POINT_DEDUCTION_RECEIVED` | Target user and owners/admins | `ACTION_REQUIRED` or `WARNING` | Open Activity |
 
-Implemented types are `MEMBER_NEEDS_HOUSE_ASSIGNMENT`, `SEASON_STARTED`, `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, and `ROLE_CHANGED`. Other types are listed so the model does not paint us into a corner.
+Implemented types include `MEMBER_NEEDS_HOUSE_ASSIGNMENT`, `SEASON_STARTED`, `SEASON_RECAP`, `SEASON_CORRECTION`, `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, and `ROLE_CHANGED`. Season recap and correction notices are in-app only; neither is currently eligible for push delivery.
 
 ---
 
@@ -110,6 +112,8 @@ enum NotificationType {
   INVITE_ACCEPTED
   ROLE_CHANGED
   SEASON_STARTED
+  SEASON_RECAP
+  SEASON_CORRECTION
   POINT_AWARD_RECEIVED
   POINT_DEDUCTION_RECEIVED
 }
@@ -362,15 +366,17 @@ Status: implemented.
 
 ### Phase 5 - Additional Notification Types
 
-Add more types only after the first workflow feels useful:
+Current season notification producers:
 
 - Point award received
 - Point deduction received
 - Season started
+- Season recap
+- Season results changed after correction
 - Role changed
 - Org settings changed
 
-Status: implemented for the currently selected producers. `SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. Org settings changes remain a deferred producer rather than incomplete MVP work.
+`SEASON_STARTED` is implemented as an org-wide `INFO` notification created inside the season-start transaction. It uses deterministic per-recipient dedupe keys and links to Overview. On rollover, `SEASON_RECAP` links to the just-closed season's organization-scoped report without embedding a winner claim. Closed-season corrections that change the winning house set create a transactionally persisted, deduplicated `SEASON_CORRECTION` notice for active owners/admins. Neither new season report notice is pushable. Org settings changes remain deferred.
 
 `POINT_AWARD_RECEIVED` is implemented as a targeted `INFO` notification created inside the point-award transaction. It notifies the recipient and links to Activity. Self-awards are rejected before a transaction or notification is created.
 
@@ -382,7 +388,7 @@ Status: implemented for the currently selected producers. `SEASON_STARTED` is im
 
 The compact notification menu is an inbox, not a permanent history view:
 
-- Informational and warning notifications are archived when marked read: `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, and `RELEASE_ANNOUNCEMENT`.
+- Informational and warning notifications are archived when marked read: `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `SEASON_RECAP`, `SEASON_CORRECTION`, `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, and `RELEASE_ANNOUNCEMENT`.
 - `MEMBER_NEEDS_HOUSE_ASSIGNMENT` remains visible after a manual mark-read because the underlying work can still be outstanding. It is marked read and archived automatically when the member is assigned to a house.
 - The menu has a viewport-bounded, vertically scrollable feed for notification backlogs.
 

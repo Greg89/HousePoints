@@ -372,6 +372,7 @@ async function testClosedSeasonCorrections() {
     assert.equal(await revision(f.org.id), before);
     assert.equal((await prisma.pointTransaction.findUniqueOrThrow({ where: { id: point.id } })).deletedAt, null);
     assert.equal(await prisma.auditEvent.count({ where: { organizationId: f.org.id, eventType: "POINT_DELETED" } }), 0);
+    assert.equal(await prisma.notification.count({ where: { organizationId: f.org.id, type: "SEASON_CORRECTION" } }), 0);
     const corrected = await softDeleteTransaction({ ...params, deletionReason: "  Duplicate record  " });
     assert.equal(await total(), 0);
     assert.equal(corrected.deletionReason, "Duplicate record");
@@ -388,6 +389,16 @@ async function testClosedSeasonCorrections() {
     assert.equal(metadata.scoreContributionAfter, 0);
     assert.equal(metadata.scoreChange, -delta);
     assert.equal(metadata.reportingRevision, (before + 1n).toString());
+    const correctionNotifications = await prisma.notification.findMany({
+      where: { organizationId: f.org.id, type: "SEASON_CORRECTION" },
+      orderBy: { recipientUserId: "asc" },
+    });
+    assert.equal(correctionNotifications.length, 4);
+    assert(correctionNotifications.every(row =>
+      row.actionHref === `/o/${f.org.slug}/reports?season=${f.season.id}` &&
+      row.body.includes("No winner") &&
+      row.entityId === f.season.id
+    ));
   }
   const f = await fixture();
   const point = await createPointAward(f.award());

@@ -5,6 +5,8 @@ import {
   buildPointAwardNotificationData,
   buildPointDeductionNotificationData,
   buildPointReactionNotificationData,
+  buildSeasonCorrectionNotificationData,
+  buildSeasonRecapNotificationData,
   buildSeasonStartedNotificationData,
   buildRoleChangedNotificationData,
   buildMemberNeedsAssignmentNotificationData,
@@ -245,6 +247,44 @@ describe("buildSeasonStartedNotificationData", () => {
   it("sets recipientUserId from recipientId", () => {
     const result = buildSeasonStartedNotificationData(base);
     expect(result.recipientUserId).toBe("user-3");
+  });
+});
+
+describe("season report notifications", () => {
+  it("links a season recap to the completed season report without embedding a winner", () => {
+    const result = buildSeasonRecapNotificationData({
+      organizationId: "org-1",
+      recipientId: "user-3",
+      organizationSlug: "acme team",
+      seasonId: "season-5",
+      seasonName: "Spring 2025",
+    });
+
+    expect(result.type).toBe("SEASON_RECAP");
+    expect(result.entityType).toBe("Season");
+    expect(result.entityId).toBe("season-5");
+    expect(result.actionHref).toBe("/o/acme%20team/reports?season=season-5");
+    expect(result.body).not.toMatch(/winner/i);
+    expect(result.dedupeKey).toBe("season-recap:org-1:season-5");
+  });
+
+  it("identifies a changed winner set and deduplicates by correction", () => {
+    const result = buildSeasonCorrectionNotificationData({
+      organizationId: "org-1",
+      recipientId: "user-3",
+      organizationSlug: "acme",
+      seasonId: "season-5",
+      seasonName: "Spring 2025",
+      transactionId: "transaction-8",
+      previousWinners: ["Phoenix", "Falcon"],
+      currentWinners: [],
+    });
+
+    expect(result.type).toBe("SEASON_CORRECTION");
+    expect(result.severity).toBe("INFO");
+    expect(result.body).toContain("Phoenix, Falcon to No winner");
+    expect(result.actionHref).toBe("/o/acme/reports?season=season-5");
+    expect(result.dedupeKey).toBe("season-correction:org-1:season-5:transaction-8");
   });
 });
 

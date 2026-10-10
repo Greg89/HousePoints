@@ -172,7 +172,7 @@ One draft per organization: name, optional message/planned dates, timezone, read
 
 Done when owner/admin permissions, timezone edge cases, draft conflicts, and past-planned-end messaging are tested. Existing start remains available until S2 connects the draft flow.
 
-Status: **implementation complete and locally verified October 9, 2026**. Workspace tests, typecheck, lint, and production build pass. Database integration validation is still pending: the configured integration database is missing the existing `Organization.reportingRevision` column and is not clearly a disposable local test database, so it was not migrated or modified. No shared or production migration was applied.
+Status: **implementation complete and locally verified October 9, 2026**. Workspace tests, typecheck, lint, production build, and PostgreSQL integration tests pass against a fresh disposable local PostgreSQL 16 container. No shared or production database was migrated or modified.
 
 ### S2 — Start the prepared season atomically
 
@@ -182,7 +182,7 @@ Add expected-active-season/plan-version checks and idempotent kickoff. Close the
 
 Done when double-click/retry produces one transition, simultaneous award/start is correct, stale plans conflict, and rollback preserves the original active season and draft. No scheduler or standalone close.
 
-Status: **implementation complete and locally verified October 9, 2026**. Full workspace tests, typecheck, lint, and production build pass. Real-database integration tests are implemented and typechecked but have not been executed: the configured integration database is missing the existing `Organization.reportingRevision` column and is not clearly disposable, so it was not migrated or modified. No shared or production migration was applied.
+Status: **implementation complete and locally verified October 9, 2026**. Full workspace tests, typecheck, lint, production build, and PostgreSQL integration tests pass against a fresh disposable local PostgreSQL 16 container. No shared or production database was migrated or modified.
 
 ### S3 — Connect season recap, comparison, and correction notices
 
@@ -191,6 +191,8 @@ Dependencies: S2, R4, F3. Surfaces: Overview/season reports, recap notification 
 Use the same reporting service for closed-season totals, co-winners, contributions, and comparisons. Connect recap notices to the actual organization/season rather than embedding an immutable winner claim. Surface correction disclosure and send a deduplicated owner/admin informational notice when a correction changes the winning set.
 
 Done when kickoff → old-season recap → drill-through and later correction → updated winner/report are verified end to end. Update prior season/winner/comparison docs to match implemented behavior.
+
+Status: **implementation complete and locally verified October 9, 2026**. All 1,187 workspace tests, typecheck, lint, production build, database/API integration tests, and reporting integration tests pass. The new notification enum migration has been applied only to a fresh disposable local PostgreSQL 16 container; it has not been applied to a shared or production environment.
 
 ## B — Billing spike (current commitment)
 

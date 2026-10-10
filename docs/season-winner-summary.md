@@ -35,8 +35,8 @@ Out of scope:
 
 - Use `PointTransaction` rows for the selected season where `deletedAt` is null.
 - Include both awards and deductions in final house totals.
-- Winning house is highest final point total.
-- Ties sort by house name ascending for stable display.
+- All houses tied at the highest final point total are co-winners; name ordering is for stable display only and does not break ties.
+- An empty season has no winner.
 - Top contributor is the user with the highest received point total in the selected season.
 - Active seasons return `null` for the recap. They are still in progress.
 

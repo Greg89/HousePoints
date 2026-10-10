@@ -115,6 +115,9 @@ function ScopedReportsView({
       seasonContext.activeSeason,
     [seasonContext, seasonId],
   );
+  const seasonWinners = leaderboard.filter(
+    (house) => house.rank === 1 && house.transactions > 0,
+  );
 
   const selectedHouse = useMemo(() => {
     if (!houseId) return null;
@@ -273,6 +276,28 @@ function ScopedReportsView({
           buildHref={buildHref}
         />
       </header>
+
+      {!selectedSeason.isActive ? (
+        <section
+          aria-label="Season recap"
+          className="rounded-xl border bg-card p-5"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Final standings
+          </p>
+          {seasonWinners.length > 0 ? (
+            <p className="mt-2 text-lg font-semibold text-foreground">
+              {seasonWinners.length === 1 ? "Winner: " : "Co-winners: "}
+              {seasonWinners.map((house) => house.name).join(", ")}
+            </p>
+          ) : (
+            <p className="mt-2 text-lg font-semibold text-foreground">No winner</p>
+          )}
+          <p className="mt-2 text-sm text-muted-foreground">
+            Results reflect recorded corrections and may change if further authorized corrections are made.
+          </p>
+        </section>
+      ) : null}
 
       {(selectedHouse || selectedMember || selectedCategory || selectedGiver || type) ? (
         <ScopeChips

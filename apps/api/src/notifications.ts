@@ -196,6 +196,56 @@ export function buildSeasonStartedNotificationData(input: {
   };
 }
 
+export function buildSeasonRecapNotificationData(input: {
+  organizationId: string;
+  recipientId: string;
+  organizationSlug: string;
+  seasonId: string;
+  seasonName: string;
+}): NotificationRow {
+  return {
+    organizationId: input.organizationId,
+    recipientUserId: input.recipientId,
+    type: "SEASON_RECAP",
+    severity: "INFO",
+    title: "Season results are ready",
+    body: `${input.seasonName} has ended. Review the season report for current standings and contributions; recorded corrections may change the results.`,
+    actionLabel: "View season report",
+    actionHref: `/o/${encodeURIComponent(input.organizationSlug)}/reports?season=${encodeURIComponent(input.seasonId)}`,
+    entityType: "Season",
+    entityId: input.seasonId,
+    dedupeKey: `season-recap:${input.organizationId}:${input.seasonId}`,
+  };
+}
+
+export function buildSeasonCorrectionNotificationData(input: {
+  organizationId: string;
+  recipientId: string;
+  organizationSlug: string;
+  seasonId: string;
+  seasonName: string;
+  transactionId: string;
+  previousWinners: string[];
+  currentWinners: string[];
+}): NotificationRow {
+  const describeWinners = (winners: string[]) => winners.length > 0
+    ? winners.join(", ")
+    : "No winner";
+  return {
+    organizationId: input.organizationId,
+    recipientUserId: input.recipientId,
+    type: "SEASON_CORRECTION",
+    severity: "INFO",
+    title: "Season results changed",
+    body: `A recorded correction changed the winning houses for ${input.seasonName}: ${describeWinners(input.previousWinners)} to ${describeWinners(input.currentWinners)}.`,
+    actionLabel: "Review updated results",
+    actionHref: `/o/${encodeURIComponent(input.organizationSlug)}/reports?season=${encodeURIComponent(input.seasonId)}`,
+    entityType: "Season",
+    entityId: input.seasonId,
+    dedupeKey: `season-correction:${input.organizationId}:${input.seasonId}:${input.transactionId}`,
+  };
+}
+
 export function buildRoleChangedNotificationData(input: {
   organizationId: string;
   recipientId: string;

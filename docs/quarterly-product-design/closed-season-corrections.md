@@ -22,13 +22,13 @@ The point's deletion timestamp and audit timestamp use the same database clock r
 
 Removing a +5 award changes its contribution from +5 to zero; removing a -10 deduction changes it from -10 to zero. This is not a new deduction against a historical season. Failure to persist the audit rolls back the deletion and revision.
 
-Audit history labels new closed-season events as corrections and displays their reasons and score contributions. Historical reports explain that totals and winners reflect recorded corrections and may change. Old audit records continue to render without the new metadata; no history is fabricated or backfilled. Final co-winner-change notifications remain part of S3 after the ranking work.
+Audit history labels new closed-season events as corrections and displays their reasons and score contributions. Historical reports explain that totals and winners reflect recorded corrections and may change. Old audit records continue to render without the new metadata; no history is fabricated or backfilled. S3 now sends a deduplicated informational notification to active owners/admins when a closed-season correction changes the winning house set; the correction, audit, revision, and notification are persisted transactionally.
 
 Platform moderation remains its separate privileged review workflow: it already requires an operator note and atomically retains that note with its report and platform audit, while the organization ledger receives its existing public moderation reason. F3 does not expose private operator notes in organization audit views or change moderation permissions.
 
 ## Release and rollback
 
-This slice requires F1's reporting revision migration and locking protocol. It introduces no new schema migration, environment variables, secrets, feature flags, or native mobile changes. The reason field already exists in the API contract.
+This slice requires F1's reporting revision migration and locking protocol. S3 adds the notification enum migration [`20261009160000_season_recap_correction_notifications`](../../packages/db/prisma/migrations/20261009160000_season_recap_correction_notifications/migration.sql). It introduces no new environment variables, secrets, feature flags, or native mobile changes. The reason field already exists in the API contract.
 
 Deploy the updated web confirmation before, or together with, the API enforcement. Older web clients can still delete active-season records, but their reasonless closed-season requests will receive the new typed validation response until refreshed. The new web client remains compatible with the preceding API. Rolling back the API removes the server-side requirement; audit metadata already written remains readable by older code. Do not alter historical records during rollback.
 
@@ -36,6 +36,6 @@ Deploy the updated web confirmation before, or together with, the API enforcemen
 
 API tests cover missing/blank reasons, unchanged active-season behavior, member rejection, organization isolation, and audit metadata. Web tests cover required reason validation, trimming, error/draft recovery, season-closure recovery, cancellation, and audit/historical labels.
 
-Real PostgreSQL tests cover corrections of both awards and deductions, changed historical totals, atomic revision/audit evidence, and a rollover ordered before a reasonless correction. A fixture-scoped database constraint deliberately rejects audit persistence after the ledger update to prove that the entire correction rolls back. The constraint is removed in a finally block.
+Real PostgreSQL tests cover corrections of both awards and deductions, changed historical totals, atomic revision/audit evidence, winner-set notifications, and a rollover ordered before a reasonless correction. A fixture-scoped database constraint deliberately rejects audit persistence after the ledger update to prove that the entire correction rolls back. The constraint is removed in a finally block.
 
-Local verification passed on September 26, 2026: root typecheck, all 1,015 unit/component tests, coverage thresholds, production build, API/web lint, and the PostgreSQL 16 ledger/concurrency integration suite. Database verification used a disposable local container; no staging or production migrations were applied.
+F3 local verification passed on September 26, 2026: root typecheck, all 1,015 unit/component tests, coverage thresholds, production build, API/web lint, and the PostgreSQL 16 ledger/concurrency integration suite. S3 unit/route/report tests, root typecheck, production build, lint, database/API integration suite, and reporting integration suite pass October 9, 2026 against a fresh disposable local PostgreSQL 16 container. No staging or production databases were migrated or modified.

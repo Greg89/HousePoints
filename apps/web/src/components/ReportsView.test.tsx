@@ -198,6 +198,52 @@ describe("ReportsView", () => {
     expect(screen.getByText(/No transactions match this view yet/i)).toBeInTheDocument();
   });
 
+  it("shows historical winners and discloses that recorded corrections can change results", () => {
+    render(
+      <ReportsView
+        {...baseProps}
+        seasonId="season-0"
+        initialResult={makeSuccess([], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    const recap = screen.getByRole("region", { name: "Season recap" });
+    expect(within(recap).getByText("Winner: Slytherin")).toBeInTheDocument();
+    expect(recap).toHaveTextContent(/reflect recorded corrections/i);
+    expect(recap).toHaveTextContent(/may change/i);
+  });
+
+  it("does not name a winner for an empty historical season", () => {
+    render(
+      <ReportsView
+        {...baseProps}
+        seasonId="season-0"
+        leaderboard={leaderboard.map((house) => ({ ...house, transactions: 0 }))}
+        initialResult={makeSuccess([], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "Season recap" })).toHaveTextContent("No winner");
+  });
+
+  it("shows every house tied for the historical season lead", () => {
+    render(
+      <ReportsView
+        {...baseProps}
+        seasonId="season-0"
+        leaderboard={leaderboard.map((house) => ({ ...house, rank: 1 }))}
+        initialResult={makeSuccess([], null)}
+        onLoadReport={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "Season recap" })).toHaveTextContent(
+      "Co-winners: Slytherin, Gryffindor",
+    );
+  });
+
   it("shows house recipients and links each to the member scope", () => {
     const onLoadReport = vi.fn();
     render(

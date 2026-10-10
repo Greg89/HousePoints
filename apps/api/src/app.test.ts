@@ -374,7 +374,7 @@ const makeActorMembership = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(prisma.organization.findUniqueOrThrow).mockResolvedValue({ reportingRevision: 2n } as never);
+  vi.mocked(prisma.organization.findUniqueOrThrow).mockResolvedValue({ reportingRevision: 2n, slug: "acme" } as never);
   vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "org-1", now: new Date() }]);
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
@@ -2078,6 +2078,98 @@ describe("POST /points/delete", () => {
     await app.close();
   });
 
+  it("notifies active owners and admins when a closed-season correction changes winners", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-1",
+      deletedAt: null,
+      delta: 15,
+      targetHouseId: "house-1",
+      season: { id: "season-closed", name: "Q2", isActive: false, endsAt: new Date() },
+    });
+    mockTxGroupBy.mockResolvedValue([
+      { targetHouseId: "house-1", _sum: { delta: 15 }, _count: { _all: 1 } },
+      { targetHouseId: "house-2", _sum: { delta: 10 }, _count: { _all: 1 } },
+    ]);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix" },
+      { id: "house-2", name: "Falcon" },
+    ]);
+    mockTxUpdate.mockResolvedValue(deletedPoint);
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "owner-1" } },
+      { user: { id: "admin-1" } },
+    ]);
+    const app = await buildTestApp("auth0|admin");
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1", reason: "Duplicate award" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        isActive: true,
+        archivedAt: null,
+        role: { in: ["OWNER", "ADMIN"] },
+      },
+      select: { user: { select: { id: true } } },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          recipientUserId: "owner-1",
+          type: "SEASON_CORRECTION",
+          body: expect.stringContaining("Phoenix to Falcon"),
+          actionHref: "/o/acme/reports?season=season-closed",
+          dedupeKey: "season-correction:org-1:season-closed:tx-1",
+        }),
+        expect.objectContaining({
+          recipientUserId: "admin-1",
+          type: "SEASON_CORRECTION",
+        }),
+      ]),
+      skipDuplicates: true,
+    });
+    await app.close();
+  });
+
+  it("does not notify when a closed-season correction preserves the winner set", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-1",
+      deletedAt: null,
+      delta: 5,
+      targetHouseId: "house-1",
+      season: { id: "season-closed", name: "Q2", isActive: false, endsAt: new Date() },
+    });
+    mockTxGroupBy.mockResolvedValue([
+      { targetHouseId: "house-1", _sum: { delta: 20 }, _count: { _all: 2 } },
+      { targetHouseId: "house-2", _sum: { delta: 10 }, _count: { _all: 1 } },
+    ]);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix" },
+      { id: "house-2", name: "Falcon" },
+    ]);
+    mockTxUpdate.mockResolvedValue(deletedPoint);
+    const app = await buildTestApp("auth0|admin");
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1", reason: "Duplicate award" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("does not reveal transactions from another organization", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockTxFindUnique.mockResolvedValue({
@@ -2664,6 +2756,19 @@ describe("POST /seasons/start", () => {
         },
         {
           organizationId: "org-secure",
+          recipientUserId: "user-owner",
+          type: "SEASON_RECAP",
+          severity: "INFO",
+          title: "Season results are ready",
+          body: "Q3 2026 has ended. Review the season report for current standings and contributions; recorded corrections may change the results.",
+          actionLabel: "View season report",
+          actionHref: "/o/acme/reports?season=season-active",
+          entityType: "Season",
+          entityId: "season-active",
+          dedupeKey: "season-recap:org-secure:season-active",
+        },
+        {
+          organizationId: "org-secure",
           recipientUserId: "user-admin",
           type: "SEASON_STARTED",
           severity: "INFO",
@@ -2677,6 +2782,19 @@ describe("POST /seasons/start", () => {
         },
         {
           organizationId: "org-secure",
+          recipientUserId: "user-admin",
+          type: "SEASON_RECAP",
+          severity: "INFO",
+          title: "Season results are ready",
+          body: "Q3 2026 has ended. Review the season report for current standings and contributions; recorded corrections may change the results.",
+          actionLabel: "View season report",
+          actionHref: "/o/acme/reports?season=season-active",
+          entityType: "Season",
+          entityId: "season-active",
+          dedupeKey: "season-recap:org-secure:season-active",
+        },
+        {
+          organizationId: "org-secure",
           recipientUserId: "user-member",
           type: "SEASON_STARTED",
           severity: "INFO",
@@ -2687,6 +2805,19 @@ describe("POST /seasons/start", () => {
           entityType: "Season",
           entityId: "season-next",
           dedupeKey: "season-started:org-secure:season-next",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-member",
+          type: "SEASON_RECAP",
+          severity: "INFO",
+          title: "Season results are ready",
+          body: "Q3 2026 has ended. Review the season report for current standings and contributions; recorded corrections may change the results.",
+          actionLabel: "View season report",
+          actionHref: "/o/acme/reports?season=season-active",
+          entityType: "Season",
+          entityId: "season-active",
+          dedupeKey: "season-recap:org-secure:season-active",
         },
       ],
       skipDuplicates: true,
@@ -2877,10 +3008,10 @@ describe("Season planning", () => {
       }),
     }));
     expect(mockNotificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({
+      data: expect.arrayContaining([expect.objectContaining({
         body: "Olivia started Winter 2027. House standings and leaderboards now use the new season.\n\nWelcome to the next season.",
         entityId: nextSeason.id,
-      })],
+      })]),
       skipDuplicates: true,
     }));
     expect(mockSeasonPlanDelete).toHaveBeenCalledWith({ where: { id: plan.id } });

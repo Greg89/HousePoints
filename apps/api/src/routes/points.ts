@@ -6,6 +6,7 @@ import {
   deletePointTransactionSchema,
   deductPointsSchema,
   POINT_REACTION_LABELS,
+  scoreWinners,
   pointReactionDetailsRequestSchema,
   pointReactionDetailsResponseSchema,
   pointReactionResponseSchema,
@@ -21,6 +22,7 @@ import { activeScoringSeason, scoringWriteTime, ScoringWriteError, withScoringWr
 import { info, warn } from "../logging.js";
 import { parseBody, requireActor, requireAdminActor, resolveSeasonOrReject } from "../route-helpers.js";
 import {
+  buildSeasonCorrectionNotificationData,
   buildPointAwardNotificationData,
   buildPointDeductionNotificationData,
   buildPointReactionNotificationData,
@@ -756,7 +758,13 @@ export async function softDeleteTransaction(params: {
   return withScoringWrite(params.organizationId, async (tx) => {
     const existing = await tx.pointTransaction.findUnique({
       where: { id: params.transactionId },
-      select: { organizationId: true, deletedAt: true, season: { select: { id: true, name: true, isActive: true, endsAt: true } } },
+      select: {
+        organizationId: true,
+        deletedAt: true,
+        delta: true,
+        targetHouseId: true,
+        season: { select: { id: true, name: true, isActive: true, endsAt: true } },
+      },
     });
     if (!existing || existing.organizationId !== params.organizationId) throw new ScoringWriteError(404, "POINT_TRANSACTION_NOT_FOUND", "Point transaction not found");
     if (existing.deletedAt) throw new ScoringWriteError(409, "POINT_TRANSACTION_ALREADY_DELETED", "Point transaction is already deleted");
@@ -764,6 +772,47 @@ export async function softDeleteTransaction(params: {
     const deletionReason = params.deletionReason?.trim() || null;
     if (isClosedSeason && !deletionReason) {
       throw new ScoringWriteError(422, "CORRECTION_REASON_REQUIRED", "A reason is required to correct points in a closed season.");
+    }
+    let correctionWinners: {
+      houses: Array<{ id: string; name: string }>;
+      previous: Array<{ id: string; name: string; points: number; rank: number }>;
+      current: Array<{ id: string; name: string; points: number; rank: number }>;
+    } | null = null;
+    if (isClosedSeason) {
+      const [houses, totals] = await Promise.all([
+        tx.house.findMany({
+          where: { organizationId: params.organizationId },
+          select: { id: true, name: true },
+        }),
+        tx.pointTransaction.groupBy({
+          by: ["targetHouseId"],
+          where: { organizationId: params.organizationId, seasonId: existing.season.id, deletedAt: null },
+          _sum: { delta: true },
+          _count: { _all: true },
+        }),
+      ]);
+      const pointsByHouse = new Map(totals.map((row) => [row.targetHouseId, row._sum.delta ?? 0]));
+      const transactionCount = totals.reduce((count, row) => count + row._count._all, 0);
+      const previous = scoreWinners(houses.map((house) => ({
+        id: house.id,
+        name: house.name,
+        points: pointsByHouse.get(house.id) ?? 0,
+      })), transactionCount);
+      pointsByHouse.set(
+        existing.targetHouseId,
+        (pointsByHouse.get(existing.targetHouseId) ?? 0) - existing.delta,
+      );
+      const current = scoreWinners(houses.map((house) => ({
+        id: house.id,
+        name: house.name,
+        points: pointsByHouse.get(house.id) ?? 0,
+      })), transactionCount - 1);
+      if (
+        previous.map((house) => house.id).sort().join(",") !==
+        current.map((house) => house.id).sort().join(",")
+      ) {
+        correctionWinners = { houses, previous, current };
+      }
     }
     const correctedAt = await scoringWriteTime(tx);
     const point = await tx.pointTransaction.update({
@@ -822,6 +871,42 @@ export async function softDeleteTransaction(params: {
         },
       },
     });
+
+    if (correctionWinners) {
+      const [organization, recipients] = await Promise.all([
+        tx.organization.findUniqueOrThrow({
+          where: { id: params.organizationId },
+          select: { slug: true },
+        }),
+        tx.organizationMembership.findMany({
+          where: {
+            organizationId: params.organizationId,
+            isActive: true,
+            archivedAt: null,
+            role: { in: ["OWNER", "ADMIN"] },
+          },
+          select: { user: { select: { id: true } } },
+        }),
+      ]);
+      const houseNames = new Map(correctionWinners.houses.map((house) => [house.id, house.name]));
+      const notificationRows = recipients.map((recipient) =>
+        buildSeasonCorrectionNotificationData({
+          organizationId: params.organizationId,
+          recipientId: recipient.user.id,
+          organizationSlug: organization.slug,
+          seasonId: existing.season.id,
+          seasonName: existing.season.name,
+          transactionId: point.id,
+          previousWinners: correctionWinners.previous.map((house) => houseNames.get(house.id) ?? house.name),
+          currentWinners: correctionWinners.current.map((house) => houseNames.get(house.id) ?? house.name),
+        }));
+      if (notificationRows.length > 0) {
+        await tx.notification.createMany({
+          data: notificationRows,
+          skipDuplicates: true,
+        });
+      }
+    }
 
     return point;
   });
