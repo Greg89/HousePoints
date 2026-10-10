@@ -220,9 +220,17 @@ server join endpoint after explicit confirmation.
 
 Activity reactions are also implemented using the current
 `/transactions/react` and `/transactions/reactions` contracts. Award rows
-provide a visible picker plus a long-press shortcut, update counts
-optimistically with rollback, and expose the server-backed reaction details.
-Deduction rows do not expose reaction controls.
+open an activity actions sheet on long press, with reaction choices followed by
+Report activity. The inline React and Report buttons are removed. Reaction counts
+still open server-backed reaction details; changes update optimistically with
+rollback. Deduction rows offer Report activity only. Screen readers can invoke
+the card's Activity actions accessibility action. Opening the sheet triggers
+best-effort light iOS feedback or Android long-press feedback via `expo-haptics`.
+New native builds are required to include this dependency; no environment changes
+are needed. Before release, increment the app version (the configured EAS runtime
+policy is `appVersion`) so this native dependency is not sent as an OTA update to
+older binaries. Verify long press, scrolling cancellation, feedback, and opening the
+report form from the sheet on iOS and Android devices before release.
 
 **Phase 3 — Admin subset**
 
