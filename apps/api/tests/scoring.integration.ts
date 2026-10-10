@@ -118,6 +118,104 @@ async function testRollover(awardFirst: boolean) {
   console.log(`PASS ordered award/rollover (${awardFirst ? "award first" : "rollover first"}) and failed rollover rollback`);
 }
 
+async function createSeasonPlan(f: Awaited<ReturnType<typeof fixture>>) {
+  const plannedEndsAt = new Date("2027-03-31T13:00:00.000Z");
+  const plan = await prisma.seasonPlan.create({
+    data: {
+      organizationId: f.org.id,
+      name: "Prepared next season",
+      kickoffMessage: "Welcome to the next season.",
+      plannedEndsAt,
+      timezone: "America/New_York",
+      version: 1,
+      createdById: f.actor(0).id,
+      updatedById: f.actor(0).id,
+    },
+  });
+  return {
+    plan,
+    request: {
+      expectedActiveSeasonId: f.season.id,
+      expectedPlanVersion: plan.version,
+      idempotencyKey: randomUUID(),
+    },
+  };
+}
+
+async function testPreparedKickoffAndRollback() {
+  const f = await fixture();
+  const { plan, request } = await createSeasonPlan(f);
+  const transition = await startSeasonTransaction(f.actor(0), null, request);
+  const retry = await startSeasonTransaction(f.actor(0), null, request);
+
+  assert.equal(retry.replayed, true);
+  assert.equal(retry.previousSeason.id, transition.previousSeason.id);
+  assert.equal(retry.activeSeason.id, transition.activeSeason.id);
+  assert.equal(transition.activeSeason.plannedEndsAt?.toISOString(), plan.plannedEndsAt?.toISOString());
+  assert.equal(transition.activeSeason.timezone, plan.timezone);
+  assert.equal(await prisma.seasonTransition.count({ where: { organizationId: f.org.id } }), 1);
+  assert.equal(await prisma.seasonPlan.count({ where: { organizationId: f.org.id } }), 0);
+  assert.equal(await prisma.season.count({ where: { organizationId: f.org.id, isActive: true } }), 1);
+  assert.equal(await prisma.notification.count({
+    where: { organizationId: f.org.id, body: { contains: plan.kickoffMessage! } },
+  }), 4);
+  assert.equal(await prisma.auditEvent.count({
+    where: { organizationId: f.org.id, eventType: "SEASON_STARTED" },
+  }), 1);
+
+  const rollbackFixture = await fixture();
+  const rollbackPlan = await createSeasonPlan(rollbackFixture);
+  assert.match(rollbackFixture.org.id, /^[a-z0-9]+$/i);
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Notification" ADD CONSTRAINT "s2_reject_kickoff_notification" CHECK ("organizationId" <> '${rollbackFixture.org.id}') NOT VALID`,
+  );
+  try {
+    await assert.rejects(startSeasonTransaction(rollbackFixture.actor(0), null, rollbackPlan.request));
+  } finally {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "Notification" DROP CONSTRAINT "s2_reject_kickoff_notification"',
+    );
+  }
+  assert.equal(await prisma.season.count({
+    where: { organizationId: rollbackFixture.org.id, isActive: true },
+  }), 1);
+  assert.equal(await prisma.season.count({ where: { organizationId: rollbackFixture.org.id } }), 1);
+  assert.equal(await prisma.seasonPlan.count({ where: { organizationId: rollbackFixture.org.id } }), 1);
+  assert.equal(await prisma.seasonTransition.count({ where: { organizationId: rollbackFixture.org.id } }), 0);
+  assert.equal(await prisma.auditEvent.count({ where: { organizationId: rollbackFixture.org.id } }), 0);
+  console.log("PASS prepared kickoff idempotency, announcement persistence, plan consumption and transaction rollback");
+}
+
+async function testPreparedRollover(awardFirst: boolean) {
+  const f = await fixture();
+  const { request } = await createSeasonPlan(f);
+  const lock = await holdLock(f.org.id);
+  let award!: ReturnType<typeof createPointAward>;
+  let rollover!: ReturnType<typeof startSeasonTransaction>;
+  try {
+    if (awardFirst) award = createPointAward(f.award());
+    else rollover = startSeasonTransaction(f.actor(0), null, request);
+    await waitForBlockedWrites(1);
+    if (awardFirst) rollover = startSeasonTransaction(f.actor(0), null, request);
+    else award = createPointAward(f.award());
+    await waitForBlockedWrites(2);
+  } finally {
+    lock.release();
+    await lock.done;
+  }
+
+  const [point, transition] = await Promise.all([award, rollover]);
+  assert.equal(point.seasonId, awardFirst ? f.season.id : transition.activeSeason.id);
+  assert.equal(transition.previousSeason.endsAt!.getTime(), transition.activeSeason.startsAt.getTime());
+  assert(awardFirst
+    ? point.createdAt <= transition.activeSeason.startsAt
+    : point.createdAt >= transition.activeSeason.startsAt);
+  assert.equal(await prisma.season.count({ where: { organizationId: f.org.id, isActive: true } }), 1);
+  assert.equal(await prisma.seasonTransition.count({ where: { organizationId: f.org.id } }), 1);
+  assert.equal(await prisma.seasonPlan.count({ where: { organizationId: f.org.id } }), 0);
+  console.log(`PASS ordered prepared kickoff/award (${awardFirst ? "award first" : "kickoff first"})`);
+}
+
 async function testRollbackAndDeletions() {
   const f = await fixture();
   const before = await revision(f.org.id);
@@ -274,6 +372,7 @@ async function testClosedSeasonCorrections() {
     assert.equal(await revision(f.org.id), before);
     assert.equal((await prisma.pointTransaction.findUniqueOrThrow({ where: { id: point.id } })).deletedAt, null);
     assert.equal(await prisma.auditEvent.count({ where: { organizationId: f.org.id, eventType: "POINT_DELETED" } }), 0);
+    assert.equal(await prisma.notification.count({ where: { organizationId: f.org.id, type: "SEASON_CORRECTION" } }), 0);
     const corrected = await softDeleteTransaction({ ...params, deletionReason: "  Duplicate record  " });
     assert.equal(await total(), 0);
     assert.equal(corrected.deletionReason, "Duplicate record");
@@ -290,6 +389,16 @@ async function testClosedSeasonCorrections() {
     assert.equal(metadata.scoreContributionAfter, 0);
     assert.equal(metadata.scoreChange, -delta);
     assert.equal(metadata.reportingRevision, (before + 1n).toString());
+    const correctionNotifications = await prisma.notification.findMany({
+      where: { organizationId: f.org.id, type: "SEASON_CORRECTION" },
+      orderBy: { recipientUserId: "asc" },
+    });
+    assert.equal(correctionNotifications.length, 4);
+    assert(correctionNotifications.every(row =>
+      row.actionHref === `/o/${f.org.slug}/reports?season=${f.season.id}` &&
+      row.body.includes("No winner") &&
+      row.entityId === f.season.id
+    ));
   }
   const f = await fixture();
   const point = await createPointAward(f.award());
@@ -411,6 +520,9 @@ try {
   await testDeductions(false);
   await testRollover(true);
   await testRollover(false);
+  await testPreparedKickoffAndRollback();
+  await testPreparedRollover(true);
+  await testPreparedRollover(false);
   await testRollbackAndDeletions();
   await testRevisionCoverage();
   await profileContention();
@@ -420,6 +532,7 @@ try {
   await prisma.auditEvent.deleteMany({ where: { organizationId: { in: orgIds } } });
   await prisma.pointTransaction.deleteMany({ where: { organizationId: { in: orgIds } } });
   await prisma.organizationMembership.deleteMany({ where: { organizationId: { in: orgIds } } });
+  await prisma.seasonTransition.deleteMany({ where: { organizationId: { in: orgIds } } });
   await prisma.season.deleteMany({ where: { organizationId: { in: orgIds } } });
   await prisma.house.deleteMany({ where: { organizationId: { in: orgIds } } });
   await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });

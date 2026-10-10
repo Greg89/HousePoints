@@ -37,6 +37,10 @@ const actionLabels: Record<AdminAuditAction["type"], string> = {
   ORG_ARCHIVED: "Organization archived",
   ORG_RESTORED: "Organization restored",
   SEASON_STARTED: "Season started",
+  SEASON_PLAN_CREATED: "Next-season plan created",
+  SEASON_PLAN_UPDATED: "Next-season plan updated",
+  SEASON_PLAN_DISCARDED: "Next-season plan discarded",
+  SEASON_PLANNED_END_UPDATED: "Season planned end updated",
   ORG_SETTINGS_UPDATED: "Organization updated",
   POINTS_DEDUCTED: "Points deducted",
   USER_HOUSE_ASSIGNED: "House assigned",
@@ -58,6 +62,10 @@ const actionIcons: Record<AdminAuditAction["type"], typeof Trash> = {
   ORG_ARCHIVED: Buildings,
   ORG_RESTORED: Buildings,
   SEASON_STARTED: Calendar,
+  SEASON_PLAN_CREATED: Calendar,
+  SEASON_PLAN_UPDATED: Calendar,
+  SEASON_PLAN_DISCARDED: Calendar,
+  SEASON_PLANNED_END_UPDATED: Calendar,
   ORG_SETTINGS_UPDATED: Buildings,
   POINTS_DEDUCTED: TrendDown,
   USER_HOUSE_ASSIGNED: UserSwitch,
@@ -91,6 +99,10 @@ const auditFilterOptions: Array<{ value: AuditFilter; label: string }> = [
   { value: "INVITE_CREATED", label: "Invites created" },
   { value: "INVITE_USED", label: "Invites used" },
   { value: "SEASON_STARTED", label: "Season starts" },
+  { value: "SEASON_PLAN_CREATED", label: "Season plans created" },
+  { value: "SEASON_PLAN_UPDATED", label: "Season plans updated" },
+  { value: "SEASON_PLAN_DISCARDED", label: "Season plans discarded" },
+  { value: "SEASON_PLANNED_END_UPDATED", label: "Planned season ends updated" },
 ];
 
 export function RecentAdminActionsReport({

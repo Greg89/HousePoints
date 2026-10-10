@@ -11,7 +11,7 @@ import {
   Sparkle,
   UsersThree,
 } from "@phosphor-icons/react";
-import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, RecognitionCategory, Season, SeasonTransition, UserRole } from "@housepoints/contracts";
+import type { AdminAuditAction, DeletedPoint, InviteStats, OrgSettings, PagedAdminAuditActions, PointAdjustmentStats, RecognitionCategory, Season, SeasonPlan, SeasonPlanContext, SeasonTransition, UserRole } from "@housepoints/contracts";
 import type {
   CreateInviteResult,
   ArchiveOrganizationResult,
@@ -23,6 +23,7 @@ import type {
   RenameSeasonResult,
   RoleChangeResult,
   StartSeasonResult,
+  SaveSeasonPlanResult,
   MutationResult,
 } from "@/lib/action-results";
 import type { AdminHouse, AdminUser } from "./AdminManageTypes";
@@ -62,7 +63,12 @@ interface AdminFormsProps {
   onLoadPointAdjustmentStats: (seasonId?: string) => Promise<PointAdjustmentStats>;
   onCreateInvite: () => Promise<CreateInviteResult>;
   onStartSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
+  onKickoffSeason: (formData: FormData) => Promise<StartSeasonResult<SeasonTransition>>;
   onRenameSeason: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
+  onReadSeasonPlanContext: () => Promise<SeasonPlanContext>;
+  onSaveSeasonPlan: (formData: FormData) => Promise<SaveSeasonPlanResult<SeasonPlan>>;
+  onDiscardSeasonPlan: (formData: FormData) => Promise<MutationResult>;
+  onUpdateSeasonPlannedEnd: (formData: FormData) => Promise<RenameSeasonResult<Season>>;
   recognitionCategories?: RecognitionCategory[];
   onListRecognitionCategories?: () => Promise<RecognitionCategory[]>;
   onCreateRecognitionCategory?: (input: { name: string; description?: string; idempotencyKey: string }) => Promise<MutationResult>;
@@ -188,7 +194,12 @@ export function AdminForms({
   onLoadPointAdjustmentStats,
   onCreateInvite,
   onStartSeason,
+  onKickoffSeason,
   onRenameSeason,
+  onReadSeasonPlanContext,
+  onSaveSeasonPlan,
+  onDiscardSeasonPlan,
+  onUpdateSeasonPlannedEnd,
   recognitionCategories,
   onListRecognitionCategories,
   onCreateRecognitionCategory,
@@ -351,7 +362,12 @@ export function AdminForms({
               activeSeason={activeSeason}
               actorRole={actorRole}
               onStartSeason={onStartSeason}
+              onKickoffSeason={onKickoffSeason}
               onRenameSeason={onRenameSeason}
+              onReadPlanContext={onReadSeasonPlanContext}
+              onSavePlan={onSaveSeasonPlan}
+              onDiscardPlan={onDiscardSeasonPlan}
+              onUpdatePlannedEnd={onUpdateSeasonPlannedEnd}
             />
           ) : null}
 

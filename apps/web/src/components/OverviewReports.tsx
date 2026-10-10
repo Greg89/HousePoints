@@ -2,7 +2,7 @@
 
 import { ArrowRight, ChartLineUp, Clock, Sparkle, Trophy, Users } from "@phosphor-icons/react";
 import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
-import { TRAIT_LABELS } from "@housepoints/contracts";
+import { selectOverviewReport, TRAIT_LABELS } from "@housepoints/contracts";
 
 interface OverviewReportsProps {
   dashboardSummary: DashboardSummary;
@@ -28,28 +28,8 @@ export function OverviewReports({
   const scopeLabel = selectedHouse ? selectedHouse.name : "All houses";
   const seasonName = dashboardSummary.selectedSeason.name;
   const isHistoricalSeason = !dashboardSummary.selectedSeason.isActive;
-  const standout = selectedHouse
-    ? dashboardSummary.seasonStandoutsByHouse.find((entry) => entry.houseId === selectedHouse.id)?.standout ?? null
-    : dashboardSummary.seasonStandout;
-  const leaders = (categoryMode
-    ? dashboardSummary.categoryLeaders.map((entry) => ({ ...entry, name: entry.category?.name ?? null }))
-    : dashboardSummary.traitLeaders.map((entry) => ({ ...entry, name: entry.trait ? TRAIT_LABELS[entry.trait] : null })))
-    .filter((entry) => !selectedHouse || entry.houseId === selectedHouse.id);
-  const recentActivity = (
-    selectedHouse
-      ? dashboardSummary.recentActivity.filter((item) => item.targetHouseName === selectedHouse.name)
-      : dashboardSummary.recentActivity
-  ).slice(0, 8);
-  const velocity = selectedHouse
-    ? dashboardSummary.pointsVelocity.filter((entry) => entry.houseId === selectedHouse.id)
-    : dashboardSummary.pointsVelocity;
-  const maxVelocityPoints = Math.max(
-    1,
-    ...velocity.flatMap((entry) => entry.days.map((day) => day.points)),
-  );
-  const rankedMembers = selectedHouse
-    ? dashboardSummary.houseMemberRankings.find((entry) => entry.houseId === selectedHouse.id)?.members ?? []
-    : [];
+  const { standout, leaders, recentActivity, velocity, maxVelocityPoints, rankedMembers } =
+    selectOverviewReport(dashboardSummary, selectedHouse, categoryMode);
   const winnerSummary = !selectedHouse && isHistoricalSeason ? dashboardSummary.seasonWinnerSummary : null;
   const winningHouses = winnerSummary?.winningHouses ?? (winnerSummary?.winningHouse ? [winnerSummary.winningHouse] : []);
   const topContributors = winnerSummary?.topContributors ?? (winnerSummary?.topContributor ? [winnerSummary.topContributor] : []);

@@ -34,6 +34,12 @@ import {
   updateMemberDisplayNameSchema,
   transferOwnerSchema,
   seasonTransitionSchema,
+  seasonPlanSchema,
+  seasonPlanContextSchema,
+  saveSeasonPlanSchema,
+  discardSeasonPlanSchema,
+  kickoffSeasonSchema,
+  updateSeasonPlannedEndSchema,
   memberScoreSchema,
   memberScoresSchema,
   activityItemSchema,
@@ -100,6 +106,7 @@ const webConsumedApiEndpoints = [
   "/devices/unregister",
   "/houses/leaderboard",
   "/members",
+  "/members/performance",
   "/notifications/list",
   "/notifications/mark-all-read",
   "/notifications/mark-read",
@@ -137,6 +144,11 @@ const webConsumedApiEndpoints = [
   "/recognition-categories/list",
   "/seasons/context",
   "/seasons/compare",
+  "/seasons/plan-context",
+  "/seasons/plan",
+  "/seasons/plan/discard",
+  "/seasons/kickoff",
+  "/seasons/planned-end",
   "/seasons/rename",
   "/seasons/start",
   "/transactions/react",
@@ -1079,6 +1091,55 @@ describe("season schemas", () => {
     });
   });
 
+  it("validates season plans, optimistic versions, and date ordering", () => {
+    const savedPlan = {
+      expectedVersion: 0,
+      name: "Winter 2027",
+      kickoffMessage: null,
+      plannedStartsAt: "2027-01-01T14:00:00.000Z",
+      plannedEndsAt: "2027-03-31T13:00:00.000Z",
+      timezone: "America/New_York",
+    };
+    expect(saveSeasonPlanSchema.parse(savedPlan)).toEqual(savedPlan);
+    expect(saveSeasonPlanSchema.safeParse({
+      ...savedPlan,
+      plannedEndsAt: "2026-12-31T13:00:00.000Z",
+    }).success).toBe(false);
+    expect(discardSeasonPlanSchema.parse({ expectedVersion: 1 })).toEqual({
+      expectedVersion: 1,
+    });
+    expect(updateSeasonPlannedEndSchema.parse({
+      seasonId: "season-1",
+      plannedEndsAt: null,
+      timezone: "UTC",
+    })).toEqual({
+      seasonId: "season-1",
+      plannedEndsAt: null,
+      timezone: "UTC",
+    });
+  });
+
+  it("validates season plan context and its readiness summary", () => {
+    expect(seasonPlanSchema.parse({
+      id: "plan-1",
+      name: "Winter 2027",
+      kickoffMessage: null,
+      plannedStartsAt: null,
+      plannedEndsAt: null,
+      timezone: "UTC",
+      version: 1,
+      createdAt: "2026-10-01T00:00:00.000Z",
+      updatedAt: "2026-10-01T00:00:00.000Z",
+    }).version).toBe(1);
+    expect(seasonPlanContextSchema.parse({
+      activeSeason,
+      plan: null,
+      activeCategoryCount: 20,
+      houseCount: 4,
+      unassignedMemberCount: 2,
+    }).unassignedMemberCount).toBe(2);
+  });
+
   it("accepts the start-season transition response", () => {
     expect(
       seasonTransitionSchema.parse({
@@ -1089,6 +1150,23 @@ describe("season schemas", () => {
       previousSeason,
       activeSeason,
     });
+  });
+
+  it("validates prepared season kickoff requests", () => {
+    expect(kickoffSeasonSchema.parse({
+      expectedActiveSeasonId: "season-active",
+      expectedPlanVersion: 2,
+      idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+    })).toEqual({
+      expectedActiveSeasonId: "season-active",
+      expectedPlanVersion: 2,
+      idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+    });
+    expect(kickoffSeasonSchema.safeParse({
+      expectedActiveSeasonId: "season-active",
+      expectedPlanVersion: 0,
+      idempotencyKey: "not-a-uuid",
+    }).success).toBe(false);
   });
 
   it("accepts a comparison request for two distinct seasons", () => {

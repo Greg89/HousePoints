@@ -1,6 +1,6 @@
 # Custom recognition categories
 
-Status: C1–C4 code is implemented and locally verified; deployed to production per the release owner October 4, 2026. C4 Android device and old-binary checks remain pending. C5 uses environment-wide feature flags, beta before production, without organization-ID allowlists. Live category enablement evidence remains to be recorded. See [shared decisions](./README.md#decision-register), especially D1 and D9.
+Status: C1–C5 are complete per the release owner. C1–C4 were deployed to production per the release owner October 4, 2026. C5 used environment-wide feature flags, beta before production, without organization-ID allowlists. See [shared decisions](./README.md#decision-register), especially D1 and D9.
 
 ## C1 persistence foundation
 
@@ -55,13 +55,15 @@ the award draft; the server logs failures with the request ID.
 
 ## C4 mobile compatibility
 
-Implemented and locally verified September 27, 2026; Android device and currently supported old-binary checks remain pending. The upgraded app declares `categories-v1` on dashboard and activity reads even while category awards are disabled. Activity uses the category's fixed name, including archived custom categories, and dashboard summary parsing accepts category leaders and custom recent activity. Notification bodies already come from the C2 API's category name and need no native management screen or enum substitution.
+Implemented and locally verified September 27, 2026; Android device and currently supported old-binary acceptance are complete per the release owner. Detailed device evidence is not linked from this design document. The upgraded app declares `categories-v1` on dashboard and activity reads even while category awards are disabled. Activity uses the category's fixed name, including archived custom categories, and dashboard summary parsing accepts category leaders and custom recent activity. Notification bodies already come from the C2 API's category name and need no native management screen or enum substitution.
 
 `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED` defaults to `false` in the mobile app. With the flag off, the legacy trait award flow remains available. When enabled in an EAS build or compatible update, the picker fetches organization-scoped categories for every active organization, excludes archived entries, and submits a `categories-v1` category ID with the existing retry key. An archive race keeps the recipient, amount, reason, and selected identity in the draft, refreshes categories, and requires a new available selection. The app does not expose Add or Archive controls.
 
-The C4 rollout adds no database migration. EAS preview and production environments must set the new Expo public flag only during C5's controlled staging rehearsal and subsequent release decision; changing it requires a new build or update containing the changed public environment. Keep `RECOGNITION_CATEGORY_MUTATIONS_ENABLED=false` on the API until the staging rehearsal. To roll back mobile category awards, build with the mobile flag false while retaining the category-aware API readers and schema. Before wider enablement, verify in staging that an upgraded Android build can award and display archived/custom categories and that the currently supported old binary surfaces HTTP 426's update guidance without a parsing crash. A supported app-update path is a C5 prerequisite.
+The C4 rollout adds no database migration. Changing the Expo public flag requires a new build or update containing the changed public environment. The C4 device and old-binary acceptance gate was completed per the release owner. To roll back mobile category awards, build with the mobile flag false while retaining the category-aware API readers and schema.
 
-## C5 release rehearsal — prepared, not enabled
+## C5 release rehearsal
+
+Status: complete per the release owner. The rollout configuration and compatibility/rollback behavior below document the release approach.
 
 The category-aware web and mobile readers advertise `categories-v1` even with their award/management flags off. This is required for rollback after custom awards exist. Web and API writes remain disabled by default. Rollout is environment-wide, beta first and production afterward: set `RECOGNITION_CATEGORY_MUTATIONS_ENABLED=true` on the Railway API, `RECOGNITION_CATEGORIES_WEB_ENABLED=true` on Railway web, and `EXPO_PUBLIC_RECOGNITION_CATEGORIES_ENABLED=true` in the matching EAS Environment. Redeploy API/web and deliver a mobile build or compatible update containing the new value. No organization-ID list is required. Remove obsolete category rollout ID-list settings from Railway and EAS; they are no longer read. Existing tenant scoping and owner-only category management remain unchanged.
 
@@ -76,7 +78,7 @@ Before the staging rehearsal, record the `develop` commit, staging API/web deplo
 
 `Staging E2E` uses the `staging` GitHub Environment secrets `E2E_BASE_URL`, `E2E_OWNER_EMAIL`, `E2E_OWNER_PASSWORD`, `E2E_TARGET_MEMBER`, and `E2E_ORG_SLUG` (plus the existing normal smoke credentials). Set the optional `E2E_RECOGNITION_CATEGORY_NAME` variable if the standard award smoke should select a non-seeded active category. `Mobile Staging E2E` needs its existing APK URL and account/member secrets plus `MOBILE_E2E_CATEGORY_NAME` for category mode. The scheduled mobile workflow reads `MOBILE_E2E_RECOGNITION_MODE` from the staging Environment; set it to `categories` only while the scheduled APK points to a category-enabled build, otherwise leave it `legacy`.
 
-Completion evidence: migration/query results and unchanged totals; linked web and mobile E2E runs; candidate and old APK identifiers; device screenshots for active, archived, and HTTP 426 states; category/award IDs proving same-name history stays separate; notification and cross-organization checks; and a successful staging rollback rehearsal. None of these live results has been recorded yet. After beta verification and a supported client-version decision, enable the same three flags in production and deliver a production mobile build or compatible update using the production EAS Environment.
+Completion evidence expected for this repeatable runbook: migration/query results and unchanged totals; linked web and mobile E2E runs; candidate and old APK identifiers; device screenshots for active, archived, and HTTP 426 states; category/award IDs proving same-name history stays separate; notification and cross-organization checks; and a successful staging rollback rehearsal. C5 is complete per the release owner; detailed live evidence is not linked from this design document. For future rollouts, follow the staging gate before enabling the same flags in production and delivering a production mobile build or compatible update.
 
 ## Confirmed direction — September 20, 2026
 

@@ -174,3 +174,22 @@ describe("legacy mobile E2E award input guards", () => {
     expect(beforeSubmit).toContain('- assertVisible: "Award 7 points"');
   });
 });
+
+describe("mobile E2E launcher recovery", () => {
+  const recovery = readFileSync(new URL("../../e2e/subflows/wait-for-sign-in.yaml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  it.each(["sign-in-dashboard-award", "category-award"])("shares guarded startup handling in %s", name => {
+    const flow = readFileSync(new URL(`../../e2e/${name}.yaml`, import.meta.url), "utf8");
+    expect(flow.indexOf("- runFlow: subflows/wait-for-sign-in.yaml")).toBeGreaterThan(flow.indexOf("clearState: true"));
+    expect(flow.indexOf("- runFlow: subflows/wait-for-sign-in.yaml")).toBeLessThan(flow.indexOf('- tapOn:'));
+  });
+  it("only closes the Android Pixel Launcher dialog, preserving evidence and mandatory login", () => {
+    expect(recovery).toContain('visible: "Sign in with Auth0|Pixel Launcher isn.t responding"');
+    expect(recovery).toContain('when:\n      platform: Android\n      visible: "Pixel Launcher isn.t responding"');
+    expect(recovery.indexOf("takeScreenshot:")).toBeLessThan(recovery.indexOf('- tapOn: "Close app"'));
+    expect(recovery).toContain('id: "mobile.login.sign-in"\n    timeout: 30000');
+    expect(recovery).not.toContain("optional: true");
+    const matches = new RegExp("^Pixel Launcher isn.t responding$");
+    expect(matches.test("Pixel Launcher isn't responding")).toBe(true);
+    expect(matches.test("HousePoints isn't responding")).toBe(false);
+  });
+});

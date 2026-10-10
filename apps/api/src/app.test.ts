@@ -65,6 +65,7 @@ vi.mock("@housepoints/db", () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      count: vi.fn(),
     },
     orgInvite: {
       create: vi.fn(),
@@ -99,6 +100,16 @@ vi.mock("@housepoints/db", () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+    },
+    seasonPlan: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    seasonTransition: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
     },
     pointMutationRequest: { findUnique: vi.fn(), create: vi.fn() },
     recognitionCategory: {
@@ -185,6 +196,7 @@ const mockHouseCreate = prisma.house.create as ReturnType<typeof vi.fn>;
 const mockHouseFindMany = prisma.house.findMany as ReturnType<typeof vi.fn>;
 const mockHouseFindFirst = prisma.house.findFirst as ReturnType<typeof vi.fn>;
 const mockHouseFindUnique = prisma.house.findUnique as ReturnType<typeof vi.fn>;
+const mockHouseCount = prisma.house.count as ReturnType<typeof vi.fn>;
 const mockInviteCreate = prisma.orgInvite.create as ReturnType<typeof vi.fn>;
 const mockInviteCount = prisma.orgInvite.count as ReturnType<typeof vi.fn>;
 const mockInviteFindMany = prisma.orgInvite.findMany as ReturnType<typeof vi.fn>;
@@ -210,6 +222,12 @@ const mockSeasonFindFirst = prisma.season.findFirst as ReturnType<typeof vi.fn>;
 const mockSeasonFindMany = prisma.season.findMany as ReturnType<typeof vi.fn>;
 const mockSeasonCreate = prisma.season.create as ReturnType<typeof vi.fn>;
 const mockSeasonUpdate = prisma.season.update as ReturnType<typeof vi.fn>;
+const mockSeasonPlanFindUnique = prisma.seasonPlan.findUnique as ReturnType<typeof vi.fn>;
+const mockSeasonPlanCreate = prisma.seasonPlan.create as ReturnType<typeof vi.fn>;
+const mockSeasonPlanUpdate = prisma.seasonPlan.update as ReturnType<typeof vi.fn>;
+const mockSeasonPlanDelete = prisma.seasonPlan.delete as ReturnType<typeof vi.fn>;
+const mockSeasonTransitionFindUnique = prisma.seasonTransition.findUnique as ReturnType<typeof vi.fn>;
+const mockSeasonTransitionCreate = prisma.seasonTransition.create as ReturnType<typeof vi.fn>;
 const mockTxCreate = prisma.pointTransaction.create as ReturnType<typeof vi.fn>;
 const mockTxCount = prisma.pointTransaction.count as ReturnType<typeof vi.fn>;
 const mockTxFindUnique = prisma.pointTransaction.findUnique as ReturnType<typeof vi.fn>;
@@ -356,7 +374,7 @@ const makeActorMembership = (overrides = {}) => ({
 // Reset all mock implementations before each test to ensure isolation
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(prisma.organization.findUniqueOrThrow).mockResolvedValue({ reportingRevision: 2n } as never);
+  vi.mocked(prisma.organization.findUniqueOrThrow).mockResolvedValue({ reportingRevision: 2n, slug: "acme" } as never);
   vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "org-1", now: new Date() }]);
   mockTxFindMany.mockResolvedValue([]);
   mockTxFindFirst.mockResolvedValue(null);
@@ -424,6 +442,13 @@ beforeEach(() => {
     }),
   );
   mockSeasonFindMany.mockResolvedValue([]);
+  mockSeasonPlanFindUnique.mockResolvedValue(null);
+  mockSeasonPlanCreate.mockResolvedValue({});
+  mockSeasonPlanUpdate.mockResolvedValue({});
+  mockSeasonPlanDelete.mockResolvedValue({});
+  mockSeasonTransitionFindUnique.mockResolvedValue(null);
+  mockSeasonTransitionCreate.mockResolvedValue({});
+  mockHouseCount.mockResolvedValue(0);
   mockAuditEventFindMany.mockResolvedValue([]);
   mockAuditEventCreate.mockResolvedValue({});
   mockNotificationCount.mockResolvedValue(0);
@@ -2053,6 +2078,98 @@ describe("POST /points/delete", () => {
     await app.close();
   });
 
+  it("notifies active owners and admins when a closed-season correction changes winners", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-1",
+      deletedAt: null,
+      delta: 15,
+      targetHouseId: "house-1",
+      season: { id: "season-closed", name: "Q2", isActive: false, endsAt: new Date() },
+    });
+    mockTxGroupBy.mockResolvedValue([
+      { targetHouseId: "house-1", _sum: { delta: 15 }, _count: { _all: 1 } },
+      { targetHouseId: "house-2", _sum: { delta: 10 }, _count: { _all: 1 } },
+    ]);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix" },
+      { id: "house-2", name: "Falcon" },
+    ]);
+    mockTxUpdate.mockResolvedValue(deletedPoint);
+    mockMembershipFindMany.mockResolvedValue([
+      { user: { id: "owner-1" } },
+      { user: { id: "admin-1" } },
+    ]);
+    const app = await buildTestApp("auth0|admin");
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1", reason: "Duplicate award" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mockMembershipFindMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-1",
+        isActive: true,
+        archivedAt: null,
+        role: { in: ["OWNER", "ADMIN"] },
+      },
+      select: { user: { select: { id: true } } },
+    });
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          recipientUserId: "owner-1",
+          type: "SEASON_CORRECTION",
+          body: expect.stringContaining("Phoenix to Falcon"),
+          actionHref: "/o/acme/reports?season=season-closed",
+          dedupeKey: "season-correction:org-1:season-closed:tx-1",
+        }),
+        expect.objectContaining({
+          recipientUserId: "admin-1",
+          type: "SEASON_CORRECTION",
+        }),
+      ]),
+      skipDuplicates: true,
+    });
+    await app.close();
+  });
+
+  it("does not notify when a closed-season correction preserves the winner set", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin());
+    mockTxFindUnique.mockResolvedValue({
+      id: "tx-1",
+      organizationId: "org-1",
+      deletedAt: null,
+      delta: 5,
+      targetHouseId: "house-1",
+      season: { id: "season-closed", name: "Q2", isActive: false, endsAt: new Date() },
+    });
+    mockTxGroupBy.mockResolvedValue([
+      { targetHouseId: "house-1", _sum: { delta: 20 }, _count: { _all: 2 } },
+      { targetHouseId: "house-2", _sum: { delta: 10 }, _count: { _all: 1 } },
+    ]);
+    mockHouseFindMany.mockResolvedValue([
+      { id: "house-1", name: "Phoenix" },
+      { id: "house-2", name: "Falcon" },
+    ]);
+    mockTxUpdate.mockResolvedValue(deletedPoint);
+    const app = await buildTestApp("auth0|admin");
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/points/delete",
+      payload: { transactionId: "tx-1", reason: "Duplicate award" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("does not reveal transactions from another organization", async () => {
     mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
     mockTxFindUnique.mockResolvedValue({
@@ -2639,6 +2756,19 @@ describe("POST /seasons/start", () => {
         },
         {
           organizationId: "org-secure",
+          recipientUserId: "user-owner",
+          type: "SEASON_RECAP",
+          severity: "INFO",
+          title: "Season results are ready",
+          body: "Q3 2026 has ended. Review the season report for current standings and contributions; recorded corrections may change the results.",
+          actionLabel: "View season report",
+          actionHref: "/o/acme/reports?season=season-active",
+          entityType: "Season",
+          entityId: "season-active",
+          dedupeKey: "season-recap:org-secure:season-active",
+        },
+        {
+          organizationId: "org-secure",
           recipientUserId: "user-admin",
           type: "SEASON_STARTED",
           severity: "INFO",
@@ -2652,6 +2782,19 @@ describe("POST /seasons/start", () => {
         },
         {
           organizationId: "org-secure",
+          recipientUserId: "user-admin",
+          type: "SEASON_RECAP",
+          severity: "INFO",
+          title: "Season results are ready",
+          body: "Q3 2026 has ended. Review the season report for current standings and contributions; recorded corrections may change the results.",
+          actionLabel: "View season report",
+          actionHref: "/o/acme/reports?season=season-active",
+          entityType: "Season",
+          entityId: "season-active",
+          dedupeKey: "season-recap:org-secure:season-active",
+        },
+        {
+          organizationId: "org-secure",
           recipientUserId: "user-member",
           type: "SEASON_STARTED",
           severity: "INFO",
@@ -2662,6 +2805,19 @@ describe("POST /seasons/start", () => {
           entityType: "Season",
           entityId: "season-next",
           dedupeKey: "season-started:org-secure:season-next",
+        },
+        {
+          organizationId: "org-secure",
+          recipientUserId: "user-member",
+          type: "SEASON_RECAP",
+          severity: "INFO",
+          title: "Season results are ready",
+          body: "Q3 2026 has ended. Review the season report for current standings and contributions; recorded corrections may change the results.",
+          actionLabel: "View season report",
+          actionHref: "/o/acme/reports?season=season-active",
+          entityType: "Season",
+          entityId: "season-active",
+          dedupeKey: "season-recap:org-secure:season-active",
         },
       ],
       skipDuplicates: true,
@@ -2773,6 +2929,498 @@ describe("POST /seasons/start", () => {
       select: { user: { select: { id: true } } },
     });
     expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("Season planning", () => {
+  const plan = {
+    id: "plan-1",
+    organizationId: "org-secure",
+    name: "Winter 2027",
+    kickoffMessage: "Welcome to the next season.",
+    plannedStartsAt: new Date("2027-01-01T14:00:00.000Z"),
+    plannedEndsAt: new Date("2027-03-31T13:00:00.000Z"),
+    timezone: "America/New_York",
+    version: 2,
+    createdById: "user-owner",
+    updatedById: "user-owner",
+    createdAt: new Date("2026-10-01T12:00:00.000Z"),
+    updatedAt: new Date("2026-10-02T12:00:00.000Z"),
+  };
+
+  it("kicks off the current plan atomically, carries planned metadata, and includes its announcement", async () => {
+    const nextSeason = {
+      id: "season-winter",
+      name: plan.name,
+      startsAt: new Date("2026-10-09T16:00:00.000Z"),
+      endsAt: null,
+      plannedEndsAt: plan.plannedEndsAt,
+      timezone: plan.timezone,
+      isActive: true,
+    };
+    const closedSeason = {
+      ...ACTIVE_SEASON,
+      endsAt: nextSeason.startsAt,
+      isActive: false,
+    };
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonTransitionFindUnique.mockResolvedValue(null);
+    mockSeasonFindFirst
+      .mockResolvedValueOnce(ACTIVE_SEASON)
+      .mockResolvedValueOnce(null);
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    mockCategoryCount.mockResolvedValue(4);
+    mockSeasonUpdate.mockResolvedValue(closedSeason);
+    mockSeasonCreate.mockResolvedValue(nextSeason);
+    mockMembershipFindMany.mockResolvedValue([{ user: { id: "user-owner" } }]);
+    mockNotificationCreateMany.mockResolvedValue({ count: 1 });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: ACTIVE_SEASON.id,
+        expectedPlanVersion: plan.version,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockSeasonTransitionCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: "org-secure",
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+        planVersion: plan.version,
+        previousSeasonId: ACTIVE_SEASON.id,
+        activeSeasonId: nextSeason.id,
+      },
+    });
+    expect(mockSeasonCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        organizationId: "org-secure",
+        name: plan.name,
+        startsAt: expect.any(Date),
+        isActive: true,
+        plannedEndsAt: plan.plannedEndsAt,
+        timezone: plan.timezone,
+      }),
+    }));
+    expect(mockNotificationCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.arrayContaining([expect.objectContaining({
+        body: "Olivia started Winter 2027. House standings and leaderboards now use the new season.\n\nWelcome to the next season.",
+        entityId: nextSeason.id,
+      })]),
+      skipDuplicates: true,
+    }));
+    expect(mockSeasonPlanDelete).toHaveBeenCalledWith({ where: { id: plan.id } });
+    expect(res.json()).toMatchObject({
+      previousSeason: { id: ACTIVE_SEASON.id, isActive: false },
+      activeSeason: {
+        id: nextSeason.id,
+        name: plan.name,
+        plannedEndsAt: plan.plannedEndsAt.toISOString(),
+        timezone: plan.timezone,
+      },
+    });
+    await app.close();
+  });
+
+  it("returns the original transition for a retried kickoff without repeating writes or push", async () => {
+    const priorTransition = {
+      previousSeason: { ...ACTIVE_SEASON, isActive: false, endsAt: new Date("2026-10-09T16:00:00.000Z") },
+      activeSeason: {
+        id: "season-winter",
+        name: plan.name,
+        startsAt: new Date("2026-10-09T16:00:00.000Z"),
+        endsAt: null,
+        plannedEndsAt: plan.plannedEndsAt,
+        timezone: plan.timezone,
+        isActive: true,
+      },
+      previousSeasonId: ACTIVE_SEASON.id,
+      planVersion: plan.version,
+    };
+    const pushDispatcher = vi.fn();
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonTransitionFindUnique.mockResolvedValue(priorTransition);
+    const app = await buildTestApp("auth0|owner", {}, { pushDispatcher });
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: ACTIVE_SEASON.id,
+        expectedPlanVersion: plan.version,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().activeSeason.id).toBe("season-winter");
+    expect(mockSeasonFindFirst).not.toHaveBeenCalled();
+    expect(mockSeasonPlanFindUnique).not.toHaveBeenCalled();
+    expect(mockSeasonTransitionCreate).not.toHaveBeenCalled();
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    expect(mockNotificationCreateMany).not.toHaveBeenCalled();
+    expect(pushDispatcher).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects reuse of a kickoff key for a different plan version", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonTransitionFindUnique.mockResolvedValue({
+      previousSeason: ACTIVE_SEASON,
+      activeSeason: {
+        id: "season-winter",
+        name: plan.name,
+        startsAt: new Date("2026-10-09T16:00:00.000Z"),
+        endsAt: null,
+        plannedEndsAt: plan.plannedEndsAt,
+        timezone: plan.timezone,
+        isActive: true,
+      },
+      previousSeasonId: ACTIVE_SEASON.id,
+      planVersion: plan.version,
+    });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: ACTIVE_SEASON.id,
+        expectedPlanVersion: plan.version + 1,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("IDEMPOTENCY_KEY_CONFLICT");
+    expect(mockSeasonFindFirst).not.toHaveBeenCalled();
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects stale plan versions without transitioning", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonTransitionFindUnique.mockResolvedValue(null);
+    mockSeasonFindFirst.mockResolvedValueOnce(ACTIVE_SEASON);
+    mockSeasonPlanFindUnique.mockResolvedValue({ ...plan, version: plan.version + 1 });
+    const app = await buildTestApp("auth0|owner");
+
+    const stalePlan = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: ACTIVE_SEASON.id,
+        expectedPlanVersion: plan.version,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(stalePlan.statusCode).toBe(409);
+    expect(stalePlan.json().code).toBe("SEASON_PLAN_VERSION_CONFLICT");
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects kickoff when no active category remains", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonTransitionFindUnique.mockResolvedValue(null);
+    mockSeasonFindFirst
+      .mockResolvedValueOnce(ACTIVE_SEASON)
+      .mockResolvedValueOnce(null);
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    mockCategoryCount.mockResolvedValue(0);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: ACTIVE_SEASON.id,
+        expectedPlanVersion: plan.version,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACTIVE_CATEGORY_REQUIRED");
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    expect(mockSeasonPlanDelete).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects a kickoff against a stale active season", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonTransitionFindUnique.mockResolvedValue(null);
+    mockSeasonFindFirst.mockResolvedValueOnce(ACTIVE_SEASON);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: "season-stale",
+        expectedPlanVersion: plan.version,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe("ACTIVE_SEASON_CHANGED");
+    expect(mockSeasonPlanFindUnique).not.toHaveBeenCalled();
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("rejects admins from kicking off a prepared season", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/kickoff",
+      payload: {
+        expectedActiveSeasonId: ACTIVE_SEASON.id,
+        expectedPlanVersion: plan.version,
+        idempotencyKey: "d9428888-122b-4b6f-a53d-9b7f3b234540",
+      },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("OWNER_REQUIRED");
+    expect(mockTransaction).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("returns an organization-scoped plan and readiness to admins", async () => {
+    mockFindUnique.mockResolvedValue(makeAdmin({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    mockCategoryCount.mockResolvedValue(4);
+    mockHouseCount.mockResolvedValue(3);
+    mockMembershipCount.mockResolvedValue(2);
+    const app = await buildTestApp("auth0|admin");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan-context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      activeSeason: {
+        id: ACTIVE_SEASON.id,
+        name: ACTIVE_SEASON.name,
+        startsAt: ACTIVE_SEASON.startsAt.toISOString(),
+        endsAt: null,
+        isActive: true,
+      },
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        kickoffMessage: plan.kickoffMessage,
+        plannedStartsAt: plan.plannedStartsAt.toISOString(),
+        plannedEndsAt: plan.plannedEndsAt.toISOString(),
+        timezone: plan.timezone,
+        version: plan.version,
+        createdAt: plan.createdAt.toISOString(),
+        updatedAt: plan.updatedAt.toISOString(),
+      },
+      activeCategoryCount: 4,
+      houseCount: 3,
+      unassignedMemberCount: 2,
+    });
+    expect(mockSeasonPlanFindUnique).toHaveBeenCalledWith({
+      where: { organizationId: "org-secure" },
+    });
+    expect(mockMembershipCount).toHaveBeenCalledWith({
+      where: {
+        organizationId: "org-secure",
+        isActive: true,
+        archivedAt: null,
+        houseId: null,
+      },
+    });
+    await app.close();
+  });
+
+  it("prevents regular members from inspecting owner/admin season plans", async () => {
+    mockFindUnique.mockResolvedValue(makeMember());
+    const app = await buildTestApp("auth0|member");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan-context",
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe("ADMIN_REQUIRED");
+    expect(mockSeasonPlanFindUnique).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("creates an audited plan and increments its version on updates", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonPlanFindUnique.mockResolvedValue(null);
+    mockSeasonFindFirst.mockResolvedValue(null);
+    mockSeasonPlanCreate.mockResolvedValue({ ...plan, version: 1 });
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan",
+      payload: {
+        expectedVersion: 0,
+        name: "Winter 2027",
+        kickoffMessage: "Welcome to the next season.",
+        plannedStartsAt: "2027-01-01T14:00:00.000Z",
+        plannedEndsAt: "2027-03-31T13:00:00.000Z",
+        timezone: "America/New_York",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockSeasonPlanCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-secure",
+        name: "Winter 2027",
+        plannedStartsAt: new Date("2027-01-01T14:00:00.000Z"),
+        plannedEndsAt: new Date("2027-03-31T13:00:00.000Z"),
+        timezone: "America/New_York",
+        version: 1,
+        createdById: "user-owner",
+        updatedById: "user-owner",
+      }),
+    });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "SEASON_PLAN_CREATED",
+        metadata: expect.objectContaining({
+          planId: plan.id,
+          previousVersion: null,
+          version: 1,
+        }),
+      }),
+    });
+    await app.close();
+  });
+
+  it("rejects stale plan versions and invalid time zones without writing", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    const app = await buildTestApp("auth0|owner");
+    const payload = {
+      expectedVersion: 1,
+      name: "Winter 2027",
+      kickoffMessage: null,
+      plannedStartsAt: null,
+      plannedEndsAt: null,
+      timezone: "America/New_York",
+    };
+
+    const staleResponse = await app.inject({
+      method: "POST",
+      url: "/seasons/plan",
+      payload,
+    });
+    expect(staleResponse.statusCode).toBe(409);
+    expect(staleResponse.json().code).toBe("SEASON_PLAN_VERSION_CONFLICT");
+    expect(mockSeasonPlanUpdate).not.toHaveBeenCalled();
+
+    const invalidTimezoneResponse = await app.inject({
+      method: "POST",
+      url: "/seasons/plan",
+      payload: { ...payload, expectedVersion: 2, timezone: "Not/AZone" },
+    });
+    expect(invalidTimezoneResponse.statusCode).toBe(400);
+    expect(invalidTimezoneResponse.json().code).toBe("INVALID_TIMEZONE");
+    expect(mockSeasonPlanUpdate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("audits draft discard and never changes the active season", async () => {
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonPlanFindUnique.mockResolvedValue(plan);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/plan/discard",
+      payload: { expectedVersion: plan.version },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ discarded: true });
+    expect(mockSeasonPlanDelete).toHaveBeenCalledWith({ where: { id: plan.id } });
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "SEASON_PLAN_DISCARDED",
+        metadata: expect.objectContaining({ planId: plan.id, version: plan.version }),
+      }),
+    });
+    expect(mockSeasonUpdate).not.toHaveBeenCalled();
+    expect(mockSeasonCreate).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("updates and audits only the expected active season planned end", async () => {
+    const plannedEnd = {
+      ...ACTIVE_SEASON,
+      plannedEndsAt: new Date("2026-12-31T15:00:00.000Z"),
+      timezone: "America/New_York",
+    };
+    mockFindUnique.mockResolvedValue(makeOwner({}, { organizationId: "org-secure" }));
+    mockSeasonFindFirst.mockResolvedValue(ACTIVE_SEASON);
+    mockSeasonUpdate.mockResolvedValue(plannedEnd);
+    const app = await buildTestApp("auth0|owner");
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/seasons/planned-end",
+      payload: {
+        seasonId: ACTIVE_SEASON.id,
+        plannedEndsAt: "2026-12-31T15:00:00.000Z",
+        timezone: "America/New_York",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      id: ACTIVE_SEASON.id,
+      plannedEndsAt: "2026-12-31T15:00:00.000Z",
+      timezone: "America/New_York",
+    });
+    expect(mockSeasonUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: ACTIVE_SEASON.id },
+      data: {
+        plannedEndsAt: new Date("2026-12-31T15:00:00.000Z"),
+        timezone: "America/New_York",
+      },
+    }));
+    expect(mockAuditEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "SEASON_PLANNED_END_UPDATED",
+        metadata: {
+          seasonId: ACTIVE_SEASON.id,
+          beforePlannedEndsAt: null,
+          beforeTimezone: null,
+          afterPlannedEndsAt: "2026-12-31T15:00:00.000Z",
+          afterTimezone: "America/New_York",
+        },
+      }),
+    });
     await app.close();
   });
 });

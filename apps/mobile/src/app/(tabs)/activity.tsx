@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -30,7 +31,8 @@ import {
   optimisticReactionResponse,
   REACTION_EMOJI,
 } from "@/lib/activity-reactions";
-import { ReactionPickerModal } from "@/components/ReactionPickerModal";
+import { ActivityActionsModal } from "@/components/ActivityActionsModal";
+import { activityLongPressFeedback } from "@/lib/activity-haptics";
 import { ReactionDetailsModal } from "@/components/ReactionDetailsModal";
 import { ReportActivityModal } from "@/components/ReportActivityModal";
 import { activityReportPayload, type ReportCategory } from "@/lib/moderation-report";
@@ -49,9 +51,10 @@ export default function ActivityScreen() {
   const queryClient = useQueryClient();
   useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
   const listRef = useRef<FlatList<ActivityItem>>(null);
-  const [pickerItem, setPickerItem] = useState<ActivityItem | null>(null);
+  const [actionsItem, setActionsItem] = useState<ActivityItem | null>(null);
   const [detailsPointId, setDetailsPointId] = useState<string | null>(null);
   const [reportItem, setReportItem] = useState<ActivityItem | null>(null);
+  const queuedReportItem = useRef<ActivityItem | null>(null);
   const [optimisticReactions, setOptimisticReactions] = useState<
     Record<string, PointReactionResponse>
   >({});
@@ -202,14 +205,15 @@ export default function ActivityScreen() {
         <ActivityRow
           item={item}
           focused={item.id === pointId}
-          reacting={reactionMutation.isPending && reactionMutation.variables?.item.id === item.id}
-          onOpenPicker={() => setPickerItem(item)}
+          onOpenActions={() => {
+            setActionsItem(item);
+            void activityLongPressFeedback();
+          }}
           onViewDetails={() => {
             setDetailsPointId(item.id);
             detailsMutation.reset();
             detailsMutation.mutate(item.id);
           }}
-          onReport={() => setReportItem(item)}
         />
       )}
       onScrollToIndexFailed={() => undefined}
@@ -227,7 +231,7 @@ export default function ActivityScreen() {
         <View style={styles.heading}>
           <Text style={styles.title}>Activity</Text>
           <Text style={styles.subtitle}>
-            Most recent points across your organization
+            Most recent points across your organization. Long press a card for actions.
           </Text>
         </View>
       }
@@ -251,16 +255,28 @@ export default function ActivityScreen() {
               <ActivityIndicator size="small" color="#64748b" />
             </View>
           ) : null}
-          <ReactionPickerModal
-            visible={pickerItem !== null}
-            selected={pickerItem?.myReactionKey ?? null}
+          <ActivityActionsModal
+            visible={actionsItem !== null}
+            canReact={actionsItem !== null && !activityCardPresentation(actionsItem).isDeduction}
+            onReport={() => {
+              // iOS must finish dismissing one native modal before presenting another.
+              if (Platform.OS === "ios") queuedReportItem.current = actionsItem;
+              else setReportItem(actionsItem);
+              setActionsItem(null);
+            }}
+            onDismiss={() => {
+              if (!queuedReportItem.current) return;
+              setReportItem(queuedReportItem.current);
+              queuedReportItem.current = null;
+            }}
+            selected={actionsItem?.myReactionKey ?? null}
             pending={reactionMutation.isPending}
-            onClose={() => setPickerItem(null)}
+            onClose={() => setActionsItem(null)}
             onSelect={(key) => {
-              if (!pickerItem) return;
-              const nextKey = nextReactionKey(pickerItem.myReactionKey, key);
-              reactionMutation.mutate({ item: pickerItem, nextKey });
-              setPickerItem(null);
+              if (!actionsItem) return;
+              const nextKey = nextReactionKey(actionsItem.myReactionKey, key);
+              reactionMutation.mutate({ item: actionsItem, nextKey });
+              setActionsItem(null);
             }}
           />
           <ReactionDetailsModal
@@ -288,23 +304,24 @@ function Separator() {
 function ActivityRow({
   item,
   focused,
-  reacting,
-  onOpenPicker,
+  onOpenActions,
   onViewDetails,
-  onReport,
 }: {
   item: ActivityItem;
   focused: boolean;
-  reacting: boolean;
-  onOpenPicker: () => void;
+  onOpenActions: () => void;
   onViewDetails: () => void;
-  onReport: () => void;
 }) {
   const presentation = activityCardPresentation(item);
   return (
     <Pressable
       style={[styles.row, focused && styles.rowFocused]}
-      onLongPress={presentation.isDeduction ? undefined : onOpenPicker}
+      onLongPress={onOpenActions}
+      accessibilityHint="Long press for activity actions"
+      accessibilityActions={[{ name: "longpress", label: "Activity actions" }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "longpress") onOpenActions();
+      }}
       delayLongPress={350}
     >
       <View style={styles.primaryRow}>
@@ -392,7 +409,7 @@ function ActivityRow({
             {presentation.relativeTime}
           </Text>
         </View>
-        {!presentation.isDeduction ? (
+        {!presentation.isDeduction && presentation.topReactions.length > 0 ? (
           <View style={styles.reactionRow}>
             {presentation.topReactions.map((reaction) => (
               <Pressable
@@ -407,21 +424,8 @@ function ActivityRow({
                 <Text>{REACTION_EMOJI[reaction.reactionKey]} {reaction.count}</Text>
               </Pressable>
             ))}
-            <Pressable
-              style={styles.reactButton}
-              onPress={onOpenPicker}
-              disabled={reacting}
-              accessibilityLabel="Open reaction picker"
-            >
-              <Text style={styles.reactButtonText}>
-                {reacting ? "Saving…" : item.myReactionKey
-                  ? `${REACTION_EMOJI[item.myReactionKey]} Reacted`
-                  : "＋ React"}
-              </Text>
-            </Pressable>
           </View>
         ) : null}
-        <Pressable style={styles.reportButton} onPress={onReport} accessibilityLabel="Report activity"><Text style={styles.reportButtonText}>⚑ Report</Text></Pressable>
       </View>
     </Pressable>
   );
@@ -556,10 +560,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   reactionChipMine: { borderColor: "#3b82f6", backgroundColor: "#eff6ff" },
-  reactButton: { paddingHorizontal: 8, paddingVertical: 5 },
-  reactButtonText: { color: "#2563eb", fontSize: 12, fontWeight: "700" },
-  reportButton: { alignSelf: "flex-end", marginTop: 10, paddingHorizontal: 8, paddingVertical: 5 },
-  reportButtonText: { color: "#64748b", fontSize: 12, fontWeight: "700" },
   delta: {
     fontSize: 21,
     fontWeight: "700",

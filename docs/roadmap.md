@@ -141,7 +141,7 @@ Key context for whoever picks this up next:
   organization-scoped device registrations and calls the injected
   `PushDispatcher`. The Expo implementation batches at 100 messages and remains
   replaceable without changing notification writers.
-- **Eligible notification types for push** — `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `RELEASE_ANNOUNCEMENT`, `MEMBER_NEEDS_HOUSE_ASSIGNMENT` (admins only). Non-pushable types should short-circuit before the HTTP call.
+- **Eligible notification types for push** — `POINT_AWARD_RECEIVED`, `POINT_DEDUCTION_RECEIVED`, `POINT_REACTION_RECEIVED`, `INVITE_ACCEPTED`, `ROLE_CHANGED`, `SEASON_STARTED`, `RELEASE_ANNOUNCEMENT`, `MEMBER_NEEDS_HOUSE_ASSIGNMENT` (admins only). Season report recap/correction notices are in-app only. Non-pushable types should short-circuit before the HTTP call.
 - **Test approach** — mock `deviceRegistration.findMany` and the `PushDispatcher` in `apps/api/src/app.test.ts` (`deviceRegistration` delegate is already in the top-level `vi.mock` block). Assert both the persist happens and the dispatcher is called with the expected payload.
 - **Mobile screens shipped** — Home, recipient-focused Activity cards (paginated), global top-10 contributor Leaderboard, Award (modal), Profile (display-name edit), Notifications (list + mark-read + mark-all-read). All under `apps/mobile/src/app/`. Alerts and account access share the primary-screen header while Profile stays out of the bottom navigation.
 - **Mobile push registration** — `DeviceRegistrationManager` observes the

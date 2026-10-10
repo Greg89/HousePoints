@@ -77,7 +77,7 @@ On mobile, render each row as a stacked card instead of a wide table.
   - `deletedAt` is null.
 - Include both awards and deductions in point totals.
 - Award count should count point transactions, regardless of positive or deduction type. If we later need separate counts, add `awardCount` and `deductionCount`.
-- Rank is ordered by total points descending. Ties should use house name ascending for stable display.
+- Rank is ordered by total points descending. Equal totals share competition rank; house name is only a stable display order and does not break ties.
 - Active days:
   - Use the season's `startsAt` and `endsAt` when available.
   - For an active season with no `endsAt`, use current server time.

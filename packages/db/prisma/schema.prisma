@@ -48,6 +48,10 @@ enum AuditEventType {
   POINT_DELETED
   POINTS_DEDUCTED
   SEASON_STARTED
+  SEASON_PLAN_CREATED
+  SEASON_PLAN_UPDATED
+  SEASON_PLAN_DISCARDED
+  SEASON_PLANNED_END_UPDATED
   HOUSE_SETTINGS_UPDATED
   ORG_SETTINGS_UPDATED
   USER_DISPLAY_NAME_CHANGED
@@ -66,6 +70,8 @@ enum NotificationType {
   INVITE_ACCEPTED
   ROLE_CHANGED
   SEASON_STARTED
+  SEASON_RECAP
+  SEASON_CORRECTION
   POINT_AWARD_RECEIVED
   POINT_DEDUCTION_RECEIVED
   POINT_REACTION_RECEIVED
@@ -131,6 +137,8 @@ model Organization {
   transactions   PointTransaction[]
   invites        OrgInvite[]
   seasons        Season[]
+  seasonPlan     SeasonPlan?
+  seasonTransitions SeasonTransition[]
   auditEvents    AuditEvent[]
   slugAliases    OrganizationSlugAlias[]
   notifications  Notification[]
@@ -217,6 +225,8 @@ model User {
   usedInvite               OrgInvite[]              @relation("UsedInvites")
   archivedOrganizations    Organization[]           @relation("ArchivedOrganizations")
   createdSeasons           Season[]                 @relation("CreatedSeasons")
+  createdSeasonPlans SeasonPlan[] @relation("CreatedSeasonPlans")
+  updatedSeasonPlans SeasonPlan[] @relation("UpdatedSeasonPlans")
   auditEvents              AuditEvent[]             @relation("AuditEventActor")
   authIdentities           AuthIdentity[]
   memberships              OrganizationMembership[]
@@ -273,18 +283,61 @@ model Season {
   name           String
   startsAt       DateTime
   endsAt         DateTime?
+  plannedEndsAt  DateTime?
+  timezone       String?
   isActive       Boolean            @default(false)
   createdById    String?
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy      User?              @relation("CreatedSeasons", fields: [createdById], references: [id], onDelete: SetNull)
   transactions   PointTransaction[]
+  previousSeasonTransitions SeasonTransition[] @relation("SeasonTransitionPrevious")
+  startedSeasonTransitions  SeasonTransition[] @relation("SeasonTransitionActive")
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
   @@unique([organizationId, name])
+  @@unique([organizationId, id])
   @@index([organizationId, isActive])
   @@index([organizationId, startsAt])
   @@index([createdById])
+}
+
+model SeasonTransition {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  idempotencyKey     String
+  planVersion        Int
+  previousSeasonId   String
+  activeSeasonId     String       @unique
+  createdAt          DateTime     @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  previousSeason     Season       @relation("SeasonTransitionPrevious", fields: [organizationId, previousSeasonId], references: [organizationId, id], onDelete: Restrict)
+  activeSeason       Season       @relation("SeasonTransitionActive", fields: [organizationId, activeSeasonId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, previousSeasonId])
+}
+
+model SeasonPlan {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  name           String
+  kickoffMessage String?
+  plannedStartsAt DateTime?
+  plannedEndsAt  DateTime?
+  timezone       String
+  version        Int          @default(1)
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?        @relation("CreatedSeasonPlans", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?        @relation("UpdatedSeasonPlans", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@index([updatedById])
 }
 
 model PointTransaction {

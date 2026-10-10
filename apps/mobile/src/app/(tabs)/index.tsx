@@ -1,5 +1,7 @@
-import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
-import { useQuery } from "@tanstack/react-query";
+import { MemberDetailsLink } from "@/components/MemberDetailsLink";
+import { HousesSection } from "@/components/HousesSection";
+import { useHouseOverview } from "@/hooks/use-house-overview";
+import type { DashboardSummary } from "@housepoints/contracts";
 import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -14,45 +16,14 @@ import {
 
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
-import { ApiResponseError, callApi } from "@/lib/api-client";
-import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
-import { mobileQueryKeys } from "@/lib/mobile-query-keys";
-import { CATEGORY_READ_CAPABILITY } from "@/lib/recognition-categories";
-
-const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
+import { ApiResponseError } from "@/lib/api-client";
 
 type SeasonStandout = NonNullable<DashboardSummary["seasonStandout"]>;
 
 export default function HomeScreen() {
-  const { user, getAccessToken } = useAppAuth();
-  const { activeOrgSlug, activeMembership } = useActiveOrg();
-  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
-
-  const summaryQuery = useQuery({
-    queryKey: mobileQueryKeys.dashboardSummary(activeOrgSlug),
-    enabled: activeOrgSlug !== null,
-    queryFn: async ({ signal }) => {
-      const accessToken = await getAccessToken();
-      return callApi(
-        "/dashboard/summary",
-        CATEGORY_READ_CAPABILITY,
-        { accessToken, organizationSlug: activeOrgSlug, signal },
-      );
-    },
-  });
-
-  const housesQuery = useQuery({
-    queryKey: mobileQueryKeys.houseLeaderboard(activeOrgSlug),
-    enabled: activeOrgSlug !== null,
-    queryFn: async ({ signal }) => {
-      const accessToken = await getAccessToken();
-      return callApi(
-        "/houses/leaderboard",
-        {},
-        { accessToken, organizationSlug: activeOrgSlug, signal },
-      );
-    },
-  });
+  const { user } = useAppAuth();
+  const { activeMembership } = useActiveOrg();
+  const { summaryQuery, housesQuery, summary, houses } = useHouseOverview();
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -70,12 +41,6 @@ export default function HomeScreen() {
     !housesQuery.data;
 
   const failed = summaryQuery.error ?? housesQuery.error;
-
-  // Local annotations force TS to resolve the query response types. Without
-  // them TanStack Query's `data` degrades to `any` because `callApi<E>`'s
-  // `z.output` return type does not distribute through the generic boundary.
-  const summary: DashboardSummary | undefined = summaryQuery.data;
-  const houses: LeaderboardEntry[] | undefined = housesQuery.data;
 
   return (
     <ScrollView
@@ -97,14 +62,7 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      <Pressable
-        testID="mobile.home.award-points"
-        accessibilityLabel="Award points"
-        style={styles.awardButton}
-        onPress={() => router.push("/award")}
-      >
-        <Text style={styles.awardLabel}>+ Award points</Text>
-      </Pressable>
+      {(initialLoading || failed || !summary) ? <AwardPointsButton /> : null}
 
       {initialLoading ? (
         <View style={styles.centered}>
@@ -118,6 +76,9 @@ export default function HomeScreen() {
             <SeasonHeader
               seasonName={summary.selectedSeason.name}
               startsAt={summary.selectedSeason.startsAt}
+              isActive={summary.selectedSeason.isActive}
+              plannedEndsAt={summary.selectedSeason.plannedEndsAt ?? null}
+              timezone={summary.selectedSeason.timezone ?? null}
             />
           ) : null}
           {houses ? <HousesSection houses={houses} /> : null}
@@ -155,11 +116,23 @@ function ErrorCard({
 function SeasonHeader({
   seasonName,
   startsAt,
+  isActive,
+  plannedEndsAt,
+  timezone,
 }: {
   seasonName: string;
   startsAt: string;
+  isActive: boolean;
+  plannedEndsAt: string | null;
+  timezone: string | null;
 }) {
   const formatted = formatSeasonStart(startsAt);
+  const plannedEnd = plannedEndsAt
+    ? formatPlannedSeasonEnd(plannedEndsAt, timezone)
+    : null;
+  const plannedEndPassed = plannedEndsAt
+    ? new Date(plannedEndsAt).getTime() < Date.now()
+    : false;
   return (
     <View style={styles.seasonCard}>
       <Text style={styles.eyebrow}>Current season</Text>
@@ -167,43 +140,29 @@ function SeasonHeader({
       {formatted ? (
         <Text style={styles.seasonMeta}>Started {formatted}</Text>
       ) : null}
+      {isActive && plannedEnd ? (
+        <Text style={[styles.seasonMeta, plannedEndPassed && styles.seasonWarning]}>
+          {plannedEndPassed
+            ? `Past planned end (${plannedEnd}); awaiting next kickoff. Awards continue.`
+            : `Planned end: ${plannedEnd}. Awards continue until kickoff.`}
+        </Text>
+      ) : null}
+      <AwardPointsButton />
     </View>
   );
 }
 
-function HousesSection({ houses }: { houses: LeaderboardEntry[] }) {
-  const sorted = [...houses].sort((a, b) => b.score - a.score);
+function AwardPointsButton() {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Houses</Text>
-      {sorted.length === 0 ? (
-        <Text style={styles.empty}>
-          No houses yet. Ask an admin to set some up.
-        </Text>
-      ) : (
-        <View style={styles.card}>
-          {sorted.map((house, index) => (
-            <View
-              key={house.id}
-              style={[styles.houseRow, index > 0 && styles.houseRowBorder]}
-            >
-              <View style={[styles.dot, { backgroundColor: house.color }]} />
-              <View style={styles.houseText}>
-                <Text style={styles.houseName}>{house.name}</Text>
-                <Text style={styles.houseMeta}>
-                  {house.memberCount}{" "}
-                  {house.memberCount === 1 ? "member" : "members"}
-                  {" \u00b7 "}
-                  {house.transactions}{" "}
-                  {house.transactions === 1 ? "award" : "awards"}
-                </Text>
-              </View>
-              <Text style={styles.houseScore}>{house.score}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
+    <Pressable
+      testID="mobile.home.award-points"
+      accessibilityLabel="Award points"
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.awardButton, pressed && styles.awardPressed]}
+      onPress={() => router.push("/award")}
+    >
+      <Text style={styles.awardLabel}>+ Award points</Text>
+    </Pressable>
   );
 }
 
@@ -211,7 +170,8 @@ function StandoutCard({ standout }: { standout: SeasonStandout }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Season standout</Text>
-      <View style={[styles.card, styles.standoutCard]}>
+      <Text style={styles.standoutMeta}>Long press to view performance.</Text>
+      <MemberDetailsLink memberId={standout.memberId} name={standout.memberName} style={[styles.card, styles.standoutCard]}>
         <View style={[styles.dot, { backgroundColor: standout.houseColor }]} />
         <View style={styles.standoutText}>
           <Text style={styles.standoutName}>{standout.memberName}</Text>
@@ -219,7 +179,7 @@ function StandoutCard({ standout }: { standout: SeasonStandout }) {
             {standout.houseName} {"\u00b7"} {standout.points} pts
           </Text>
         </View>
-      </View>
+      </MemberDetailsLink>
     </View>
   );
 }
@@ -236,6 +196,20 @@ function formatSeasonStart(iso: string): string | null {
   });
 }
 
+function formatPlannedSeasonEnd(iso: string, timezone: string | null): string | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.valueOf())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timezone ?? undefined,
+    timeZoneName: timezone ? "short" : undefined,
+  }).format(date);
+}
+
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: "#f8fafc" },
   container: { padding: 20, paddingBottom: 40, gap: 20 },
@@ -243,13 +217,17 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, fontWeight: "700", color: "#0f172a" },
   org: { fontSize: 15, color: "#475569", marginTop: 4 },
   awardButton: {
-    backgroundColor: "#0f172a",
+    backgroundColor: "#eef2ff",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
     borderRadius: 12,
+    marginTop: 16,
     paddingVertical: 14,
     alignItems: "center",
   },
+  awardPressed: { backgroundColor: "#e0e7ff" },
   awardLabel: {
-    color: "#ffffff",
+    color: "#3730a3",
     fontSize: 15,
     fontWeight: "700",
   },
@@ -274,44 +252,23 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   seasonCard: {
-    backgroundColor: "#0f172a",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 16,
   },
   eyebrow: {
     fontSize: 11,
-    color: "#94a3b8",
+    color: "#64748b",
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginBottom: 4,
   },
-  seasonName: { fontSize: 22, fontWeight: "700", color: "#f8fafc" },
-  seasonMeta: { fontSize: 13, color: "#cbd5e1", marginTop: 6 },
-  houseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  houseRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  houseText: { flex: 1 },
-  houseName: { fontSize: 16, fontWeight: "600", color: "#0f172a" },
-  houseMeta: { fontSize: 12, color: "#64748b", marginTop: 2 },
-  houseScore: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0f172a",
-    fontVariant: ["tabular-nums"],
-  },
+  seasonName: { fontSize: 22, fontWeight: "700", color: "#0f172a" },
+  seasonMeta: { fontSize: 13, color: "#64748b", lineHeight: 19, marginTop: 6 },
+  seasonWarning: { color: "#92400e" },
+  dot: { width: 12, height: 12, borderRadius: 6 },
   standoutCard: {
     flexDirection: "row",
     alignItems: "center",

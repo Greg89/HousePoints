@@ -347,3 +347,19 @@ Fill these in as work completes:
 - Google Play production submission:
 - Live App Store listing:
 - Live Google Play listing:
+
+### Emulator launcher interruption during mobile E2E
+
+Both award flows share `apps/mobile/e2e/subflows/wait-for-sign-in.yaml`.
+Startup waits for the sign-in control or the specific Android **Pixel Launcher
+isn't responding** dialog. If that launcher dialog appears, the flow captures
+`pixel-launcher-anr-before-recovery`, closes the launcher, and still requires
+`mobile.login.sign-in` before proceeding. Other dialogs, including a HousePoints
+ANR, are not dismissed. Persistent emulator failures still fail the run.
+
+An October 10 artifact showed the launcher dialog covering a rendered login
+screen; device logs showed React Native starting and the splash screen closing,
+without a supplied app fatal exception. That evidence points to an emulator
+interruption, not a confirmed app startup regression. Rerun the updated workflow
+against the same preview APK to verify recovery. No new GitHub Environment
+secrets, Railway variables, or preview build are required for this test-only change.

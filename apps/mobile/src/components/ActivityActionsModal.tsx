@@ -6,12 +6,15 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MOBILE_REACTION_KEYS, REACTION_EMOJI } from "@/lib/activity-reactions";
 
-export function ReactionPickerModal(props: {
+export function ActivityActionsModal(props: {
   visible: boolean;
+  canReact: boolean;
+  onReport: () => void;
   selected: PointReactionKey | null;
   pending: boolean;
   onSelect: (key: PointReactionKey) => void;
   onClose: () => void;
+  onDismiss?: () => void;
 }) {
   return (
     <Modal
@@ -19,11 +22,12 @@ export function ReactionPickerModal(props: {
       transparent
       animationType="fade"
       onRequestClose={props.onClose}
+      onDismiss={props.onDismiss}
     >
       <Pressable style={styles.backdrop} onPress={props.onClose}>
-        <Pressable style={styles.sheet} onPress={() => undefined}>
-          <Text style={styles.title}>Choose a reaction</Text>
-          <View style={styles.grid}>
+        <Pressable style={styles.sheet} onPress={() => undefined} accessibilityViewIsModal>
+          <Text style={styles.title}>Activity actions</Text>
+          {props.canReact ? <View style={styles.grid}>
             {MOBILE_REACTION_KEYS.map((key) => {
               const selected = props.selected === key;
               return (
@@ -45,7 +49,13 @@ export function ReactionPickerModal(props: {
                 </Pressable>
               );
             })}
-          </View>
+          </View> : null}
+          <Pressable accessibilityRole="button" style={styles.report} onPress={props.onReport}>
+            <Text style={styles.reportText}>⚑ Report activity</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.cancel} onPress={props.onClose}>
+            <Text style={styles.label}>Cancel</Text>
+          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
@@ -65,6 +75,9 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 36,
   },
+  report: { marginTop: 16, borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingVertical: 16, minHeight: 48 },
+  reportText: { color: "#b91c1c", fontSize: 15, fontWeight: "600" },
+  cancel: { alignItems: "center", padding: 12, minHeight: 48 },
   title: { fontSize: 18, fontWeight: "700", color: "#0f172a", marginBottom: 16 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   option: {
@@ -82,4 +95,3 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 22 },
   label: { flex: 1, fontSize: 13, fontWeight: "600", color: "#334155" },
 });
-

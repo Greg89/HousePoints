@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F4 and C1–C3 implemented and locally verified; C4 code is locally verified with device acceptance pending; C5 cohort gate, rehearsal code, and runbook are prepared locally, with live checks pending. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 and C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner; R1–R4 are implemented locally; S1 is locally verified. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -24,7 +24,7 @@ The [decision register](./README.md#decision-register) is the product authority.
 | Billing decision | B1–B3 | Cost-informed commercial specification and tested sandbox architecture |
 | Conditional paid pilot | P1–P7, after billing decision | Verified owner subscriptions, platform oversight, and recovery workflows |
 
-F1–F4 and C1–C3 are implemented; complete C4 device and old-binary verification before C5. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
+F1–F4 and C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner. B1 is independently actionable once someone is ready to conduct the spike; it does not block category/reporting work. S1 can be developed once categories are available, while final recap integration waits for reports. No background season-closing service is part of any slice.
 
 ## F — Targeted scoring and navigation reliability
 
@@ -92,7 +92,7 @@ Done when archive-vs-award and simultaneous-last-archive races are safe, reused 
 
 ### C3 — Web category management and award selection
 
-Status: **implementation complete, locally verified September 27, 2026**. The web category UI is disabled by default through `RECOGNITION_CATEGORIES_WEB_ENABLED`; API mutations remain disabled until C5. See the [category rollout notes](./recognition-categories.md#c3-web-category-management-and-awards).
+Status: **implementation complete, locally verified September 27, 2026**. The web category UI is disabled by default through `RECOGNITION_CATEGORIES_WEB_ENABLED`; API mutations were gated until C5. See the [category rollout notes](./recognition-categories.md#c3-web-category-management-and-awards).
 
 Dependencies: C2. Surfaces: Manage Recognition, award dialog, activity/report labels.
 
@@ -102,7 +102,7 @@ Done when owner/member permissions, archive/add with the same name, picker exclu
 
 ### C4 — Mobile category compatibility
 
-Status: **implementation complete with local verification September 27, 2026; device and old-binary acceptance pending**. The native award flag remains off by default; see the [mobile compatibility notes](./recognition-categories.md#c4-mobile-compatibility).
+Status: **complete per the release owner**. See the [mobile compatibility notes](./recognition-categories.md#c4-mobile-compatibility).
 
 Dependencies: C2. Surfaces: mobile picker, activity/home/report models, notifications, version handling.
 
@@ -112,7 +112,7 @@ Done when the upgraded app completes an award and renders archived/custom catego
 
 ### C5 — Enable categories with a cross-client release rehearsal
 
-Status: **rehearsal automation, rollback-safe web reads, and staging runbook prepared; rollout changed October 4, 2026 to environment-wide flags, beta before production, without organization-ID allowlists**. Code has been deployed per the release owner; category device, old-binary, and live enablement evidence remains to be recorded. See the [C5 runbook](./recognition-categories.md#c5-release-rehearsal--prepared-not-enabled).
+Status: **complete per the release owner**. The rollout uses environment-wide flags, beta before production, without organization-ID allowlists. See the [C5 release notes](./recognition-categories.md#c5-release-rehearsal).
 
 Dependencies: C3, C4. Surfaces: deployment/release docs, compatibility gate and targeted E2E.
 
@@ -172,6 +172,8 @@ One draft per organization: name, optional message/planned dates, timezone, read
 
 Done when owner/admin permissions, timezone edge cases, draft conflicts, and past-planned-end messaging are tested. Existing start remains available until S2 connects the draft flow.
 
+Status: **implementation complete and locally verified October 9, 2026**. Workspace tests, typecheck, lint, production build, and PostgreSQL integration tests pass against a fresh disposable local PostgreSQL 16 container. No shared or production database was migrated or modified.
+
 ### S2 — Start the prepared season atomically
 
 Dependencies: S1, F1, F2, F4. Surfaces: existing transition service, owner confirmation, notifications.
@@ -180,6 +182,8 @@ Add expected-active-season/plan-version checks and idempotent kickoff. Close the
 
 Done when double-click/retry produces one transition, simultaneous award/start is correct, stale plans conflict, and rollback preserves the original active season and draft. No scheduler or standalone close.
 
+Status: **implementation complete and locally verified October 9, 2026**. Full workspace tests, typecheck, lint, production build, and PostgreSQL integration tests pass against a fresh disposable local PostgreSQL 16 container. No shared or production database was migrated or modified.
+
 ### S3 — Connect season recap, comparison, and correction notices
 
 Dependencies: S2, R4, F3. Surfaces: Overview/season reports, recap notification links.
@@ -187,6 +191,8 @@ Dependencies: S2, R4, F3. Surfaces: Overview/season reports, recap notification 
 Use the same reporting service for closed-season totals, co-winners, contributions, and comparisons. Connect recap notices to the actual organization/season rather than embedding an immutable winner claim. Surface correction disclosure and send a deduplicated owner/admin informational notice when a correction changes the winning set.
 
 Done when kickoff → old-season recap → drill-through and later correction → updated winner/report are verified end to end. Update prior season/winner/comparison docs to match implemented behavior.
+
+Status: **implementation complete and locally verified October 9, 2026**. All 1,187 workspace tests, typecheck, lint, production build, database/API integration tests, and reporting integration tests pass. The new notification enum migration has been applied only to a fresh disposable local PostgreSQL 16 container; it has not been applied to a shared or production environment.
 
 ## B — Billing spike (current commitment)
 
@@ -198,7 +204,18 @@ Estimate hosting at realistic member/activity levels; propose Standard price and
 
 Done when each unresolved item has a recommendation, evidence, and owner decision needed before implementation. Time-box discovery to producing this record, not building a generic billing framework.
 
-Draft status: a decision-record skeleton has been drafted at [B1 decision record (draft)](./b1-decision-record.md) that turns every open item from the billing design into a numbered section with a recommendation, an evidence requirement, and a specific owner sign-off. It does not commit to a price, provider, or hosting cost — those require primary-source evidence gathered during the spike. B1 remains "prepared, not decided" until every acceptance-checklist item in that record has a documented owner decision.
+Research status: [B1 decision record](./b1-decision-record.md) contains an
+official-source comparison for Stripe, Paddle, Apple, and Google Play. The
+owner has selected a U.S.-only launch, a U.S. seller entity, USD, a 21–50
+initial Plus band, Stripe as the B2 sandbox candidate, a 30-day price-change
+notice, immediate provider-native proration, the archive/exception policies,
+and the Limited-mode endpoint matrix. iOS may link to web billing; Google
+Play is limited to non-clickable billing information. A staging cost
+measurement plan is documented but has not been run. Representative hosting
+telemetry and prices remain unavailable, and seller-specific provider
+fees/tax obligations still need confirmation. B1 remains "prepared, not
+decided" until every open item in its acceptance checklist is resolved; no
+production billing is authorized.
 
 ### B2 — Prove the lifecycle in an isolated sandbox
 
@@ -238,6 +255,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4: **code locally verified; Android device and old-binary checks pending**. C5: **cohort gate and rehearsal prepared; live evidence and supported-version policy pending**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. Remaining C/R/S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4–C5: **complete per the release owner**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. S1: **implementation complete with local verification; database integration validation and deployment pending**. Remaining S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Recommended next checkpoint: **C4 Android device and old-binary verification, then the C5 staging rehearsal**. Keep category mutation disabled until the controlled staging run and preserve the legacy enum boundary for unsupported clients.
+Recommended next checkpoint after S2 verification: **S3 — connect season recap, comparison, and correction notices**. S2 preserves the legacy immediate-start API behavior through the shared transition service.

@@ -1,6 +1,8 @@
 # Season kickoff and reporting
 
-Status: proposed. Extends [implemented seasons](../seasons-design.md), [winner summary](../season-winner-summary.md), and [comparison](../season-comparison-report.md). D2 (closed-season corrections with required reason and audit trail), D3 (transaction-time house attribution), and D4 (shared ranks and co-winners for this release) are approved September 20, 2026; D5 (manual rollover with informational planned dates and no background season-transition service) is also approved September 20, 2026. Other implementation details remain proposed.
+Status: S1–S3 are implemented and locally verified, including PostgreSQL integration validation; deployment remains pending. Integration verification ran against a fresh disposable local PostgreSQL 16 container, not a shared or production database. Extends [implemented seasons](../seasons-design.md), [winner summary](../season-winner-summary.md), and [comparison](../season-comparison-report.md). D2 (closed-season corrections with required reason and audit trail), D3 (transaction-time house attribution), and D4 (shared ranks and co-winners for this release) are approved September 20, 2026; D5 (manual rollover with informational planned dates and no background season-transition service) is also approved September 20, 2026.
+
+S1 locally adds organization-scoped season planning, owner plan management with audited version checks, DST-aware local date entry, active-season planned-end metadata, and web/mobile planned-end messaging. S2 connects the prepared plan to the existing serialized transition: the owner confirms the active season and plan version, and a database-backed idempotency record lets retries return the original transition. Kickoff copies the plan's intended end and timezone to the new season, creates the announcement notifications, and consumes the plan in one transaction. Legacy immediate-start requests still use the same transition service. S3 adds a linked recap notice for the season that just closed, a historical report recap with current winners and correction disclosure, and an informational owner/admin notice when a closed-season correction changes the winner set. Correction notices and the score correction/audit commit in the same organization-scoped transaction and are deduplicated per corrected transaction. All 1,187 workspace tests, typecheck, lint, production build, database/API integration tests, and reporting integration tests pass. PostgreSQL verification used a fresh disposable local PostgreSQL 16 container. No shared or production database was migrated or modified.
 
 ## Current foundation and intended change
 
@@ -17,14 +19,14 @@ Approved September 20, 2026 (D9): season planning and richer management ship on 
 1. **Prepare:** create or edit one next-season plan containing name, optional kickoff message, optional intended start and end, and an IANA organization timezone. Show a readiness summary: active recognition categories, houses, unassigned members, and the current season that will close.
 2. **Review:** preview the announcement and explain that existing points remain in the old season while new awards begin at zero in the successor. Planned dates are expectations, not automation. Warn about unassigned members without blocking kickoff; invalid dates or no active category are blocking errors.
 3. **Kick off now:** owner confirms the current season and successor. Recheck permissions, expected active-season ID, plan version, category readiness, and future entitlement eligibility. Close the old season and create the new season at one server timestamp in one transaction.
-4. **Communicate:** persist the kickoff announcement and the previous season's recap notification transactionally. Deliver push after commit through a bounded or durable dispatch mechanism. Link recipients to the correct organization and season.
+4. **Communicate:** persist the kickoff announcement transactionally as season-start notifications linked to the new season and organization. Deliver push after commit through the existing bounded dispatcher; push failure does not reverse a committed kickoff. S3 connects the previous season's recap notification and report link.
 5. **Review results:** select any historical season to see standings, co-winners, counts, awarded/deducted/net points, recipient contributions, category breakdown, and comparison links. Drill-through uses exactly the reporting rules in [leaderboard reporting](./leaderboard-reporting.md).
 
 Admins can inspect plans and reports but cannot edit or start seasons. Members can see the active season context and permitted historical reports. The kickoff message is optional plain text with a proposed 500-character limit.
 
 ## State and data
 
-Use a separate organization-scoped `SeasonPlan` for the next season rather than forcing drafts into existing `Season` contracts that require `startsAt`. Proposed fields: organization ID (unique), name, kickoff message, planned start/end instants, timezone, version, creator/updater, timestamps. Discarding a draft is an audited configuration operation; it does not delete a real season or ledger history.
+Use a separate organization-scoped `SeasonPlan` for the next season rather than forcing drafts into existing `Season` contracts that require `startsAt`. S1 persists organization ID (unique), name, kickoff message, planned start/end instants, timezone, version, creator/updater, and timestamps. Discarding a draft is an audited configuration operation; it does not delete a real season or ledger history.
 
 Add planned end and timezone metadata to actual seasons as needed. Keep existing `startsAt` and `endsAt` as actual boundaries. A missed planned end displays "Past planned end; awaiting next kickoff" and continues accepting awards. It must not silently close or pretend the actual end occurred.
 
@@ -35,6 +37,8 @@ Support editing a plan, discarding it, renaming a season, and updating an active
 ## Atomic transition and award boundary
 
 Kickoff input includes an idempotency key, expected active-season ID, and expected plan version. The retry of a successful kickoff returns the same transition and does not send duplicate announcements. A conflicting kickoff or changed plan returns a typed conflict with a refresh action.
+
+Prepared kickoffs persist the idempotency key and plan version alongside the previous and new season IDs. The organization scoring lock serializes kickoff with awards and retries; the owner membership row is rechecked and locked inside the transaction. Existing seasons and point history are not rewritten. The current billing design has no season-start entitlement gate, so no paid eligibility check is introduced here; revisit if B3 adds gated season behavior.
 
 The transition and all point writers use a common concurrency protocol, such as a transaction-scoped organization lock. Resolve the active season only after acquiring that protection and keep it through the write. An award that commits before rollover belongs to the old season; one serialized after rollover belongs to the new season. A pre-transaction active-season lookup alone cannot guarantee this.
 
@@ -48,7 +52,7 @@ Approved September 20, 2026: authorized corrections after season closure update 
 
 The remaining scope recommendation is unchanged: closed means no new normal awards. Use existing authorized correction mechanisms; do not add arbitrary historical deductions in this release.
 
-Reports display "Results reflect recorded corrections" and an as-of/revision indicator. A correction advances the reporting revision and records the affected season. A recap announcement links to the report instead of embedding a permanent winner claim that may later be wrong. A correction that changes the winning set should produce a deduplicated informational notice to owners/admins; do not rebroadcast the entire season announcement automatically.
+Reports display "Results reflect recorded corrections" and an as-of/revision indicator. A correction advances the reporting revision and records the affected season. A recap announcement links to the report instead of embedding a permanent winner claim that may later be wrong. A correction that changes the winning set produces a deduplicated informational notice to active owners/admins; do not rebroadcast the entire season announcement automatically. Recap and correction notices link to the organization-scoped report for the affected season. These new notices are informational in-app notifications and are not sent as push notifications.
 
 Empty seasons have no winner. Equal highest scores have co-winners. Recipient contributions include departed members, and transaction-time house attribution is preserved. Legacy closed seasons use the same live-ledger rules; this migration cannot reconstruct an original closing snapshot that was never captured.
 
@@ -59,3 +63,5 @@ New metadata is nullable for existing seasons. Keep existing start/rename APIs f
 Verify owner/admin/member access, stale-plan conflicts, duplicate kickoff, notification dedupe, transaction rollback, concurrent awards/kickoff, concurrent deductions, timezone edge cases, planned dates passing without automation, empty/tied/negative results, and closed-season correction notices. Use real database concurrency tests for ordering invariants.
 
 Rollback can hide planning UI while retaining new fields and the compatible transition service. Do not roll back to a point writer that ignores the new concurrency protocol.
+
+S2 adds the additive `20261009150000_season_kickoff_idempotency` migration. S3 adds `20261009160000_season_recap_correction_notifications` to extend the notification enum; it requires no new environment variables or secrets. Keep the transition ledger and its unique organization/key constraint after kickoff has been enabled; removing it would invalidate retry guarantees. The old immediate-start route remains supported and uses the shared transition service.

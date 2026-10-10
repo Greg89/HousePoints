@@ -220,9 +220,40 @@ server join endpoint after explicit confirmation.
 
 Activity reactions are also implemented using the current
 `/transactions/react` and `/transactions/reactions` contracts. Award rows
-provide a visible picker plus a long-press shortcut, update counts
-optimistically with rollback, and expose the server-backed reaction details.
-Deduction rows do not expose reaction controls.
+open an activity actions sheet on long press, with reaction choices followed by
+Report activity. The inline React and Report buttons are removed. Reaction counts
+still open server-backed reaction details; changes update optimistically with
+rollback. Deduction rows offer Report activity only. Screen readers can invoke
+the card's Activity actions accessibility action. Opening the sheet triggers
+best-effort light iOS feedback or Android long-press feedback via `expo-haptics`.
+New native builds are required to include this dependency; no environment changes
+are needed. Before release, increment the app version (the configured EAS runtime
+policy is `appVersion`) so this native dependency is not sent as an OTA update to
+older binaries. Verify long press, scrolling cancellation, feedback, and opening the
+report form from the sheet on iOS and Android devices before release.
+
+Home house rows now open `/house/[houseId]` directly on long press, with the same
+best-effort haptic feedback used by activity cards and a screen-reader action.
+House details include current-season points, member/transaction counts, season
+standout, recognition leader, 14-day points velocity, member rankings, and recent
+activity. The screen supports pull to refresh, loading/retry states, and missing
+houses; it requires an authenticated user with an active organization.
+
+Home and house details use `useHouseOverview` to share the organization-scoped
+dashboard and house leaderboard caches. Web `OverviewReports` and native
+`HouseOverviewReport` both use `selectOverviewReport` from contracts, preserving
+server-calculated rankings, category/trait mode, and house filtering. No new API,
+environment variable, or dependency is required for house details.
+
+This is the dashboard overview, not the paginated `/reports/query` ledger. Recent
+activity is capped at eight entries from the dashboard snapshot and uses the
+existing house-name field in the activity contract; it is not a complete house
+history. Device QA: long press either house, check back navigation, refresh after
+an award, and switch organizations before reopening details.
+
+Member performance details are implemented for long presses on the Home season
+standout and Leaderboard contributor rows. See [member-performance.md](./member-performance.md)
+for the shared web/native API, ranking resources, data semantics, and API-first rollout.
 
 **Phase 3 — Admin subset**
 
@@ -369,4 +400,9 @@ Triaged 2026-07-29. These replace the previous open-questions list.
 | 17.4 | Admin scope on mobile | **Match the design doc**: member house assignment, role changes, invite generation/share, point deduction (gated by `POINT_ADJUSTMENTS_ENABLED`). Everything else deep-links to web. | Deferred to web-only: season creation/transition, org archive, release announcements, house theme QA, season comparison report. |
 | 17.5 | App identity | **Name: HousePoints. Bundle id: `com.housepoints.app`. Scheme: `housepoints://`.** | Locked before Auth0 Native Application registration and store identifier reservation. Callback + logout URLs recorded in §12. |
 | 17.6 | Expo Updates (OTA) | **Enabled from day one** on `preview` and `production` channels. | JS-only hotfixes ship without store review. Native code changes still require an EAS Build + store submission. Rollback via `eas update --republish` to the previous runtime version. |
+
+
+### Home presentation
+
+The home screen groups season information and the softly tinted Award points action in one white, bordered card. Planned-end text is muted until overdue. Award points remains available when dashboard data is loading or unavailable. Shared tab headers use a notification bell on a pale circle beside the dark profile circle, with an outlined/read and filled/unread state, a capped unread badge, and accessible notification counts.
 

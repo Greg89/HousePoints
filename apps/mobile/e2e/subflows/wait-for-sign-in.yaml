@@ -1,0 +1,20 @@
+appId: com.housepoints.app
+name: Wait for sign-in and recover a Pixel Launcher ANR
+---
+# Wait for either login or the specific emulator launcher dialog. Checking the
+# dialog immediately after launch can miss it while the app is still starting.
+- extendedWaitUntil:
+    visible: "Sign in with Auth0|Pixel Launcher isn.t responding"
+    timeout: 30000
+- runFlow:
+    when:
+      platform: Android
+      visible: "Pixel Launcher isn.t responding"
+    commands:
+      - takeScreenshot: pixel-launcher-anr-before-recovery
+      - tapOn: "Close app"
+# Never dismiss a HousePoints ANR or turn the actual login check into optional.
+- extendedWaitUntil:
+    visible:
+      id: "mobile.login.sign-in"
+    timeout: 30000

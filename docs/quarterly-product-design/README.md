@@ -2,7 +2,7 @@
 
 Created September 20, 2026. Target planning horizon: Q4 2026.
 
-Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1–F4 and C1–C3 category persistence/API/web compatibility are implemented and locally verified. C4 mobile code is locally verified, with Android device and old-binary compatibility checks pending. C5 rehearsal checks and rollback notes are prepared, with live evidence and supported-version policy pending. Category rollout uses environment-wide flags, beta before production, without organization-ID allowlists.
+Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1–F4 are implemented and locally verified; C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner. R1–R4 are implemented locally; S1–S3 are implemented and locally verified, including PostgreSQL integration validation; deployment remains pending. Category rollout uses environment-wide flags, beta before production, without organization-ID allowlists.
 
 ## Product direction
 

@@ -10,6 +10,7 @@ import {
 describe("mobile query invalidation policy", () => {
   it("maps point changes to every affected organization-scoped surface", () => {
     expect(mobileMutationInvalidations.pointsChanged("alpha")).toEqual([
+      mobileQueryKeys.memberPerformanceRoot("alpha"),
       mobileQueryKeys.activityRecent("alpha"),
       mobileQueryKeys.dashboardSummary("alpha"),
       mobileQueryKeys.houseLeaderboard("alpha"),
@@ -40,5 +41,19 @@ describe("mobile query invalidation policy", () => {
 
     expect(queryClient.getQueryState(mobileQueryKeys.activityRecent("alpha"))?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(mobileQueryKeys.activityRecent("beta"))?.isInvalidated).toBe(false);
+  });
+});
+
+describe("member performance invalidation", () => {
+  it("refreshes all member/season variants only in the changed organization", async () => {
+    const client = new QueryClient();
+    const alpha = mobileQueryKeys.memberPerformance("alpha", "m1", "s1");
+    const alphaOther = mobileQueryKeys.memberPerformance("alpha", "m2", "s2");
+    const beta = mobileQueryKeys.memberPerformance("beta", "m1", "s1");
+    for (const key of [alpha, alphaOther, beta]) client.setQueryData(key, {});
+    await invalidateMobileQueries(client, mobileMutationInvalidations.pointsChanged("alpha"));
+    expect(client.getQueryState(alpha)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(alphaOther)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(beta)?.isInvalidated).toBe(false);
   });
 });

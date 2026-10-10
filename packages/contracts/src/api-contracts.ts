@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { memberPerformanceRequestSchema, memberPerformanceSchema } from "./member-performance-schemas.js";
 import { apiErrorSchema } from "./shared.js";
 import {
   adminAuditRequestSchema,
@@ -73,6 +74,12 @@ import {
   actorScopeSchema,
   seasonScopedRequestSchema,
   seasonContextSchema,
+  seasonPlanContextSchema,
+  seasonPlanSchema,
+  saveSeasonPlanSchema,
+  discardSeasonPlanSchema,
+  kickoffSeasonSchema,
+  updateSeasonPlannedEndSchema,
   createSeasonSchema,
   seasonTransitionSchema,
   seasonCompareRequestSchema,
@@ -185,6 +192,7 @@ export const apiContracts = {
   "/devices/register": defineContract(registerDeviceRequestSchema, registerDeviceResponseSchema),
   "/devices/unregister": defineContract(unregisterDeviceRequestSchema, unregisterDeviceResponseSchema),
   "/houses/leaderboard": defineContract(seasonScopedRequestSchema, leaderboardSchema),
+  "/members/performance": defineContract(memberPerformanceRequestSchema, memberPerformanceSchema),
   "/members": defineContract(actorScopeSchema, orgMembersSchema),
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),
   "/notifications/mark-all-read": defineContract(actorScopeSchema, notificationMutationResponseSchema),
@@ -247,6 +255,11 @@ export const apiContracts = {
     recognitionCategoryMutationResponseSchema,
   ),
   "/seasons/context": defineContract(actorScopeSchema, seasonContextSchema),
+  "/seasons/plan-context": defineContract(actorScopeSchema, seasonPlanContextSchema),
+  "/seasons/plan": defineContract(saveSeasonPlanSchema, seasonPlanSchema),
+  "/seasons/plan/discard": defineContract(discardSeasonPlanSchema, z.object({ discarded: z.literal(true) })),
+  "/seasons/kickoff": defineContract(kickoffSeasonSchema, seasonTransitionSchema),
+  "/seasons/planned-end": defineContract(updateSeasonPlannedEndSchema, seasonSchema),
   "/seasons/compare": defineContract(
     seasonCompareRequestSchema,
     seasonComparisonSchema,

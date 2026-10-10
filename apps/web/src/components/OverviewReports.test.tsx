@@ -31,6 +31,20 @@ const summary: DashboardSummary = {
 };
 
 describe("OverviewReports", () => {
+  it("uses the shared house projection for standout and recorded member ranks", () => {
+    const house = { id: "a", name: "Alpha", color: "#111111", description: null, score: 10, transactions: 2, memberCount: 2 };
+    render(<OverviewReports dashboardSummary={{
+      ...summary,
+      seasonStandout: { memberId: "other", memberName: "Other standout", houseId: "b", houseName: "Beta", houseColor: "#222222", points: 100 },
+      seasonStandoutsByHouse: [{ houseId: "a", standout: { memberId: "alice", memberName: "Alice", houseId: "a", houseName: "Alpha", houseColor: "#111111", points: 10 } }],
+      houseMemberRankings: [{ houseId: "a", members: [{ memberId: "former", displayName: "Former contributor", role: null, points: 10, rank: 1 }] }],
+    }} selectedHouse={house} onShowActivity={vi.fn()} />);
+    expect(screen.getByText("Alice")).toBeTruthy();
+    expect(screen.queryByText("Other standout")).toBeNull();
+    expect(screen.getByText("Former contributor")).toBeTruthy();
+    expect(screen.getByText("Former member")).toBeTruthy();
+  });
+
   it("shows every tied winner even when net totals are zero", () => {
     render(<OverviewReports dashboardSummary={summary} onShowActivity={vi.fn()} />);
     const recap = screen.getByRole("article", { name: "Season recap" });

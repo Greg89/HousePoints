@@ -39,9 +39,14 @@ import {
   readMemberScores,
   readSeasonComparison,
   readSeasonContext,
+  readSeasonPlanContext,
   readSeasonReports,
   renameSeason,
+  saveSeasonPlan,
+  discardSeasonPlan,
+  kickoffSeason,
   startSeason,
+  updateSeasonPlannedEnd,
 } from "./actions/seasons";
 import { AdminForms } from "@/components/AdminForms";
 import { AdminUnavailablePanel } from "@/components/AdminUnavailablePanel";
@@ -190,7 +195,12 @@ export async function renderDashboardPage(route: string) {
       onLoadPointAdjustmentStats={readPointAdjustmentStats}
       onCreateInvite={createInviteLink}
       onStartSeason={startSeason}
+      onKickoffSeason={kickoffSeason}
       onRenameSeason={renameSeason}
+      onReadSeasonPlanContext={readSeasonPlanContext}
+      onSaveSeasonPlan={saveSeasonPlan}
+      onDiscardSeasonPlan={discardSeasonPlan}
+      onUpdateSeasonPlannedEnd={updateSeasonPlannedEnd}
       recognitionCategories={recognitionCategories}
       onListRecognitionCategories={recognitionCategoriesWebEnabled ? readRecognitionCategories : undefined}
       onCreateRecognitionCategory={recognitionCategoriesWebEnabled ? createRecognitionCategory : undefined}
