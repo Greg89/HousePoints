@@ -791,6 +791,25 @@ describe("AdminForms", () => {
     expect(screen.queryByRole("form", { name: "Start season" })).not.toBeInTheDocument();
   });
 
+  it("opens and dismisses the immediate-start editor without changing the season", async () => {
+    const { user, props } = setupAdminForms();
+    switchToManageSection("Seasons");
+    const startSeason = screen.getByRole("button", { name: "Start immediately" });
+
+    await user.click(startSeason);
+    expect(screen.getByRole("dialog", { name: "Start next season" })).toHaveTextContent(
+      "Starting a new season immediately closes Q3 2026.",
+    );
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Start next season" })).not.toBeInTheDocument();
+      expect(startSeason).toHaveFocus();
+    });
+    expect(props.onStartSeason).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
+  });
+
   it("confirms and starts a new season for owners", async () => {
     const { user, props } = setupAdminForms();
     switchToManageSection("Seasons");

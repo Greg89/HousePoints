@@ -179,6 +179,9 @@ The admin and owner credentials remain optional for local development, but both 
 the staging GitHub Environment. The Manage workspace suite also verifies deep-link URL state,
 refresh and browser history, member filtering and detail-sheet focus restoration, Audit modes,
 owner tool sheets, and the admin mobile picker without submitting mutations.
+The season tool check opens **Start immediately**, verifies the **Start next
+season** editor warning, and dismisses it with Escape while checking focus
+restoration. It never submits or starts a season.
 Desktop tabs and the mobile picker assert the complete destination set in both
 rollout modes, rather than requiring six destinations after Recognition ships.
 Local selector regression coverage can run without staging credentials or an app

@@ -98,12 +98,14 @@ test("owner can traverse every workspace, preserve URLs, and open focused tools 
 
   await navigation.getByRole("tab", { name: "Seasons" }).click();
   await expect(page.getByRole("region", { name: "Season history" })).toBeVisible();
-  const startSeason = page.getByRole("button", { name: "Start next season" });
+  const startSeason = page.getByRole("button", { name: "Start immediately", exact: true });
+  await expect(startSeason).toBeEnabled();
   await startSeason.click();
   await expect(page.getByRole("dialog", { name: "Start next season" })).toContainText(
     /immediately closes/i,
   );
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Start next season" })).toHaveCount(0);
   await expect(startSeason).toBeFocused();
 
   await navigation.getByRole("tab", { name: "Organization" }).click();
