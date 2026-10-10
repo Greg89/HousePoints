@@ -232,6 +232,25 @@ policy is `appVersion`) so this native dependency is not sent as an OTA update t
 older binaries. Verify long press, scrolling cancellation, feedback, and opening the
 report form from the sheet on iOS and Android devices before release.
 
+Home house rows now open `/house/[houseId]` directly on long press, with the same
+best-effort haptic feedback used by activity cards and a screen-reader action.
+House details include current-season points, member/transaction counts, season
+standout, recognition leader, 14-day points velocity, member rankings, and recent
+activity. The screen supports pull to refresh, loading/retry states, and missing
+houses; it requires an authenticated user with an active organization.
+
+Home and house details use `useHouseOverview` to share the organization-scoped
+dashboard and house leaderboard caches. Web `OverviewReports` and native
+`HouseOverviewReport` both use `selectOverviewReport` from contracts, preserving
+server-calculated rankings, category/trait mode, and house filtering. No new API,
+environment variable, or dependency is required for house details.
+
+This is the dashboard overview, not the paginated `/reports/query` ledger. Recent
+activity is capped at eight entries from the dashboard snapshot and uses the
+existing house-name field in the activity contract; it is not a complete house
+history. Device QA: long press either house, check back navigation, refresh after
+an award, and switch organizations before reopening details.
+
 **Phase 3 — Admin subset**
 
 - Manage members: house assignment, role changes, remove member (implemented

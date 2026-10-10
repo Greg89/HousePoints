@@ -18,6 +18,10 @@ refresh remains available as an explicit fallback.
 - App foreground, network reconnect, and screen-focus triggers refetch stale
   active queries.
 - Primary data screens expose pull to refresh.
+- Home and house details share `useHouseOverview` and the same organization-scoped
+  dashboard/house leaderboard keys, including focus refresh and existing mutation
+  invalidation. Navigating to details reuses fresh data instead of making a second
+  independent report cache.
 - Mobile mutations use an audited, exact, organization-scoped key catalog.
 - Expo Router focus hooks handle tabs that remain mounted.
 - Web and other-device mutations cannot invalidate this device's in-memory

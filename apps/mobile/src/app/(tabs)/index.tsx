@@ -1,5 +1,6 @@
-import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
-import { useQuery } from "@tanstack/react-query";
+import { HousesSection } from "@/components/HousesSection";
+import { useHouseOverview } from "@/hooks/use-house-overview";
+import type { DashboardSummary } from "@housepoints/contracts";
 import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -14,45 +15,14 @@ import {
 
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
-import { ApiResponseError, callApi } from "@/lib/api-client";
-import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
-import { mobileQueryKeys } from "@/lib/mobile-query-keys";
-import { CATEGORY_READ_CAPABILITY } from "@/lib/recognition-categories";
-
-const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
+import { ApiResponseError } from "@/lib/api-client";
 
 type SeasonStandout = NonNullable<DashboardSummary["seasonStandout"]>;
 
 export default function HomeScreen() {
-  const { user, getAccessToken } = useAppAuth();
-  const { activeOrgSlug, activeMembership } = useActiveOrg();
-  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
-
-  const summaryQuery = useQuery({
-    queryKey: mobileQueryKeys.dashboardSummary(activeOrgSlug),
-    enabled: activeOrgSlug !== null,
-    queryFn: async ({ signal }) => {
-      const accessToken = await getAccessToken();
-      return callApi(
-        "/dashboard/summary",
-        CATEGORY_READ_CAPABILITY,
-        { accessToken, organizationSlug: activeOrgSlug, signal },
-      );
-    },
-  });
-
-  const housesQuery = useQuery({
-    queryKey: mobileQueryKeys.houseLeaderboard(activeOrgSlug),
-    enabled: activeOrgSlug !== null,
-    queryFn: async ({ signal }) => {
-      const accessToken = await getAccessToken();
-      return callApi(
-        "/houses/leaderboard",
-        {},
-        { accessToken, organizationSlug: activeOrgSlug, signal },
-      );
-    },
-  });
+  const { user } = useAppAuth();
+  const { activeMembership } = useActiveOrg();
+  const { summaryQuery, housesQuery, summary, houses } = useHouseOverview();
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -70,12 +40,6 @@ export default function HomeScreen() {
     !housesQuery.data;
 
   const failed = summaryQuery.error ?? housesQuery.error;
-
-  // Local annotations force TS to resolve the query response types. Without
-  // them TanStack Query's `data` degrades to `any` because `callApi<E>`'s
-  // `z.output` return type does not distribute through the generic boundary.
-  const summary: DashboardSummary | undefined = summaryQuery.data;
-  const houses: LeaderboardEntry[] | undefined = housesQuery.data;
 
   return (
     <ScrollView
@@ -193,42 +157,6 @@ function SeasonHeader({
   );
 }
 
-function HousesSection({ houses }: { houses: LeaderboardEntry[] }) {
-  const sorted = [...houses].sort((a, b) => b.score - a.score);
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Houses</Text>
-      {sorted.length === 0 ? (
-        <Text style={styles.empty}>
-          No houses yet. Ask an admin to set some up.
-        </Text>
-      ) : (
-        <View style={styles.card}>
-          {sorted.map((house, index) => (
-            <View
-              key={house.id}
-              style={[styles.houseRow, index > 0 && styles.houseRowBorder]}
-            >
-              <View style={[styles.dot, { backgroundColor: house.color }]} />
-              <View style={styles.houseText}>
-                <Text style={styles.houseName}>{house.name}</Text>
-                <Text style={styles.houseMeta}>
-                  {house.memberCount}{" "}
-                  {house.memberCount === 1 ? "member" : "members"}
-                  {" \u00b7 "}
-                  {house.transactions}{" "}
-                  {house.transactions === 1 ? "award" : "awards"}
-                </Text>
-              </View>
-              <Text style={styles.houseScore}>{house.score}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
 function StandoutCard({ standout }: { standout: SeasonStandout }) {
   return (
     <View style={styles.section}>
@@ -323,31 +251,7 @@ const styles = StyleSheet.create({
   },
   seasonName: { fontSize: 22, fontWeight: "700", color: "#f8fafc" },
   seasonMeta: { fontSize: 13, color: "#cbd5e1", marginTop: 6 },
-  houseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  houseRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  houseText: { flex: 1 },
-  houseName: { fontSize: 16, fontWeight: "600", color: "#0f172a" },
-  houseMeta: { fontSize: 12, color: "#64748b", marginTop: 2 },
-  houseScore: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0f172a",
-    fontVariant: ["tabular-nums"],
-  },
+  dot: { width: 12, height: 12, borderRadius: 6 },
   standoutCard: {
     flexDirection: "row",
     alignItems: "center",
