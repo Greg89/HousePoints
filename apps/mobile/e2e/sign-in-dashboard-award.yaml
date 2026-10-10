@@ -7,10 +7,7 @@ tags:
 - launchApp:
     clearState: true
 
-- extendedWaitUntil:
-    visible:
-      id: "mobile.login.sign-in"
-    timeout: 30000
+- runFlow: subflows/wait-for-sign-in.yaml
 - tapOn:
     id: "mobile.login.sign-in"
 
