@@ -401,3 +401,8 @@ Triaged 2026-07-29. These replace the previous open-questions list.
 | 17.5 | App identity | **Name: HousePoints. Bundle id: `com.housepoints.app`. Scheme: `housepoints://`.** | Locked before Auth0 Native Application registration and store identifier reservation. Callback + logout URLs recorded in §12. |
 | 17.6 | Expo Updates (OTA) | **Enabled from day one** on `preview` and `production` channels. | JS-only hotfixes ship without store review. Native code changes still require an EAS Build + store submission. Rollback via `eas update --republish` to the previous runtime version. |
 
+
+### Home presentation
+
+The home screen groups season information and the softly tinted Award points action in one white, bordered card. Planned-end text is muted until overdue. Award points remains available when dashboard data is loading or unavailable. Shared tab headers use a notification bell on a pale circle beside the dark profile circle, with an outlined/read and filled/unread state, a capped unread badge, and accessible notification counts.
+

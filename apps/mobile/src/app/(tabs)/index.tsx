@@ -62,14 +62,7 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      <Pressable
-        testID="mobile.home.award-points"
-        accessibilityLabel="Award points"
-        style={styles.awardButton}
-        onPress={() => router.push("/award")}
-      >
-        <Text style={styles.awardLabel}>+ Award points</Text>
-      </Pressable>
+      {(initialLoading || failed || !summary) ? <AwardPointsButton /> : null}
 
       {initialLoading ? (
         <View style={styles.centered}>
@@ -148,13 +141,28 @@ function SeasonHeader({
         <Text style={styles.seasonMeta}>Started {formatted}</Text>
       ) : null}
       {isActive && plannedEnd ? (
-        <Text style={styles.seasonMeta}>
+        <Text style={[styles.seasonMeta, plannedEndPassed && styles.seasonWarning]}>
           {plannedEndPassed
             ? `Past planned end (${plannedEnd}); awaiting next kickoff. Awards continue.`
             : `Planned end: ${plannedEnd}. Awards continue until kickoff.`}
         </Text>
       ) : null}
+      <AwardPointsButton />
     </View>
+  );
+}
+
+function AwardPointsButton() {
+  return (
+    <Pressable
+      testID="mobile.home.award-points"
+      accessibilityLabel="Award points"
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.awardButton, pressed && styles.awardPressed]}
+      onPress={() => router.push("/award")}
+    >
+      <Text style={styles.awardLabel}>+ Award points</Text>
+    </Pressable>
   );
 }
 
@@ -209,13 +217,17 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, fontWeight: "700", color: "#0f172a" },
   org: { fontSize: 15, color: "#475569", marginTop: 4 },
   awardButton: {
-    backgroundColor: "#0f172a",
+    backgroundColor: "#eef2ff",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
     borderRadius: 12,
+    marginTop: 16,
     paddingVertical: 14,
     alignItems: "center",
   },
+  awardPressed: { backgroundColor: "#e0e7ff" },
   awardLabel: {
-    color: "#ffffff",
+    color: "#3730a3",
     fontSize: 15,
     fontWeight: "700",
   },
@@ -240,19 +252,22 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   seasonCard: {
-    backgroundColor: "#0f172a",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 16,
   },
   eyebrow: {
     fontSize: 11,
-    color: "#94a3b8",
+    color: "#64748b",
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginBottom: 4,
   },
-  seasonName: { fontSize: 22, fontWeight: "700", color: "#f8fafc" },
-  seasonMeta: { fontSize: 13, color: "#cbd5e1", marginTop: 6 },
+  seasonName: { fontSize: 22, fontWeight: "700", color: "#0f172a" },
+  seasonMeta: { fontSize: 13, color: "#64748b", lineHeight: 19, marginTop: 6 },
+  seasonWarning: { color: "#92400e" },
   dot: { width: 12, height: 12, borderRadius: 6 },
   standoutCard: {
     flexDirection: "row",
