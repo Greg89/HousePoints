@@ -1,4 +1,5 @@
-﻿import "dotenv/config";
+import { registerMemberPerformanceRoutes } from "./routes/member-performance.js";
+import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
@@ -151,6 +152,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
   await registerReleaseRoutes(app, { pushDispatcher });
   await registerDashboardRoutes(app);
+  await registerMemberPerformanceRoutes(app);
   await registerReportRoutes(app, { cursorSecret: options.reportCursorSecret ?? process.env.REPORT_CURSOR_SECRET });
   await registerTelemetryRoutes(app);
 

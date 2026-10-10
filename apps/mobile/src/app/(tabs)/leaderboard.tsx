@@ -1,5 +1,5 @@
-import type { DashboardSummary, LeaderboardEntry } from "@housepoints/contracts";
-import { useQuery } from "@tanstack/react-query";
+import { MemberDetailsLink } from "@/components/MemberDetailsLink";
+import { useHouseOverview } from "@/hooks/use-house-overview";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -12,50 +12,15 @@ import {
   View,
 } from "react-native";
 
-import { useAppAuth } from "@/context/auth-provider";
-import { useActiveOrg } from "@/context/org-provider";
-import { ApiResponseError, callApi } from "@/lib/api-client";
-import { useRefreshQueriesOnFocus } from "@/hooks/use-refresh-queries-on-focus";
-import { mobileQueryKeys } from "@/lib/mobile-query-keys";
-import { CATEGORY_READ_CAPABILITY } from "@/lib/recognition-categories";
+import { ApiResponseError } from "@/lib/api-client";
 import {
   contributorInitials,
   topContributors,
   type TopContributor,
 } from "@/lib/leaderboard";
 
-const FOCUS_QUERY_KEYS = [["dashboard"], ["houses"]] as const;
-
 export default function LeaderboardScreen() {
-  const { getAccessToken } = useAppAuth();
-  const { activeOrgSlug } = useActiveOrg();
-  useRefreshQueriesOnFocus(FOCUS_QUERY_KEYS);
-
-  const summaryQuery = useQuery({
-    queryKey: mobileQueryKeys.dashboardSummary(activeOrgSlug),
-    enabled: activeOrgSlug !== null,
-    queryFn: async ({ signal }) => {
-      const accessToken = await getAccessToken();
-      return callApi(
-        "/dashboard/summary",
-        CATEGORY_READ_CAPABILITY,
-        { accessToken, organizationSlug: activeOrgSlug, signal },
-      );
-    },
-  });
-
-  const housesQuery = useQuery({
-    queryKey: mobileQueryKeys.houseLeaderboard(activeOrgSlug),
-    enabled: activeOrgSlug !== null,
-    queryFn: async ({ signal }) => {
-      const accessToken = await getAccessToken();
-      return callApi(
-        "/houses/leaderboard",
-        {},
-        { accessToken, organizationSlug: activeOrgSlug, signal },
-      );
-    },
-  });
+  const { summaryQuery, housesQuery, summary, houses } = useHouseOverview();
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -68,13 +33,11 @@ export default function LeaderboardScreen() {
   }, [summaryQuery, housesQuery]);
 
   const contributors = useMemo<TopContributor[]>(() => {
-    const summary: DashboardSummary | undefined = summaryQuery.data;
-    const houses: LeaderboardEntry[] | undefined = housesQuery.data;
     if (!summary || !houses) {
       return [];
     }
     return topContributors(summary.houseMemberRankings, houses);
-  }, [housesQuery.data, summaryQuery.data]);
+  }, [houses, summary]);
 
   const initialLoading =
     (summaryQuery.isPending || housesQuery.isPending) &&
@@ -97,6 +60,7 @@ export default function LeaderboardScreen() {
     >
       <View style={styles.heading}>
         <Text style={styles.title}>Leaderboard</Text>
+        <Text style={styles.seasonName}>Long press a member to view performance.</Text>
         {summaryQuery.data ? (
           <Text style={styles.seasonName}>
             {summaryQuery.data.selectedSeason.name}
@@ -139,7 +103,7 @@ function ContributorRow({
   bordered: boolean;
 }) {
   return (
-    <View style={[styles.memberRow, bordered && styles.memberRowBorder]}>
+    <MemberDetailsLink memberId={contributor.memberId} name={contributor.displayName} style={[styles.memberRow, bordered && styles.memberRowBorder]}>
       <View style={styles.rank}>
         <Rank rank={contributor.rank} />
       </View>
@@ -159,7 +123,7 @@ function ContributorRow({
           {contributor.points.toLocaleString()}
         </Text>
       </View>
-    </View>
+    </MemberDetailsLink>
   );
 }
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { memberPerformanceRequestSchema, memberPerformanceSchema } from "./member-performance-schemas.js";
 import { apiErrorSchema } from "./shared.js";
 import {
   adminAuditRequestSchema,
@@ -191,6 +192,7 @@ export const apiContracts = {
   "/devices/register": defineContract(registerDeviceRequestSchema, registerDeviceResponseSchema),
   "/devices/unregister": defineContract(unregisterDeviceRequestSchema, unregisterDeviceResponseSchema),
   "/houses/leaderboard": defineContract(seasonScopedRequestSchema, leaderboardSchema),
+  "/members/performance": defineContract(memberPerformanceRequestSchema, memberPerformanceSchema),
   "/members": defineContract(actorScopeSchema, orgMembersSchema),
   "/notifications/list": defineContract(notificationListRequestSchema, pagedNotificationsSchema),
   "/notifications/mark-all-read": defineContract(actorScopeSchema, notificationMutationResponseSchema),

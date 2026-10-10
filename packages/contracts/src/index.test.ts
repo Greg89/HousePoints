@@ -106,6 +106,7 @@ const webConsumedApiEndpoints = [
   "/devices/unregister",
   "/houses/leaderboard",
   "/members",
+  "/members/performance",
   "/notifications/list",
   "/notifications/mark-all-read",
   "/notifications/mark-read",

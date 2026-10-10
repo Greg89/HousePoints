@@ -1,3 +1,4 @@
+import { MemberDetailsLink } from "@/components/MemberDetailsLink";
 import { HousesSection } from "@/components/HousesSection";
 import { useHouseOverview } from "@/hooks/use-house-overview";
 import type { DashboardSummary } from "@housepoints/contracts";
@@ -161,7 +162,8 @@ function StandoutCard({ standout }: { standout: SeasonStandout }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Season standout</Text>
-      <View style={[styles.card, styles.standoutCard]}>
+      <Text style={styles.standoutMeta}>Long press to view performance.</Text>
+      <MemberDetailsLink memberId={standout.memberId} name={standout.memberName} style={[styles.card, styles.standoutCard]}>
         <View style={[styles.dot, { backgroundColor: standout.houseColor }]} />
         <View style={styles.standoutText}>
           <Text style={styles.standoutName}>{standout.memberName}</Text>
@@ -169,7 +171,7 @@ function StandoutCard({ standout }: { standout: SeasonStandout }) {
             {standout.houseName} {"\u00b7"} {standout.points} pts
           </Text>
         </View>
-      </View>
+      </MemberDetailsLink>
     </View>
   );
 }

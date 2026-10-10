@@ -1,6 +1,8 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
 export const mobileQueryKeys = {
+  memberPerformanceRoot: (slug: string | null) => ["member-performance", slug] as const,
+  memberPerformance: (slug: string | null, memberId: string, seasonId: string | null) => ["member-performance", slug, memberId, seasonId] as const,
   dashboardSummary: (slug: string | null) => ["dashboard", "summary", slug] as const,
   houseLeaderboard: (slug: string | null) => ["houses", "leaderboard", slug] as const,
   activityRecent: (slug: string | null) => ["activity", "recent", slug] as const,
@@ -17,12 +19,14 @@ function forOrg(slug: string | null, keys: QueryKey[]): QueryKey[] {
 
 export const mobileMutationInvalidations = {
   pointsChanged: (slug: string | null) => forOrg(slug, [
+    mobileQueryKeys.memberPerformanceRoot(slug),
     mobileQueryKeys.activityRecent(slug),
     mobileQueryKeys.dashboardSummary(slug),
     mobileQueryKeys.houseLeaderboard(slug),
     mobileQueryKeys.adminContext(slug),
   ]),
   memberChanged: (slug: string | null) => forOrg(slug, [
+    mobileQueryKeys.memberPerformanceRoot(slug),
     mobileQueryKeys.members(slug),
     mobileQueryKeys.adminContext(slug),
     mobileQueryKeys.dashboardSummary(slug),
@@ -30,6 +34,7 @@ export const mobileMutationInvalidations = {
     mobileQueryKeys.activityRecent(slug),
   ]),
   profileChanged: (slug: string | null) => forOrg(slug, [
+    mobileQueryKeys.memberPerformanceRoot(slug),
     mobileQueryKeys.members(slug),
     mobileQueryKeys.adminContext(slug),
     mobileQueryKeys.dashboardSummary(slug),
@@ -49,6 +54,6 @@ export async function invalidateMobileQueries(
   queryKeys: readonly QueryKey[],
 ): Promise<void> {
   await Promise.all(queryKeys.map((queryKey) =>
-    queryClient.invalidateQueries({ queryKey, exact: true }),
+    queryClient.invalidateQueries({ queryKey, exact: !(queryKey[0] === "member-performance" && queryKey.length === 2) }),
   ));
 }

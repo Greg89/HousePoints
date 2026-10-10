@@ -17,3 +17,5 @@ export * from "./recognition-category-schemas.js";
 export * from "./score-ranking.js";
 export * from "./report-schemas.js";
 export * from "./overview-report.js";
+export * from "./member-overview.js";
+export * from "./member-performance-schemas.js";

@@ -251,6 +251,10 @@ existing house-name field in the activity contract; it is not a complete house
 history. Device QA: long press either house, check back navigation, refresh after
 an award, and switch organizations before reopening details.
 
+Member performance details are implemented for long presses on the Home season
+standout and Leaderboard contributor rows. See [member-performance.md](./member-performance.md)
+for the shared web/native API, ranking resources, data semantics, and API-first rollout.
+
 **Phase 3 — Admin subset**
 
 - Manage members: house assignment, role changes, remove member (implemented

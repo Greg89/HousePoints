@@ -3,7 +3,7 @@ import type { ReportPageRequest, ReportPageResponse, ReportScope } from "@housep
 import { prisma } from "@housepoints/db";
 import { decodeReportCursor, encodeReportCursor, ReportReadError } from "./report-cursor.js";
 
-const REPORT_ITEM_SELECT = {
+export const REPORT_ITEM_SELECT = {
   id: true, type: true, delta: true, reason: true, trait: true, createdAt: true,
   category: { select: { id: true, name: true, archivedAt: true } },
   targetHouse: { select: { id: true, name: true, color: true } },
@@ -13,7 +13,7 @@ const REPORT_ITEM_SELECT = {
 
 type ReportRow = Prisma.PointTransactionGetPayload<{ select: typeof REPORT_ITEM_SELECT }>;
 
-function scopedWhere(organizationId: string, scope: ReportScope): Prisma.PointTransactionWhereInput {
+export function scopedWhere(organizationId: string, scope: ReportScope): Prisma.PointTransactionWhereInput {
   return {
     organizationId,
     seasonId: scope.seasonId,
@@ -26,7 +26,7 @@ function scopedWhere(organizationId: string, scope: ReportScope): Prisma.PointTr
   };
 }
 
-function mapReportRow(row: ReportRow): ReportPageResponse["items"][number] {
+export function mapReportRow(row: ReportRow): ReportPageResponse["items"][number] {
   return {
     id: row.id,
     type: row.type,
@@ -48,7 +48,7 @@ function mapReportRow(row: ReportRow): ReportPageResponse["items"][number] {
   };
 }
 
-async function validateReportScope(
+export async function validateReportScope(
   tx: Prisma.TransactionClient,
   organizationId: string,
   scope: ReportScope,
@@ -100,15 +100,7 @@ export async function readReportPage(params: {
     : null;
 
   return prisma.$transaction(async (tx) => {
-    const membership = await tx.organizationMembership.findFirst({
-      where: {
-        id: membershipId, userId: actorUserId, organizationId,
-        isActive: true, archivedAt: null,
-        organization: { archivedAt: null, suspendedAt: null },
-      },
-      select: { id: true },
-    });
-    if (!membership) throw new ReportReadError(403, "REPORT_ACCESS_REVOKED", "Report access is no longer available.");
+    await validateReportAccess(tx, { organizationId, membershipId, actorUserId });
 
     const organization = await tx.organization.findUnique({
       where: { id: organizationId }, select: { reportingRevision: true },
@@ -121,13 +113,7 @@ export async function readReportPage(params: {
 
     await validateReportScope(tx, organizationId, scope);
     const where = scopedWhere(organizationId, scope);
-    const totals = await tx.pointTransaction.groupBy({
-      by: ["type"], where, _sum: { delta: true }, _count: { _all: true },
-    });
-    const award = totals.find((row) => row.type === "AWARD");
-    const deduction = totals.find((row) => row.type === "DEDUCTION");
-    const awardedPoints = Math.max(0, award?._sum.delta ?? 0);
-    const deductedPoints = Math.abs(Math.min(0, deduction?._sum.delta ?? 0));
+    const summary = await readReportTotals(tx, where);
 
     let deductionsOutsideCategory: { points: number; count: number } | null = null;
     if (scope.categoryId) {
@@ -170,15 +156,7 @@ export async function readReportPage(params: {
     return {
       scope,
       revision,
-      summary: {
-        netPoints: awardedPoints - deductedPoints,
-        awardedPoints,
-        deductedPoints,
-        transactionCount: (award?._count._all ?? 0) + (deduction?._count._all ?? 0),
-        awardCount: award?._count._all ?? 0,
-        deductionCount: deduction?._count._all ?? 0,
-        deductionsOutsideCategory,
-      },
+      summary: { ...summary, deductionsOutsideCategory },
       items: page.map(mapReportRow),
       nextCursor: rows.length > limit && last
         ? encodeReportCursor({
@@ -188,4 +166,36 @@ export async function readReportPage(params: {
         : null,
     };
   }, { isolationLevel: "RepeatableRead", maxWait: 5_000, timeout: 10_000 });
+}
+
+/** Shared totals for paginated reports and bounded performance overviews. */
+export async function readReportTotals(tx: Prisma.TransactionClient, where: Prisma.PointTransactionWhereInput) {
+  const totals = await tx.pointTransaction.groupBy({
+    by: ["type"], where, _sum: { delta: true }, _count: { _all: true },
+  });
+  const award = totals.find((row) => row.type === "AWARD");
+  const deduction = totals.find((row) => row.type === "DEDUCTION");
+  const awardedPoints = Math.max(0, award?._sum.delta ?? 0);
+  const deductedPoints = Math.abs(Math.min(0, deduction?._sum.delta ?? 0));
+  return {
+    netPoints: awardedPoints - deductedPoints, awardedPoints, deductedPoints,
+    transactionCount: (award?._count._all ?? 0) + (deduction?._count._all ?? 0),
+    awardCount: award?._count._all ?? 0, deductionCount: deduction?._count._all ?? 0,
+    deductionsOutsideCategory: null,
+  };
+}
+
+export async function validateReportAccess(tx: Prisma.TransactionClient, scope: {
+  organizationId: string; membershipId: string; actorUserId: string;
+}) {
+  const { organizationId, membershipId, actorUserId } = scope;
+  const membership = await tx.organizationMembership.findFirst({
+    where: {
+      id: membershipId, userId: actorUserId, organizationId,
+      isActive: true, archivedAt: null,
+      organization: { archivedAt: null, suspendedAt: null },
+    },
+    select: { id: true },
+  });
+  if (!membership) throw new ReportReadError(403, "REPORT_ACCESS_REVOKED", "Report access is no longer available.");
 }

@@ -58,6 +58,7 @@ export type ApiLogEvent =
   | "notifications.push_failed"
   | "dashboard.summary.loaded"
   | "reports.query.loaded"
+  | "members.performance.loaded"
   | "devices.registered"
   | "devices.unregistered"
   | "seasons.active_missing"

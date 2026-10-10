@@ -22,7 +22,9 @@ refresh remains available as an explicit fallback.
   dashboard/house leaderboard keys, including focus refresh and existing mutation
   invalidation. Navigating to details reuses fresh data instead of making a second
   independent report cache.
-- Mobile mutations use an audited, exact, organization-scoped key catalog.
+- Mobile mutations use an audited, organization-scoped key catalog. Keys are exact
+  except the member-performance family, which invalidates every member/season
+  variant within the affected organization.
 - Expo Router focus hooks handle tabs that remain mounted.
 - Web and other-device mutations cannot invalidate this device's in-memory
   cache directly; the lifecycle and focus triggers reconcile them on use.
@@ -98,14 +100,14 @@ Acceptance criteria:
 
 | Mutation group | Exact organization-scoped cache surfaces |
 | --- | --- |
-| Award or deduct points | Activity, dashboard summary, house leaderboard, admin context |
-| Assign house, change role, remove member | Members, admin context, dashboard summary, house leaderboard, activity |
-| Change display name | Members, admin context, dashboard summary, activity |
+| Award or deduct points | Activity, dashboard summary, house leaderboard, admin context, member performance |
+| Assign house, change role, remove member | Members, admin context, dashboard summary, house leaderboard, activity, member performance |
+| Change display name | Members, admin context, dashboard summary, activity, member performance |
 | React to activity | Activity |
 | Mark notifications read | Notification list and unread badge |
 
-All keys include the active organization slug, and invalidation uses exact-key
-matching. Create/join and account deletion update authentication state rather
+All keys include the active organization slug. Invalidation uses exact-key
+matching except for the organization-scoped member-performance family. Create/join and account deletion update authentication state rather
 than ordinary query caches and remain governed by Slice 4.
 
 Document the query-key ownership map and audit every mobile mutation. Prefer a
