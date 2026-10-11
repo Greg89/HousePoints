@@ -153,7 +153,12 @@ Evidence needed:
 - Provider-specific fees estimated per successful charge and per refund/
   dispute (§ 4).
 
-Measurement plan (not yet run):
+Measurement plan (representative seven-day run not yet started):
+
+An October 11 [initial Railway inspection](./staging-measurements.md) records
+project-wide usage and beta service inventory. The project totals do not
+isolate staging or establish per-organization cost; the evidence below is
+still required.
 
 1. Use the existing isolated Railway staging environment documented in
    [Scale & Ops § 5.2](../05-scale-ops.md#52-staging-environment); do not

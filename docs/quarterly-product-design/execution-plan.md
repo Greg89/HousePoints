@@ -1,6 +1,6 @@
 # Quarterly execution plan
 
-Created September 20, 2026. Status: F1–F4 and C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner; R1–R4 are implemented locally; S1 is locally verified. Remaining slices are pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
+Created September 20, 2026. Status: F1–F4 and C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner; R1–R4 are implemented locally; S1–S3 are locally verified, including PostgreSQL integration checks. Billing discovery and release gates remain pending. This is an ordered backlog, not a calendar or a commitment to finish every item in Q4.
 
 The [decision register](./README.md#decision-register) is the product authority. This plan preserves the approved scope: category add/archive only, correctable historical results, transaction-time house attribution, shared ranks, manual season rollover, member-capacity billing, and essential mobile compatibility.
 
@@ -255,6 +255,6 @@ Full pass-3 refactor, offline mutation queue, generic API tokens/webhooks, nativ
 
 ## Tracking
 
-F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4–C5: **complete per the release owner**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. S1: **implementation complete with local verification; database integration validation and deployment pending**. Remaining S/B slices: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
+F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4–C5: **complete per the release owner**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. S1–S3: **implementation complete with local verification, including PostgreSQL integration validation; deployment pending**. B1: **prepared with three acceptance items open**. B2–B3: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Recommended next checkpoint after S2 verification: **S3 — connect season recap, comparison, and correction notices**. S2 preserves the legacy immediate-start API behavior through the shared transition service.
+Next development checkpoint: **B1 — close the cost, pricing, and seller-specific Stripe evidence gaps**. Follow the [billing readiness checklist](./billing-readiness.md). Reporting staging E2E and deployment/native release evidence remain separate release gates; they do not block B1 discovery. S1–S3 do not need reimplementation.
