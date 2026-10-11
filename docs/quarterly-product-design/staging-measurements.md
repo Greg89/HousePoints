@@ -58,3 +58,13 @@ Each of the seven returned series per service has 361 samples. Actual sample bou
 Values are arithmetic sample means, not invoice integrals. Network RX/TX and CPU/memory limits were also captured. The web series includes a zero-valued bucket, including its limits; investigate lifecycle/sampling context before interpreting that as idle demand. No backup cost, invoice period, controlled member count, or representative activity rates are established by this capture. Network semantics and cost conversions remain to validate. No monthly cost or price is inferred here.
 
 This establishes repeatable beta-scoped resource capture and an ambient baseline. It does not start the controlled seven-day member-capacity experiment or configure recurring collection.
+
+## Billing-period reconciliation, October 11
+
+The project-scoped CLI usage query reports the current period as **September 29, 2026 00:08:25 UTC through October 29, 2026 00:08:25 UTC**. At this later inspection HousePoints accrued usage was **$5.883657**, comprising Seq $2.062973, API $1.696034, web $1.514618 and Postgres $0.610033. Postgres backup usage contributed $0.008585. These totals span the project, not beta alone, and changed since the earlier snapshot as usage accrued.
+
+With explicit owner permission, the workspace summary was inspected for shared-cost context. The authenticated Plans/Billing pages confirm **Pro with $20 monthly included usage**. Railway's [billing explanation](https://docs.railway.com/pricing/understanding-your-bill) describes a $20 minimum monthly commitment that covers the first $20 of usage; do not add the full plan amount to already-covered resource costs. The workspace is shared, so do not allocate its entire bill or all included usage to HousePoints without an explicit allocation assumption.
+
+The CLI's current-bill field mirrors accrued metered usage and is below the plan minimum at this inspection; it is not a final invoice total. Tax, prior-period overages, other credits and invoice timing still require reconciliation. No payment details or invoice access links were copied into the repository. The existing shared compute limits are $10 soft / $35 hard and were not changed.
+
+The [controlled workload specification](./controlled-workload.md) now defines cohort sizes, assumed activity rates, isolated marginal comparisons and the next runner work. No load has been started.
