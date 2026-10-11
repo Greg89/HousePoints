@@ -19,7 +19,7 @@ Collection status, October 11: the owner requested a new staging measurement per
 
 For each scenario, record: member count, activity rates, observation duration, retained-data size, measured resource deltas, applicable account rates, projected monthly variable cost, fixed-cost allocation and its assumed subscriber count, payment costs, support allowance, and resulting margin. Separate measured values from projections. Do not infer marginal cost from a shared invoice without a baseline and controlled comparison.
 
-The [controlled workload specification](./controlled-workload.md) defines the next implementation: dedicated synthetic cohorts and a bounded authenticated staging runner. Billing-period dates and Pro included usage are now verified in the measurement log; final invoice allocation and controlled workload evidence remain open. General Railway diagnostics stay deferred.
+The [controlled workload specification](./controlled-workload.md) now has a locally tested [API rehearsal runner](../../tools/beta-workload.md) for scoped summary reads and idempotent awards. Next are dedicated synthetic fixtures, normal application authentication, and one live read/award rehearsal; full web/report coverage and scheduling remain pending. Billing-period dates and Pro included usage are verified in the measurement log; final invoice allocation and controlled workload evidence remain open. General Railway diagnostics stay deferred.
 
 After those decisions, B2 needs isolated Stripe sandbox access and runnable lifecycle evidence. B3 then settles email delivery/content, operations, transition rehearsal and the paid-pilot go/defer decision. P1–P7 remain gated by B3. Do not begin a real-provider B2 run while B1's acceptance checklist is incomplete.
 

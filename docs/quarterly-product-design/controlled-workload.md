@@ -1,6 +1,6 @@
 # B1 controlled workload specification
 
-Prepared October 11, 2026. Status: experiment specification; runner and dedicated staging fixtures are not yet provisioned. These rates are sensitivity assumptions, not observed demand or approved pricing inputs. Keep B1's acceptance items open until measurement and owner review.
+Prepared October 11, 2026. Status: experiment specification with a locally tested [bounded API rehearsal runner](../../tools/beta-workload.md). Dedicated staging fixtures and live runner validation remain pending. These rates are sensitivity assumptions, not observed demand or approved pricing inputs. Keep B1's acceptance items open until measurement and owner review.
 
 ## Fixtures
 

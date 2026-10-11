@@ -1,0 +1,15 @@
+{
+  "apiOrigin": "https://housepointsapi-beta.up.railway.app",
+  "runId": "1621bc12-2b8c-4aec-8bbb-11afff293628",
+  "organizationSlug": "b1-synthetic-rehearsal",
+  "allowedRecipients": ["REPLACE_WITH_SYNTHETIC_RECIPIENT_ID"],
+  "intervalSeconds": 30,
+  "actions": [
+    { "kind": "summary" },
+    {
+      "kind": "award",
+      "targetUserId": "REPLACE_WITH_SYNTHETIC_RECIPIENT_ID",
+      "categoryId": "REPLACE_WITH_ACTIVE_CATEGORY_ID"
+    }
+  ]
+}
