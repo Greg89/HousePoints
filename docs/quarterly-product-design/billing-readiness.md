@@ -15,7 +15,7 @@ The [B1 decision record](./b1-decision-record.md#acceptance-checklist) remains a
 
 Use B1 §3's measurement procedure. Store only aggregate synthetic usage and redacted billing evidence in the repository; keep credentials and personal/payment data out. Record evidence dates and locations so another reviewer can reproduce the estimate.
 
-Collection status, October 11: the owner requested a new staging measurement period. Authenticated Railway inspection and the first project-wide accounting snapshot are recorded in the [measurement log](./staging-measurements.md). Beta-specific resource isolation and a complete baseline remain pending. Start the seven-day representative window from that verified baseline, not from this request date; no recurring collector is configured yet.
+Collection status, October 11: the owner requested a new staging measurement period. The [measurement log](./staging-measurements.md) now includes the project-wide accounting snapshot and the first verified beta-scoped raw resource capture for all four services. An ambient baseline is available; controlled activity/member fixtures, backup costs and invoice reconciliation remain pending. Start the seven-day representative window once those experiment inputs are established; no recurring collector is configured yet.
 
 For each scenario, record: member count, activity rates, observation duration, retained-data size, measured resource deltas, applicable account rates, projected monthly variable cost, fixed-cost allocation and its assumed subscriber count, payment costs, support allowance, and resulting margin. Separate measured values from projections. Do not infer marginal cost from a shared invoice without a baseline and controlled comparison.
 

@@ -37,3 +37,24 @@ Service totals shown in the same project view: Seq $2.02, API $1.66, web $1.49, 
 4. Compare 19→20 and 49→50 member scenarios and prepare the cost/margin sheet. Keep B1's cost and price acceptance boxes unchecked until reviewed.
 
 No recurring collector has been configured yet. This snapshot starts evidence gathering, not an assertion that B1's seven-day representative measurement requirement is met.
+
+## Repeatable capture tooling
+
+The [beta resource collector](./metrics-collection.md) provides pinned, read-only CLI capture with explicit project/environment IDs and UTC windows. Local scope/date checks pass. Device authorization and the first live capture succeeded October 11 after the initial browser callback timed out.
+
+## First verified beta capture
+
+Local raw evidence: `artifacts/railway-beta/beta-20261010T162748Z-20261011T162748Z.json` (ignored by Git). Requested window: October 10, 16:27:48 UTC through October 11, 16:27:48 UTC (12:27:48 EDT each day). Each response explicitly identifies environment `beta` and the expected service name.
+
+Each of the seven returned series per service has 361 samples. Actual sample boundaries are October 10, 16:24 UTC through October 11, 16:24 UTC, at four-minute intervals. Railway rounds sampling boundaries; these are not exactly the requested endpoints. Preserve this distinction and deduplicate timestamps when combining captures.
+
+| Beta service | Mean sampled memory (GB) | Mean sampled CPU (`CPU_USAGE`) | Mean sampled disk (GB) |
+|---|---:|---:|---:|
+| API | 0.188636 | 0.0000046104 | 0 |
+| Web | 0.146555 | 0.0000176916 | 0 |
+| Postgres | 0.057370 | 0.0000754203 | 1.132511 |
+| Seq | 0.221617 | 0.0066891215 | 1.224509 |
+
+Values are arithmetic sample means, not invoice integrals. Network RX/TX and CPU/memory limits were also captured. The web series includes a zero-valued bucket, including its limits; investigate lifecycle/sampling context before interpreting that as idle demand. No backup cost, invoice period, controlled member count, or representative activity rates are established by this capture. Network semantics and cost conversions remain to validate. No monthly cost or price is inferred here.
+
+This establishes repeatable beta-scoped resource capture and an ambient baseline. It does not start the controlled seven-day member-capacity experiment or configure recurring collection.
