@@ -9,6 +9,12 @@ Roadmap: Tier 6 in [`docs/roadmap.md`](../../docs/roadmap.md).
 
 ## Status
 
+The award recipient and recognition pickers render inside the existing iOS
+award sheet to avoid nested native-modal presentation. Android retains native
+dialogs and hardware-back dismissal. When checking an iPhone preview, open,
+close, and reopen each picker, select a recipient and trait/category, and
+confirm the form draft survives without the award screen resetting.
+
 Phase 1 is complete. The app includes Auth0 native sign-in, organization
 selection and zero-membership create/join onboarding, dashboard, a global
 top-10 contributor leaderboard across houses, recipient-focused paginated

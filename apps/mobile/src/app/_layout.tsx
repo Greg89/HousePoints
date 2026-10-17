@@ -41,7 +41,9 @@ export default function RootLayout() {
               <ToastProvider>
                 <StatusBar style="dark" />
                 <KeyboardProvider>
-                  <Stack screenOptions={{ headerShown: false }} />
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="award" options={{ presentation: "modal", headerShown: true, title: "Award points" }} />
+                  </Stack>
                 </KeyboardProvider>
               </ToastProvider>
             </OrgProvider>
