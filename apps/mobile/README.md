@@ -393,6 +393,89 @@ Confirm the group has the same runtime version and production environment
 values before republishing. Native changes cannot be rolled back through OTA;
 ship a new store build.
 
+## iOS staging through TestFlight
+
+The App Store Connect listing is **HousePoints-DS**, Apple ID `6823836742`.
+The bundle identifier remains `com.housepoints.app` and the installed app name
+remains HousePoints. The `testflight` build profile uses App Store signing,
+the EAS `preview` environment, and the `preview` OTA channel. It increments
+native build numbers remotely. Test data and notifications use staging services.
+
+From `apps/mobile` on macOS:
+
+```bash
+npx eas-cli@latest build --profile testflight --platform ios
+npx eas-cli@latest submit --profile testflight --platform ios --id <successful-build-id>
+```
+
+Use the build ID returned by the first command so the submission cannot select
+an unrelated preview or production build. Follow Apple's credential prompts
+directly in EAS; never commit signing keys or paste credentials into chat.
+After processing, resolve any export-compliance questions in App Store Connect,
+create an internal TestFlight group, add the account holder, assign the build,
+and install from TestFlight. Repeat the physical-device smoke test through this
+distribution path. This upload does not submit the app for public App Review.
+
+This staging profile is a manual testing path. The store release workflow below
+continues using production services. Build a production candidate for public
+release; do not submit the staging binary for public review. GitHub Environment
+variables still need `EXPO_ASC_APP_ID=6823836742` for automated iOS releases;
+the manual submission profile does not configure GitHub or signing credentials.
+
+## Production TestFlight for coworker testing
+
+Use the `production` build and submit profiles for a production-connected iOS
+release candidate. They use the EAS `production` environment, `production` OTA
+channel, App Store signing, remote build-number increments, and Apple ID
+`6823836742`. Keep the `testflight` profile above for staging tests.
+
+Read-only EAS production configuration verification on October 18, 2026:
+API `https://housepointsapi-production.up.railway.app`, web
+`https://app.housepoints-ds.com`, Auth0 domain
+`dev-0kihwasowi558bwz.us.auth0.com`, native client
+`9j8AYgn5MPqL0xyJh2D7rgeZKU94SdAi`. The Auth0 tenant's DEVELOPMENT label
+does not mean this build uses the staging API. Recheck these values when EAS
+environment configuration changes.
+
+From `apps/mobile` on macOS:
+
+```bash
+npx eas-cli@latest build --profile production --platform ios
+npx eas-cli@latest submit --profile production --platform ios --id <successful-production-build-id>
+```
+
+Always specify `--platform ios`: the production Android submit profile targets
+the live Play production track. Submit by exact build ID, not `--latest`, to
+avoid accidentally selecting a staging binary. Installing a production TestFlight
+build replaces the staging install because both use the same bundle identifier.
+Sign out and back in, and verify the intended production organization before
+creating data. Production-channel OTA updates also reach this TestFlight build.
+
+Before sharing with coworkers:
+
+1. Confirm the build used production API/web/Auth0 settings in EAS, install it
+   through your internal TestFlight group, and repeat the device smoke test.
+2. In App Store Connect's TestFlight Test Information, complete the beta
+   description, feedback email, reviewer contact, and production review-account
+   credentials. These beta review fields are separate from App Review Information
+   on the public iOS version page. Never commit credentials.
+3. Create an **external** group for coworkers, add only the production build,
+   write What to Test, and submit for Beta App Review if Apple requires it.
+   Wait for approval before invitations/public-link distribution. Do not enable
+   automatic build distribution for this group: staging and production builds
+   share this app record and must be assigned deliberately.
+4. Invite coworkers by email after approval. They install via TestFlight; no
+   App Store Connect role or device registration is required. Their HousePoints
+   accounts and organization memberships are separate from TestFlight access.
+5. Use a dedicated coworker-testing organization in production when practical;
+   awards and administrative actions affect real data. Retain feedback and the
+   production build number/ID with release evidence.
+
+EAS submission uploads the binary to App Store Connect. It does not submit it
+for public App Review or publish it. The approved, tested production build may
+later be selected for public App Review without rebuilding if unchanged. Never
+select the staging TestFlight build for public release.
+
 ## Store release workflow
 
 The manually dispatched `Mobile Store Release` GitHub Actions workflow queues a

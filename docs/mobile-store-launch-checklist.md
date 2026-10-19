@@ -205,12 +205,12 @@ configuration, not safe storage for secrets.
 
 ## 6. Create the Apple application
 
-- [ ] Enroll the owning organization/person in the Apple Developer Program.
+- [x] Enroll the owning organization/person in the Apple Developer Program.
 - [ ] Accept current App Store Connect agreements.
 - [ ] Complete required tax and banking setup.
-- [ ] Reserve `com.housepoints.app`.
-- [ ] Create the HousePoints App Store Connect application record.
-- [ ] Record its numeric Apple ID for `EXPO_ASC_APP_ID`.
+- [x] Reserve `com.housepoints.app`.
+- [x] Create the HousePoints-DS App Store Connect application record.
+- [x] Record its numeric Apple ID: `6823836742` (use for `EXPO_ASC_APP_ID`).
 - [ ] Create an App Store Connect API key suitable for EAS Submit.
 - [ ] Configure the key and distribution credentials in EAS.
 - [ ] Complete listing text, screenshots, privacy, compliance, age rating, and
