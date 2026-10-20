@@ -277,11 +277,12 @@ function setupAdminForms(overrides: Partial<React.ComponentProps<typeof AdminFor
     ...overrides,
   };
 
-  render(<AdminForms {...props} />);
+  const { rerender } = render(<AdminForms {...props} />);
 
   return {
     user: userEvent.setup(),
     props,
+    rerender,
   };
 }
 
@@ -857,6 +858,29 @@ describe("AdminForms", () => {
     });
     expect(props.onStartSeason).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Current season")).toHaveTextContent("Q3 2026");
+  });
+
+  it("loads the season plan once even when server action props change identity", async () => {
+    const { props, rerender } = setupAdminForms();
+    switchToManageSection("Seasons");
+    await screen.findByText("No draft yet.", { exact: false });
+    expect(props.onReadSeasonPlanContext).toHaveBeenCalledOnce();
+
+    // A revalidated RSC payload hands the client fresh server-action references.
+    const refreshedReadPlanContext = vi.fn().mockResolvedValue({
+      activeSeason,
+      plan: null,
+      activeCategoryCount: 20,
+      houseCount: 2,
+      unassignedMemberCount: 1,
+    });
+    for (let refresh = 0; refresh < 3; refresh += 1) {
+      rerender(<AdminForms {...props} onReadSeasonPlanContext={refreshedReadPlanContext} />);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(props.onReadSeasonPlanContext).toHaveBeenCalledOnce();
+    expect(refreshedReadPlanContext).not.toHaveBeenCalled();
   });
 
   it("confirms and kicks off the prepared plan with an idempotency key", async () => {
