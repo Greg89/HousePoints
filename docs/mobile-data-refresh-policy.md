@@ -213,3 +213,7 @@ Expected request-volume result: revisiting a screen inside its freshness window
 logs the focus event but no corresponding API request; revisiting after the
 window logs one request per stale active resource. No repeated requests should
 appear while the screen remains idle.
+
+### Manage workspace
+
+Manage context shares the existing organization-scoped admin-context cache (60-second stale time). Category management uses a separate manage-categories cache because it includes archived categories; admin activity uses manage-audit with cursor pages. Both include the organization slug. Management saves invalidate the affected organization's member/dashboard/performance/activity/admin caches, award categories, management categories, and management audit history. Forms remount on organization or role changes; late saves invalidate their original organization without navigating a screen that has lost focus.

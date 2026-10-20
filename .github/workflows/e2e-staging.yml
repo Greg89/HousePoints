@@ -12,6 +12,11 @@ on:
         required: true
         default: false
         type: boolean
+      reports_rehearsal:
+        description: "Run report navigation, filter, and mobile-width checks"
+        required: true
+        default: false
+        type: boolean
   schedule:
     - cron: "17 8 * * 1-5"
 
@@ -46,6 +51,7 @@ jobs:
       E2E_LIFECYCLE_ORG_SLUG: ${{ secrets.E2E_LIFECYCLE_ORG_SLUG }}
       E2E_ORG_SLUG: ${{ secrets.E2E_ORG_SLUG }}
       E2E_RECOGNITION_ROLLOUT: ${{ inputs.category_rehearsal || false }}
+      E2E_REPORTS_DRILL_THROUGH: ${{ inputs.reports_rehearsal || false }}
       E2E_RECOGNITION_CATEGORY_NAME: ${{ vars.E2E_RECOGNITION_CATEGORY_NAME }}
 
     steps:

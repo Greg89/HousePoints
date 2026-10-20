@@ -17,13 +17,25 @@
         "buildType": "apk"
       }
     },
+    "testflight": {
+      "distribution": "store",
+      "channel": "preview",
+      "environment": "preview",
+      "autoIncrement": true
+    },
     "production": {
+      "distribution": "store",
       "channel": "production",
       "environment": "production",
       "autoIncrement": true
     }
   },
   "submit": {
+    "testflight": {
+      "ios": {
+        "ascAppId": "6823836742"
+      }
+    },
     "internal": {
       "android": {
         "track": "internal",
@@ -31,6 +43,9 @@
       }
     },
     "production": {
+      "ios": {
+        "ascAppId": "6823836742"
+      },
       "android": {
         "track": "production",
         "releaseStatus": "completed"

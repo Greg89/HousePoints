@@ -8,12 +8,11 @@ import {
   type Trait,
 } from "@housepoints/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Stack, router } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import {
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AwardPickerDialog } from "@/components/AwardPickerDialog";
 import { useAppAuth } from "@/context/auth-provider";
 import { useActiveOrg } from "@/context/org-provider";
 import { useToast } from "@/context/toast-provider";
@@ -196,14 +196,11 @@ export default function AwardPointsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          presentation: "modal",
-          headerShown: true,
-          title: "Award points",
-        }}
-      />
-      <View style={styles.flex}>
+      <View
+        style={styles.flex}
+        accessibilityElementsHidden={memberPickerOpen || recognitionPickerOpen}
+        importantForAccessibility={memberPickerOpen || recognitionPickerOpen ? "no-hide-descendants" : "auto"}
+      >
         <KeyboardAwareScrollView
           style={styles.flex}
           contentContainerStyle={styles.container}
@@ -409,11 +406,9 @@ function RecognitionSelectModal({
 }) {
   const title = mode === "category" ? "Select category" : "Select trait";
   return (
-    <Modal
+    <AwardPickerDialog
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      onClose={onClose}
     >
       <View style={styles.modalRoot}>
         <Pressable
@@ -430,6 +425,7 @@ function RecognitionSelectModal({
               </Text>
             </View>
             <Pressable
+              testID={`mobile.award.${mode}-close`}
               accessibilityRole="button"
               accessibilityLabel={`Close ${mode} list`}
               onPress={onClose}
@@ -459,7 +455,7 @@ function RecognitionSelectModal({
             />}
         </View>
       </View>
-    </Modal>
+    </AwardPickerDialog>
   );
 }
 
@@ -535,11 +531,9 @@ function MemberSelectModal({
   onSelect: (id: string) => void;
 }) {
   return (
-    <Modal
+    <AwardPickerDialog
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+      onClose={onClose}
     >
       <View style={styles.modalRoot}>
         <Pressable
@@ -556,6 +550,7 @@ function MemberSelectModal({
               </Text>
             </View>
             <Pressable
+              testID="mobile.award.member-close"
               accessibilityRole="button"
               accessibilityLabel="Close recipient list"
               onPress={onClose}
@@ -598,7 +593,7 @@ function MemberSelectModal({
           />
         </View>
       </View>
-    </Modal>
+    </AwardPickerDialog>
   );
 }
 

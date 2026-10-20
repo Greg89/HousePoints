@@ -185,6 +185,13 @@ export function SeasonManagement({
   const [now, setNow] = useState<number | null>(null);
   const startFormRef = useRef<HTMLFormElement>(null);
   const kickoffIdempotencyKey = useRef<string | null>(null);
+  // Server action props get a new identity whenever an action response revalidates
+  // the RSC tree (e.g. the Auth0 proxy rolling the session cookie). Reading through a
+  // ref keeps the mount-time load from re-firing in a request loop on every refresh.
+  const readPlanContextRef = useRef(onReadPlanContext);
+  useEffect(() => {
+    readPlanContextRef.current = onReadPlanContext;
+  }, [onReadPlanContext]);
   const canManageSeasons = actorRole === "OWNER";
   const renameSeason = seasonList.find((season) => season.id === renameSeasonId) ?? currentSeason;
 
@@ -192,7 +199,7 @@ export function SeasonManagement({
     setPlanContextLoading(true);
     setPlanContextError(null);
     try {
-      const context = await onReadPlanContext();
+      const context = await readPlanContextRef.current();
       setPlanContext(context);
       setCurrentSeason(context.activeSeason);
       setSeasonList((existing) => existing.map((season) =>
@@ -205,11 +212,11 @@ export function SeasonManagement({
     } finally {
       setPlanContextLoading(false);
     }
-  }, [onReadPlanContext]);
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
-    void onReadPlanContext()
+    void readPlanContextRef.current()
       .then((context) => {
         if (!isCurrent) return;
         setPlanContext(context);
@@ -230,7 +237,7 @@ export function SeasonManagement({
     return () => {
       isCurrent = false;
     };
-  }, [onReadPlanContext]);
+  }, []);
 
   useEffect(() => {
     const updateNow = () => setNow(Date.now());

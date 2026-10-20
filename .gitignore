@@ -15,6 +15,7 @@
 **/test-results/
 **/playwright-report/
 **/node_modules/.vite/vitest/
+/artifacts/railway-beta/
 
 # next.js
 /.next/

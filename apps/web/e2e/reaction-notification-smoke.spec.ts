@@ -9,6 +9,7 @@ import { signInIfNeeded } from "./support/auth";
 import { expectDashboardReady } from "./support/dashboard";
 import { gotoE2EStart } from "./support/navigation";
 import { selectMemberFromCombobox } from "./support/member-picker";
+import { selectAwardRecognition } from "./support/award";
 
 const missingEnv = missingRequiredEnv(requiredStagingEnv);
 
@@ -47,8 +48,7 @@ async function createAward(browser: Browser, targetMember: string, note: string)
 
     await selectMemberFromCombobox(page, dialog, /recipient/i, targetMember);
     await dialog.getByRole("button", { name: "+5", exact: true }).click();
-    await dialog.getByRole("combobox").filter({ hasText: /select a trait/i }).click();
-    await page.getByRole("option", { name: /collaboration/i }).click();
+    await selectAwardRecognition(page, dialog);
     await dialog.getByPlaceholder(/describe what they did well/i).fill(note);
     await dialog.getByRole("button", { name: /^award points$/i }).click();
 

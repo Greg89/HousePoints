@@ -6,11 +6,16 @@ import { expectDashboardReady } from "./support/dashboard";
 import { gotoE2EStart } from "./support/navigation";
 
 const missingEnv = missingRequiredEnv(requiredDashboardSmokeEnv);
+const reportsEnabled = process.env.E2E_REPORTS_DRILL_THROUGH === "true";
+
+if (reportsEnabled && missingEnv.length > 0) {
+  throw new Error(`Reports rehearsal requires: ${missingEnv.join(", ")}`);
+}
 
 // Opt-in: staging must set E2E_REPORTS_DRILL_THROUGH=true and have the
 // REPORTS_DRILL_THROUGH_WEB_ENABLED flag on in the deployed web app.
 test.skip(
-  process.env.E2E_REPORTS_DRILL_THROUGH !== "true" || missingEnv.length > 0,
+  !reportsEnabled,
   `Reports drill-through E2E is opt-in and needs staging configuration: ${missingEnv.join(", ")}`,
 );
 
@@ -21,9 +26,7 @@ test.describe("Reports drill-through", () => {
     await expectDashboardReady(page);
 
     const fullReportLink = page.getByRole("link", { name: /full report/i }).first();
-    if ((await fullReportLink.count()) === 0) {
-      test.skip(true, "Dashboard is not exposing the Full report link; check REPORTS_DRILL_THROUGH_WEB_ENABLED on the deployed web app.");
-    }
+    await expect(fullReportLink, "Enable REPORTS_DRILL_THROUGH_WEB_ENABLED on the deployed web app").toBeVisible();
 
     await fullReportLink.click();
     await page.waitForURL(/\/reports(\?|$)/, { timeout: 30_000 });
@@ -43,14 +46,14 @@ test.describe("Reports drill-through", () => {
 
     const orgSlug = readOrgSlugFromUrl(page.url());
     if (!orgSlug) {
-      test.skip(true, "Could not derive the organization slug from the dashboard URL.");
+      throw new Error("Could not derive the organization slug from the dashboard URL.");
     }
 
     const response = await page.goto(`/o/${encodeURIComponent(orgSlug!)}/reports?type=AWARD`, {
       waitUntil: "domcontentloaded",
     });
     if (response && response.status() === 404) {
-      test.skip(true, "Reports route returned 404; REPORTS_DRILL_THROUGH_WEB_ENABLED is likely off on the deployed web app.");
+      throw new Error("Reports route returned 404; enable REPORTS_DRILL_THROUGH_WEB_ENABLED on the deployed web app.");
     }
 
     const toolbar = page.getByRole("group", { name: /award\/deduction filter/i });
@@ -75,14 +78,14 @@ test.describe("Reports drill-through", () => {
 
     const orgSlug = readOrgSlugFromUrl(page.url());
     if (!orgSlug) {
-      test.skip(true, "Could not derive the organization slug from the dashboard URL.");
+      throw new Error("Could not derive the organization slug from the dashboard URL.");
     }
 
     const response = await page.goto(`/o/${encodeURIComponent(orgSlug!)}/reports`, {
       waitUntil: "domcontentloaded",
     });
     if (response && response.status() === 404) {
-      test.skip(true, "Reports route returned 404; REPORTS_DRILL_THROUGH_WEB_ENABLED is likely off on the deployed web app.");
+      throw new Error("Reports route returned 404; enable REPORTS_DRILL_THROUGH_WEB_ENABLED on the deployed web app.");
     }
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
