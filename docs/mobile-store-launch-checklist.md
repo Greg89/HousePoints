@@ -101,6 +101,11 @@ from `apps/mobile`, review the dependency changes, and commit both
 Keep compatibility validation enabled; the existing TypeScript exclusion is
 intentional and is not the cause of an Expo package-version failure.
 
+The October 20, 2026 compatibility refresh updates Expo to `~57.0.30` and
+aligns constants, linking, notifications, router, splash screen, and updates
+with the recommended SDK 57 patches. Include these changes in the next native
+preview and production builds rather than an OTA-only release.
+
 ### App versions and native builds
 
 The current release candidate is `1.0.2`, including the Expo SDK 57 patch
