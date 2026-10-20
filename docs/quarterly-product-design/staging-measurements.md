@@ -68,3 +68,15 @@ With explicit owner permission, the workspace summary was inspected for shared-c
 The CLI's current-bill field mirrors accrued metered usage and is below the plan minimum at this inspection; it is not a final invoice total. Tax, prior-period overages, other credits and invoice timing still require reconciliation. No payment details or invoice access links were copied into the repository. The existing shared compute limits are $10 soft / $35 hard and were not changed.
 
 The [controlled workload specification](./controlled-workload.md) now defines cohort sizes, assumed activity rates, isolated marginal comparisons and the next runner work. No load has been started.
+
+## Rehearsal fixture setup, October 11
+
+Created **B1 Synthetic Rehearsal** (`b1-synthetic-rehearsal`) through the authenticated beta UI at `https://beta.housepoints-ds.com`. Gregory Dodson is the setup owner, assigned to B1 House A. This is a separate organization from existing beta organizations.
+
+- Four houses persist after reload: B1 House A, B1 House B, B1 House C and B1 House D.
+- Season 0 is active. The initial dashboard showed one member and zero points. No point awards or automated load were run.
+- Membership setup uses single-use invitation links valid for 72 hours. No invitation was generated or sent during this setup.
+- A separate user-controlled test identity is still needed for the recipient and dedicated workload actor. The personal setup owner is not evidence of a fully synthetic cohort.
+- Local screenshot evidence: `artifacts/railway-beta/rehearsal-houses.jpg` (ignored by Git).
+
+This verifies browser-based setup and authenticated page reads only. It does not verify the CLI workload runner, supply its access token, establish the required cohort sizes or start the seven-day controlled measurement window. Next: enroll test identities, assign houses, then verify one read and one award before scheduling any load.
