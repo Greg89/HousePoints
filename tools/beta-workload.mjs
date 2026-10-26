@@ -4,6 +4,7 @@ import { readFile, open, mkdir, access } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { deviceLogin } from './beta-device-login.mjs';
 
 const ORIGIN = 'https://housepointsapi-beta.up.railway.app';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -95,13 +96,13 @@ export async function executePlan(plan, { token, fetchImpl = globalThis.fetch, s
 
 async function main() {
   const [file, mode] = process.argv.slice(2);
-  if (!file || (mode && mode !== '--execute')) throw new Error('Usage: node tools/beta-workload.mjs plan.json [--execute]');
+  if (!file || process.argv.length > 4 || (mode && !['--execute', '--device-login'].includes(mode))) throw new Error('Usage: node tools/beta-workload.mjs plan.json [--execute|--device-login]');
   const plan = validatePlan(JSON.parse(await readFile(file, 'utf8')));
-  if (mode !== '--execute') {
+  if (!mode) {
     console.log(JSON.stringify({ mode: 'dry-run', ...plan, requests: plan.actions.map((_, i) => requestFor(plan, i)) }, null, 2));
     return;
   }
-  if (!process.env.B1_ACCESS_TOKEN) throw new Error('Missing B1_ACCESS_TOKEN.');
+  if (mode === '--execute' && !process.env.B1_ACCESS_TOKEN) throw new Error('Missing B1_ACCESS_TOKEN.');
   const journalPath = resolve('artifacts/railway-beta', `${plan.runId}.jsonl`);
   await mkdir(dirname(journalPath), { recursive: true });
   const journal = await open(journalPath, 'wx');
@@ -110,14 +111,20 @@ async function main() {
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
   const record = async event => journal.write(`${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`);
+  const stopped = async () => interrupted || await access(resolve('artifacts/railway-beta/STOP')).then(() => true, () => false);
   try {
     await record({ runId: plan.runId, planHash: createHash('sha256').update(JSON.stringify(plan)).digest('hex'), outcome: 'started' });
+    const token = mode === '--device-login' ? await deviceLogin({ stopped,
+      announce: info => console.log(JSON.stringify({ ...info, instruction: 'Sign in with the dedicated rehearsal test account. This runs the reviewed plan after approval.' })),
+    }) : process.env.B1_ACCESS_TOKEN;
     const totals = await executePlan(plan, {
-      token: process.env.B1_ACCESS_TOKEN, record,
-      stopped: async () => interrupted || await access(resolve('artifacts/railway-beta/STOP')).then(() => true, () => false),
+      token, record, stopped,
     });
     await record({ outcome: 'complete', totals });
     console.log(JSON.stringify(totals));
+  } catch (error) {
+    await record({ outcome: 'incomplete' });
+    throw error;
   } finally {
     process.off('SIGINT', stop); process.off('SIGTERM', stop);
     await journal.close();

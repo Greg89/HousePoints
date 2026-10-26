@@ -1,6 +1,6 @@
 # Billing readiness and remaining release evidence
 
-Updated October 11, 2026. Billing discovery is the next development checkpoint. S1–S3 are implemented and locally verified; release evidence is tracked separately below. This checklist does not approve prices or production charging.
+Updated October 26, 2026. The owner deferred cost collection and prioritized billing specification and implementation readiness. The active next step is the provider-independent entitlement evaluator/contracts in [billing implementation](./billing-implementation.md). S1–S3 are implemented and locally verified; release evidence is tracked separately below. This checklist does not approve prices or production charging.
 
 ## B1: collect evidence and close three decisions
 
@@ -19,7 +19,9 @@ Collection status, October 11: the owner requested a new staging measurement per
 
 For each scenario, record: member count, activity rates, observation duration, retained-data size, measured resource deltas, applicable account rates, projected monthly variable cost, fixed-cost allocation and its assumed subscriber count, payment costs, support allowance, and resulting margin. Separate measured values from projections. Do not infer marginal cost from a shared invoice without a baseline and controlled comparison.
 
-The [controlled workload specification](./controlled-workload.md) now has a locally tested [API rehearsal runner](../../tools/beta-workload.md) for scoped summary reads and idempotent awards. Next are dedicated synthetic fixtures, normal application authentication, and one live read/award rehearsal; full web/report coverage and scheduling remain pending. Billing-period dates and Pro included usage are verified in the measurement log; final invoice allocation and controlled workload evidence remain open. General Railway diagnostics stay deferred.
+The [controlled workload specification](./controlled-workload.md) now has a locally tested [API rehearsal runner](../../tools/beta-workload.md) for scoped summary reads and idempotent awards, plus an in-memory device-login wrapper. The isolated rehearsal organization has four houses and two members; its browser read/one-point award rehearsal passed October 20. A dedicated Auth0 native client is configured. The first device-login attempt expired without running workload actions; automated read/award acceptance remains pending. Representative cohorts, full web/report coverage and scheduling remain pending. Billing-period dates and Pro included usage are verified in the measurement log; final invoice allocation and controlled workload evidence remain open. General Railway diagnostics stay deferred.
+
+Current order: reconcile billing rules and review open lifecycle choices, implement the pure evaluator/contracts, then additive observation-only persistence. The device-login rehearsal, representative fixtures and controlled measurement window are deferred. The owner confirmed no Stripe seller account exists yet. Account setup is needed for provider evidence; live prices, seller terms and launch approval remain open. Earlier cost/rehearsal tooling is preserved, not scheduled or running as a result of this review.
 
 After those decisions, B2 needs isolated Stripe sandbox access and runnable lifecycle evidence. B3 then settles email delivery/content, operations, transition rehearsal and the paid-pilot go/defer decision. P1–P7 remain gated by B3. Do not begin a real-provider B2 run while B1's acceptance checklist is incomplete.
 

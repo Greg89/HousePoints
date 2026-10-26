@@ -4,6 +4,8 @@ Status: discovery design. The requested scope is planning/spiking a monthly paid
 
 ## Product boundary
 
+October 26 review: the owner deferred cost collection to focus on specification and implementation readiness. The [implementation specification](./billing-implementation.md) consolidates the later B1 decisions, resolves older prose conflicts and defines the next code slices. No live prices or production charging are approved. Later B1 decisions and that reconciliation take precedence over historical recommendations below.
+
 An organization subscription is a commercial relationship, separate from `OrganizationMembership` (a user's role/access), organization archive, and moderation suspension. Payment never grants a person organization access and never overrides a security suspension.
 
 Approved September 20, 2026: organization owners subscribe and manage their subscriptions through a self-service flow. Platform operators have visibility into what each organization is being billed and can manage subscription exceptions. Platform-assisted enrollment is not the default model.
@@ -21,7 +23,7 @@ Approved September 20, 2026: start with two platform-managed exception types.
 
 Both require a nonblank reason, authorized platform actor, durable audit history, and revocation support. Record previous/new state, timestamps, and scope. Owners and platform operators can see the effective access, reason, and expiry where applicable.
 
-For an already-paying organization, complimentary access must explicitly resolve future recurring charges; an entitlement-only override is insufficient. Show the intended provider billing change separately, reconcile it, and expose failures rather than claiming charges have stopped prematurely. Exact provider operations and treatment of existing unpaid invoices remain to be designed. Grant expiry or revocation must not silently create a new paid subscription or authorize an unexpected charge. Recovery/expiry transitions and owner notices must be specified during the spike.
+For an already-paying organization, complimentary access does not alter recurring charges. Show that charges continue and offer a separate owner-initiated cancellation workflow. Reconcile that separate operation before claiming charges have stopped. Grant expiry or revocation must not create a paid subscription or authorize a charge. This follows the later B1 exception decision.
 
 Discounts and custom negotiated pricing are outside the initial scope.
 
@@ -37,9 +39,9 @@ Direction agreed September 20, 2026: subscription tiers should account for membe
 |---|---|---|
 | Free | Up to 4 members | No subscription charge |
 | Standard | 5–20 members | Monthly organization subscription; price undecided |
-| Plus | Starts at 21 members; larger capacity bands as needed | Predictable monthly price per capacity band; exact limits/prices undecided |
+| Plus | 21–50 members initially, per later B1 approval | Predictable monthly organization price; price undecided |
 
-Approved September 20, 2026: use capacity bands with predictable monthly organization prices, rather than a Plus base price with per-member charges. Standard includes the 20th member; Plus starts at the 21st. Larger bands can be introduced or adjusted as actual organization sizes warrant. A 21–50 band was illustrative, not an approved limit. Do not promise unlimited membership or build a detailed large-organization tariff before demand justifies it.
+Use capacity bands with predictable monthly organization prices, rather than per-member charges. Standard includes the 20th member; Plus starts at the 21st and its initial maximum of 50 was approved in B1. Larger bands require a separate decision. Do not promise unlimited membership.
 
 Changing the plan catalog is distinct from changing an existing subscriber's agreed price or capacity. Version band definitions and explicitly decide notice, effective dates, and grandfathering before applying changes to existing subscriptions. Approval to adjust bands is not authorization for silent billing changes.
 
@@ -47,7 +49,7 @@ The reason for the tiers is hosting sustainability. Member count is a proposed p
 
 Decisions to resolve next:
 
-- Exact Plus capacity boundaries and prices, and the process for adding larger bands.
+- Prices and the process for adding bands above the approved initial Plus maximum of 50.
 - Counted-member definition — approved September 20, 2026: count all current organization memberships, including owners, admins, regular members, members awaiting house assignment, and temporarily suspended members. Exclude pending invitations and removed/archived memberships. Count a person once in each organization they belong to. Suspension does not release capacity; implementation must distinguish suspension from membership removal rather than blindly filtering by an active-access flag.
 - Capacity enforcement — approved September 20, 2026: invitations may be created at capacity, but joining cannot exceed the plan limit. Require an owner-approved upgrade (or a freed membership slot) before the join succeeds; never upgrade or charge automatically. Show the invitee a clear capacity message and create a deduplicated action-required notification for owners. A blocked attempt does not consume the invitation; it may be retried while otherwise valid and unexpired. Existing members retain normal access. Enforce capacity atomically across concurrent joins and all other membership-creation/restoration paths. For repeat attempts by an existing member, preserve the existing idempotent membership behavior without counting another slot.
 - Capacity notification lifecycle: keep the owner notice visible while the organization remains full; resolve/archive it when an upgrade or membership removal makes a slot available. Capacity notifications do not reserve slots or extend invitation expiry.
@@ -84,7 +86,7 @@ D8 payment-failure policy approved September 20, 2026: seven days of normal acce
 
 Cancellation scheduled for the paid-through date remains Active until that date. Reinstatement restores entitlements without rewriting seasons or points. Unknown/unreconciled provider state must not automatically grant access: retain a bounded last-known decision where policy permits, alert operators, and reconcile. Final expiry policy must be explicit before launch.
 
-In Limited mode, the recommended allowlist includes sign-in/out, billing recovery, account deletion requests, ownership transfer, member removal, archive, moderation, and audited correction of existing records. Reads remain subject to security suspension and membership. New invites, awards/deductions, categories, season kickoff, and other growth operations are blocked. Reactions and other nonessential writes are blocked initially to keep the policy explicit. Convert this recommendation into an endpoint-level capability matrix before implementation; test every write path, including mobile.
+In Limited mode, follow the approved B1 endpoint matrix: invitation creation is allowed, joining is blocked, recovery/safety actions remain allowed, and awards/deductions, categories, season kickoff, reactions and normal configuration changes are blocked. Reads remain subject to security suspension and membership. Test every write path, including mobile.
 
 Owner/admin billing notices explain organization availability; detailed invoices/payment contact information remain owner/platform-only. Billing action-required notices stay visible until the underlying condition resolves. Ordinary members see a concise organization availability message without financial details.
 

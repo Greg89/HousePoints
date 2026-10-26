@@ -80,3 +80,11 @@ Created **B1 Synthetic Rehearsal** (`b1-synthetic-rehearsal`) through the authen
 - Local screenshot evidence: `artifacts/railway-beta/rehearsal-houses.jpg` (ignored by Git).
 
 This verifies browser-based setup and authenticated page reads only. It does not verify the CLI workload runner, supply its access token, establish the required cohort sizes or start the seven-day controlled measurement window. Next: enroll test identities, assign houses, then verify one read and one award before scheduling any load.
+
+## Browser rehearsal completed, October 20
+
+The owner confirmed that a separately controlled test account joined using the single-use invitation. The beta Members view showed two members, with only the test member awaiting assignment. Assigned that member to **B1 House B** and verified the success notice and zero unassigned members.
+
+Using the existing setup-owner session, submitted exactly one **+1 Collaboration** award with note `B1 synthetic workload rehearsal`. The success notice and Activity feed confirmed the recipient's B1 House B, Season 0, category, note and +1 amount. No other organization was changed. Account email and invitation token are deliberately omitted from this record.
+
+Local screenshot evidence: `artifacts/railway-beta/rehearsal-award.jpg` (ignored by Git). This completes the small authenticated **browser** read/award rehearsal. It does not prove automated-runner authentication, retries or workload scheduling. The organization still has only two members; representative cohorts, retained-data fixtures and the controlled seven-day measurement window remain pending. Next: establish normal application authentication for the bounded runner using a dedicated test actor, then run and verify its minimal plan before expanding the workload.

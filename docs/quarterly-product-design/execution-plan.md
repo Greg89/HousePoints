@@ -15,6 +15,8 @@ The [decision register](./README.md#decision-register) is the product authority.
 
 ## Order and checkpoints
 
+October 26 reprioritization: cost collection is deferred at the owner's request. Follow [billing implementation](./billing-implementation.md) for spec reconciliation and provider-independent evaluator/contracts, then observation-only persistence. These units may proceed while commercial B1 checkboxes remain open. This supersedes the old cost-first next-step ordering, not the production billing or provider-evidence gates. P1–P7 remain the rollout outline; foundational design/local work is distinct from enabling paid enforcement.
+
 | Checkpoint | Required slices | Reviewable result |
 |---|---|---|
 | Trustworthy scoring | F1–F4 | Safe retries, concurrent mutations, corrections, and notification targeting |
@@ -265,4 +267,4 @@ Before implementing, decide the minimum useful report, environment safeguards, e
 
 F1–F4 and C1–C3: **implementation complete with local verification; deployment pending**. C4–C5: **complete per the release owner**. R1–R2: **implementation complete with local verification; deployment pending**. R3–R4: **implementation complete locally behind `REPORTS_DRILL_THROUGH_WEB_ENABLED`; targeted E2E pending**. S1–S3: **implementation complete with local verification, including PostgreSQL integration validation; deployment pending**. B1: **prepared with three acceptance items open**. B2–B3: **todo**. P1–P7: **gated pending B3**. Update this file as slices complete with verification and release evidence; do not mark a slice done merely because code is merged while a required compatibility or rollout check remains open.
 
-Next development checkpoint: **B1 — close the cost, pricing, and seller-specific Stripe evidence gaps**. Follow the [billing readiness checklist](./billing-readiness.md). Reporting staging E2E and deployment/native release evidence remain separate release gates; they do not block B1 discovery. S1–S3 do not need reimplementation.
+Next development checkpoint: **billing specification review and pure entitlement evaluator/contracts**, followed by observation-only persistence. Follow the [implementation specification](./billing-implementation.md) and [billing readiness checklist](./billing-readiness.md). Cost collection is deferred; prices, seller terms and provider evidence remain open launch/integration gates. Reporting staging E2E and deployment/native release evidence remain separate release gates. S1–S3 do not need reimplementation.

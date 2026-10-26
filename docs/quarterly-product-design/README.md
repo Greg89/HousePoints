@@ -2,6 +2,8 @@
 
 Created September 20, 2026. Target planning horizon: Q4 2026.
 
+Billing update, October 26: cost collection is deferred by the owner. The [billing implementation specification](./billing-implementation.md) is the current technical blueprint. Later B1 approvals supersede the historical D7/D8 wording below: initial Plus capacity is 50 and Limited allows invitation creation while blocking joins. Complimentary grants never mutate recurring charges. Prices and live-launch approval remain open; provider-independent implementation can proceed.
+
 Status: main product decisions reviewed and work sliced. Decisions explicitly marked approved are settled; remaining implementation/commercial details are identified in the individual designs. See the [execution plan](./execution-plan.md) for ordered slices, dependencies, verification, and release gates. F1–F4 are implemented and locally verified; C1–C3 are implemented and locally verified; C4–C5 are complete per the release owner. R1–R4 are implemented locally; S1–S3 are implemented and locally verified, including PostgreSQL integration validation; deployment remains pending. Category rollout uses environment-wide flags, beta before production, without organization-ID allowlists.
 
 ## Product direction

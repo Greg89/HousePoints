@@ -16,6 +16,8 @@ existing larger organizations.
 
 ## How to read this record
 
+October 26 scope update: the owner deferred cost work and prioritized a correct billing specification and implementation plan. Cost evidence is not an active prerequisite for specification or provider-independent implementation. It remains unaccepted commercial evidence. See [billing implementation](./billing-implementation.md) for the consolidated rules, concrete slices and remaining proposed policy choices. Preserve open prices/seller terms as live-launch gates; do not restart staging cost collection without reprioritization.
+
 Each open item is scored:
 
 - **Direction** — the already-approved policy, quoted or paraphrased from the
